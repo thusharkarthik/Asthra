@@ -5,10 +5,12 @@ from app.models.permission import Permission
 from app.models.user import User
 from app.repositories.permission_repository import PermissionRepository
 from app.schemas.role import PermissionCreate, PermissionUpdate
+from app.services.activity_service import ActivityService
 
 
 class PermissionService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.permission_repository = PermissionRepository(db)
 
     def create(self, permission_create: PermissionCreate, current_user: User) -> Permission:
@@ -19,11 +21,19 @@ class PermissionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A permission with this code already exists.",
             )
-        return self.permission_repository.create(
+        permission = self.permission_repository.create(
             code=code,
             name=permission_create.name.strip(),
             description=permission_create.description,
         )
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            entity_type="permission",
+            entity_id=str(permission.id),
+            action="permission.created",
+            description=f"Permission '{permission.code}' was created.",
+        )
+        return permission
 
     def list(self, current_user: User) -> list[Permission]:
         self._ensure_active_user(current_user)

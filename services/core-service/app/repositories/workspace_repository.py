@@ -83,6 +83,7 @@ class WorkspaceRepository:
                 action="workspace.created",
                 entity_type="workspace",
                 entity_id=str(workspace.id),
+                description=f"Workspace '{workspace.name}' was created.",
                 summary=f"Workspace '{workspace.name}' was created.",
             )
         )
