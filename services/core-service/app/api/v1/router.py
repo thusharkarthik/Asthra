@@ -10,6 +10,7 @@ from app.api.v1 import (
     permissions,
     projects,
     roles,
+    system,
     teams,
     users,
     workspaces,
@@ -34,3 +35,4 @@ api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
 api_router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
 api_router.include_router(activity.router, prefix="/activity", tags=["activity"])
+api_router.include_router(system.router, prefix="/system", tags=["system"])
