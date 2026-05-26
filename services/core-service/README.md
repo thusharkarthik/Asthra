@@ -648,6 +648,90 @@ Authorization: Bearer <jwt>
 
 The reusable activity logging service is available as `ActivityService.log_activity(...)`.
 
+## Invitation And Membership Endpoints
+
+All invitation and membership endpoints require a JWT bearer token. No email is sent yet; invitations return a token that can be supplied to the accept endpoint.
+
+### Create Invitation
+
+```http
+POST /api/v1/invitations
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "email": "new.user@example.com",
+  "organization_id": 1,
+  "workspace_id": 1,
+  "role_id": 1
+}
+```
+
+`workspace_id` and `role_id` are optional. Duplicate pending invitations for the same email and organization/workspace return `409 Conflict`.
+
+### List Invitations
+
+```http
+GET /api/v1/invitations
+Authorization: Bearer <jwt>
+```
+
+Returns invitations for organizations the current user belongs to. Superusers can view all invitations.
+
+### Get Invitation
+
+```http
+GET /api/v1/invitations/{invitation_id}
+Authorization: Bearer <jwt>
+```
+
+### Accept Invitation
+
+```http
+POST /api/v1/invitations/{invitation_id}/accept
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "token": "<invitation-token>"
+}
+```
+
+Only pending, non-expired invitations can be accepted. The authenticated user's email must match the invitation email.
+
+### Revoke Invitation
+
+```http
+POST /api/v1/invitations/{invitation_id}/revoke
+Authorization: Bearer <jwt>
+```
+
+Only pending invitations can be revoked.
+
+### Remove Organization Member
+
+```http
+DELETE /api/v1/organizations/{organization_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes a user from the organization membership table and records an activity log entry.
+
+### Remove Workspace Member
+
+```http
+DELETE /api/v1/workspaces/{workspace_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes a user from the workspace membership table and records an activity log entry.
+
 ## Structure
 
 ```text
