@@ -11,6 +11,7 @@ from app.schemas.workspace import (
     WorkspaceRead,
     WorkspaceUpdate,
 )
+from app.services.membership_service import MembershipService
 from app.services.workspace_service import WorkspaceService
 
 router = APIRouter()
@@ -69,3 +70,14 @@ def list_workspace_members(
     current_user: User = Depends(get_current_user),
 ) -> list[WorkspaceMember]:
     return WorkspaceService(db).list_members(workspace_id, current_user)
+
+
+@router.delete("/{workspace_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_workspace_member(
+    workspace_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    MembershipService(db).remove_workspace_member(workspace_id, user_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

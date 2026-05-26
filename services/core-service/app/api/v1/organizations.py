@@ -11,6 +11,7 @@ from app.schemas.organization import (
     OrganizationRead,
     OrganizationUpdate,
 )
+from app.services.membership_service import MembershipService
 from app.services.organization_service import OrganizationService
 
 router = APIRouter()
@@ -73,3 +74,14 @@ def list_organization_members(
     current_user: User = Depends(get_current_user),
 ) -> list[OrganizationMember]:
     return OrganizationService(db).list_members(organization_id, current_user)
+
+
+@router.delete("/{organization_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_organization_member(
+    organization_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    MembershipService(db).remove_organization_member(organization_id, user_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
