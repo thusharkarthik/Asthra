@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.team_repository import TeamRepository
 from app.schemas.team import TeamCreate, TeamMemberCreate, TeamUpdate
+from app.services.notification_service import NotificationService
 
 
 class TeamService:
@@ -79,13 +80,24 @@ class TeamService:
                 detail="User is already a team member.",
             )
 
-        return self.team_repository.add_member(
+        member = self.team_repository.add_member(
             team=team,
             user_id=target_user.id,
             role_id=member_create.role_id,
             member_role=member_create.member_role,
             actor_user_id=current_user.id,
         )
+        NotificationService(self.team_repository.db).create_notification(
+            user_id=target_user.id,
+            type="team.member_added",
+            title="Added to team",
+            message=f"You were added to team '{team.name}'.",
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+        )
+        return member
 
     def list_members(self, team_id: int, current_user: User) -> list[TeamMember]:
         team = self.get(team_id, current_user)
