@@ -7,7 +7,11 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 
-password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+password_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=settings.bcrypt_rounds,
+)
 
 
 def hash_password(password: str) -> str:
