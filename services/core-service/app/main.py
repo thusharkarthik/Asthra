@@ -1,18 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.exceptions import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
+from app.core.logging import configure_logging
+from app.core.responses import error_response, success_response
+from app.db.session import SessionLocal
+from app.middleware.request_id import RequestIdMiddleware
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(
-        title=settings.service_name,
-        version="0.1.0",
+        title=settings.app_name,
+        version=settings.app_version,
         docs_url="/docs",
         redoc_url="/redoc",
     )
 
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -21,9 +35,37 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
+
     @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        return {"status": "ok", "service": settings.service_name}
+    def health_check(request: Request) -> dict:
+        return success_response(
+            data={"status": "ok", "service": settings.app_name},
+            request_id=getattr(request.state, "request_id", None),
+        )
+
+    @app.get("/ready", tags=["health"])
+    def readiness_check(request: Request):
+        request_id = getattr(request.state, "request_id", None)
+        try:
+            with SessionLocal() as db:
+                db.execute(text("SELECT 1"))
+        except Exception:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=error_response(
+                    message="Service is not ready.",
+                    code="service_unready",
+                    details={"database": "unreachable"},
+                    request_id=request_id,
+                ),
+            )
+        return success_response(
+            data={"status": "ready", "database": "ok"},
+            request_id=request_id,
+        )
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app
