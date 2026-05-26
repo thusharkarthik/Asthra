@@ -1,21 +1,31 @@
-from app.schemas.work_item import WorkItemCreate
+from fastapi import HTTPException
+
+from app.schemas.work_item import WorkItemUpdate
 from app.services.work_item_service import WorkItemService
+from tests.conftest import create_work_item
 
 
-def test_create_work_item(db):
-    work_item = WorkItemService(db).create(
-        WorkItemCreate(
-            project_id=1,
-            title="Design Flow work items",
-            type_id=1,
-            status_id=1,
-            priority_id=1,
-            assignee_id=2,
-            reporter_id=1,
-        ),
+def test_work_item_crud(db):
+    work_item = create_work_item(db, title="Implement Flow CRUD")
+    service = WorkItemService(db)
+
+    work_items = service.list(project_id=1)
+    assert len(work_items) == 1
+
+    fetched_work_item = service.get(work_item.id)
+    assert fetched_work_item.title == "Implement Flow CRUD"
+
+    updated_work_item = service.update(
+        work_item.id,
+        WorkItemUpdate(title="Implement Flow CRUD tests"),
     )
+    assert updated_work_item.title == "Implement Flow CRUD tests"
 
-    assert work_item.id is not None
-    assert work_item.project_id == 1
-    assert work_item.title == "Design Flow work items"
-    assert work_item.assignee_id == 2
+    service.delete(work_item.id)
+
+    try:
+        service.get(work_item.id)
+    except HTTPException as exc:
+        assert exc.status_code == 404
+    else:
+        raise AssertionError("Expected deleted work item to return 404.")

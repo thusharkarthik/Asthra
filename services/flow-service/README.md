@@ -13,6 +13,7 @@ Initial Flow entities:
 - Work item comments
 - Work item labels
 - Work item attachment metadata
+- Flow activity events for core MVP changes
 - Boards and board columns
 
 Flow references Asthra Core records by ID for users, workspaces, and projects. Cross-service validation and synchronization will be added later through service contracts, not direct database foreign keys.
@@ -36,6 +37,34 @@ curl http://localhost:8000/ready
 ```
 
 API routes are mounted under `/api/v1`.
+
+Seed default Flow lookup data after the database tables exist:
+
+```bash
+python scripts/seed_flow_defaults.py
+```
+
+The seed script is idempotent and creates or updates:
+
+- types: `task`, `bug`, `story`, `epic`
+- statuses: `todo`, `in_progress`, `review`, `done`
+- priorities: `low`, `medium`, `high`, `critical`
+
+## Docker
+
+From the repository root:
+
+```bash
+docker compose up --build flow-service
+```
+
+The Docker Compose service exposes Flow on:
+
+```text
+http://localhost:8001
+```
+
+The container uses SQLite at `/app/data/asthra_flow.db`, backed by the `flow_service_data` Docker volume.
 
 ## Environment Variables
 
@@ -72,7 +101,7 @@ Routers are registered for these areas:
 - `/api/v1/labels`
 - `/api/v1/work-items/{work_item_id}/comments`
 - `/api/v1/work-items/{work_item_id}/labels`
-- `/api/v1/attachments`
+- `/api/v1/work-items/{work_item_id}/attachments`
 
 ## Work Item Endpoints
 
@@ -139,7 +168,7 @@ DELETE /api/v1/work-items/{work_item_id}
 
 Delete performs a soft delete by setting `is_active` to `false`.
 
-Board, comment, and label endpoints are implemented at a basic MVP level. Attachments, authentication integration, and persistence migrations will be added in later controlled tasks.
+Board, comment, label, attachment metadata, and Flow activity event handling are implemented at a basic MVP level. Authentication integration and persistence migrations will be added in later controlled tasks.
 
 ## Board Endpoints
 
@@ -267,6 +296,69 @@ Request:
 
 The label must belong to the same project as the work item.
 
+## Attachment Endpoints
+
+Attachments store metadata only. Flow does not upload files, store file bytes, or integrate with external storage yet.
+
+### Add Attachment Metadata
+
+```http
+POST /api/v1/work-items/{work_item_id}/attachments
+```
+
+Request:
+
+```json
+{
+  "file_name": "spec.pdf",
+  "file_url": "https://files.example/spec.pdf",
+  "file_type": "application/pdf",
+  "file_size": 2048,
+  "uploaded_by_id": 1
+}
+```
+
+### List Work Item Attachments
+
+```http
+GET /api/v1/work-items/{work_item_id}/attachments
+```
+
+### Delete Attachment Metadata
+
+```http
+DELETE /api/v1/work-items/{work_item_id}/attachments/{attachment_id}
+```
+
+Delete performs a soft delete by setting `is_active` to `false`.
+
+## Flow Activity Events
+
+Flow writes simple internal activity events to `flow_activities` for:
+
+- work item created
+- work item updated
+- comment added
+- label added
+- attachment added
+
+These events are local to Flow and are not a cross-service audit log yet.
+
+## Response And Error Format
+
+Health and readiness endpoints use a standard response envelope:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {},
+  "error": null
+}
+```
+
+HTTP, validation, and unexpected errors use the same envelope with `success: false`.
+
 ## Tests
 
 Run the current Flow service tests from the service directory:
@@ -276,4 +368,11 @@ cd services/flow-service
 pytest tests
 ```
 
-The tests use an in-memory SQLite database and cover basic creation for work items, boards, comments, and labels.
+The tests use a disposable SQLite database at `tests/test_asthra_flow.db`. They cover:
+
+- health and readiness endpoints
+- create/list/get/update/delete work item
+- create board and board column
+- add comment
+- add label
+- add attachment metadata
