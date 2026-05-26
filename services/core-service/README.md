@@ -732,6 +732,89 @@ Authorization: Bearer <jwt>
 
 Removes a user from the workspace membership table and records an activity log entry.
 
+## User Profile And Settings Endpoints
+
+All profile and settings endpoints require a JWT bearer token.
+
+### Current User Profile
+
+```http
+GET /api/v1/users/me
+Authorization: Bearer <jwt>
+```
+
+Returns the authenticated user's profile.
+
+### Update Current User Profile
+
+```http
+PATCH /api/v1/users/me
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "full_name": "Example User",
+  "avatar_url": "https://example.com/avatar.png",
+  "job_title": "Engineering Manager",
+  "timezone": "UTC",
+  "locale": "en-US"
+}
+```
+
+Users can update only their own profile. Updates record an activity log entry.
+
+### Get User Profile
+
+```http
+GET /api/v1/users/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Users can view their own profile, superusers can view all profiles, and other profile visibility requires shared organization or workspace membership.
+
+### Organization Settings
+
+```http
+GET /api/v1/organizations/{organization_id}/settings
+PATCH /api/v1/organizations/{organization_id}/settings
+Authorization: Bearer <jwt>
+```
+
+Supported settings:
+
+```json
+{
+  "default_timezone": "UTC",
+  "allow_public_invites": false,
+  "default_member_role": "member"
+}
+```
+
+Settings updates require organization access and record an activity log entry.
+
+### Workspace Settings
+
+```http
+GET /api/v1/workspaces/{workspace_id}/settings
+PATCH /api/v1/workspaces/{workspace_id}/settings
+Authorization: Bearer <jwt>
+```
+
+Supported settings:
+
+```json
+{
+  "default_project_visibility": "private",
+  "default_timezone": "UTC",
+  "enable_activity_feed": true
+}
+```
+
+Settings updates require workspace access and record an activity log entry.
+
 ## Structure
 
 ```text

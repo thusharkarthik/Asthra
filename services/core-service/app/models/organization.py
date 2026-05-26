@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -14,6 +14,7 @@ class Organization(TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    settings: Mapped[dict | None] = mapped_column(JSON)
 
     created_by = relationship("User")
     members = relationship("OrganizationMember", back_populates="organization")

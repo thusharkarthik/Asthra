@@ -11,8 +11,10 @@ from app.schemas.organization import (
     OrganizationRead,
     OrganizationUpdate,
 )
+from app.schemas.settings import OrganizationSettingsRead, OrganizationSettingsUpdate
 from app.services.membership_service import MembershipService
 from app.services.organization_service import OrganizationService
+from app.services.settings_service import SettingsService
 
 router = APIRouter()
 
@@ -74,6 +76,29 @@ def list_organization_members(
     current_user: User = Depends(get_current_user),
 ) -> list[OrganizationMember]:
     return OrganizationService(db).list_members(organization_id, current_user)
+
+
+@router.get("/{organization_id}/settings", response_model=OrganizationSettingsRead)
+def get_organization_settings(
+    organization_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationSettingsRead:
+    return SettingsService(db).get_organization_settings(organization_id, current_user)
+
+
+@router.patch("/{organization_id}/settings", response_model=OrganizationSettingsRead)
+def update_organization_settings(
+    organization_id: int,
+    settings_update: OrganizationSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationSettingsRead:
+    return SettingsService(db).update_organization_settings(
+        organization_id,
+        settings_update,
+        current_user,
+    )
 
 
 @router.delete("/{organization_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
