@@ -13,3 +13,4 @@ class UserRead(TimestampedRead):
     email: EmailStr
     full_name: str | None = None
     is_active: bool
+    is_superuser: bool

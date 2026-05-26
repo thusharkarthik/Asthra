@@ -15,11 +15,11 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
 
-    jwt_secret: str = Field(default="change-me", alias="JWT_SECRET")
-    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    jwt_access_token_expire_minutes: int = Field(
+    secret_key: str = Field(default="change-me", alias="SECRET_KEY")
+    algorithm: str = Field(default="HS256", alias="ALGORITHM")
+    access_token_expire_minutes: int = Field(
         default=60,
-        alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+        alias="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

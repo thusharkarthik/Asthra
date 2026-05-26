@@ -1,8 +1,4 @@
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    pass
+from app.db.base_class import Base
 
 
 from app.models.activity_log import ActivityLog  # noqa: E402,F401
