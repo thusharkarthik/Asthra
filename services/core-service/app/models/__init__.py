@@ -1,7 +1,7 @@
 from app.models.activity_log import ActivityLog
 from app.models.organization import Organization, OrganizationMember
 from app.models.permission import Permission
-from app.models.project import Project
+from app.models.project import Project, ProjectTeam
 from app.models.role import Role
 from app.models.team import Team, TeamMember
 from app.models.user import User
@@ -13,6 +13,7 @@ __all__ = [
     "OrganizationMember",
     "Permission",
     "Project",
+    "ProjectTeam",
     "Role",
     "Team",
     "TeamMember",
