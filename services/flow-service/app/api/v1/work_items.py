@@ -1,0 +1,73 @@
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.work_item import WorkItem
+from app.schemas.work_item import WorkItemCreate, WorkItemRead, WorkItemUpdate
+from app.services.work_item_service import WorkItemService
+
+router = APIRouter()
+
+
+def auth_placeholder() -> None:
+    # TODO: Replace with Core Service JWT validation and membership checks.
+    return None
+
+
+@router.post("", response_model=WorkItemRead, status_code=status.HTTP_201_CREATED)
+def create_work_item(
+    work_item_create: WorkItemCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> WorkItem:
+    return WorkItemService(db).create(work_item_create)
+
+
+@router.get("", response_model=list[WorkItemRead])
+def list_work_items(
+    status_id: int | None = None,
+    assignee_id: int | None = None,
+    project_id: int | None = None,
+    priority_id: int | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> list[WorkItem]:
+    return WorkItemService(db).list(
+        status_id=status_id,
+        assignee_id=assignee_id,
+        project_id=project_id,
+        priority_id=priority_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/{work_item_id}", response_model=WorkItemRead)
+def get_work_item(
+    work_item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> WorkItem:
+    return WorkItemService(db).get(work_item_id)
+
+
+@router.patch("/{work_item_id}", response_model=WorkItemRead)
+def update_work_item(
+    work_item_id: int,
+    work_item_update: WorkItemUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> WorkItem:
+    return WorkItemService(db).update(work_item_id, work_item_update)
+
+
+@router.delete("/{work_item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_work_item(
+    work_item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> Response:
+    WorkItemService(db).delete(work_item_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
