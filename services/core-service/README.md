@@ -347,6 +347,111 @@ Authorization: Bearer <jwt>
 
 Removes the user from the team and records a basic activity log entry.
 
+## Project Endpoints
+
+All project endpoints require a JWT bearer token. Project access is scoped to the parent workspace: users must have access to the workspace unless they are superusers.
+
+### Create Project
+
+```http
+POST /api/v1/projects
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "workspace_id": 1,
+  "name": "Core API",
+  "description": "Foundation API work",
+  "status": "active",
+  "owner_id": 2
+}
+```
+
+`owner_id` is optional. If provided, the owner must be an active member of the project workspace. Project creation records a basic activity log entry.
+
+### List Projects
+
+```http
+GET /api/v1/projects
+Authorization: Bearer <jwt>
+```
+
+Returns active projects visible through the current user's workspace memberships.
+
+### Get Project
+
+```http
+GET /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single project if the user has access to the parent workspace.
+
+### Update Project
+
+```http
+PATCH /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Core API MVP",
+  "description": "Updated project description",
+  "status": "active",
+  "owner_id": 2
+}
+```
+
+### Delete Project
+
+```http
+DELETE /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### Link Team To Project
+
+```http
+POST /api/v1/projects/{project_id}/teams
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "team_id": 1
+}
+```
+
+The team must belong to the same workspace as the project. Duplicate links return `409 Conflict`.
+
+### List Project Teams
+
+```http
+GET /api/v1/projects/{project_id}/teams
+Authorization: Bearer <jwt>
+```
+
+Returns team links for the project.
+
+### Unlink Team From Project
+
+```http
+DELETE /api/v1/projects/{project_id}/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Removes the team link and records a basic activity log entry.
+
 ## Structure
 
 ```text
