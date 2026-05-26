@@ -1,10 +1,17 @@
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.exceptions import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
+from app.core.responses import error_response, success_response
 from app.db.session import SessionLocal
 
 
@@ -24,9 +31,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
+
     @app.get("/health", tags=["health"])
     def health_check() -> dict:
-        return {"status": "ok", "service": settings.app_name}
+        return success_response(data={"status": "ok", "service": settings.app_name})
 
     @app.get("/ready", tags=["health"])
     def readiness_check():
@@ -36,9 +47,13 @@ def create_app() -> FastAPI:
         except Exception:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"status": "unready", "database": "unreachable"},
+                content=error_response(
+                    message="Service is not ready.",
+                    code="service_unready",
+                    details={"database": "unreachable"},
+                ),
             )
-        return {"status": "ready", "database": "ok"}
+        return success_response(data={"status": "ready", "database": "ok"})
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app

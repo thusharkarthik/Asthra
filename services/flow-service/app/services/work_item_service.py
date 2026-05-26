@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.services.activity_service import ActivityService
 
 
 class WorkItemService:
     def __init__(self, db: Session) -> None:
         self.work_item_repository = WorkItemRepository(db)
+        self.activity_service = ActivityService(db)
 
     def create(self, work_item_create: WorkItemCreate) -> WorkItem:
         self._validate_required_ids(work_item_create.project_id, work_item_create.reporter_id)
@@ -22,7 +24,17 @@ class WorkItemService:
             board_id=work_item_create.board_id,
             board_column_id=work_item_create.board_column_id,
         )
-        return self.work_item_repository.create(work_item_create)
+        work_item = self.work_item_repository.create(work_item_create)
+        self.activity_service.log_activity(
+            action="work_item.created",
+            entity_type="work_item",
+            entity_id=str(work_item.id),
+            actor_user_id=work_item.reporter_id,
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            description=f"Work item '{work_item.title}' was created.",
+        )
+        return work_item
 
     def list(
         self,
@@ -64,7 +76,18 @@ class WorkItemService:
             board_id=work_item_update.board_id,
             board_column_id=work_item_update.board_column_id,
         )
-        return self.work_item_repository.update(work_item, work_item_update)
+        updated_work_item = self.work_item_repository.update(work_item, work_item_update)
+        self.activity_service.log_activity(
+            action="work_item.updated",
+            entity_type="work_item",
+            entity_id=str(updated_work_item.id),
+            actor_user_id=updated_work_item.reporter_id,
+            project_id=updated_work_item.project_id,
+            work_item_id=updated_work_item.id,
+            description=f"Work item '{updated_work_item.title}' was updated.",
+            metadata={"updated_fields": list(work_item_update.model_dump(exclude_unset=True))},
+        )
+        return updated_work_item
 
     def delete(self, work_item_id: int) -> None:
         work_item = self.get(work_item_id)

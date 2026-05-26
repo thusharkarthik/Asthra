@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 from app.models.work_item_label import WorkItemLabel
 from app.repositories.label_repository import LabelRepository
 from app.schemas.label import WorkItemLabelAssign, WorkItemLabelCreate
+from app.services.activity_service import ActivityService
 
 
 class LabelService:
     def __init__(self, db: Session) -> None:
         self.label_repository = LabelRepository(db)
+        self.activity_service = ActivityService(db)
 
     def create(self, label_create: WorkItemLabelCreate) -> WorkItemLabel:
         if self.label_repository.get_by_project_and_name(label_create.project_id, label_create.name):
@@ -49,4 +51,13 @@ class LabelService:
                 detail="Label is already attached to this work item.",
             )
 
-        return self.label_repository.add_label_to_work_item(work_item, label)
+        attached_label = self.label_repository.add_label_to_work_item(work_item, label)
+        self.activity_service.log_activity(
+            action="label.added",
+            entity_type="label",
+            entity_id=str(attached_label.id),
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            description=f"Label '{attached_label.name}' added to work item '{work_item.title}'.",
+        )
+        return attached_label
