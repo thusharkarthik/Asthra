@@ -578,6 +578,76 @@ python scripts/seed_default_roles.py
 
 This creates `owner`, `admin`, `manager`, `member`, and `viewer` if they do not already exist.
 
+## Activity And Audit Endpoints
+
+All activity endpoints require a JWT bearer token. Access is intentionally simple: users can view activity for organizations, workspaces, and projects they belong to; superusers can view all activity.
+
+### List Activity
+
+```http
+GET /api/v1/activity
+Authorization: Bearer <jwt>
+```
+
+Optional query parameters:
+
+```text
+entity_type
+action
+organization_id
+workspace_id
+project_id
+actor_user_id
+limit
+offset
+```
+
+Example:
+
+```http
+GET /api/v1/activity?entity_type=project&action=project.created&limit=25
+Authorization: Bearer <jwt>
+```
+
+### Get Activity
+
+```http
+GET /api/v1/activity/{activity_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By User
+
+```http
+GET /api/v1/activity/users/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Non-superusers can only view their own actor activity through this endpoint.
+
+### Activity By Organization
+
+```http
+GET /api/v1/activity/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By Workspace
+
+```http
+GET /api/v1/activity/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By Project
+
+```http
+GET /api/v1/activity/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+The reusable activity logging service is available as `ActivityService.log_activity(...)`.
+
 ## Structure
 
 ```text

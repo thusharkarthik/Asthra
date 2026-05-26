@@ -10,6 +10,7 @@ from app.models.user import User, UserRole
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
 from app.schemas.role import RoleCreate, RolePermissionCreate, RoleUpdate, UserRoleCreate
+from app.services.activity_service import ActivityService
 
 
 VALID_ROLE_SCOPES = {"global", "organization", "workspace", "project"}
@@ -17,6 +18,7 @@ VALID_ROLE_SCOPES = {"global", "organization", "workspace", "project"}
 
 class RoleService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.role_repository = RoleRepository(db)
         self.permission_repository = PermissionRepository(db)
 
@@ -29,13 +31,22 @@ class RoleService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A role with this name already exists in this scope.",
             )
-        return self.role_repository.create(
+        role = self.role_repository.create(
             name=name,
             key=self._keyify(name),
             description=role_create.description,
             scope=scope,
             organization_id=role_create.organization_id,
         )
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role",
+            entity_id=str(role.id),
+            action="role.created",
+            description=f"Role '{role.name}' was created.",
+        )
+        return role
 
     def list(self, current_user: User) -> list[Role]:
         self._ensure_active_user(current_user)
