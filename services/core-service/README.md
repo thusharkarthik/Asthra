@@ -96,6 +96,80 @@ Authorization: Bearer <jwt>
 
 Returns the current user profile for a valid bearer token.
 
+## Organization Endpoints
+
+All organization endpoints require a JWT bearer token.
+
+### Create Organization
+
+```http
+POST /api/v1/organizations
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Acme",
+  "description": "Primary operating organization"
+}
+```
+
+The creating user is added as the organization `owner`, and a basic activity log entry is recorded.
+
+### List Organizations
+
+```http
+GET /api/v1/organizations
+Authorization: Bearer <jwt>
+```
+
+Returns active organizations visible to the current user.
+
+### Get Organization
+
+```http
+GET /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single organization if the user has access.
+
+### Update Organization
+
+```http
+PATCH /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Acme Platform",
+  "description": "Updated organization description"
+}
+```
+
+### Delete Organization
+
+```http
+DELETE /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### List Organization Members
+
+```http
+GET /api/v1/organizations/{organization_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns organization membership records for users with organization access.
+
 ## Workspace Endpoints
 
 All workspace endpoints require a JWT bearer token.
