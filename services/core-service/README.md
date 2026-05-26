@@ -96,6 +96,81 @@ Authorization: Bearer <jwt>
 
 Returns the current user profile for a valid bearer token.
 
+## Workspace Endpoints
+
+All workspace endpoints require a JWT bearer token.
+
+### Create Workspace
+
+```http
+POST /api/v1/workspaces
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "organization_id": 1,
+  "name": "Platform",
+  "description": "Core platform workspace"
+}
+```
+
+The creating user is added as the workspace `owner`, and a basic activity log entry is recorded.
+
+### List Workspaces
+
+```http
+GET /api/v1/workspaces
+Authorization: Bearer <jwt>
+```
+
+Returns active workspaces visible to the current user.
+
+### Get Workspace
+
+```http
+GET /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single workspace if the user has access.
+
+### Update Workspace
+
+```http
+PATCH /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Platform Core",
+  "description": "Updated workspace description"
+}
+```
+
+### Delete Workspace
+
+```http
+DELETE /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### List Workspace Members
+
+```http
+GET /api/v1/workspaces/{workspace_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns the workspace membership records for users with workspace access.
+
 ## Structure
 
 ```text
