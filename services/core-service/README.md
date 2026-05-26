@@ -245,6 +245,108 @@ Authorization: Bearer <jwt>
 
 Returns the workspace membership records for users with workspace access.
 
+## Team Endpoints
+
+All team endpoints require a JWT bearer token. Team access is scoped to the parent workspace: users must have access to the workspace unless they are superusers.
+
+### Create Team
+
+```http
+POST /api/v1/teams
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "workspace_id": 1,
+  "name": "Core Engineering",
+  "description": "Team responsible for Asthra Core"
+}
+```
+
+The creating user is added as the team `owner`, and a basic activity log entry is recorded.
+
+### List Teams
+
+```http
+GET /api/v1/teams
+Authorization: Bearer <jwt>
+```
+
+Returns active teams visible through the current user's workspace memberships.
+
+### Get Team
+
+```http
+GET /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single team if the user has access to the parent workspace.
+
+### Update Team
+
+```http
+PATCH /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Core Platform",
+  "description": "Updated team description"
+}
+```
+
+### Delete Team
+
+```http
+DELETE /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### Add Team Member
+
+```http
+POST /api/v1/teams/{team_id}/members
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "user_id": 2,
+  "member_role": "member"
+}
+```
+
+The target user must already be a member of the team's workspace. Duplicate team members return `409 Conflict`.
+
+### List Team Members
+
+```http
+GET /api/v1/teams/{team_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns team membership records.
+
+### Remove Team Member
+
+```http
+DELETE /api/v1/teams/{team_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes the user from the team and records a basic activity log entry.
+
 ## Structure
 
 ```text
