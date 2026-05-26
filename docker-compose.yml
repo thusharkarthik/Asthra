@@ -1,3 +1,30 @@
-services: {}
+services:
+  flow-service:
+    build:
+      context: ./services/flow-service
+    container_name: asthra-flow-service
+    env_file:
+      - ./services/flow-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_flow.db
+    ports:
+      - "8001:8000"
+    volumes:
+      - flow_service_data:/app/data
 
-# Infrastructure services will be added when the implementation tier requires them.
+  docs-service:
+    build:
+      context: ./services/docs-service
+    container_name: asthra-docs-service
+    env_file:
+      - ./services/docs-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_docs.db
+    ports:
+      - "8002:8000"
+    volumes:
+      - docs_service_data:/app/data
+
+volumes:
+  flow_service_data:
+  docs_service_data:
