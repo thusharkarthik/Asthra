@@ -1,25 +1,54 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import TimestampedRead
 
 
 class OrganizationCreate(BaseModel):
-    name: str
-    slug: str
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("Organization name is required.")
+        return name
+
+
+class OrganizationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        name = value.strip()
+        if not name:
+            raise ValueError("Organization name is required.")
+        return name
 
 
 class OrganizationRead(TimestampedRead):
     name: str
+    description: str | None = None
     slug: str
+    created_by_id: int
+    is_active: bool
 
 
 class OrganizationMemberCreate(BaseModel):
     organization_id: int
     user_id: int
     role_id: int | None = None
+    member_role: str = "member"
 
 
 class OrganizationMemberRead(TimestampedRead):
     organization_id: int
     user_id: int
     role_id: int | None = None
+    member_role: str
