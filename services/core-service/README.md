@@ -36,6 +36,7 @@ DATABASE_URL=postgresql+psycopg://asthra:asthra@localhost:5432/asthra_core
 SECRET_KEY=change-me-in-local-env
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+BCRYPT_ROUNDS=12
 ```
 
 For local SQLite development, set:
@@ -100,6 +101,24 @@ Errors use the same envelope with `success: false` and an `error` object:
 ```
 
 Existing business endpoints are not force-refactored into the envelope yet.
+
+## Tests
+
+Install dependencies and run the test suite from the core service directory:
+
+```bash
+cd services/core-service
+pip install -r requirements.txt
+pytest tests
+```
+
+The tests run against a disposable SQLite database at `tests/test_asthra_core.db`. They set `ENVIRONMENT=test`, `SECRET_KEY=test-secret-key`, and `BCRYPT_ROUNDS=4` for faster local auth checks. Do not point tests at a development or production database.
+
+The current test foundation covers:
+
+- health, readiness, and system info endpoints
+- auth registration, duplicate email handling, login, invalid login, and current-user lookup
+- authenticated smoke tests for creating organizations, workspaces, and projects
 
 ## Request IDs And Logging
 
