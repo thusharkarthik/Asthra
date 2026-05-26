@@ -815,6 +815,67 @@ Supported settings:
 
 Settings updates require workspace access and record an activity log entry.
 
+## Notification Endpoints
+
+All notification endpoints require a JWT bearer token. Users can only view, update, or delete their own notifications. No email, websocket, or realtime notification delivery is implemented yet.
+
+### List Notifications
+
+```http
+GET /api/v1/notifications
+Authorization: Bearer <jwt>
+```
+
+Optional query parameters:
+
+```text
+is_read
+type
+organization_id
+workspace_id
+project_id
+limit
+offset
+```
+
+### Get Notification
+
+```http
+GET /api/v1/notifications/{notification_id}
+Authorization: Bearer <jwt>
+```
+
+Returns `404` if the notification does not belong to the current user.
+
+### Mark Notification Read
+
+```http
+PATCH /api/v1/notifications/{notification_id}/read
+Authorization: Bearer <jwt>
+```
+
+Marks one notification as read and records an activity log entry.
+
+### Mark All Notifications Read
+
+```http
+PATCH /api/v1/notifications/read-all
+Authorization: Bearer <jwt>
+```
+
+Marks all unread notifications for the current user as read and returns the number updated.
+
+### Delete Notification
+
+```http
+DELETE /api/v1/notifications/{notification_id}
+Authorization: Bearer <jwt>
+```
+
+Deletes one notification and records an activity log entry.
+
+Notifications are created by a reusable `NotificationService.create_notification(...)` helper.
+
 ## Structure
 
 ```text

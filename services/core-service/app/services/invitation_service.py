@@ -9,6 +9,7 @@ from app.models.user import User
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.invitation import InvitationAccept, InvitationCreate
 from app.services.activity_service import ActivityService
+from app.services.notification_service import NotificationService
 
 
 class InvitationService:
@@ -63,6 +64,18 @@ class InvitationService:
             action="invitation.created",
             description=f"Invitation for {invitation.email} was created.",
         )
+        invited_user = self.repository.get_user_by_email(invitation.email)
+        if invited_user is not None:
+            NotificationService(self.db).create_notification(
+                user_id=invited_user.id,
+                type="invitation.created",
+                title="New invitation",
+                message="You have been invited to join an Asthra organization.",
+                organization_id=invitation.organization_id,
+                workspace_id=invitation.workspace_id,
+                entity_type="invitation",
+                entity_id=str(invitation.id),
+            )
         return invitation
 
     def list(self, current_user: User) -> list[Invitation]:
@@ -108,6 +121,16 @@ class InvitationService:
             entity_id=str(invitation.id),
             action="invitation.accepted",
             description=f"Invitation for {invitation.email} was accepted.",
+        )
+        NotificationService(self.db).create_notification(
+            user_id=invitation.invited_by_id,
+            type="invitation.accepted",
+            title="Invitation accepted",
+            message=f"{current_user.email} accepted an invitation.",
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
         )
         return invitation
 
