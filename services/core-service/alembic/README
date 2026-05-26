@@ -1,0 +1,3 @@
+Alembic migration environment for Asthra Core Service.
+
+Migration revisions should be generated into alembic/versions when Level 2 database work begins.
