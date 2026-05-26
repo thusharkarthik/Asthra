@@ -1,0 +1,142 @@
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.models.work_item import WorkItem
+from app.repositories.work_item_repository import WorkItemRepository
+from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+
+
+class WorkItemService:
+    def __init__(self, db: Session) -> None:
+        self.work_item_repository = WorkItemRepository(db)
+
+    def create(self, work_item_create: WorkItemCreate) -> WorkItem:
+        self._validate_required_ids(work_item_create.project_id, work_item_create.reporter_id)
+        self._validate_references(
+            type_id=work_item_create.type_id,
+            status_id=work_item_create.status_id,
+            priority_id=work_item_create.priority_id,
+        )
+        self._validate_board_linkage(
+            project_id=work_item_create.project_id,
+            board_id=work_item_create.board_id,
+            board_column_id=work_item_create.board_column_id,
+        )
+        return self.work_item_repository.create(work_item_create)
+
+    def list(
+        self,
+        *,
+        status_id: int | None = None,
+        assignee_id: int | None = None,
+        project_id: int | None = None,
+        priority_id: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[WorkItem]:
+        return self.work_item_repository.list(
+            status_id=status_id,
+            assignee_id=assignee_id,
+            project_id=project_id,
+            priority_id=priority_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    def get(self, work_item_id: int) -> WorkItem:
+        work_item = self.work_item_repository.get_by_id(work_item_id)
+        if work_item is None or not work_item.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Work item not found.",
+            )
+        return work_item
+
+    def update(self, work_item_id: int, work_item_update: WorkItemUpdate) -> WorkItem:
+        work_item = self.get(work_item_id)
+        self._validate_references(
+            type_id=work_item_update.type_id,
+            status_id=work_item_update.status_id,
+            priority_id=work_item_update.priority_id,
+        )
+        self._validate_board_linkage(
+            project_id=work_item.project_id,
+            board_id=work_item_update.board_id,
+            board_column_id=work_item_update.board_column_id,
+        )
+        return self.work_item_repository.update(work_item, work_item_update)
+
+    def delete(self, work_item_id: int) -> None:
+        work_item = self.get(work_item_id)
+        self.work_item_repository.delete(work_item)
+
+    def _validate_required_ids(self, project_id: int, reporter_id: int) -> None:
+        if project_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="project_id is required.",
+            )
+        if reporter_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="reporter_id is required.",
+            )
+
+    def _validate_references(
+        self,
+        *,
+        type_id: int | None,
+        status_id: int | None,
+        priority_id: int | None,
+    ) -> None:
+        if type_id is not None and not self.work_item_repository.type_exists(type_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Work item type not found.",
+            )
+        if status_id is not None and not self.work_item_repository.status_exists(status_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Work item status not found.",
+            )
+        if priority_id is not None and not self.work_item_repository.priority_exists(priority_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Work item priority not found.",
+            )
+
+    def _validate_board_linkage(
+        self,
+        *,
+        project_id: int,
+        board_id: int | None,
+        board_column_id: int | None,
+    ) -> None:
+        board = None
+        if board_id is not None:
+            board = self.work_item_repository.get_board(board_id)
+            if board is None or not board.is_active:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found.")
+            if board.project_id != project_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Board must belong to the same project as the work item.",
+                )
+
+        if board_column_id is not None:
+            board_column = self.work_item_repository.get_board_column(board_column_id)
+            if board_column is None or not board_column.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Board column not found.",
+                )
+            if board_id is not None and board_column.board_id != board_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Board column must belong to the selected board.",
+                )
+            if board_id is None and board_column.board.project_id != project_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Board column must belong to a board in the work item's project.",
+                )
