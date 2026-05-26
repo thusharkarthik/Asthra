@@ -96,6 +96,488 @@ Authorization: Bearer <jwt>
 
 Returns the current user profile for a valid bearer token.
 
+## Organization Endpoints
+
+All organization endpoints require a JWT bearer token.
+
+### Create Organization
+
+```http
+POST /api/v1/organizations
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Acme",
+  "description": "Primary operating organization"
+}
+```
+
+The creating user is added as the organization `owner`, and a basic activity log entry is recorded.
+
+### List Organizations
+
+```http
+GET /api/v1/organizations
+Authorization: Bearer <jwt>
+```
+
+Returns active organizations visible to the current user.
+
+### Get Organization
+
+```http
+GET /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single organization if the user has access.
+
+### Update Organization
+
+```http
+PATCH /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Acme Platform",
+  "description": "Updated organization description"
+}
+```
+
+### Delete Organization
+
+```http
+DELETE /api/v1/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### List Organization Members
+
+```http
+GET /api/v1/organizations/{organization_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns organization membership records for users with organization access.
+
+## Workspace Endpoints
+
+All workspace endpoints require a JWT bearer token.
+
+### Create Workspace
+
+```http
+POST /api/v1/workspaces
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "organization_id": 1,
+  "name": "Platform",
+  "description": "Core platform workspace"
+}
+```
+
+The creating user is added as the workspace `owner`, and a basic activity log entry is recorded.
+
+### List Workspaces
+
+```http
+GET /api/v1/workspaces
+Authorization: Bearer <jwt>
+```
+
+Returns active workspaces visible to the current user.
+
+### Get Workspace
+
+```http
+GET /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single workspace if the user has access.
+
+### Update Workspace
+
+```http
+PATCH /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Platform Core",
+  "description": "Updated workspace description"
+}
+```
+
+### Delete Workspace
+
+```http
+DELETE /api/v1/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### List Workspace Members
+
+```http
+GET /api/v1/workspaces/{workspace_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns the workspace membership records for users with workspace access.
+
+## Team Endpoints
+
+All team endpoints require a JWT bearer token. Team access is scoped to the parent workspace: users must have access to the workspace unless they are superusers.
+
+### Create Team
+
+```http
+POST /api/v1/teams
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "workspace_id": 1,
+  "name": "Core Engineering",
+  "description": "Team responsible for Asthra Core"
+}
+```
+
+The creating user is added as the team `owner`, and a basic activity log entry is recorded.
+
+### List Teams
+
+```http
+GET /api/v1/teams
+Authorization: Bearer <jwt>
+```
+
+Returns active teams visible through the current user's workspace memberships.
+
+### Get Team
+
+```http
+GET /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single team if the user has access to the parent workspace.
+
+### Update Team
+
+```http
+PATCH /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Core Platform",
+  "description": "Updated team description"
+}
+```
+
+### Delete Team
+
+```http
+DELETE /api/v1/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### Add Team Member
+
+```http
+POST /api/v1/teams/{team_id}/members
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "user_id": 2,
+  "member_role": "member"
+}
+```
+
+The target user must already be a member of the team's workspace. Duplicate team members return `409 Conflict`.
+
+### List Team Members
+
+```http
+GET /api/v1/teams/{team_id}/members
+Authorization: Bearer <jwt>
+```
+
+Returns team membership records.
+
+### Remove Team Member
+
+```http
+DELETE /api/v1/teams/{team_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes the user from the team and records a basic activity log entry.
+
+## Project Endpoints
+
+All project endpoints require a JWT bearer token. Project access is scoped to the parent workspace: users must have access to the workspace unless they are superusers.
+
+### Create Project
+
+```http
+POST /api/v1/projects
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "workspace_id": 1,
+  "name": "Core API",
+  "description": "Foundation API work",
+  "status": "active",
+  "owner_id": 2
+}
+```
+
+`owner_id` is optional. If provided, the owner must be an active member of the project workspace. Project creation records a basic activity log entry.
+
+### List Projects
+
+```http
+GET /api/v1/projects
+Authorization: Bearer <jwt>
+```
+
+Returns active projects visible through the current user's workspace memberships.
+
+### Get Project
+
+```http
+GET /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Returns a single project if the user has access to the parent workspace.
+
+### Update Project
+
+```http
+PATCH /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Core API MVP",
+  "description": "Updated project description",
+  "status": "active",
+  "owner_id": 2
+}
+```
+
+### Delete Project
+
+```http
+DELETE /api/v1/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+Performs a soft delete by setting `is_active` to `false`.
+
+### Link Team To Project
+
+```http
+POST /api/v1/projects/{project_id}/teams
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "team_id": 1
+}
+```
+
+The team must belong to the same workspace as the project. Duplicate links return `409 Conflict`.
+
+### List Project Teams
+
+```http
+GET /api/v1/projects/{project_id}/teams
+Authorization: Bearer <jwt>
+```
+
+Returns team links for the project.
+
+### Unlink Team From Project
+
+```http
+DELETE /api/v1/projects/{project_id}/teams/{team_id}
+Authorization: Bearer <jwt>
+```
+
+Removes the team link and records a basic activity log entry.
+
+## Role And Permission Endpoints
+
+All role and permission endpoints require a JWT bearer token. These APIs prepare RBAC data models and management workflows; complex permission enforcement is intentionally deferred.
+
+### Create Role
+
+```http
+POST /api/v1/roles
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "manager",
+  "description": "Can manage scoped resources",
+  "scope": "workspace"
+}
+```
+
+Valid role scopes are `global`, `organization`, `workspace`, and `project`. Duplicate role names within the same scope return `409 Conflict`.
+
+### Role CRUD
+
+```http
+GET /api/v1/roles
+GET /api/v1/roles/{role_id}
+PATCH /api/v1/roles/{role_id}
+DELETE /api/v1/roles/{role_id}
+Authorization: Bearer <jwt>
+```
+
+Delete performs a soft delete by setting `is_active` to `false`.
+
+### Create Permission
+
+```http
+POST /api/v1/permissions
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "code": "workspace.read",
+  "name": "Read workspaces",
+  "description": "Allows workspace read access"
+}
+```
+
+Duplicate permission codes return `409 Conflict`.
+
+### Permission CRUD
+
+```http
+GET /api/v1/permissions
+GET /api/v1/permissions/{permission_id}
+PATCH /api/v1/permissions/{permission_id}
+DELETE /api/v1/permissions/{permission_id}
+Authorization: Bearer <jwt>
+```
+
+Delete performs a soft delete by setting `is_active` to `false`.
+
+### Link Permission To Role
+
+```http
+POST /api/v1/roles/{role_id}/permissions
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "permission_id": 1
+}
+```
+
+Duplicate role-permission links return `409 Conflict`.
+
+### List And Unlink Role Permissions
+
+```http
+GET /api/v1/roles/{role_id}/permissions
+DELETE /api/v1/roles/{role_id}/permissions/{permission_id}
+Authorization: Bearer <jwt>
+```
+
+### Assign Role To User
+
+```http
+POST /api/v1/users/{user_id}/roles
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "role_id": 1
+}
+```
+
+Duplicate user-role assignments return `409 Conflict`.
+
+### List And Remove User Roles
+
+```http
+GET /api/v1/users/{user_id}/roles
+DELETE /api/v1/users/{user_id}/roles/{role_id}
+Authorization: Bearer <jwt>
+```
+
+### Seed Default Roles
+
+After migrations are applied, seed default global roles with:
+
+```bash
+python scripts/seed_default_roles.py
+```
+
+This creates `owner`, `admin`, `manager`, `member`, and `viewer` if they do not already exist.
+
 ## Structure
 
 ```text
