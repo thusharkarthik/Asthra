@@ -876,6 +876,82 @@ Deletes one notification and records an activity log entry.
 
 Notifications are created by a reusable `NotificationService.create_notification(...)` helper.
 
+## API Key Endpoints
+
+All API key endpoints require a JWT bearer token. Users can only manage their own API keys. Organization and workspace scoped keys require membership or creator access.
+
+Security note: raw API keys are shown only once during creation. Asthra stores only `hashed_key` and displays `key_prefix` for identification.
+
+### Create API Key
+
+```http
+POST /api/v1/api-keys
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Local development key",
+  "organization_id": 1,
+  "workspace_id": 1,
+  "scopes": ["projects.read", "projects.write"],
+  "expires_at": null
+}
+```
+
+Response includes the one-time `api_key` value.
+
+### List API Keys
+
+```http
+GET /api/v1/api-keys
+Authorization: Bearer <jwt>
+```
+
+### Get API Key
+
+```http
+GET /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+### Update API Key
+
+```http
+PATCH /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Updated key name",
+  "scopes": ["projects.read"],
+  "is_active": true
+}
+```
+
+### Revoke API Key
+
+```http
+POST /api/v1/api-keys/{api_key_id}/revoke
+Authorization: Bearer <jwt>
+```
+
+Sets `is_active` to `false`.
+
+### Delete API Key
+
+```http
+DELETE /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+Deletes the API key record.
+
 ## Structure
 
 ```text
