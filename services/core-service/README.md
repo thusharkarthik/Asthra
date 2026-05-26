@@ -27,9 +27,10 @@ API routes are mounted under `/api/v1`.
 ## Environment Variables
 
 ```text
-ASTHRA_ENV=development
-ASTHRA_SERVICE_NAME=asthra-core-service
-ASTHRA_API_V1_PREFIX=/api/v1
+APP_NAME=asthra-core-service
+APP_VERSION=0.1.0
+ENVIRONMENT=development
+API_V1_PREFIX=/api/v1
 ASTHRA_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 DATABASE_URL=postgresql+psycopg://asthra:asthra@localhost:5432/asthra_core
 SECRET_KEY=change-me-in-local-env
@@ -42,6 +43,67 @@ For local SQLite development, set:
 ```text
 DATABASE_URL=sqlite:///./asthra_core.db
 ```
+
+## Health And System Endpoints
+
+### Health
+
+```http
+GET /health
+```
+
+Returns a simple service status.
+
+### Readiness
+
+```http
+GET /ready
+```
+
+Checks database connectivity and returns `ready` when the database can be reached. If the database check fails, the endpoint returns `503`.
+
+### System Info
+
+```http
+GET /api/v1/system/info
+```
+
+Returns service name, version, environment, and API prefix.
+
+## Standard Response Format
+
+New system endpoints use this response envelope:
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {},
+  "error": null,
+  "request_id": "request-id"
+}
+```
+
+Errors use the same envelope with `success: false` and an `error` object:
+
+```json
+{
+  "success": false,
+  "message": "Request validation failed.",
+  "data": null,
+  "error": {
+    "code": "validation_error",
+    "details": []
+  },
+  "request_id": "request-id"
+}
+```
+
+Existing business endpoints are not force-refactored into the envelope yet.
+
+## Request IDs And Logging
+
+Requests may provide `X-Request-ID`. If missing, the service generates one. The value is returned in the `X-Request-ID` response header and included in structured log output as `request_id`.
 
 ## Auth Endpoints
 
