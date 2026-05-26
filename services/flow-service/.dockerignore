@@ -5,5 +5,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+tests/
 asthra_flow.db
-tests/*.db
