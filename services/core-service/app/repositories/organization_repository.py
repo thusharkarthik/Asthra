@@ -72,6 +72,7 @@ class OrganizationRepository:
                 action="organization.created",
                 entity_type="organization",
                 entity_id=str(organization.id),
+                description=f"Organization '{organization.name}' was created.",
                 summary=f"Organization '{organization.name}' was created.",
             )
         )

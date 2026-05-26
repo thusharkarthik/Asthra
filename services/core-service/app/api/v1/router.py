@@ -2,7 +2,10 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     activity,
+    api_keys,
     auth,
+    invitations,
+    notifications,
     organizations,
     permissions,
     projects,
@@ -15,7 +18,10 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 
+api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(invitations.router, prefix="/invitations", tags=["invitations"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(
     organizations.router,

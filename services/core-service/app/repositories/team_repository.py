@@ -93,6 +93,7 @@ class TeamRepository:
                 action="team.created",
                 entity_type="team",
                 entity_id=str(team.id),
+                description=f"Team '{team.name}' was created.",
                 summary=f"Team '{team.name}' was created.",
             )
         )
@@ -132,6 +133,7 @@ class TeamRepository:
                 action="team.member_added",
                 entity_type="team_member",
                 entity_id=str(user_id),
+                description=f"User {user_id} was added to team {team.id}.",
                 summary=f"User {user_id} was added to team {team.id}.",
             )
         )
@@ -150,6 +152,7 @@ class TeamRepository:
                 action="team.member_removed",
                 entity_type="team_member",
                 entity_id=str(removed_user_id),
+                description=f"User {removed_user_id} was removed from team {team.id}.",
                 summary=f"User {removed_user_id} was removed from team {team.id}.",
             )
         )

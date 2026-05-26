@@ -578,6 +578,380 @@ python scripts/seed_default_roles.py
 
 This creates `owner`, `admin`, `manager`, `member`, and `viewer` if they do not already exist.
 
+## Activity And Audit Endpoints
+
+All activity endpoints require a JWT bearer token. Access is intentionally simple: users can view activity for organizations, workspaces, and projects they belong to; superusers can view all activity.
+
+### List Activity
+
+```http
+GET /api/v1/activity
+Authorization: Bearer <jwt>
+```
+
+Optional query parameters:
+
+```text
+entity_type
+action
+organization_id
+workspace_id
+project_id
+actor_user_id
+limit
+offset
+```
+
+Example:
+
+```http
+GET /api/v1/activity?entity_type=project&action=project.created&limit=25
+Authorization: Bearer <jwt>
+```
+
+### Get Activity
+
+```http
+GET /api/v1/activity/{activity_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By User
+
+```http
+GET /api/v1/activity/users/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Non-superusers can only view their own actor activity through this endpoint.
+
+### Activity By Organization
+
+```http
+GET /api/v1/activity/organizations/{organization_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By Workspace
+
+```http
+GET /api/v1/activity/workspaces/{workspace_id}
+Authorization: Bearer <jwt>
+```
+
+### Activity By Project
+
+```http
+GET /api/v1/activity/projects/{project_id}
+Authorization: Bearer <jwt>
+```
+
+The reusable activity logging service is available as `ActivityService.log_activity(...)`.
+
+## Invitation And Membership Endpoints
+
+All invitation and membership endpoints require a JWT bearer token. No email is sent yet; invitations return a token that can be supplied to the accept endpoint.
+
+### Create Invitation
+
+```http
+POST /api/v1/invitations
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "email": "new.user@example.com",
+  "organization_id": 1,
+  "workspace_id": 1,
+  "role_id": 1
+}
+```
+
+`workspace_id` and `role_id` are optional. Duplicate pending invitations for the same email and organization/workspace return `409 Conflict`.
+
+### List Invitations
+
+```http
+GET /api/v1/invitations
+Authorization: Bearer <jwt>
+```
+
+Returns invitations for organizations the current user belongs to. Superusers can view all invitations.
+
+### Get Invitation
+
+```http
+GET /api/v1/invitations/{invitation_id}
+Authorization: Bearer <jwt>
+```
+
+### Accept Invitation
+
+```http
+POST /api/v1/invitations/{invitation_id}/accept
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "token": "<invitation-token>"
+}
+```
+
+Only pending, non-expired invitations can be accepted. The authenticated user's email must match the invitation email.
+
+### Revoke Invitation
+
+```http
+POST /api/v1/invitations/{invitation_id}/revoke
+Authorization: Bearer <jwt>
+```
+
+Only pending invitations can be revoked.
+
+### Remove Organization Member
+
+```http
+DELETE /api/v1/organizations/{organization_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes a user from the organization membership table and records an activity log entry.
+
+### Remove Workspace Member
+
+```http
+DELETE /api/v1/workspaces/{workspace_id}/members/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Removes a user from the workspace membership table and records an activity log entry.
+
+## User Profile And Settings Endpoints
+
+All profile and settings endpoints require a JWT bearer token.
+
+### Current User Profile
+
+```http
+GET /api/v1/users/me
+Authorization: Bearer <jwt>
+```
+
+Returns the authenticated user's profile.
+
+### Update Current User Profile
+
+```http
+PATCH /api/v1/users/me
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "full_name": "Example User",
+  "avatar_url": "https://example.com/avatar.png",
+  "job_title": "Engineering Manager",
+  "timezone": "UTC",
+  "locale": "en-US"
+}
+```
+
+Users can update only their own profile. Updates record an activity log entry.
+
+### Get User Profile
+
+```http
+GET /api/v1/users/{user_id}
+Authorization: Bearer <jwt>
+```
+
+Users can view their own profile, superusers can view all profiles, and other profile visibility requires shared organization or workspace membership.
+
+### Organization Settings
+
+```http
+GET /api/v1/organizations/{organization_id}/settings
+PATCH /api/v1/organizations/{organization_id}/settings
+Authorization: Bearer <jwt>
+```
+
+Supported settings:
+
+```json
+{
+  "default_timezone": "UTC",
+  "allow_public_invites": false,
+  "default_member_role": "member"
+}
+```
+
+Settings updates require organization access and record an activity log entry.
+
+### Workspace Settings
+
+```http
+GET /api/v1/workspaces/{workspace_id}/settings
+PATCH /api/v1/workspaces/{workspace_id}/settings
+Authorization: Bearer <jwt>
+```
+
+Supported settings:
+
+```json
+{
+  "default_project_visibility": "private",
+  "default_timezone": "UTC",
+  "enable_activity_feed": true
+}
+```
+
+Settings updates require workspace access and record an activity log entry.
+
+## Notification Endpoints
+
+All notification endpoints require a JWT bearer token. Users can only view, update, or delete their own notifications. No email, websocket, or realtime notification delivery is implemented yet.
+
+### List Notifications
+
+```http
+GET /api/v1/notifications
+Authorization: Bearer <jwt>
+```
+
+Optional query parameters:
+
+```text
+is_read
+type
+organization_id
+workspace_id
+project_id
+limit
+offset
+```
+
+### Get Notification
+
+```http
+GET /api/v1/notifications/{notification_id}
+Authorization: Bearer <jwt>
+```
+
+Returns `404` if the notification does not belong to the current user.
+
+### Mark Notification Read
+
+```http
+PATCH /api/v1/notifications/{notification_id}/read
+Authorization: Bearer <jwt>
+```
+
+Marks one notification as read and records an activity log entry.
+
+### Mark All Notifications Read
+
+```http
+PATCH /api/v1/notifications/read-all
+Authorization: Bearer <jwt>
+```
+
+Marks all unread notifications for the current user as read and returns the number updated.
+
+### Delete Notification
+
+```http
+DELETE /api/v1/notifications/{notification_id}
+Authorization: Bearer <jwt>
+```
+
+Deletes one notification and records an activity log entry.
+
+Notifications are created by a reusable `NotificationService.create_notification(...)` helper.
+
+## API Key Endpoints
+
+All API key endpoints require a JWT bearer token. Users can only manage their own API keys. Organization and workspace scoped keys require membership or creator access.
+
+Security note: raw API keys are shown only once during creation. Asthra stores only `hashed_key` and displays `key_prefix` for identification.
+
+### Create API Key
+
+```http
+POST /api/v1/api-keys
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Local development key",
+  "organization_id": 1,
+  "workspace_id": 1,
+  "scopes": ["projects.read", "projects.write"],
+  "expires_at": null
+}
+```
+
+Response includes the one-time `api_key` value.
+
+### List API Keys
+
+```http
+GET /api/v1/api-keys
+Authorization: Bearer <jwt>
+```
+
+### Get API Key
+
+```http
+GET /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+### Update API Key
+
+```http
+PATCH /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "Updated key name",
+  "scopes": ["projects.read"],
+  "is_active": true
+}
+```
+
+### Revoke API Key
+
+```http
+POST /api/v1/api-keys/{api_key_id}/revoke
+Authorization: Bearer <jwt>
+```
+
+Sets `is_active` to `false`.
+
+### Delete API Key
+
+```http
+DELETE /api/v1/api-keys/{api_key_id}
+Authorization: Bearer <jwt>
+```
+
+Deletes the API key record.
+
 ## Structure
 
 ```text

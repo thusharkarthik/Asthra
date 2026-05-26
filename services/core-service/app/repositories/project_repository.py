@@ -87,9 +87,11 @@ class ProjectRepository:
                 actor_user_id=created_by_id,
                 organization_id=workspace.organization_id,
                 workspace_id=workspace.id,
+                project_id=project.id,
                 action="project.created",
                 entity_type="project",
                 entity_id=str(project.id),
+                description=f"Project '{project.name}' was created.",
                 summary=f"Project '{project.name}' was created.",
             )
         )
@@ -113,9 +115,11 @@ class ProjectRepository:
                 actor_user_id=actor_user_id,
                 organization_id=project.workspace.organization_id,
                 workspace_id=project.workspace_id,
+                project_id=project.id,
                 action="project.team_linked",
                 entity_type="project_team",
                 entity_id=str(team.id),
+                description=f"Team {team.id} was linked to project {project.id}.",
                 summary=f"Team {team.id} was linked to project {project.id}.",
             )
         )
@@ -131,9 +135,11 @@ class ProjectRepository:
                 actor_user_id=actor_user_id,
                 organization_id=project.workspace.organization_id,
                 workspace_id=project.workspace_id,
+                project_id=project.id,
                 action="project.team_unlinked",
                 entity_type="project_team",
                 entity_id=str(team_id),
+                description=f"Team {team_id} was unlinked from project {project.id}.",
                 summary=f"Team {team_id} was unlinked from project {project.id}.",
             )
         )

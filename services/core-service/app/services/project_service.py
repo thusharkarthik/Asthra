@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectTeamCreate, ProjectUpdate
+from app.services.notification_service import NotificationService
 
 
 class ProjectService:
@@ -22,7 +23,7 @@ class ProjectService:
         self._ensure_workspace_access(workspace, current_user)
         owner_id = self._resolve_owner_id(project_create.owner_id, workspace.id)
         key = self._build_unique_key(workspace_id=workspace.id, name=project_create.name)
-        return self.project_repository.create(
+        project = self.project_repository.create(
             workspace=workspace,
             name=project_create.name.strip(),
             key=key,
@@ -31,6 +32,19 @@ class ProjectService:
             owner_id=owner_id,
             created_by_id=current_user.id,
         )
+        if project.owner_id is not None and project.owner_id != current_user.id:
+            NotificationService(self.project_repository.db).create_notification(
+                user_id=project.owner_id,
+                type="project.created",
+                title="New project",
+                message=f"You were assigned as owner for project '{project.name}'.",
+                organization_id=workspace.organization_id,
+                workspace_id=workspace.id,
+                project_id=project.id,
+                entity_type="project",
+                entity_id=str(project.id),
+            )
+        return project
 
     def list(self, current_user: User) -> list[Project]:
         self._ensure_active_user(current_user)
