@@ -452,6 +452,132 @@ Authorization: Bearer <jwt>
 
 Removes the team link and records a basic activity log entry.
 
+## Role And Permission Endpoints
+
+All role and permission endpoints require a JWT bearer token. These APIs prepare RBAC data models and management workflows; complex permission enforcement is intentionally deferred.
+
+### Create Role
+
+```http
+POST /api/v1/roles
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "name": "manager",
+  "description": "Can manage scoped resources",
+  "scope": "workspace"
+}
+```
+
+Valid role scopes are `global`, `organization`, `workspace`, and `project`. Duplicate role names within the same scope return `409 Conflict`.
+
+### Role CRUD
+
+```http
+GET /api/v1/roles
+GET /api/v1/roles/{role_id}
+PATCH /api/v1/roles/{role_id}
+DELETE /api/v1/roles/{role_id}
+Authorization: Bearer <jwt>
+```
+
+Delete performs a soft delete by setting `is_active` to `false`.
+
+### Create Permission
+
+```http
+POST /api/v1/permissions
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "code": "workspace.read",
+  "name": "Read workspaces",
+  "description": "Allows workspace read access"
+}
+```
+
+Duplicate permission codes return `409 Conflict`.
+
+### Permission CRUD
+
+```http
+GET /api/v1/permissions
+GET /api/v1/permissions/{permission_id}
+PATCH /api/v1/permissions/{permission_id}
+DELETE /api/v1/permissions/{permission_id}
+Authorization: Bearer <jwt>
+```
+
+Delete performs a soft delete by setting `is_active` to `false`.
+
+### Link Permission To Role
+
+```http
+POST /api/v1/roles/{role_id}/permissions
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "permission_id": 1
+}
+```
+
+Duplicate role-permission links return `409 Conflict`.
+
+### List And Unlink Role Permissions
+
+```http
+GET /api/v1/roles/{role_id}/permissions
+DELETE /api/v1/roles/{role_id}/permissions/{permission_id}
+Authorization: Bearer <jwt>
+```
+
+### Assign Role To User
+
+```http
+POST /api/v1/users/{user_id}/roles
+Authorization: Bearer <jwt>
+```
+
+Request:
+
+```json
+{
+  "role_id": 1
+}
+```
+
+Duplicate user-role assignments return `409 Conflict`.
+
+### List And Remove User Roles
+
+```http
+GET /api/v1/users/{user_id}/roles
+DELETE /api/v1/users/{user_id}/roles/{role_id}
+Authorization: Bearer <jwt>
+```
+
+### Seed Default Roles
+
+After migrations are applied, seed default global roles with:
+
+```bash
+python scripts/seed_default_roles.py
+```
+
+This creates `owner`, `admin`, `manager`, `member`, and `viewer` if they do not already exist.
+
 ## Structure
 
 ```text
