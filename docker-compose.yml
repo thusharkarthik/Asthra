@@ -168,6 +168,19 @@ services:
     volumes:
       - guard_service_data:/app/data
 
+  insights-service:
+    build:
+      context: ./services/insights-service
+    container_name: asthra-insights-service
+    env_file:
+      - ./services/insights-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_insights.db
+    ports:
+      - "8013:8000"
+    volumes:
+      - insights_service_data:/app/data
+
 volumes:
   core_service_data:
   flow_service_data:
@@ -182,3 +195,4 @@ volumes:
   automation_service_data:
   connect_service_data:
   guard_service_data:
+  insights_service_data:
