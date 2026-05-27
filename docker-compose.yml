@@ -77,6 +77,19 @@ services:
     volumes:
       - desk_service_data:/app/data
 
+  pulse-service:
+    build:
+      context: ./services/pulse-service
+    container_name: asthra-pulse-service
+    env_file:
+      - ./services/pulse-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_pulse.db
+    ports:
+      - "8007:8000"
+    volumes:
+      - pulse_service_data:/app/data
+
 volumes:
   flow_service_data:
   docs_service_data:
@@ -84,3 +97,4 @@ volumes:
   memory_service_data:
   discover_service_data:
   desk_service_data:
+  pulse_service_data:
