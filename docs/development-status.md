@@ -11,6 +11,7 @@ Asthra is currently in platform foundation and MVP hardening. The repository has
 - Root Docker Compose orchestration for all current services.
 - Standard `/health`, `/ready`, and `/api/v1/system/info` endpoints across services.
 - API Gateway foundation with request IDs, service registry, and selected proxy routes.
+- Event Bus foundation with event envelopes, subscriptions, and placeholder delivery logs.
 
 ## Current Hardening Standards
 
@@ -23,7 +24,7 @@ Asthra is currently in platform foundation and MVP hardening. The repository has
 
 - Shared auth is not yet propagated across services.
 - API Gateway exists as an MVP foundation, but it does not validate auth or route every service yet.
-- No event bus exists yet.
+- Event Bus exists as an MVP foundation, but it does not use a broker or background workers yet.
 - No Redis/cache layer exists yet.
 - Service-to-service communication is not standardized.
 - Real RAG, vector DB integration, agents, and automation execution are intentionally deferred.
