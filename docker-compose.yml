@@ -38,7 +38,21 @@ services:
     volumes:
       - ai_service_data:/app/data
 
+  memory-service:
+    build:
+      context: ./services/memory-service
+    container_name: asthra-memory-service
+    env_file:
+      - ./services/memory-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_memory.db
+    ports:
+      - "8004:8000"
+    volumes:
+      - memory_service_data:/app/data
+
 volumes:
   flow_service_data:
   docs_service_data:
   ai_service_data:
+  memory_service_data:
