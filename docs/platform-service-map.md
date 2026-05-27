@@ -4,6 +4,7 @@ Asthra is organized as a modular service suite. Each service owns a clear produc
 
 | Service | Suite Name | Current Status | MVP Scope | Future Scope |
 | --- | --- | --- | --- | --- |
+| api-gateway | Asthra API Gateway | Foundation MVP | health, readiness, service registry, request IDs, selected proxy routes | auth validation, rate limits, service discovery, cache integration, full routing |
 | core-service | Asthra Core | Level 2 foundation MVP | users, organizations, workspaces, teams, projects, roles, permissions, activity, invitations, settings, notifications, API keys | shared auth propagation, tenant policy enforcement, service identity |
 | flow-service | Asthra Flow | MVP implemented | work items, boards, comments, labels, attachments metadata | sprints, roadmap workflows, dependency mapping, AI task assistance |
 | docs-service | Asthra Docs | MVP implemented | spaces, pages, versions, comments, tags, attachments metadata, basic search | semantic search, RAG-ready indexing, collaborative editing |

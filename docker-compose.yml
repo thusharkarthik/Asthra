@@ -1,4 +1,13 @@
 services:
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: asthra-api-gateway
+    env_file:
+      - ./services/api-gateway/.env.example
+    ports:
+      - "8080:8000"
+
   core-service:
     build:
       context: ./services/core-service
