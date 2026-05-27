@@ -32,6 +32,18 @@ Gateway URL:
 http://localhost:8080
 ```
 
+Run the Event Service:
+
+```bash
+docker compose up --build event-service
+```
+
+Event Service URL:
+
+```text
+http://localhost:8015
+```
+
 Every container listens on `8000` internally. Host ports are assigned in Docker Compose and documented in [service-port-map.md](service-port-map.md).
 
 ## Health Checks

@@ -1,0 +1,9 @@
+[project]
+name = "asthra-shared-events"
+version = "0.1.0"
+description = "Shared event schemas and naming constants for Asthra."
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]

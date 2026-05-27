@@ -14,6 +14,7 @@ This document records the current platform-wide hardening pass.
   - `scripts/`
 - Verified Docker Compose includes all current services.
 - Added API Gateway as the platform entry point for selected service proxy routes.
+- Added Event Bus foundation for event envelopes and subscription metadata.
 - Kept each service on the existing SQLite local database pattern.
 - Added or confirmed `/api/v1/system/info` across services.
 - Confirmed service metadata config fields:
@@ -45,7 +46,7 @@ Each service should expose:
 
 - Shared auth propagation across service boundaries.
 - API gateway for routing, auth, rate limits, and request normalization.
-- Event bus for cross-service domain events.
+- Broker-backed event bus for cross-service domain events.
 - Redis/cache layer for high-read workflows and background coordination.
 - RAG integration between Docs, Memory, and Intelligence.
 - Standard service-to-service communication contracts.
