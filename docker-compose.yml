@@ -25,6 +25,20 @@ services:
     volumes:
       - docs_service_data:/app/data
 
+  ai-service:
+    build:
+      context: ./services/ai-service
+    container_name: asthra-ai-service
+    env_file:
+      - ./services/ai-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_intelligence.db
+    ports:
+      - "8003:8000"
+    volumes:
+      - ai_service_data:/app/data
+
 volumes:
   flow_service_data:
   docs_service_data:
+  ai_service_data:
