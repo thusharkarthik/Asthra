@@ -1,4 +1,17 @@
 services:
+  core-service:
+    build:
+      context: ./services/core-service
+    container_name: asthra-core-service
+    env_file:
+      - ./services/core-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_core.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - core_service_data:/app/data
+
   flow-service:
     build:
       context: ./services/flow-service
@@ -117,6 +130,7 @@ services:
       - collab_service_data:/app/data
 
 volumes:
+  core_service_data:
   flow_service_data:
   docs_service_data:
   ai_service_data:
