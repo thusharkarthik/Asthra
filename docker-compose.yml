@@ -51,8 +51,22 @@ services:
     volumes:
       - memory_service_data:/app/data
 
+  discover-service:
+    build:
+      context: ./services/discover-service
+    container_name: asthra-discover-service
+    env_file:
+      - ./services/discover-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_discover.db
+    ports:
+      - "8005:8000"
+    volumes:
+      - discover_service_data:/app/data
+
 volumes:
   flow_service_data:
   docs_service_data:
   ai_service_data:
   memory_service_data:
+  discover_service_data:
