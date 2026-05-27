@@ -181,6 +181,19 @@ services:
     volumes:
       - insights_service_data:/app/data
 
+  media-service:
+    build:
+      context: ./services/media-service
+    container_name: asthra-media-service
+    env_file:
+      - ./services/media-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_media.db
+    ports:
+      - "8014:8000"
+    volumes:
+      - media_service_data:/app/data
+
 volumes:
   core_service_data:
   flow_service_data:
@@ -196,3 +209,4 @@ volumes:
   connect_service_data:
   guard_service_data:
   insights_service_data:
+  media_service_data:
