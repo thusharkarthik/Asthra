@@ -39,6 +39,17 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=error_response("Service is not ready.", "service_unready", {"database": "unreachable"}))
         return success_response(data={"status": "ready", "database": "ok"})
 
+    @app.get(f"{settings.api_v1_prefix}/system/info", tags=["system"])
+    def system_info() -> dict:
+        return success_response(
+            data={
+                "service": settings.app_name,
+                "version": settings.app_version,
+                "environment": settings.environment,
+                "api_prefix": settings.api_v1_prefix,
+            }
+        )
+
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app
 

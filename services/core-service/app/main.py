@@ -67,6 +67,18 @@ def create_app() -> FastAPI:
             request_id=request_id,
         )
 
+    @app.get(f"{settings.api_v1_prefix}/system/info", tags=["system"])
+    def system_info(request: Request) -> dict:
+        return success_response(
+            data={
+                "service": settings.app_name,
+                "version": settings.app_version,
+                "environment": settings.environment,
+                "api_prefix": settings.api_v1_prefix,
+            },
+            request_id=getattr(request.state, "request_id", None),
+        )
+
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app
 

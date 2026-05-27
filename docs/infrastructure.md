@@ -30,7 +30,13 @@ From the repository root:
 docker compose up --build
 ```
 
-After startup, verify each service by opening its health URL. Containers listen on port `8000` internally, while Docker Compose publishes each service to its assigned host port.
+After startup, verify each service by opening its health URL. Containers listen on port `8000` internally, while Docker Compose publishes each service to its assigned host port. Each service also exposes `/ready` and `/api/v1/system/info`.
+
+See also:
+
+- [service-port-map.md](service-port-map.md)
+- [local-development.md](local-development.md)
+- [integration-hardening.md](integration-hardening.md)
 
 ## Current Scope
 
