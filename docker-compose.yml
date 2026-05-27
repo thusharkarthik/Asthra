@@ -103,6 +103,19 @@ services:
     volumes:
       - dev_service_data:/app/data
 
+  collab-service:
+    build:
+      context: ./services/collab-service
+    container_name: asthra-collab-service
+    env_file:
+      - ./services/collab-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_collab.db
+    ports:
+      - "8009:8000"
+    volumes:
+      - collab_service_data:/app/data
+
 volumes:
   flow_service_data:
   docs_service_data:
@@ -112,3 +125,4 @@ volumes:
   desk_service_data:
   pulse_service_data:
   dev_service_data:
+  collab_service_data:
