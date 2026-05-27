@@ -1,4 +1,17 @@
 services:
+  core-service:
+    build:
+      context: ./services/core-service
+    container_name: asthra-core-service
+    env_file:
+      - ./services/core-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_core.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - core_service_data:/app/data
+
   flow-service:
     build:
       context: ./services/flow-service
@@ -25,6 +38,175 @@ services:
     volumes:
       - docs_service_data:/app/data
 
+  ai-service:
+    build:
+      context: ./services/ai-service
+    container_name: asthra-ai-service
+    env_file:
+      - ./services/ai-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_intelligence.db
+    ports:
+      - "8003:8000"
+    volumes:
+      - ai_service_data:/app/data
+
+  memory-service:
+    build:
+      context: ./services/memory-service
+    container_name: asthra-memory-service
+    env_file:
+      - ./services/memory-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_memory.db
+    ports:
+      - "8004:8000"
+    volumes:
+      - memory_service_data:/app/data
+
+  discover-service:
+    build:
+      context: ./services/discover-service
+    container_name: asthra-discover-service
+    env_file:
+      - ./services/discover-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_discover.db
+    ports:
+      - "8005:8000"
+    volumes:
+      - discover_service_data:/app/data
+
+  desk-service:
+    build:
+      context: ./services/desk-service
+    container_name: asthra-desk-service
+    env_file:
+      - ./services/desk-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_desk.db
+    ports:
+      - "8006:8000"
+    volumes:
+      - desk_service_data:/app/data
+
+  pulse-service:
+    build:
+      context: ./services/pulse-service
+    container_name: asthra-pulse-service
+    env_file:
+      - ./services/pulse-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_pulse.db
+    ports:
+      - "8007:8000"
+    volumes:
+      - pulse_service_data:/app/data
+
+  dev-service:
+    build:
+      context: ./services/dev-service
+    container_name: asthra-dev-service
+    env_file:
+      - ./services/dev-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_dev.db
+    ports:
+      - "8008:8000"
+    volumes:
+      - dev_service_data:/app/data
+
+  collab-service:
+    build:
+      context: ./services/collab-service
+    container_name: asthra-collab-service
+    env_file:
+      - ./services/collab-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_collab.db
+    ports:
+      - "8009:8000"
+    volumes:
+      - collab_service_data:/app/data
+
+  automation-service:
+    build:
+      context: ./services/automation-service
+    container_name: asthra-automation-service
+    env_file:
+      - ./services/automation-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_automation.db
+    ports:
+      - "8010:8000"
+    volumes:
+      - automation_service_data:/app/data
+
+  connect-service:
+    build:
+      context: ./services/connect-service
+    container_name: asthra-connect-service
+    env_file:
+      - ./services/connect-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_connect.db
+    ports:
+      - "8011:8000"
+    volumes:
+      - connect_service_data:/app/data
+
+  guard-service:
+    build:
+      context: ./services/guard-service
+    container_name: asthra-guard-service
+    env_file:
+      - ./services/guard-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_guard.db
+    ports:
+      - "8012:8000"
+    volumes:
+      - guard_service_data:/app/data
+
+  insights-service:
+    build:
+      context: ./services/insights-service
+    container_name: asthra-insights-service
+    env_file:
+      - ./services/insights-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_insights.db
+    ports:
+      - "8013:8000"
+    volumes:
+      - insights_service_data:/app/data
+
+  media-service:
+    build:
+      context: ./services/media-service
+    container_name: asthra-media-service
+    env_file:
+      - ./services/media-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_media.db
+    ports:
+      - "8014:8000"
+    volumes:
+      - media_service_data:/app/data
+
 volumes:
+  core_service_data:
   flow_service_data:
   docs_service_data:
+  ai_service_data:
+  memory_service_data:
+  discover_service_data:
+  desk_service_data:
+  pulse_service_data:
+  dev_service_data:
+  collab_service_data:
+  automation_service_data:
+  connect_service_data:
+  guard_service_data:
+  insights_service_data:
+  media_service_data:
