@@ -129,6 +129,19 @@ services:
     volumes:
       - collab_service_data:/app/data
 
+  automation-service:
+    build:
+      context: ./services/automation-service
+    container_name: asthra-automation-service
+    env_file:
+      - ./services/automation-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_automation.db
+    ports:
+      - "8010:8000"
+    volumes:
+      - automation_service_data:/app/data
+
 volumes:
   core_service_data:
   flow_service_data:
@@ -140,3 +153,4 @@ volumes:
   pulse_service_data:
   dev_service_data:
   collab_service_data:
+  automation_service_data:
