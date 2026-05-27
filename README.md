@@ -8,6 +8,7 @@ Asthra is an original platform with its own architecture, suite model, workflows
 
 | Service | Suite Name | Port | Current Status |
 | --- | --- | ---: | --- |
+| api-gateway | Asthra API Gateway | 8080 | Gateway foundation MVP |
 | core-service | Asthra Core | 8000 | Level 2 foundation MVP |
 | flow-service | Asthra Flow | 8001 | Work management MVP |
 | docs-service | Asthra Docs | 8002 | Knowledge/documentation MVP |
@@ -62,6 +63,7 @@ Completed platform foundation:
 - Docker Compose orchestration for all current services
 - MVP endpoints, seed scripts, and basic tests for service foundations
 - Standard health/readiness/system metadata endpoints
+- API Gateway foundation for selected service proxy routes
 
 Future platform work:
 

@@ -4,6 +4,7 @@ All services run on port `8000` inside their containers. Docker Compose publishe
 
 | Service | Suite Name | Host Port | Health | Ready | System Info |
 | --- | --- | ---: | --- | --- | --- |
+| api-gateway | Asthra API Gateway | 8080 | http://localhost:8080/health | http://localhost:8080/ready | http://localhost:8080/api/gateway/info |
 | core-service | Asthra Core | 8000 | http://localhost:8000/health | http://localhost:8000/ready | http://localhost:8000/api/v1/system/info |
 | flow-service | Asthra Flow | 8001 | http://localhost:8001/health | http://localhost:8001/ready | http://localhost:8001/api/v1/system/info |
 | docs-service | Asthra Docs | 8002 | http://localhost:8002/health | http://localhost:8002/ready | http://localhost:8002/api/v1/system/info |

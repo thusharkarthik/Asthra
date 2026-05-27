@@ -13,6 +13,7 @@ This document records the current platform-wide hardening pass.
   - `tests/`
   - `scripts/`
 - Verified Docker Compose includes all current services.
+- Added API Gateway as the platform entry point for selected service proxy routes.
 - Kept each service on the existing SQLite local database pattern.
 - Added or confirmed `/api/v1/system/info` across services.
 - Confirmed service metadata config fields:

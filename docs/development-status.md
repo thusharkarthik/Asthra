@@ -10,6 +10,7 @@ Asthra is currently in platform foundation and MVP hardening. The repository has
 - Per-service Dockerfiles, `.env.example` files, local SQLite database configuration, seed scripts, and tests.
 - Root Docker Compose orchestration for all current services.
 - Standard `/health`, `/ready`, and `/api/v1/system/info` endpoints across services.
+- API Gateway foundation with request IDs, service registry, and selected proxy routes.
 
 ## Current Hardening Standards
 
@@ -21,7 +22,7 @@ Asthra is currently in platform foundation and MVP hardening. The repository has
 ## Known Gaps
 
 - Shared auth is not yet propagated across services.
-- No API gateway exists yet.
+- API Gateway exists as an MVP foundation, but it does not validate auth or route every service yet.
 - No event bus exists yet.
 - No Redis/cache layer exists yet.
 - Service-to-service communication is not standardized.

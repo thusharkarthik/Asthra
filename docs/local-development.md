@@ -20,6 +20,18 @@ Run one service:
 docker compose up --build core-service
 ```
 
+Run the API Gateway:
+
+```bash
+docker compose up --build api-gateway
+```
+
+Gateway URL:
+
+```text
+http://localhost:8080
+```
+
 Every container listens on `8000` internally. Host ports are assigned in Docker Compose and documented in [service-port-map.md](service-port-map.md).
 
 ## Health Checks
