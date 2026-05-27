@@ -18,6 +18,7 @@ Asthra local orchestration uses Docker Compose with one container per service. E
 | collab-service | 8009 | http://localhost:8009/health |
 | automation-service | 8010 | http://localhost:8010/health |
 | connect-service | 8011 | http://localhost:8011/health |
+| guard-service | 8012 | http://localhost:8012/health |
 
 ## Local Run
 
