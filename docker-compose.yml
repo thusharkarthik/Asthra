@@ -155,6 +155,19 @@ services:
     volumes:
       - connect_service_data:/app/data
 
+  guard-service:
+    build:
+      context: ./services/guard-service
+    container_name: asthra-guard-service
+    env_file:
+      - ./services/guard-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_guard.db
+    ports:
+      - "8012:8000"
+    volumes:
+      - guard_service_data:/app/data
+
 volumes:
   core_service_data:
   flow_service_data:
@@ -168,3 +181,4 @@ volumes:
   collab_service_data:
   automation_service_data:
   connect_service_data:
+  guard_service_data:
