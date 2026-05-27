@@ -2,27 +2,74 @@
 
 Asthra is an AI-native operating platform for work, engineering, knowledge, automation, collaboration, and intelligent workflows.
 
-Asthra is an original platform with its own architecture, suite model, workflows, and AI-first direction. The current repository stage is focused on monorepo structure and documentation only.
+Asthra is an original platform with its own architecture, suite model, workflows, and long-term AI-first direction. The current repository contains the platform monorepo, Level 2 backend service MVPs, local Docker orchestration, service documentation, seed scripts, and automated test foundations.
 
-## Current Priority
+## Current Modules
 
-- Level 0: repository structure.
-- Level 1: documentation, architecture files, and engineering standards.
-- Level 2 next: FastAPI core service foundation.
+| Service | Suite Name | Port | Current Status |
+| --- | --- | ---: | --- |
+| core-service | Asthra Core | 8000 | Level 2 foundation MVP |
+| flow-service | Asthra Flow | 8001 | Work management MVP |
+| docs-service | Asthra Docs | 8002 | Knowledge/documentation MVP |
+| ai-service | Asthra Intelligence | 8003 | Provider and prompt foundation |
+| memory-service | Asthra Memory | 8004 | Ingestion/chunking/retrieval placeholder MVP |
+| discover-service | Asthra Discover | 8005 | Product discovery MVP |
+| desk-service | Asthra Desk | 8006 | Service management MVP |
+| pulse-service | Asthra Pulse | 8007 | Incident/reliability MVP |
+| dev-service | Asthra Dev | 8008 | Engineering visibility MVP |
+| collab-service | Asthra Collab | 8009 | Collaboration MVP |
+| automation-service | Asthra Automate | 8010 | Workflow foundation MVP |
+| connect-service | Asthra Connect | 8011 | Integration foundation MVP |
+| guard-service | Asthra Guard | 8012 | Security/governance MVP |
+| insights-service | Asthra Insights | 8013 | Analytics/reporting MVP |
+| media-service | Asthra Media | 8014 | Media metadata MVP |
 
-Backend services, RAG, agents, automation runtime, and AI features are not implemented in this stage.
+## Run Locally
 
-## Monorepo Layout
+From the repository root:
 
-```text
-apps/             User-facing web applications.
-services/         Backend service boundaries.
-packages/         Shared reusable packages.
-infrastructure/   Docker, nginx, deployment, and monitoring assets.
-docs/             Product, architecture, API, database, and engineering docs.
-scripts/          Developer and operational scripts.
+```bash
+docker compose up --build
 ```
 
-## Suite Areas
+Each service exposes:
 
-Asthra includes Core, Flow, Docs, Discover, Desk, Dev, Pulse, Intelligence, Automate, Insights, Connect, Guard, Memory, Collab, and Media. These areas are represented as service boundaries now, with implementation deferred until the roadmap reaches each tier.
+- `/health`
+- `/ready`
+- `/api/v1/system/info`
+- `/docs`
+
+See [docs/service-port-map.md](docs/service-port-map.md) for the full local port map.
+
+## Run Tests
+
+Each service owns its test suite. Example:
+
+```bash
+cd services/core-service
+python -m pytest tests -q
+```
+
+Repeat from any service directory. Tests use local SQLite databases and should not target production data.
+
+## Milestone Status
+
+Completed platform foundation:
+
+- Monorepo structure and documentation foundation
+- FastAPI service skeletons across the Asthra suite
+- SQLite local persistence pattern per service
+- Docker Compose orchestration for all current services
+- MVP endpoints, seed scripts, and basic tests for service foundations
+- Standard health/readiness/system metadata endpoints
+
+Future platform work:
+
+- Shared auth propagation
+- API gateway
+- Event bus
+- Redis/cache layer
+- Service-to-service communication
+- RAG integration
+- Real AI provider workflows beyond placeholders
+- Frontend applications
