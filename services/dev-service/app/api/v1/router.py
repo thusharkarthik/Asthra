@@ -1,0 +1,77 @@
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.schemas.schemas import *
+from app.services.services import *
+
+api_router = APIRouter()
+
+@api_router.post("/repositories", response_model=RepositoryRead, status_code=201)
+def create_repo(d: RepositoryCreate, db: Session = Depends(get_db)): return RepositoryService(db).create(d)
+@api_router.get("/repositories", response_model=list[RepositoryRead])
+def list_repos(workspace_id: int | None = None, provider: str | None = None, project_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return RepositoryService(db).list(workspace_id=workspace_id, provider=provider, project_id=project_id, limit=limit, offset=offset)
+@api_router.get("/repositories/{repository_id}", response_model=RepositoryRead)
+def get_repo(repository_id: int, db: Session = Depends(get_db)): return RepositoryService(db).get(repository_id)
+@api_router.patch("/repositories/{repository_id}", response_model=RepositoryRead)
+def update_repo(repository_id: int, d: RepositoryUpdate, db: Session = Depends(get_db)): return RepositoryService(db).update(repository_id, d)
+@api_router.delete("/repositories/{repository_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_repo(repository_id: int, db: Session = Depends(get_db)): RepositoryService(db).delete(repository_id); return Response(status_code=204)
+
+@api_router.post("/pull-requests", response_model=PullRequestRead, status_code=201)
+def create_pr(d: PullRequestCreate, db: Session = Depends(get_db)): return PullRequestService(db).create(d)
+@api_router.get("/pull-requests", response_model=list[PullRequestRead])
+def list_prs(repository_id: int | None = None, status: str | None = None, author_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return PullRequestService(db).list(repository_id=repository_id, status=status, author_id=author_id, limit=limit, offset=offset)
+@api_router.get("/pull-requests/{pull_request_id}", response_model=PullRequestRead)
+def get_pr(pull_request_id: int, db: Session = Depends(get_db)): return PullRequestService(db).get(pull_request_id)
+@api_router.patch("/pull-requests/{pull_request_id}", response_model=PullRequestRead)
+def update_pr(pull_request_id: int, d: PullRequestUpdate, db: Session = Depends(get_db)): return PullRequestService(db).update(pull_request_id, d)
+
+@api_router.post("/environments", response_model=EnvironmentRead, status_code=201)
+def create_env(d: EnvironmentCreate, db: Session = Depends(get_db)): return EnvironmentService(db).create(d)
+@api_router.get("/environments", response_model=list[EnvironmentRead])
+def list_envs(workspace_id: int | None = None, db: Session = Depends(get_db)): return EnvironmentService(db).list(workspace_id)
+@api_router.get("/environments/{environment_id}", response_model=EnvironmentRead)
+def get_env(environment_id: int, db: Session = Depends(get_db)): return EnvironmentService(db).get(environment_id)
+
+@api_router.post("/services", response_model=ServiceRead, status_code=201)
+def create_service(d: ServiceCreate, db: Session = Depends(get_db)): return ServiceCatalogService(db).create(d)
+@api_router.get("/services", response_model=list[ServiceRead])
+def list_services(workspace_id: int | None = None, owner_id: int | None = None, lifecycle_status: str | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return ServiceCatalogService(db).list(workspace_id=workspace_id, owner_id=owner_id, lifecycle_status=lifecycle_status, limit=limit, offset=offset)
+@api_router.get("/services/{service_id}", response_model=ServiceRead)
+def get_service(service_id: int, db: Session = Depends(get_db)): return ServiceCatalogService(db).get(service_id)
+@api_router.patch("/services/{service_id}", response_model=ServiceRead)
+def update_service(service_id: int, d: ServiceUpdate, db: Session = Depends(get_db)): return ServiceCatalogService(db).update(service_id, d)
+@api_router.delete("/services/{service_id}", status_code=204)
+def delete_service(service_id: int, db: Session = Depends(get_db)): ServiceCatalogService(db).delete(service_id); return Response(status_code=204)
+
+@api_router.post("/deployments", response_model=DeploymentRead, status_code=201)
+def create_deployment(d: DeploymentCreate, db: Session = Depends(get_db)): return DeploymentService(db).create(d)
+@api_router.get("/deployments", response_model=list[DeploymentRead])
+def list_deployments(workspace_id: int | None = None, environment_id: int | None = None, status: str | None = None, service_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return DeploymentService(db).list(workspace_id=workspace_id, environment_id=environment_id, status=status, service_id=service_id, limit=limit, offset=offset)
+@api_router.get("/deployments/{deployment_id}", response_model=DeploymentRead)
+def get_deployment(deployment_id: int, db: Session = Depends(get_db)): return DeploymentService(db).get(deployment_id)
+@api_router.patch("/deployments/{deployment_id}", response_model=DeploymentRead)
+def update_deployment(deployment_id: int, d: DeploymentUpdate, db: Session = Depends(get_db)): return DeploymentService(db).update(deployment_id, d)
+
+@api_router.post("/releases", response_model=ReleaseRead, status_code=201)
+def create_release(d: ReleaseCreate, db: Session = Depends(get_db)): return ReleaseService(db).create(d)
+@api_router.get("/releases", response_model=list[ReleaseRead])
+def list_releases(workspace_id: int | None = None, status: str | None = None, service_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return ReleaseService(db).list(workspace_id=workspace_id, status=status, service_id=service_id, limit=limit, offset=offset)
+@api_router.get("/releases/{release_id}", response_model=ReleaseRead)
+def get_release(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).get(release_id)
+@api_router.patch("/releases/{release_id}", response_model=ReleaseRead)
+def update_release(release_id: int, d: ReleaseUpdate, db: Session = Depends(get_db)): return ReleaseService(db).update(release_id, d)
+
+@api_router.post("/services/{service_id}/owners", response_model=ServiceOwnerRead, status_code=201)
+def add_owner(service_id: int, d: ServiceOwnerCreate, db: Session = Depends(get_db)): return OwnerService(db).create(service_id, d)
+@api_router.get("/services/{service_id}/owners", response_model=list[ServiceOwnerRead])
+def list_owners(service_id: int, db: Session = Depends(get_db)): return OwnerService(db).list(service_id)
+@api_router.delete("/services/{service_id}/owners/{owner_id}", status_code=204)
+def delete_owner(service_id: int, owner_id: int, db: Session = Depends(get_db)): OwnerService(db).delete(service_id, owner_id); return Response(status_code=204)
+
+@api_router.post("/services/{service_id}/dependencies", response_model=ServiceDependencyRead, status_code=201)
+def add_dep(service_id: int, d: ServiceDependencyCreate, db: Session = Depends(get_db)): return DependencyService(db).create(service_id, d)
+@api_router.get("/services/{service_id}/dependencies", response_model=list[ServiceDependencyRead])
+def list_deps(service_id: int, db: Session = Depends(get_db)): return DependencyService(db).list(service_id)
+@api_router.delete("/services/{service_id}/dependencies/{dependency_id}", status_code=204)
+def delete_dep(service_id: int, dependency_id: int, db: Session = Depends(get_db)): DependencyService(db).delete(service_id, dependency_id); return Response(status_code=204)
