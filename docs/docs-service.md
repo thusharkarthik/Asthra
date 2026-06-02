@@ -40,6 +40,7 @@ Pages:
 - `GET /api/v1/pages/{page_id}`
 - `PATCH /api/v1/pages/{page_id}`
 - `DELETE /api/v1/pages/{page_id}`
+- `POST /api/v1/pages/{page_id}/prepare-memory-document`
 
 Comments, attachments, tags, and search:
 
@@ -94,6 +95,23 @@ pytest tests
 ```
 
 The tests use a disposable SQLite database under `tests/`.
+
+## RAG Readiness
+
+Docs does not call Memory automatically yet. It exposes a memory preparation endpoint:
+
+```http
+POST /api/v1/pages/{page_id}/prepare-memory-document
+```
+
+This returns:
+
+- title
+- content
+- workspace_id
+- `source_type="docs_page"`
+- `external_reference="page:{page_id}"`
+- metadata with page and space identifiers
 
 ## Future RAG Roadmap
 

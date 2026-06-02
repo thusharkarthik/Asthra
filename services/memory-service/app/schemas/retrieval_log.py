@@ -23,6 +23,7 @@ class RetrievalSearchRequest(BaseModel):
     top_k: int | None = Field(default=10, ge=1, le=100)
     source_id: int | None = None
     workspace_id: int | None = None
+    document_id: int | None = None
 
 
 class RetrievalSearchResult(BaseModel):
@@ -32,6 +33,8 @@ class RetrievalSearchResult(BaseModel):
     source_id: int
     workspace_id: int | None = None
     match_type: str
+    score: float | None = None
+    metadata: dict | None = None
 
 
 class RetrievalSearchResponse(BaseModel):

@@ -34,6 +34,15 @@ class PageRead(TimestampedRead):
     is_active: bool
 
 
+class PageMemoryDocumentPayload(BaseModel):
+    title: str
+    content: str
+    workspace_id: int
+    source_type: str = "docs_page"
+    external_reference: str
+    metadata: dict
+
+
 class PageVersionCreate(BaseModel):
     page_id: int
     version_number: int

@@ -16,6 +16,7 @@ from app.schemas.knowledge_document import KnowledgeDocumentCreate  # noqa: E402
 from app.schemas.knowledge_source import KnowledgeSourceCreate  # noqa: E402
 from app.services.document_service import DocumentService  # noqa: E402
 from app.services.source_service import SourceService  # noqa: E402
+from app.vectorstores.in_memory_vector_store import get_vector_store  # noqa: E402
 
 
 TEST_DB_PATH = Path(__file__).parent / "test_asthra_memory.db"
@@ -29,11 +30,13 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 def db() -> Generator[Session, None, None]:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    get_vector_store().clear()
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
+        get_vector_store().clear()
         Base.metadata.drop_all(bind=engine)
 
 

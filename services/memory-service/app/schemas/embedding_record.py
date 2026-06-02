@@ -21,6 +21,10 @@ class EmbeddingGenerationResponse(BaseModel):
     document_id: int
     embedding_model: str
     status: str
+    chunks_processed: int = 0
+    embeddings_created: int = 0
+    provider: str | None = None
+    model: str | None = None
     records_created: int
     records_updated: int
     records: list[EmbeddingRecordRead]

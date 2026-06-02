@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         alias="OPENROUTER_DEFAULT_MODEL",
     )
     groq_default_model: str = Field(default="llama-3.1-8b-instant", alias="GROQ_DEFAULT_MODEL")
+    memory_service_url: str = Field(default="http://localhost:8004", alias="MEMORY_SERVICE_URL")
     event_service_url: str | None = Field(default=None, alias="EVENT_SERVICE_URL")
     event_publishing_enabled: bool = Field(default=False, alias="EVENT_PUBLISHING_ENABLED")
 
