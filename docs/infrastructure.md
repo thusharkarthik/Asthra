@@ -6,6 +6,8 @@ Asthra local orchestration uses Docker Compose with one container per service. E
 
 | Service | Port | Health URL |
 | --- | --- | --- |
+| api-gateway | 8080 | http://localhost:8080/health |
+| event-service | 8015 | http://localhost:8015/health |
 | core-service | 8000 | http://localhost:8000/health |
 | flow-service | 8001 | http://localhost:8001/health |
 | docs-service | 8002 | http://localhost:8002/health |
@@ -30,7 +32,13 @@ From the repository root:
 docker compose up --build
 ```
 
-After startup, verify each service by opening its health URL. Containers listen on port `8000` internally, while Docker Compose publishes each service to its assigned host port.
+After startup, verify each service by opening its health URL. Containers listen on port `8000` internally, while Docker Compose publishes each service to its assigned host port. Each service also exposes `/ready` and `/api/v1/system/info`.
+
+See also:
+
+- [service-port-map.md](service-port-map.md)
+- [local-development.md](local-development.md)
+- [integration-hardening.md](integration-hardening.md)
 
 ## Current Scope
 

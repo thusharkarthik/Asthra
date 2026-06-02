@@ -1,4 +1,26 @@
 services:
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: asthra-api-gateway
+    env_file:
+      - ./services/api-gateway/.env.example
+    ports:
+      - "8080:8000"
+
+  event-service:
+    build:
+      context: ./services/event-service
+    container_name: asthra-event-service
+    env_file:
+      - ./services/event-service/.env.example
+    environment:
+      DATABASE_URL: sqlite:////app/data/asthra_events.db
+    ports:
+      - "8015:8000"
+    volumes:
+      - event_service_data:/app/data
+
   core-service:
     build:
       context: ./services/core-service
@@ -210,3 +232,4 @@ volumes:
   guard_service_data:
   insights_service_data:
   media_service_data:
+  event_service_data:
