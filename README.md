@@ -2,9 +2,45 @@
 
 Asthra is an AI-native operating platform for work, engineering, knowledge, automation, collaboration, and intelligent workflows.
 
-Asthra is an original platform with its own architecture, suite model, workflows, and long-term AI-first direction. The current repository contains the platform monorepo, Level 2 backend service MVPs, local Docker orchestration, service documentation, seed scripts, and automated test foundations.
+Asthra is an original platform with its own architecture, suite model, workflows, and long-term AI-first direction. The current repository contains the platform monorepo, backend service MVPs, shared packages, local Docker orchestration, developer tooling, governance docs, ADRs, and automated test foundations.
 
-## Current Modules
+## Platform Overview
+
+Asthra is organized around service-owned product and platform domains:
+
+- Core identity and workspace foundation
+- Work management
+- Documentation and knowledge
+- Product discovery
+- Service management
+- Incident and reliability workflows
+- Engineering visibility
+- Collaboration
+- Integrations
+- Governance
+- Analytics
+- Media metadata
+- AI, memory, eventing, and API gateway foundations
+
+## Current Architecture
+
+- Monorepo with `services/`, `packages/`, `docs/`, `scripts/`, and infrastructure files.
+- FastAPI service foundations.
+- One Docker Compose service per backend boundary.
+- SQLite local persistence for current MVP development.
+- API Gateway foundation for future frontend/client entry.
+- Event Bus foundation for future asynchronous workflows.
+- Shared packages for platform utilities, auth helpers, events, schemas, config, DB helpers, test utilities, and API clients.
+
+Architecture references:
+
+- [Architecture Principles](docs/architecture-principles.md)
+- [Service Boundaries](docs/service-boundaries.md)
+- [Data Ownership](docs/data-ownership.md)
+- [Service Communication](docs/service-communication.md)
+- [ADR Index](docs/adr)
+
+## Current Services
 
 | Service | Suite Name | Port | Current Status |
 | --- | --- | ---: | --- |
@@ -26,6 +62,20 @@ Asthra is an original platform with its own architecture, suite model, workflows
 | insights-service | Asthra Insights | 8013 | Analytics/reporting MVP |
 | media-service | Asthra Media | 8014 | Media metadata MVP |
 
+See [Service Port Map](docs/service-port-map.md) and [Platform Service Map](docs/platform-service-map.md).
+
+## Repository Structure
+
+```text
+apps/             Future user-facing web applications.
+services/         Backend service boundaries.
+packages/         Shared reusable packages.
+infrastructure/   Docker, nginx, deployment, and monitoring assets.
+docs/             Product, architecture, standards, and service docs.
+scripts/          Developer and operational scripts.
+.github/          Pull request and issue templates.
+```
+
 ## Run Locally
 
 From the repository root:
@@ -38,43 +88,36 @@ Each service exposes:
 
 - `/health`
 - `/ready`
-- `/api/v1/system/info`
+- `/api/v1/system/info` for services
 - `/docs`
-
-See [docs/service-port-map.md](docs/service-port-map.md) for the full local port map.
 
 ## Run Tests
 
-Each service owns its test suite. Example:
+Run a single service or package:
 
 ```bash
 cd services/core-service
-python -m pytest tests -q
+python3 -m pytest tests -q
 ```
 
-Repeat from any service directory. Tests use local SQLite databases and should not target production data.
+Run discovered tests:
 
-## Milestone Status
+```bash
+scripts/run_all_tests.sh
+```
 
-Completed platform foundation:
+## Contribution Notes
 
-- Monorepo structure and documentation foundation
-- FastAPI service skeletons across the Asthra suite
-- SQLite local persistence pattern per service
-- Docker Compose orchestration for all current services
-- MVP endpoints, seed scripts, and basic tests for service foundations
-- Standard health/readiness/system metadata endpoints
-- API Gateway foundation for selected service proxy routes
-- Event Bus foundation for event envelopes, subscriptions, and placeholder delivery logs
+Before contributing, read:
 
-Future platform work:
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [Git Workflow](docs/git-workflow.md)
+- [Branching Strategy](docs/branching-strategy.md)
+- [Commit Conventions](docs/commit-conventions.md)
+- [API Conventions](docs/api-conventions.md)
 
-- Shared auth propagation
-- API gateway
-- Event bus
-- Broker-backed event delivery
-- Redis/cache layer
-- Service-to-service communication
-- RAG integration
-- Real AI provider workflows beyond placeholders
-- Frontend applications
+Keep changes scoped. Do not modify unrelated service business logic. Update docs when architecture, structure, APIs, or standards change.
+
+## Roadmap
+
+See [Roadmap](docs/roadmap.md), [Development Status](docs/development-status.md), and the architecture plans for AI, RAG, event-driven workflows, and performance layers.
