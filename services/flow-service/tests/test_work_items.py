@@ -5,7 +5,12 @@ from app.services.work_item_service import WorkItemService
 from tests.conftest import create_work_item
 
 
-def test_work_item_crud(db):
+def test_work_item_crud(db, monkeypatch):
+    published_events = []
+    monkeypatch.setattr(
+        "app.services.work_item_service.publish_event",
+        lambda event_name, **kwargs: published_events.append((event_name, kwargs)),
+    )
     work_item = create_work_item(db, title="Implement Flow CRUD")
     service = WorkItemService(db)
 
@@ -20,6 +25,8 @@ def test_work_item_crud(db):
         WorkItemUpdate(title="Implement Flow CRUD tests"),
     )
     assert updated_work_item.title == "Implement Flow CRUD tests"
+    assert "flow.work_item.created" in [event[0] for event in published_events]
+    assert "flow.work_item.updated" in [event[0] for event in published_events]
 
     service.delete(work_item.id)
 

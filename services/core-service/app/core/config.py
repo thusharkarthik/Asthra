@@ -23,6 +23,8 @@ class Settings(BaseSettings):
         alias="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
     bcrypt_rounds: int = Field(default=12, alias="BCRYPT_ROUNDS")
+    event_service_url: str | None = Field(default=None, alias="EVENT_SERVICE_URL")
+    event_publishing_enabled: bool = Field(default=False, alias="EVENT_PUBLISHING_ENABLED")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

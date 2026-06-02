@@ -6,6 +6,16 @@ from fastapi import HTTPException, Request, Response, status
 
 from app.core.config import settings
 
+try:
+    from shared_auth.auth_headers import forward_auth_headers
+except ImportError:  # pragma: no cover - fallback for services before package installation
+
+    def forward_auth_headers(headers: dict | None) -> dict[str, str]:
+        if not headers:
+            return {}
+        authorization = headers.get("Authorization")
+        return {"Authorization": authorization} if authorization else {}
+
 
 HOP_BY_HOP_HEADERS = {
     "connection",
@@ -25,11 +35,8 @@ async def _request_body(request: Request) -> bytes | None:
 
 
 def _forward_headers(request: Request) -> dict[str, str]:
-    headers: dict[str, str] = {}
-    authorization = request.headers.get("Authorization")
+    headers: dict[str, str] = forward_auth_headers(request.headers)
     request_id = getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID")
-    if authorization:
-        headers["Authorization"] = authorization
     if request_id:
         headers["X-Request-ID"] = request_id
     content_type = request.headers.get("Content-Type")

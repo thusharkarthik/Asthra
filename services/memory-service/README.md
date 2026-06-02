@@ -258,3 +258,12 @@ Open:
 - `http://localhost:8000/docs`
 - `http://localhost:8000/health`
 - `http://localhost:8000/ready`
+
+## Optional Event Publishing
+
+Memory can publish placeholder document events:
+
+- `memory.document.created`
+- `memory.document.chunked`
+
+Publishing is disabled by default with `EVENT_PUBLISHING_ENABLED=false`. Event Service is optional.

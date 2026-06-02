@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
+from app.services.event_publisher import publish_event
 
 
 class WorkspaceService:
@@ -27,13 +28,23 @@ class WorkspaceService:
             organization_id=workspace_create.organization_id,
             name=workspace_create.name,
         )
-        return self.workspace_repository.create_with_owner(
+        workspace = self.workspace_repository.create_with_owner(
             organization_id=workspace_create.organization_id,
             name=workspace_create.name.strip(),
             slug=slug,
             description=workspace_create.description,
             created_by_id=current_user.id,
         )
+        publish_event(
+            "core.workspace.created",
+            payload={"name": workspace.name},
+            workspace_id=workspace.id,
+            organization_id=workspace.organization_id,
+            actor_user_id=current_user.id,
+            entity_type="workspace",
+            entity_id=str(workspace.id),
+        )
+        return workspace
 
     def list(self, current_user: User) -> list[Workspace]:
         self._ensure_active_user(current_user)

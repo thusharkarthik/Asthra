@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.page import Page
 from app.repositories.page_repository import PageRepository
 from app.schemas.page import PageCreate, PageUpdate
+from app.services.event_publisher import publish_event
 
 
 class PageService:
@@ -20,6 +21,13 @@ class PageService:
             page,
             created_by_id=page.created_by_id,
             version_number=1,
+        )
+        publish_event(
+            "docs.page.created",
+            payload={"title": page.title, "space_id": page.space_id, "status": page.status},
+            actor_user_id=page.created_by_id,
+            entity_type="page",
+            entity_id=str(page.id),
         )
         return page
 
@@ -65,6 +73,17 @@ class PageService:
                 created_by_id=page_update.updated_by_id or updated_page.created_by_id,
                 version_number=self.page_repository.next_version_number(updated_page.id),
             )
+        publish_event(
+            "docs.page.updated",
+            payload={
+                "title": updated_page.title,
+                "space_id": updated_page.space_id,
+                "updated_fields": list(page_update.model_dump(exclude_unset=True)),
+            },
+            actor_user_id=page_update.updated_by_id or updated_page.created_by_id,
+            entity_type="page",
+            entity_id=str(updated_page.id),
+        )
         return updated_page
 
     def delete(self, page_id: int) -> None:
