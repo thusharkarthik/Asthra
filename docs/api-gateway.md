@@ -18,7 +18,7 @@ The current MVP does not validate authentication, enforce rate limits, use Redis
 
 ## Routing Strategy
 
-The gateway currently supports explicit proxy routes for the first platform services:
+The gateway currently supports explicit proxy routes for all current platform services:
 
 | Gateway Route | Downstream |
 | --- | --- |
@@ -27,6 +27,17 @@ The gateway currently supports explicit proxy routes for the first platform serv
 | `/api/docs/{path}` | `DOCS_SERVICE_URL` |
 | `/api/ai/{path}` | `AI_SERVICE_URL` |
 | `/api/memory/{path}` | `MEMORY_SERVICE_URL` |
+| `/api/discover/{path}` | `DISCOVER_SERVICE_URL` |
+| `/api/desk/{path}` | `DESK_SERVICE_URL` |
+| `/api/pulse/{path}` | `PULSE_SERVICE_URL` |
+| `/api/dev/{path}` | `DEV_SERVICE_URL` |
+| `/api/collab/{path}` | `COLLAB_SERVICE_URL` |
+| `/api/automation/{path}` | `AUTOMATION_SERVICE_URL` |
+| `/api/connect/{path}` | `CONNECT_SERVICE_URL` |
+| `/api/guard/{path}` | `GUARD_SERVICE_URL` |
+| `/api/insights/{path}` | `INSIGHTS_SERVICE_URL` |
+| `/api/media/{path}` | `MEDIA_SERVICE_URL` |
+| `/api/events/{path}` | `EVENT_SERVICE_URL` |
 
 The proxy forwards:
 
@@ -36,6 +47,7 @@ The proxy forwards:
 - request body
 - `Authorization`
 - `X-Request-ID`
+- `Content-Type` when present
 
 ## Gateway Endpoints
 
@@ -45,6 +57,7 @@ The proxy forwards:
 | `GET /ready` | gateway readiness |
 | `GET /api/gateway/info` | gateway metadata and supported routes |
 | `GET /api/gateway/services` | static service registry |
+| `GET /api/gateway/health/services` | aggregate downstream service health |
 
 ## Local Run
 
@@ -74,7 +87,6 @@ Later tiers can replace this with active health polling or service discovery.
 
 ## Future Roadmap
 
-- Expand proxy routes to every Asthra service.
 - Add gateway-level auth validation.
 - Forward normalized auth context to downstream services.
 - Add rate limiting.

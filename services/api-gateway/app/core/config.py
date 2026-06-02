@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     guard_service_url: str = Field(default="http://localhost:8012", alias="GUARD_SERVICE_URL")
     insights_service_url: str = Field(default="http://localhost:8013", alias="INSIGHTS_SERVICE_URL")
     media_service_url: str = Field(default="http://localhost:8014", alias="MEDIA_SERVICE_URL")
+    event_service_url: str = Field(default="http://localhost:8015", alias="EVENT_SERVICE_URL")
 
     proxy_timeout_seconds: float = Field(default=30.0, alias="PROXY_TIMEOUT_SECONDS")
 

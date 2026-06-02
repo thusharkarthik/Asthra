@@ -49,3 +49,4 @@ def test_proxy_forwards_request(monkeypatch):
     assert FakeAsyncClient.calls[0]["params"]["limit"] == "5"
     assert FakeAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer token"
     assert FakeAsyncClient.calls[0]["headers"]["X-Request-ID"] == "proxy-test"
+    assert FakeAsyncClient.calls[0]["headers"]["Content-Type"] == "application/json"
