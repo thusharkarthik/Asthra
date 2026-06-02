@@ -20,6 +20,7 @@ class RetrievalRepository:
         top_k: int,
         source_id: int | None = None,
         workspace_id: int | None = None,
+        document_id: int | None = None,
     ) -> list[tuple[DocumentChunk, KnowledgeDocument, KnowledgeSource]]:
         statement = (
             select(DocumentChunk, KnowledgeDocument, KnowledgeSource)
@@ -31,8 +32,24 @@ class RetrievalRepository:
             statement = statement.where(KnowledgeSource.id == source_id)
         if workspace_id is not None:
             statement = statement.where(KnowledgeSource.workspace_id == workspace_id)
+        if document_id is not None:
+            statement = statement.where(KnowledgeDocument.id == document_id)
         statement = statement.order_by(DocumentChunk.id).limit(top_k)
         return list(self.db.execute(statement).all())
+
+    def get_chunks_by_ids(
+        self,
+        chunk_ids: list[int],
+    ) -> dict[int, tuple[DocumentChunk, KnowledgeDocument, KnowledgeSource]]:
+        if not chunk_ids:
+            return {}
+        statement = (
+            select(DocumentChunk, KnowledgeDocument, KnowledgeSource)
+            .join(KnowledgeDocument, DocumentChunk.document_id == KnowledgeDocument.id)
+            .join(KnowledgeSource, KnowledgeDocument.source_id == KnowledgeSource.id)
+            .where(DocumentChunk.id.in_(chunk_ids))
+        )
+        return {chunk.id: (chunk, document, source) for chunk, document, source in self.db.execute(statement).all()}
 
     def create_log(
         self,

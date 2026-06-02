@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.embedding_record import EmbeddingRecord
+from app.providers.embedding_provider_factory import get_embedding_provider
 from app.repositories.embedding_repository import EmbeddingRepository
 from app.services.document_service import DocumentService
+from app.vectorstores.in_memory_vector_store import get_vector_store
 
 
 class EmbeddingService:
@@ -26,11 +28,24 @@ class EmbeddingService:
         created_count = 0
         updated_count = 0
         records: list[EmbeddingRecord] = []
+        provider = get_embedding_provider()
+        vector_store = get_vector_store()
         for chunk in chunks:
+            vector = provider.embed_text(chunk.content)
+            vector_id = vector_store.upsert_vector(
+                chunk_id=chunk.id,
+                vector=vector,
+                metadata={
+                    "chunk_id": chunk.id,
+                    "document_id": chunk.document_id,
+                    "chunk_index": chunk.chunk_index,
+                },
+            )
             record, created = self.embedding_repository.upsert_placeholder(
                 chunk_id=chunk.id,
-                embedding_model=settings.memory_placeholder_embedding_model,
+                embedding_model=provider.model_name,
                 status="generated",
+                vector_id=vector_id,
             )
             records.append(record)
             if created:
@@ -38,6 +53,10 @@ class EmbeddingService:
             else:
                 updated_count += 1
         return records, created_count, updated_count
+
+    def provider_summary(self) -> tuple[str, str]:
+        provider = get_embedding_provider()
+        return settings.embedding_provider, provider.model_name
 
     def list_by_document(self, document_id: int) -> list[EmbeddingRecord]:
         self.document_service.get(document_id)

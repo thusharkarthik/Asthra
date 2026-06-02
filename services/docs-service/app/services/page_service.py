@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.page import Page
 from app.repositories.page_repository import PageRepository
-from app.schemas.page import PageCreate, PageUpdate
+from app.schemas.page import PageCreate, PageMemoryDocumentPayload, PageUpdate
 from app.services.event_publisher import publish_event
 
 
@@ -89,6 +89,23 @@ class PageService:
     def delete(self, page_id: int) -> None:
         page = self.get(page_id)
         self.page_repository.delete(page)
+
+    def prepare_memory_document(self, page_id: int) -> PageMemoryDocumentPayload:
+        page = self.get(page_id)
+        # TODO: Later this can optionally call memory-service ingestion. For now it only normalizes payload.
+        return PageMemoryDocumentPayload(
+            title=page.title,
+            content=page.content,
+            workspace_id=page.space.workspace_id,
+            external_reference=f"page:{page.id}",
+            metadata={
+                "page_id": page.id,
+                "space_id": page.space_id,
+                "status": page.status,
+                "created_by_id": page.created_by_id,
+                "updated_by_id": page.updated_by_id,
+            },
+        )
 
     def _ensure_active_space(self, space_id: int) -> None:
         if space_id is None:

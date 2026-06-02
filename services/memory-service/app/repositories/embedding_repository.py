@@ -37,6 +37,7 @@ class EmbeddingRepository:
         chunk_id: int,
         embedding_model: str,
         status: str,
+        vector_id: str | None = None,
     ) -> tuple[EmbeddingRecord, bool]:
         existing = self.get_by_chunk_and_model(
             chunk_id=chunk_id,
@@ -44,7 +45,7 @@ class EmbeddingRepository:
         )
         if existing is not None:
             existing.embedding_status = status
-            existing.vector_id = None
+            existing.vector_id = vector_id
             self.db.add(existing)
             self.db.commit()
             self.db.refresh(existing)
@@ -53,7 +54,7 @@ class EmbeddingRepository:
         record = EmbeddingRecord(
             chunk_id=chunk_id,
             embedding_model=embedding_model,
-            vector_id=None,
+            vector_id=vector_id,
             embedding_status=status,
         )
         self.db.add(record)

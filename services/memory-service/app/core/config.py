@@ -17,6 +17,9 @@ class Settings(BaseSettings):
         default="placeholder-keyword-model",
         alias="MEMORY_PLACEHOLDER_EMBEDDING_MODEL",
     )
+    embedding_provider: str = Field(default="mock", alias="EMBEDDING_PROVIDER")
+    embedding_model_name: str = Field(default="mock-embedding-v1", alias="EMBEDDING_MODEL_NAME")
+    vector_store_provider: str = Field(default="in_memory", alias="VECTOR_STORE_PROVIDER")
     event_service_url: str | None = Field(default=None, alias="EVENT_SERVICE_URL")
     event_publishing_enabled: bool = Field(default=False, alias="EVENT_PUBLISHING_ENABLED")
 
