@@ -5,6 +5,7 @@ from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
 from app.services.activity_service import ActivityService
+from app.services.event_publisher import publish_event
 
 
 class WorkItemService:
@@ -33,6 +34,13 @@ class WorkItemService:
             project_id=work_item.project_id,
             work_item_id=work_item.id,
             description=f"Work item '{work_item.title}' was created.",
+        )
+        publish_event(
+            "flow.work_item.created",
+            payload={"title": work_item.title, "project_id": work_item.project_id},
+            actor_user_id=work_item.reporter_id,
+            entity_type="work_item",
+            entity_id=str(work_item.id),
         )
         return work_item
 
@@ -86,6 +94,17 @@ class WorkItemService:
             work_item_id=updated_work_item.id,
             description=f"Work item '{updated_work_item.title}' was updated.",
             metadata={"updated_fields": list(work_item_update.model_dump(exclude_unset=True))},
+        )
+        publish_event(
+            "flow.work_item.updated",
+            payload={
+                "title": updated_work_item.title,
+                "project_id": updated_work_item.project_id,
+                "updated_fields": list(work_item_update.model_dump(exclude_unset=True)),
+            },
+            actor_user_id=updated_work_item.reporter_id,
+            entity_type="work_item",
+            entity_id=str(updated_work_item.id),
         )
         return updated_work_item
 

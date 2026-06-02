@@ -3,6 +3,13 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+try:
+    from shared_config.env import get_list_env
+except ImportError:  # pragma: no cover - fallback for services before package installation
+
+    def get_list_env(name: str, separator: str = ",") -> list[str]:
+        return []
+
 
 class Settings(BaseSettings):
     app_name: str = Field(default="asthra-api-gateway", alias="APP_NAME")
@@ -33,6 +40,9 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
+        configured = get_list_env("ASTHRA_CORS_ORIGINS", separator=",")
+        if configured:
+            return configured
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
 
 

@@ -1,6 +1,12 @@
-from uuid import uuid4
-
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+try:
+    from shared_observability.request_tracking import generate_request_id
+except ImportError:  # pragma: no cover - fallback for services before package installation
+    from uuid import uuid4
+
+    def generate_request_id() -> str:
+        return str(uuid4())
 
 
 class RequestIdMiddleware:
@@ -13,7 +19,7 @@ class RequestIdMiddleware:
             return
 
         headers = dict(scope.get("headers", []))
-        request_id = headers.get(b"x-request-id", b"").decode() or str(uuid4())
+        request_id = headers.get(b"x-request-id", b"").decode() or generate_request_id()
         scope.setdefault("state", {})["request_id"] = request_id
 
         async def send_with_request_id(message: Message) -> None:

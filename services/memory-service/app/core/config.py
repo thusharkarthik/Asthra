@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         default="placeholder-keyword-model",
         alias="MEMORY_PLACEHOLDER_EMBEDDING_MODEL",
     )
+    event_service_url: str | None = Field(default=None, alias="EVENT_SERVICE_URL")
+    event_publishing_enabled: bool = Field(default=False, alias="EVENT_PUBLISHING_ENABLED")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

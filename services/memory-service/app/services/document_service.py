@@ -9,6 +9,7 @@ from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
 from app.schemas.knowledge_document import KnowledgeDocumentCreate, KnowledgeDocumentUpdate
 from app.services.chunking_service import ChunkingService
+from app.services.event_publisher import publish_event
 from app.services.source_service import SourceService
 
 
@@ -24,6 +25,12 @@ class DocumentService:
         self.source_service.get(document_create.source_id)
         document = self.document_repository.create(document_create)
         self._rebuild_chunks(document)
+        publish_event(
+            "memory.document.created",
+            payload={"title": document.title, "source_id": document.source_id},
+            entity_type="knowledge_document",
+            entity_id=str(document.id),
+        )
         return document
 
     def list(
@@ -72,7 +79,14 @@ class DocumentService:
 
     def _rebuild_chunks(self, document: KnowledgeDocument) -> list[DocumentChunk]:
         chunks = self.chunking_service.chunk_text(document.content)
-        return self.chunk_repository.replace_document_chunks(
+        rebuilt_chunks = self.chunk_repository.replace_document_chunks(
             document_id=document.id,
             chunks=chunks,
         )
+        publish_event(
+            "memory.document.chunked",
+            payload={"document_id": document.id, "chunk_count": len(rebuilt_chunks)},
+            entity_type="knowledge_document",
+            entity_id=str(document.id),
+        )
+        return rebuilt_chunks

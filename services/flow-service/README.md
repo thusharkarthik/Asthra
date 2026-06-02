@@ -376,3 +376,12 @@ The tests use a disposable SQLite database at `tests/test_asthra_flow.db`. They 
 - add comment
 - add label
 - add attachment metadata
+
+## Optional Event Publishing
+
+Flow can publish placeholder work item events:
+
+- `flow.work_item.created`
+- `flow.work_item.updated`
+
+Set `EVENT_SERVICE_URL` and `EVENT_PUBLISHING_ENABLED=true` to enable later. Publishing is disabled by default and never blocks the main work item action.

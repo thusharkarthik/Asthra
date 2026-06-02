@@ -7,7 +7,12 @@ from app.services.page_service import PageService
 from tests.conftest import create_space
 
 
-def test_page_crud_and_versions(db):
+def test_page_crud_and_versions(db, monkeypatch):
+    published_events = []
+    monkeypatch.setattr(
+        "app.services.page_service.publish_event",
+        lambda event_name, **kwargs: published_events.append((event_name, kwargs)),
+    )
     space = create_space(db)
     service = PageService(db)
     page = service.create(
@@ -34,6 +39,8 @@ def test_page_crud_and_versions(db):
         PageUpdate(title="Architecture Overview", content="Updated overview", updated_by_id=2),
     )
     assert updated_page.title == "Architecture Overview"
+    assert "docs.page.created" in [event[0] for event in published_events]
+    assert "docs.page.updated" in [event[0] for event in published_events]
 
     versions = db.scalars(
         select(PageVersion).where(PageVersion.page_id == page.id).order_by(PageVersion.version_number),

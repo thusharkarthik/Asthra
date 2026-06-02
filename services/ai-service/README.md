@@ -266,3 +266,14 @@ docker compose up --build ai-service
 ```
 
 The compose service maps Asthra Intelligence to `http://localhost:8003` and stores SQLite data in a Docker volume.
+
+## Optional Event Publishing
+
+AI Service can publish `ai.completion.generated` after successful chat completions.
+
+```env
+EVENT_SERVICE_URL=
+EVENT_PUBLISHING_ENABLED=false
+```
+
+Publishing is disabled by default and fail-safe.
