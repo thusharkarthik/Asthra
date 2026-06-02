@@ -1,0 +1,8 @@
+[project]
+name = "asthra-shared-utils"
+version = "0.1.0"
+description = "Lightweight shared utility helpers for Asthra services."
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["."]
