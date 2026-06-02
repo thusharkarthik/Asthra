@@ -48,10 +48,17 @@ Events use dot notation:
 
 - `core.organization.created`
 - `core.workspace.created`
+- `core.project.created`
 - `flow.work_item.created`
+- `flow.work_item.updated`
+- `docs.page.created`
 - `docs.page.updated`
 - `ai.completion.generated`
+- `memory.document.created`
 - `memory.document.chunked`
+- `discover.idea.created`
+- `desk.ticket.created`
+- `pulse.incident.created`
 - `automation.workflow.executed`
 
 Recommended structure:
@@ -81,10 +88,42 @@ Recommended structure:
 - Creates placeholder `pending` delivery logs for matching active subscriptions.
 - Does not deliver to external systems.
 
+## Shared Event Client
+
+`packages/shared-events` includes a lightweight `EventClient` for future service-to-event-service publishing.
+
+Services will later use it to:
+
+1. Build an `EventEnvelope`.
+2. Preserve request and correlation context.
+3. POST the event to Event Service at `/api/v1/events`.
+
+The client supports no-op mode when no Event Service URL is configured. This allows services to adopt event construction without requiring Event Service to be available in every environment.
+
+Example:
+
+```python
+from shared_events import EventClient, EventNames
+
+client = EventClient(event_service_url=None)
+event = client.build_event(
+    event_name=EventNames.DOCS_PAGE_UPDATED,
+    source_service="docs-service",
+    workspace_id=1,
+    entity_type="page",
+    entity_id="42",
+    payload={"title": "Updated page"},
+)
+result = client.publish_event(event)
+```
+
+With no URL configured, `publish_event()` returns a successful no-op result and does not perform network I/O.
+
 ## Future Roadmap
 
 - Kafka, RabbitMQ, or Redis Streams adapter.
 - Background delivery workers.
+- Async broker publishing client.
 - Retry queues and dead-letter handling.
 - Automation trigger integration.
 - Cache invalidation events.
