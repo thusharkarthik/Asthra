@@ -1,0 +1,11 @@
+name: Test Placeholder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Test workflow placeholder. Real test pipeline is planned later."
