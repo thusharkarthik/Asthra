@@ -1,0 +1,11 @@
+name: Lint Placeholder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lint-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Lint workflow placeholder. Real lint pipeline is planned later."

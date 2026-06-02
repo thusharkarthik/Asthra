@@ -1,0 +1,11 @@
+name: Build Placeholder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Build workflow placeholder. Real image build pipeline is planned later."
