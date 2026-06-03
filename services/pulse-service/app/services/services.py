@@ -11,7 +11,7 @@ from app.repositories.repositories import (
     StatusPageRepository,
     TimelineRepository,
 )
-from app.schemas.incident import IncidentAISummaryRead
+from app.schemas.incident import IncidentAISummaryRead, IncidentMemoryDocumentPayload
 from app.services.ai_client import AIClient
 
 SEVERITIES = {"low", "medium", "high", "critical"}
@@ -114,6 +114,24 @@ class IncidentService:
             next_actions=result.get("next_actions") or [],
             customer_facing_update_draft=result.get("customer_facing_update_draft"),
             raw_response=result.get("raw_response"),
+        )
+
+    def prepare_memory_document(self, item_id: int) -> IncidentMemoryDocumentPayload:
+        incident = self.get(item_id)
+        timeline = TimelineRepository(self.repo.db).list_by_incident(incident.id)
+        timeline_text = "\n".join(f"{event.event_type}: {event.content}" for event in timeline)
+        return IncidentMemoryDocumentPayload(
+            external_reference=f"incident:{incident.id}",
+            workspace_id=incident.workspace_id,
+            title=incident.title,
+            content="\n\n".join(part for part in [incident.description, timeline_text] if part),
+            metadata={
+                "incident_id": incident.id,
+                "alert_id": incident.alert_id,
+                "severity": incident.severity,
+                "status": incident.status,
+                "commander_id": incident.commander_id,
+            },
         )
 
 

@@ -2,7 +2,7 @@
 
 Asthra Intelligence is the foundation service for AI capabilities across Asthra. The current MVP supports provider metadata, prompt templates, conversations, messages, request logs, and non-streaming chat completion calls through provider adapters.
 
-This service does not implement RAG, vector databases, agents, automation, or frontend functionality yet.
+This service includes foundation RAG endpoints backed by Memory Service. It does not implement agents, automation, cache, or frontend functionality.
 
 ## Scope
 
@@ -229,6 +229,33 @@ Response:
 ```
 
 Each provider call is logged to `ai_request_logs` when possible. This endpoint is not streaming and does not use RAG, vector search, agents, or automation.
+
+## RAG Endpoints
+
+Document semantic RAG:
+
+```http
+POST /api/v1/completions/rag
+```
+
+Workspace RAG:
+
+```http
+POST /api/v1/completions/workspace-rag
+```
+
+Workspace RAG request:
+
+```json
+{
+  "workspace_id": 1,
+  "query": "What is blocking onboarding?",
+  "top_k": 5,
+  "provider": "openrouter"
+}
+```
+
+`MEMORY_SERVICE_URL` controls the Memory Service base URL and defaults to `http://localhost:8004`. Tests mock Memory responses and provider responses.
 
 ## Tests
 

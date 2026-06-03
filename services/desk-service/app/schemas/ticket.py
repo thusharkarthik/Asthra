@@ -47,3 +47,12 @@ class TicketAIClassificationRead(BaseModel):
     possible_duplicate_hints: list[str] = []
     recommended_next_action: str | None = None
     raw_response: str | None = None
+
+
+class TicketMemoryDocumentPayload(BaseModel):
+    source_type: str = "support_ticket"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict

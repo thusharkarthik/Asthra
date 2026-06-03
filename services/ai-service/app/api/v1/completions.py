@@ -7,6 +7,7 @@ from app.schemas.completion import (
     ChatCompletionResponse,
     RAGCompletionRequest,
     RAGCompletionResponse,
+    WorkspaceRAGCompletionRequest,
 )
 from app.services.provider_service import ProviderService
 from app.services.rag_service import RAGService
@@ -28,3 +29,11 @@ def create_rag_completion(
     db: Session = Depends(get_db),
 ) -> RAGCompletionResponse:
     return RAGService(db).generate_rag_completion(rag_request)
+
+
+@router.post("/workspace-rag", response_model=RAGCompletionResponse)
+def create_workspace_rag_completion(
+    rag_request: WorkspaceRAGCompletionRequest,
+    db: Session = Depends(get_db),
+) -> RAGCompletionResponse:
+    return RAGService(db).generate_workspace_rag_completion(rag_request)

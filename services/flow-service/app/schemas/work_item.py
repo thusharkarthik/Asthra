@@ -101,3 +101,12 @@ class WorkItemAIBreakdownRead(BaseModel):
     dependencies: list[str] = []
     estimated_complexity: str | None = None
     raw_response: str | None = None
+
+
+class WorkItemMemoryDocumentPayload(BaseModel):
+    source_type: str = "work_item"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict

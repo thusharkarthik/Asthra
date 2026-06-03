@@ -1,14 +1,15 @@
 # Asthra Memory Service
 
-Asthra Memory is the foundation service for managed knowledge context across Asthra. This tier defines the persistence model for sources, documents, chunks, embedding records, and retrieval logs.
+Asthra Memory is the foundation service for managed knowledge context across Asthra. This tier defines sources, workspace memory collections, documents, chunks, embedding records, workspace search, and retrieval logs.
 
-This foundation does not implement full RAG, vector database integration, real embedding generation, agents, automation, or frontend functionality.
+This foundation does not implement production vector database integration, real embedding generation, agents, automation, or frontend functionality.
 
 ## Scope
 
 Initial Memory entities:
 
 - Knowledge sources
+- Memory collections
 - Knowledge documents
 - Document chunks
 - Embedding records
@@ -83,6 +84,11 @@ DATABASE_URL=sqlite:///./asthra_memory.db
 MEMORY_CHUNK_SIZE=500
 MEMORY_CHUNK_OVERLAP=50
 MEMORY_PLACEHOLDER_EMBEDDING_MODEL=placeholder-keyword-model
+EMBEDDING_PROVIDER=mock
+EMBEDDING_MODEL_NAME=mock-embedding-v1
+VECTOR_STORE_PROVIDER=in_memory
+EVENT_SERVICE_URL=
+EVENT_PUBLISHING_ENABLED=false
 ```
 
 ## Current Structure
@@ -108,6 +114,12 @@ Current routes:
 - `POST /api/v1/sources`
 - `GET /api/v1/sources`
 - `GET /api/v1/sources/{source_id}`
+- `POST /api/v1/collections`
+- `GET /api/v1/collections`
+- `GET /api/v1/collections/{collection_id}`
+- `PATCH /api/v1/collections/{collection_id}`
+- `DELETE /api/v1/collections/{collection_id}`
+- `POST /api/v1/ingest`
 - `POST /api/v1/documents`
 - `GET /api/v1/documents`
 - `GET /api/v1/documents/{document_id}`
@@ -117,8 +129,23 @@ Current routes:
 - `POST /api/v1/embeddings/generate/{document_id}`
 - `GET /api/v1/embeddings/document/{document_id}`
 - `POST /api/v1/retrieval/search`
+- `POST /api/v1/retrieval/semantic-search`
+- `POST /api/v1/workspace-search`
 
-Embedding and retrieval routes are foundation-level only. No real embedding provider, vector database integration, or semantic retrieval is implemented yet.
+Embedding and retrieval routes are foundation-level. Mock embeddings and an in-memory vector store are used by default.
+
+## Source Registry
+
+Supported `source_type` values:
+
+- `docs_page`
+- `work_item`
+- `idea`
+- `feature_request`
+- `support_ticket`
+- `incident`
+- `release`
+- `discussion_thread`
 
 ## Ingestion Flow
 
@@ -157,6 +184,25 @@ POST /api/v1/documents
 
 When a document is created, Asthra Memory automatically rebuilds its chunks.
 
+Generic ingestion can create or reuse a source, create a document, chunk it, generate mock embeddings, and index vectors in one request:
+
+```http
+POST /api/v1/ingest
+```
+
+```json
+{
+  "source_type": "support_ticket",
+  "external_reference": "support_ticket:123",
+  "workspace_id": 1,
+  "title": "Login issue",
+  "content": "User cannot sign in.",
+  "metadata": {
+    "ticket_id": 123
+  }
+}
+```
+
 ## Chunking Flow
 
 Chunking is a simple word-window strategy for now:
@@ -182,7 +228,7 @@ Generate placeholder embedding records for an already-ingested document:
 POST /api/v1/embeddings/generate/{document_id}
 ```
 
-This does not call an embedding provider. It creates or updates one `EmbeddingRecord` per document chunk using `MEMORY_PLACEHOLDER_EMBEDDING_MODEL`.
+This uses the configured embedding provider. The default `mock` provider returns deterministic local vectors and does not call external APIs.
 
 Current placeholder statuses:
 
@@ -190,7 +236,7 @@ Current placeholder statuses:
 - `generated`
 - `failed`
 
-The generate endpoint marks records as `generated` because the placeholder record was created successfully. `vector_id` remains `null` until a future vector database integration exists.
+The generate endpoint marks records as `generated` and upserts vectors into the configured vector store. The default vector store is in-memory.
 
 List embedding records for a document:
 
@@ -218,6 +264,37 @@ Request:
 ```
 
 Response includes matching chunks, document/source metadata, retrieval type, result count, and latency. Each retrieval request is stored in `retrieval_logs`.
+
+Semantic retrieval:
+
+```http
+POST /api/v1/retrieval/semantic-search
+```
+
+Workspace search:
+
+```http
+POST /api/v1/workspace-search
+```
+
+```json
+{
+  "workspace_id": 1,
+  "query": "login failures",
+  "top_k": 5
+}
+```
+
+Workspace search returns source type, title, chunk text, relevance score, source reference, document ID, chunk ID, and metadata.
+
+## Optional Event Publishing
+
+Memory can publish no-op-safe events when configured:
+
+- `memory.document.ingested`
+- `memory.document.chunked`
+- `memory.embedding.generated`
+- `memory.workspace.search`
 
 This is a SQL keyword search over chunk content, not semantic retrieval.
 

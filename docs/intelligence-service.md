@@ -68,6 +68,7 @@ Completions:
 
 - `POST /api/v1/completions/chat`
 - `POST /api/v1/completions/rag`
+- `POST /api/v1/completions/workspace-rag`
 
 Providers:
 
@@ -143,6 +144,18 @@ Request fields:
 - `system_prompt`
 
 `MEMORY_SERVICE_URL` provides the default Memory URL. Tests mock both Memory retrieval and AI providers, so no external services or paid APIs are required.
+
+`POST /api/v1/completions/workspace-rag` calls Memory workspace search, builds context across indexed workspace sources, and then uses the existing completion provider flow.
+
+Workspace RAG request fields:
+
+- `query`
+- `workspace_id`
+- `memory_service_url`
+- `top_k`
+- `provider`
+- `model`
+- `system_prompt`
 
 ## Future RAG Roadmap
 

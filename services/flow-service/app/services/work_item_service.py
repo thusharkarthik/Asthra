@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
-from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
-from app.schemas.work_item import WorkItemAIBreakdownRead
+from app.schemas.work_item import WorkItemAIBreakdownRead, WorkItemCreate, WorkItemMemoryDocumentPayload, WorkItemUpdate
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
@@ -135,6 +134,25 @@ class WorkItemService:
             dependencies=result.get("dependencies") or [],
             estimated_complexity=result.get("estimated_complexity"),
             raw_response=result.get("raw_response"),
+        )
+
+    def prepare_memory_document(self, work_item_id: int) -> WorkItemMemoryDocumentPayload:
+        work_item = self.get(work_item_id)
+        # TODO: Resolve workspace_id from Core Service project membership when service-to-service lookup is available.
+        return WorkItemMemoryDocumentPayload(
+            external_reference=f"work_item:{work_item.id}",
+            workspace_id=0,
+            title=work_item.title,
+            content=work_item.description or work_item.title,
+            metadata={
+                "work_item_id": work_item.id,
+                "project_id": work_item.project_id,
+                "type_id": work_item.type_id,
+                "status_id": work_item.status_id,
+                "priority_id": work_item.priority_id,
+                "assignee_id": work_item.assignee_id,
+                "reporter_id": work_item.reporter_id,
+            },
         )
 
     def _validate_required_ids(self, project_id: int, reporter_id: int) -> None:

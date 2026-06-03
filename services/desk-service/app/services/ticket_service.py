@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.queue_repository import QueueRepository
 from app.repositories.ticket_repository import TicketRepository
-from app.schemas.ticket import TicketAIClassificationRead, TicketCreate, TicketUpdate
+from app.schemas.ticket import TicketAIClassificationRead, TicketCreate, TicketMemoryDocumentPayload, TicketUpdate
 from app.services.ai_client import AIClient
 
 
@@ -57,4 +57,22 @@ class TicketService:
             possible_duplicate_hints=result.get("possible_duplicate_hints") or [],
             recommended_next_action=result.get("recommended_next_action"),
             raw_response=result.get("raw_response"),
+        )
+
+    def prepare_memory_document(self, ticket_id: int) -> TicketMemoryDocumentPayload:
+        ticket = self.get(ticket_id)
+        return TicketMemoryDocumentPayload(
+            external_reference=f"support_ticket:{ticket.id}",
+            workspace_id=ticket.workspace_id,
+            title=ticket.title,
+            content=ticket.description or ticket.title,
+            metadata={
+                "ticket_id": ticket.id,
+                "project_id": ticket.project_id,
+                "queue_id": ticket.queue_id,
+                "status": ticket.status,
+                "priority": ticket.priority,
+                "requester_id": ticket.requester_id,
+                "assignee_id": ticket.assignee_id,
+            },
         )
