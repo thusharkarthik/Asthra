@@ -43,6 +43,15 @@ class PageMemoryDocumentPayload(BaseModel):
     metadata: dict
 
 
+class PageAISummaryRead(BaseModel):
+    page_id: int
+    short_summary: str | None = None
+    key_points: list[str] = []
+    action_items: list[str] = []
+    related_questions: list[str] = []
+    raw_response: str | None = None
+
+
 class PageVersionCreate(BaseModel):
     page_id: int
     version_number: int

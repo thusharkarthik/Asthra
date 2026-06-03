@@ -8,7 +8,7 @@ Flow is intentionally separate from Core. It references Core projects and users 
 
 Asthra Flow provides the Tier 2 work management foundation. Its current role is to model and expose the basic workflows needed to create, organize, discuss, label, and track project work.
 
-This service does not implement AI, RAG, agents, automation, realtime collaboration, or frontend behavior.
+This service does not implement RAG, agents, automation execution, realtime collaboration, or frontend behavior. AI task breakdown is optional and disabled by default.
 
 ## Entities
 
@@ -37,6 +37,7 @@ Work items:
 - `GET /api/v1/work-items/{work_item_id}`
 - `PATCH /api/v1/work-items/{work_item_id}`
 - `DELETE /api/v1/work-items/{work_item_id}`
+- `POST /api/v1/work-items/{work_item_id}/ai-breakdown`
 
 Boards:
 
@@ -99,6 +100,21 @@ pytest tests
 
 The tests use a disposable SQLite database under `tests/` and cover health, work item CRUD, boards, board columns, comments, labels, and attachment metadata.
 
+## AI Task Breakdown
+
+`POST /api/v1/work-items/{work_item_id}/ai-breakdown` asks Asthra Intelligence to produce subtasks, acceptance criteria, risks, dependencies, and estimated complexity.
+
+It does not create subtasks automatically yet.
+
+Configuration:
+
+```text
+AI_SERVICE_URL=
+AI_FEATURES_ENABLED=false
+```
+
+Future tiers can add approved subtask creation and RAG-aware project context.
+
 ## Future Roadmap
 
 Later tiers can add:
@@ -109,5 +125,5 @@ Later tiers can add:
 - Roadmap views and dependency mapping.
 - Board drag/drop ordering and richer workflow rules.
 - Reporting and sprint analytics.
-- AI-assisted task generation after the AI layer is explicitly scheduled.
+- approved AI-assisted subtask creation.
 - Automation hooks after Asthra Automate is explicitly scheduled.

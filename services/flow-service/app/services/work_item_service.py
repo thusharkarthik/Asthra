@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.schemas.work_item import WorkItemAIBreakdownRead
+from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
 
@@ -111,6 +113,29 @@ class WorkItemService:
     def delete(self, work_item_id: int) -> None:
         work_item = self.get(work_item_id)
         self.work_item_repository.delete(work_item)
+
+    def ai_breakdown(self, work_item_id: int, request_id: str | None = None) -> WorkItemAIBreakdownRead:
+        work_item = self.get(work_item_id)
+        # TODO: Later tiers can optionally create actual subtasks from this response.
+        prompt = (
+            "Break this work item into implementation subtasks. Respond as JSON with keys: "
+            "subtasks, acceptance_criteria, risks, dependencies, estimated_complexity.\n\n"
+            f"Title: {work_item.title}\nDescription: {work_item.description or 'No description'}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You are a pragmatic engineering lead. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return WorkItemAIBreakdownRead(
+            work_item_id=work_item.id,
+            subtasks=result.get("subtasks") or [],
+            acceptance_criteria=result.get("acceptance_criteria") or [],
+            risks=result.get("risks") or [],
+            dependencies=result.get("dependencies") or [],
+            estimated_complexity=result.get("estimated_complexity"),
+            raw_response=result.get("raw_response"),
+        )
 
     def _validate_required_ids(self, project_id: int, reporter_id: int) -> None:
         if project_id is None:

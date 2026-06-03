@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.page import Page
 from app.repositories.page_repository import PageRepository
-from app.schemas.page import PageCreate, PageMemoryDocumentPayload, PageUpdate
+from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageUpdate
+from app.services.ai_client import AIClient
 from app.services.event_publisher import publish_event
 
 
@@ -105,6 +106,27 @@ class PageService:
                 "created_by_id": page.created_by_id,
                 "updated_by_id": page.updated_by_id,
             },
+        )
+
+    def ai_summary(self, page_id: int, request_id: str | None = None) -> PageAISummaryRead:
+        page = self.get(page_id)
+        prompt = (
+            "Summarize this documentation page. Respond as JSON with keys: "
+            "short_summary, key_points, action_items, related_questions.\n\n"
+            f"Title: {page.title}\nContent:\n{page.content}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You summarize technical documentation clearly. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return PageAISummaryRead(
+            page_id=page.id,
+            short_summary=result.get("short_summary"),
+            key_points=result.get("key_points") or [],
+            action_items=result.get("action_items") or [],
+            related_questions=result.get("related_questions") or [],
+            raw_response=result.get("raw_response"),
         )
 
     def _ensure_active_space(self, space_id: int) -> None:
