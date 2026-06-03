@@ -2,7 +2,7 @@
 
 Asthra Intelligence is the foundation service for AI capabilities across Asthra. The current MVP supports provider metadata, prompt templates, conversations, messages, request logs, and non-streaming chat completion calls through provider adapters.
 
-This service includes foundation RAG endpoints backed by Memory Service. It does not implement agents, automation, cache, or frontend functionality.
+This service includes foundation RAG endpoints backed by Memory Service and a read-only AI Assistant foundation. It does not implement autonomous agents, automation execution, cache, or frontend functionality.
 
 ## Scope
 
@@ -13,6 +13,11 @@ Initial Intelligence entities:
 - Conversations
 - Conversation messages
 - AI request logs
+- Assistant sessions
+- Assistant messages
+- Assistant retrieved context
+- Assistant tool call records
+- Assistant responses
 
 ## Setup
 
@@ -68,8 +73,35 @@ tests/             SQLite-backed service tests.
 - `/api/v1/prompts`
 - `/api/v1/conversations`
 - `/api/v1/completions`
+- `/api/v1/assistant`
 
 Provider management APIs are still placeholders. Prompt templates, conversations, messages, and chat completions are implemented at MVP level.
+
+## Assistant Endpoints
+
+Sessions:
+
+```http
+POST /api/v1/assistant/sessions
+GET /api/v1/assistant/sessions
+GET /api/v1/assistant/sessions/{session_id}
+DELETE /api/v1/assistant/sessions/{session_id}
+```
+
+Messages:
+
+```http
+POST /api/v1/assistant/sessions/{session_id}/messages
+GET /api/v1/assistant/sessions/{session_id}/messages
+```
+
+Chat:
+
+```http
+POST /api/v1/assistant/chat
+```
+
+The assistant retrieves workspace memory, records read-only tool usage, builds a prompt, calls the configured completion provider, and stores the response. It does not mutate downstream service data.
 
 ## Prompt Template Endpoints
 

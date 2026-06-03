@@ -14,6 +14,7 @@ Current responsibilities:
 - Manage reusable prompt templates.
 - Store conversations and messages.
 - Execute simple non-streaming chat completions through provider adapters.
+- Orchestrate read-only assistant sessions and chat.
 - Record request log metadata for observability.
 
 ## Provider Abstraction
@@ -39,6 +40,11 @@ Each adapter follows the same interface:
 - `Conversation`: user or workspace-scoped conversation metadata.
 - `ConversationMessage`: ordered conversation messages with role, content, and optional token count.
 - `AIRequestLog`: provider request metadata, token usage, status, and latency.
+- `AssistantSession`: workspace-scoped assistant session.
+- `AssistantMessage`: user and assistant message history.
+- `AssistantContext`: retrieved context used for assistant responses.
+- `AssistantToolCall`: read-only tool usage tracking.
+- `AssistantResponse`: generated assistant answer and retrieval metadata.
 
 ## Endpoints
 
@@ -73,6 +79,16 @@ Completions:
 Providers:
 
 - `GET /api/v1/providers`
+
+Assistant:
+
+- `POST /api/v1/assistant/sessions`
+- `GET /api/v1/assistant/sessions`
+- `GET /api/v1/assistant/sessions/{session_id}`
+- `DELETE /api/v1/assistant/sessions/{session_id}`
+- `POST /api/v1/assistant/sessions/{session_id}/messages`
+- `GET /api/v1/assistant/sessions/{session_id}/messages`
+- `POST /api/v1/assistant/chat`
 
 Provider management remains intentionally minimal in this tier.
 
@@ -173,6 +189,12 @@ The AI feature packs use `POST /api/v1/completions/chat` from:
 - Dev release summary
 
 These consumers keep AI optional with `AI_FEATURES_ENABLED=false` by default and mock AI calls in tests.
+
+## Assistant Foundation
+
+`POST /api/v1/assistant/chat` creates or continues a workspace-scoped assistant session, retrieves workspace context from Memory, records read-only tool usage, calls the existing completion provider flow, and stores the response.
+
+The assistant is not an agent. It does not mutate downstream services or execute automation.
 
 ## Future Agent Roadmap
 
