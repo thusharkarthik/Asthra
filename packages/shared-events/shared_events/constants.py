@@ -7,6 +7,9 @@ class EventNames:
     DOCS_PAGE_CREATED = "docs.page.created"
     DOCS_PAGE_UPDATED = "docs.page.updated"
     AI_COMPLETION_GENERATED = "ai.completion.generated"
+    AI_ASSISTANT_SESSION_CREATED = "ai.assistant.session.created"
+    AI_ASSISTANT_MESSAGE_CREATED = "ai.assistant.message.created"
+    AI_ASSISTANT_RESPONSE_GENERATED = "ai.assistant.response.generated"
     MEMORY_DOCUMENT_CREATED = "memory.document.created"
     MEMORY_DOCUMENT_CHUNKED = "memory.document.chunked"
     MEMORY_DOCUMENT_INGESTED = "memory.document.ingested"
@@ -27,6 +30,9 @@ COMMON_EVENT_NAMES = {
     EventNames.DOCS_PAGE_CREATED,
     EventNames.DOCS_PAGE_UPDATED,
     EventNames.AI_COMPLETION_GENERATED,
+    EventNames.AI_ASSISTANT_SESSION_CREATED,
+    EventNames.AI_ASSISTANT_MESSAGE_CREATED,
+    EventNames.AI_ASSISTANT_RESPONSE_GENERATED,
     EventNames.MEMORY_DOCUMENT_CREATED,
     EventNames.MEMORY_DOCUMENT_CHUNKED,
     EventNames.MEMORY_DOCUMENT_INGESTED,

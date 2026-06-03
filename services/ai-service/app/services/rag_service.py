@@ -37,6 +37,19 @@ class RAGService:
                 ],
             ),
         )
+        return RAGCompletionResponse(
+            answer=completion.generated_text,
+            sources=sources,
+            provider=completion.provider,
+            model=completion.model,
+            usage=completion.usage,
+            retrieval_metadata={
+                "retrieval_type": retrieval_payload.get("retrieval_type"),
+                "top_k": retrieval_payload.get("top_k"),
+                "result_count": retrieval_payload.get("result_count"),
+                "latency_ms": retrieval_payload.get("latency_ms"),
+            },
+        )
 
     def generate_workspace_rag_completion(self, rag_request: WorkspaceRAGCompletionRequest) -> RAGCompletionResponse:
         retrieval_payload = self._retrieve_workspace_context(rag_request)
@@ -67,19 +80,6 @@ class RAGService:
                 "workspace_id": rag_request.workspace_id,
                 "top_k": retrieval_payload.get("top_k"),
                 "result_count": retrieval_payload.get("result_count"),
-            },
-        )
-        return RAGCompletionResponse(
-            answer=completion.generated_text,
-            sources=sources,
-            provider=completion.provider,
-            model=completion.model,
-            usage=completion.usage,
-            retrieval_metadata={
-                "retrieval_type": retrieval_payload.get("retrieval_type"),
-                "top_k": retrieval_payload.get("top_k"),
-                "result_count": retrieval_payload.get("result_count"),
-                "latency_ms": retrieval_payload.get("latency_ms"),
             },
         )
 
