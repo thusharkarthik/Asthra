@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
     cors_origins_raw: str = Field(default="", alias="ASTHRA_CORS_ORIGINS")
     database_url: str = Field(default="sqlite:///./asthra_desk.db", alias="DATABASE_URL")
+    ai_service_url: str | None = Field(default=None, alias="AI_SERVICE_URL")
+    ai_features_enabled: bool = Field(default=False, alias="AI_FEATURES_ENABLED")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

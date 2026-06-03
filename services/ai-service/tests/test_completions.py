@@ -32,6 +32,7 @@ class MockProvider(BaseProvider):
 
 def test_chat_completion_uses_mock_provider_and_logs_request(db, monkeypatch):
     provider = create_provider(db)
+    published_events = []
 
     def resolve_provider(self, *, provider_name, model_name):
         return ResolvedProvider(
@@ -45,6 +46,10 @@ def test_chat_completion_uses_mock_provider_and_logs_request(db, monkeypatch):
         )
 
     monkeypatch.setattr(ProviderService, "resolve_provider", resolve_provider)
+    monkeypatch.setattr(
+        "app.services.provider_service.publish_event",
+        lambda event_name, **kwargs: published_events.append((event_name, kwargs)),
+    )
 
     response = ProviderService(db).generate_chat_completion(
         ChatCompletionRequest(
@@ -62,3 +67,4 @@ def test_chat_completion_uses_mock_provider_and_logs_request(db, monkeypatch):
     request_log = db.scalars(select(AIRequestLog)).one()
     assert request_log.status == "success"
     assert request_log.request_type == "chat_completion"
+    assert published_events[0][0] == "ai.completion.generated"

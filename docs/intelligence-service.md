@@ -67,6 +67,8 @@ Conversations:
 Completions:
 
 - `POST /api/v1/completions/chat`
+- `POST /api/v1/completions/rag`
+- `POST /api/v1/completions/workspace-rag`
 
 Providers:
 
@@ -127,9 +129,50 @@ docker compose up --build ai-service
 
 The compose service exposes Asthra Intelligence on `http://localhost:8003`.
 
+## RAG Foundation
+
+`POST /api/v1/completions/rag` calls Memory semantic retrieval, builds context from returned chunks, and then uses the existing completion provider flow.
+
+Request fields:
+
+- `query`
+- `workspace_id`
+- `memory_service_url`
+- `top_k`
+- `provider`
+- `model`
+- `system_prompt`
+
+`MEMORY_SERVICE_URL` provides the default Memory URL. Tests mock both Memory retrieval and AI providers, so no external services or paid APIs are required.
+
+`POST /api/v1/completions/workspace-rag` calls Memory workspace search, builds context across indexed workspace sources, and then uses the existing completion provider flow.
+
+Workspace RAG request fields:
+
+- `query`
+- `workspace_id`
+- `memory_service_url`
+- `top_k`
+- `provider`
+- `model`
+- `system_prompt`
+
 ## Future RAG Roadmap
 
-Later tiers may add document ingestion, embedding generation, vector search, retrieval policies, source citation, and RAG-aware completion APIs. Those features should remain separate from this MVP provider and conversation foundation.
+Later tiers may add event-driven indexing, stronger source citations, retrieval policies, production embeddings, vector database integration, and gateway-mediated cross-service auth.
+
+## Current AI Feature Consumers
+
+The AI feature packs use `POST /api/v1/completions/chat` from:
+
+- Discover idea analysis
+- Flow task breakdown
+- Docs page summary
+- Desk ticket classification
+- Pulse incident summary
+- Dev release summary
+
+These consumers keep AI optional with `AI_FEATURES_ENABLED=false` by default and mock AI calls in tests.
 
 ## Future Agent Roadmap
 

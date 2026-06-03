@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.models.page import Page
 from app.repositories.page_repository import PageRepository
-from app.schemas.page import PageCreate, PageUpdate
+from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageUpdate
+from app.services.ai_client import AIClient
+from app.services.event_publisher import publish_event
 
 
 class PageService:
@@ -20,6 +22,13 @@ class PageService:
             page,
             created_by_id=page.created_by_id,
             version_number=1,
+        )
+        publish_event(
+            "docs.page.created",
+            payload={"title": page.title, "space_id": page.space_id, "status": page.status},
+            actor_user_id=page.created_by_id,
+            entity_type="page",
+            entity_id=str(page.id),
         )
         return page
 
@@ -65,11 +74,60 @@ class PageService:
                 created_by_id=page_update.updated_by_id or updated_page.created_by_id,
                 version_number=self.page_repository.next_version_number(updated_page.id),
             )
+        publish_event(
+            "docs.page.updated",
+            payload={
+                "title": updated_page.title,
+                "space_id": updated_page.space_id,
+                "updated_fields": list(page_update.model_dump(exclude_unset=True)),
+            },
+            actor_user_id=page_update.updated_by_id or updated_page.created_by_id,
+            entity_type="page",
+            entity_id=str(updated_page.id),
+        )
         return updated_page
 
     def delete(self, page_id: int) -> None:
         page = self.get(page_id)
         self.page_repository.delete(page)
+
+    def prepare_memory_document(self, page_id: int) -> PageMemoryDocumentPayload:
+        page = self.get(page_id)
+        # TODO: Later this can optionally call memory-service ingestion. For now it only normalizes payload.
+        return PageMemoryDocumentPayload(
+            title=page.title,
+            content=page.content,
+            workspace_id=page.space.workspace_id,
+            external_reference=f"page:{page.id}",
+            metadata={
+                "page_id": page.id,
+                "space_id": page.space_id,
+                "status": page.status,
+                "created_by_id": page.created_by_id,
+                "updated_by_id": page.updated_by_id,
+            },
+        )
+
+    def ai_summary(self, page_id: int, request_id: str | None = None) -> PageAISummaryRead:
+        page = self.get(page_id)
+        prompt = (
+            "Summarize this documentation page. Respond as JSON with keys: "
+            "short_summary, key_points, action_items, related_questions.\n\n"
+            f"Title: {page.title}\nContent:\n{page.content}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You summarize technical documentation clearly. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return PageAISummaryRead(
+            page_id=page.id,
+            short_summary=result.get("short_summary"),
+            key_points=result.get("key_points") or [],
+            action_items=result.get("action_items") or [],
+            related_questions=result.get("related_questions") or [],
+            raw_response=result.get("raw_response"),
+        )
 
     def _ensure_active_space(self, space_id: int) -> None:
         if space_id is None:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.schemas.incident import IncidentCreate, IncidentRead, IncidentUpdate
+from app.schemas.incident import IncidentAISummaryRead, IncidentCreate, IncidentMemoryDocumentPayload, IncidentRead, IncidentUpdate
 from app.schemas.postmortem import PostmortemCreate, PostmortemRead
 from app.schemas.timeline import TimelineEventCreate, TimelineEventRead
 from app.services.services import IncidentService, PostmortemService, TimelineService
@@ -17,6 +17,12 @@ def list_incidents(workspace_id: int | None = None, status: str | None = None, s
 
 @router.get("/{incident_id}", response_model=IncidentRead)
 def get_incident(incident_id: int, db: Session = Depends(get_db)): return IncidentService(db).get(incident_id)
+
+@router.post("/{incident_id}/ai-summary", response_model=IncidentAISummaryRead)
+def ai_summary_incident(incident_id: int, db: Session = Depends(get_db)): return IncidentService(db).ai_summary(incident_id)
+
+@router.post("/{incident_id}/prepare-memory-document", response_model=IncidentMemoryDocumentPayload)
+def prepare_memory_document(incident_id: int, db: Session = Depends(get_db)): return IncidentService(db).prepare_memory_document(incident_id)
 
 @router.patch("/{incident_id}", response_model=IncidentRead)
 def update_incident(incident_id: int, data: IncidentUpdate, db: Session = Depends(get_db)): return IncidentService(db).update(incident_id, data)

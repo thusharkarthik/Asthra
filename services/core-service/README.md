@@ -1063,3 +1063,14 @@ Apply migrations:
 ```bash
 alembic upgrade head
 ```
+
+## Optional Event Publishing
+
+Core can publish placeholder platform events for organization, workspace, and project creation.
+
+```env
+EVENT_SERVICE_URL=
+EVENT_PUBLISHING_ENABLED=false
+```
+
+Publishing is disabled by default and is fail-safe. Core actions do not require Event Service to be running.

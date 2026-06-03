@@ -2,7 +2,7 @@
 
 Asthra Discover is Asthra's product discovery and innovation planning service. It helps teams capture product ideas, feature requests, customer feedback, validation notes, MVP plans, impact scores, and roadmap items.
 
-This service is not a frontend and does not call AI providers in this tier.
+This service is not a frontend. AI features are optional and call Asthra Intelligence only when explicitly enabled.
 
 ## Purpose
 
@@ -27,6 +27,7 @@ Ideas:
 - `GET /api/v1/ideas/{idea_id}`
 - `PATCH /api/v1/ideas/{idea_id}`
 - `DELETE /api/v1/ideas/{idea_id}`
+- `POST /api/v1/ideas/{idea_id}/ai-analysis`
 
 Feature requests:
 
@@ -93,14 +94,28 @@ docker compose up --build discover-service
 
 The service is exposed on `http://localhost:8005`.
 
+## AI Idea Analysis
+
+`POST /api/v1/ideas/{idea_id}/ai-analysis` analyzes an idea and stores the result in `IdeaAIAnalysis`.
+
+The response includes summary, problem clarity, target users, feasibility, risks, MVP suggestion, monetization angle, and next steps.
+
+Configuration:
+
+```text
+AI_SERVICE_URL=
+AI_FEATURES_ENABLED=false
+```
+
+The feature is disabled by default and tests mock AI Service.
+
 ## Future AI Roadmap
 
 Later tiers may add:
 
-- AI feasibility analysis
 - AI competitor analysis
 - AI MVP planning support
 - AI monetization analysis
 - AI feedback clustering and summarization
 
-These capabilities should use the Asthra Intelligence service later. They are intentionally not implemented in this MVP.
+Future improvements should add RAG-aware product context from Memory and optional automation handoff after explicit approval.

@@ -4,7 +4,7 @@ Asthra Dev provides engineering and DevOps visibility for repositories, pull req
 
 ## Purpose
 
-Dev creates a structured operational view of software delivery without adding real AI, RAG, agents, automation, or frontend functionality in this MVP.
+Dev creates a structured operational view of software delivery. AI release summarization is optional and disabled by default.
 
 ## Entities
 
@@ -16,6 +16,14 @@ Dev creates a structured operational view of software delivery without adding re
 - ServiceCatalogItem
 - ServiceOwner
 - ServiceDependency
+
+## AI Release Summary
+
+Endpoint:
+
+- `POST /api/v1/releases/{release_id}/ai-summary`
+
+The AI release summary response includes release overview, shipped changes, deployment risk, rollback considerations, stakeholder summary, and QA notes. Linked service and deployment context are included when simple. The endpoint does not modify release records.
 
 ## Run
 
@@ -41,6 +49,15 @@ docker compose up --build dev-service
 
 The service is exposed on `http://localhost:8008`.
 
+## AI Configuration
+
+```text
+AI_SERVICE_URL=http://localhost:8003
+AI_FEATURES_ENABLED=false
+```
+
+AI calls are fail-safe. If AI is disabled or the AI Service URL is missing, the endpoint returns a clean `503` response.
+
 ## Future AI Roadmap
 
-Later tiers may add AI release summaries, deployment risk analysis, dependency risk detection, and architecture insight generation. No AI calls are implemented in this MVP.
+Later tiers may add RAG-aware release notes, deployment risk analysis, dependency risk detection, and architecture insight generation. This MVP does not auto-change release status or deployment records.

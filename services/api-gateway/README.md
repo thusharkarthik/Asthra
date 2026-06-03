@@ -10,7 +10,8 @@ Asthra API Gateway is the single entry point for frontend and client requests. T
 - Standard `/health` and `/ready` endpoints.
 - Gateway metadata at `/api/gateway/info`.
 - Static service registry at `/api/gateway/services`.
-- Simple proxy routes for selected services.
+- Service health aggregation at `/api/gateway/health/services`.
+- Simple proxy routes for all current services.
 
 ## Supported Proxy Routes
 
@@ -21,8 +22,19 @@ Asthra API Gateway is the single entry point for frontend and client requests. T
 | `/api/docs/{path}` | docs-service |
 | `/api/ai/{path}` | ai-service |
 | `/api/memory/{path}` | memory-service |
+| `/api/discover/{path}` | discover-service |
+| `/api/desk/{path}` | desk-service |
+| `/api/pulse/{path}` | pulse-service |
+| `/api/dev/{path}` | dev-service |
+| `/api/collab/{path}` | collab-service |
+| `/api/automation/{path}` | automation-service |
+| `/api/connect/{path}` | connect-service |
+| `/api/guard/{path}` | guard-service |
+| `/api/insights/{path}` | insights-service |
+| `/api/media/{path}` | media-service |
+| `/api/events/{path}` | event-service |
 
-The proxy forwards method, path, query params, request body, `Authorization`, and `X-Request-ID`.
+The proxy forwards method, path, query params, request body, `Authorization`, `X-Request-ID`, and `Content-Type` when present.
 
 ## Setup
 
@@ -64,7 +76,6 @@ See `.env.example` for service URL configuration. In Docker Compose, service URL
 
 ## Future Roadmap
 
-- Expand proxy routing to all Asthra services.
 - Shared auth validation and auth context forwarding.
 - API gateway policy layer.
 - Rate limiting.

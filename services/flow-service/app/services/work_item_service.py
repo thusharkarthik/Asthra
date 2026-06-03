@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
-from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.schemas.work_item import WorkItemAIBreakdownRead, WorkItemCreate, WorkItemMemoryDocumentPayload, WorkItemUpdate
+from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
+from app.services.event_publisher import publish_event
 
 
 class WorkItemService:
@@ -33,6 +35,13 @@ class WorkItemService:
             project_id=work_item.project_id,
             work_item_id=work_item.id,
             description=f"Work item '{work_item.title}' was created.",
+        )
+        publish_event(
+            "flow.work_item.created",
+            payload={"title": work_item.title, "project_id": work_item.project_id},
+            actor_user_id=work_item.reporter_id,
+            entity_type="work_item",
+            entity_id=str(work_item.id),
         )
         return work_item
 
@@ -87,11 +96,64 @@ class WorkItemService:
             description=f"Work item '{updated_work_item.title}' was updated.",
             metadata={"updated_fields": list(work_item_update.model_dump(exclude_unset=True))},
         )
+        publish_event(
+            "flow.work_item.updated",
+            payload={
+                "title": updated_work_item.title,
+                "project_id": updated_work_item.project_id,
+                "updated_fields": list(work_item_update.model_dump(exclude_unset=True)),
+            },
+            actor_user_id=updated_work_item.reporter_id,
+            entity_type="work_item",
+            entity_id=str(updated_work_item.id),
+        )
         return updated_work_item
 
     def delete(self, work_item_id: int) -> None:
         work_item = self.get(work_item_id)
         self.work_item_repository.delete(work_item)
+
+    def ai_breakdown(self, work_item_id: int, request_id: str | None = None) -> WorkItemAIBreakdownRead:
+        work_item = self.get(work_item_id)
+        # TODO: Later tiers can optionally create actual subtasks from this response.
+        prompt = (
+            "Break this work item into implementation subtasks. Respond as JSON with keys: "
+            "subtasks, acceptance_criteria, risks, dependencies, estimated_complexity.\n\n"
+            f"Title: {work_item.title}\nDescription: {work_item.description or 'No description'}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You are a pragmatic engineering lead. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return WorkItemAIBreakdownRead(
+            work_item_id=work_item.id,
+            subtasks=result.get("subtasks") or [],
+            acceptance_criteria=result.get("acceptance_criteria") or [],
+            risks=result.get("risks") or [],
+            dependencies=result.get("dependencies") or [],
+            estimated_complexity=result.get("estimated_complexity"),
+            raw_response=result.get("raw_response"),
+        )
+
+    def prepare_memory_document(self, work_item_id: int) -> WorkItemMemoryDocumentPayload:
+        work_item = self.get(work_item_id)
+        # TODO: Resolve workspace_id from Core Service project membership when service-to-service lookup is available.
+        return WorkItemMemoryDocumentPayload(
+            external_reference=f"work_item:{work_item.id}",
+            workspace_id=0,
+            title=work_item.title,
+            content=work_item.description or work_item.title,
+            metadata={
+                "work_item_id": work_item.id,
+                "project_id": work_item.project_id,
+                "type_id": work_item.type_id,
+                "status_id": work_item.status_id,
+                "priority_id": work_item.priority_id,
+                "assignee_id": work_item.assignee_id,
+                "reporter_id": work_item.reporter_id,
+            },
+        )
 
     def _validate_required_ids(self, project_id: int, reporter_id: int) -> None:
         if project_id is None:

@@ -318,3 +318,12 @@ pytest tests
 ```
 
 The tests use a disposable SQLite database at `tests/test_asthra_docs.db` and cover health, readiness, spaces, pages, page versions, comments, attachment metadata, tags, and basic search.
+
+## Optional Event Publishing
+
+Docs can publish placeholder page events:
+
+- `docs.page.created`
+- `docs.page.updated`
+
+Set `EVENT_SERVICE_URL` and `EVENT_PUBLISHING_ENABLED=true` to enable later. Publishing is disabled by default and Event Service is not required.

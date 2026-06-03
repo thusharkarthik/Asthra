@@ -14,3 +14,11 @@ def search_memory(
     db: Session = Depends(get_db),
 ):
     return RetrievalService(db).keyword_search(search_request)
+
+
+@router.post("/semantic-search", response_model=RetrievalSearchResponse)
+def semantic_search_memory(
+    search_request: RetrievalSearchRequest,
+    db: Session = Depends(get_db),
+):
+    return RetrievalService(db).semantic_search(search_request)

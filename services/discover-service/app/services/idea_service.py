@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.idea import Idea
 from app.repositories.idea_repository import IdeaRepository
-from app.schemas.idea import IdeaCreate, IdeaUpdate
+from app.schemas.idea import IdeaCreate, IdeaMemoryDocumentPayload, IdeaUpdate
 
 
 class IdeaService:
@@ -27,5 +27,28 @@ class IdeaService:
 
     def delete(self, idea_id: int) -> None:
         self.repository.delete(self.get(idea_id))
+
+    def prepare_memory_document(self, idea_id: int) -> IdeaMemoryDocumentPayload:
+        idea = self.get(idea_id)
+        return IdeaMemoryDocumentPayload(
+            external_reference=f"idea:{idea.id}",
+            workspace_id=idea.workspace_id,
+            title=idea.title,
+            content="\n\n".join(
+                part
+                for part in [
+                    idea.description,
+                    idea.problem_statement,
+                    idea.target_users,
+                ]
+                if part
+            ),
+            metadata={
+                "idea_id": idea.id,
+                "project_id": idea.project_id,
+                "status": idea.status,
+                "created_by_id": idea.created_by_id,
+            },
+        )
 
     # TODO: Add AI feasibility, competitor, MVP, and monetization analysis in later tiers.

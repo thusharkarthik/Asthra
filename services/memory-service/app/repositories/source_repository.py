@@ -27,3 +27,17 @@ class SourceRepository:
 
     def get_by_id(self, source_id: int) -> KnowledgeSource | None:
         return self.db.get(KnowledgeSource, source_id)
+
+    def get_by_identity(
+        self,
+        *,
+        workspace_id: int | None,
+        source_type: str,
+        external_reference: str | None,
+    ) -> KnowledgeSource | None:
+        statement = select(KnowledgeSource).where(
+            KnowledgeSource.workspace_id == workspace_id,
+            KnowledgeSource.source_type == source_type,
+            KnowledgeSource.external_reference == external_reference,
+        )
+        return self.db.scalars(statement).first()

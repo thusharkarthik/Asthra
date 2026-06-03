@@ -12,6 +12,8 @@ def create_thread(d: ThreadCreate, db: Session = Depends(get_db)): return Thread
 def list_threads(workspace_id: int | None = None, project_id: int | None = None, entity_type: str | None = None, entity_id: int | None = None, created_by_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return ThreadService(db).list(workspace_id=workspace_id, project_id=project_id, entity_type=entity_type, entity_id=entity_id, created_by_id=created_by_id, limit=limit, offset=offset)
 @api_router.get("/threads/{thread_id}", response_model=ThreadRead)
 def get_thread(thread_id: int, db: Session = Depends(get_db)): return ThreadService(db).get(thread_id)
+@api_router.post("/threads/{thread_id}/prepare-memory-document", response_model=ThreadMemoryDocumentPayload)
+def prepare_memory_document(thread_id: int, db: Session = Depends(get_db)): return ThreadService(db).prepare_memory_document(thread_id)
 @api_router.patch("/threads/{thread_id}", response_model=ThreadRead)
 def update_thread(thread_id: int, d: ThreadUpdate, db: Session = Depends(get_db)): return ThreadService(db).update(thread_id, d)
 @api_router.delete("/threads/{thread_id}", status_code=204)

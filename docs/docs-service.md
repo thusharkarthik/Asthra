@@ -40,6 +40,8 @@ Pages:
 - `GET /api/v1/pages/{page_id}`
 - `PATCH /api/v1/pages/{page_id}`
 - `DELETE /api/v1/pages/{page_id}`
+- `POST /api/v1/pages/{page_id}/prepare-memory-document`
+- `POST /api/v1/pages/{page_id}/ai-summary`
 
 Comments, attachments, tags, and search:
 
@@ -95,6 +97,38 @@ pytest tests
 
 The tests use a disposable SQLite database under `tests/`.
 
+## RAG Readiness
+
+Docs does not call Memory automatically yet. It exposes a memory preparation endpoint:
+
+```http
+POST /api/v1/pages/{page_id}/prepare-memory-document
+```
+
+This returns:
+
+- title
+- content
+- workspace_id
+- `source_type="docs_page"`
+- `external_reference="page:{page_id}"`
+- metadata with page and space identifiers
+
+## AI Page Summary
+
+`POST /api/v1/pages/{page_id}/ai-summary` summarizes plain page content through Asthra Intelligence.
+
+The response includes short summary, key points, action items, and related questions.
+
+Configuration:
+
+```text
+AI_SERVICE_URL=
+AI_FEATURES_ENABLED=false
+```
+
+The feature is disabled by default and does not require Memory/RAG yet.
+
 ## Future RAG Roadmap
 
 Later tiers can add:
@@ -105,6 +139,6 @@ Later tiers can add:
 - Content ingestion events for Asthra Memory.
 - Embedding pipelines and vector indexes.
 - Retrieval APIs for RAG.
-- AI-assisted summaries and question answering.
+- RAG-aware summaries and question answering.
 
 No RAG, vector database, or AI functionality is implemented in this tier.

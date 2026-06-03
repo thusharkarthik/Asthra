@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.db.session import get_db
 from app.schemas.embedding_record import EmbeddingGenerationResponse, EmbeddingRecordRead
 from app.services.embedding_service import EmbeddingService
@@ -14,11 +13,17 @@ def generate_document_embeddings(
     document_id: int,
     db: Session = Depends(get_db),
 ):
-    records, created_count, updated_count = EmbeddingService(db).generate_for_document(document_id)
+    service = EmbeddingService(db)
+    records, created_count, updated_count = service.generate_for_document(document_id)
+    provider, model = service.provider_summary()
     return EmbeddingGenerationResponse(
         document_id=document_id,
-        embedding_model=settings.memory_placeholder_embedding_model,
+        embedding_model=model,
         status="generated",
+        chunks_processed=len(records),
+        embeddings_created=created_count,
+        provider=provider,
+        model=model,
         records_created=created_count,
         records_updated=updated_count,
         records=records,

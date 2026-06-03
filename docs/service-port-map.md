@@ -27,3 +27,24 @@ Run all services:
 ```bash
 docker compose up --build
 ```
+
+## Gateway Route Prefixes
+
+| Prefix | Service |
+| --- | --- |
+| `/api/core` | core-service |
+| `/api/flow` | flow-service |
+| `/api/docs` | docs-service |
+| `/api/ai` | ai-service |
+| `/api/memory` | memory-service |
+| `/api/discover` | discover-service |
+| `/api/desk` | desk-service |
+| `/api/pulse` | pulse-service |
+| `/api/dev` | dev-service |
+| `/api/collab` | collab-service |
+| `/api/automation` | automation-service |
+| `/api/connect` | connect-service |
+| `/api/guard` | guard-service |
+| `/api/insights` | insights-service |
+| `/api/media` | media-service |
+| `/api/events` | event-service |

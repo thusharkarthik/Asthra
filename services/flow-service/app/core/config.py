@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     cors_origins_raw: str = Field(default="", alias="ASTHRA_CORS_ORIGINS")
 
     database_url: str = Field(default="sqlite:///./asthra_flow.db", alias="DATABASE_URL")
+    ai_service_url: str | None = Field(default=None, alias="AI_SERVICE_URL")
+    ai_features_enabled: bool = Field(default=False, alias="AI_FEATURES_ENABLED")
+    event_service_url: str | None = Field(default=None, alias="EVENT_SERVICE_URL")
+    event_publishing_enabled: bool = Field(default=False, alias="EVENT_PUBLISHING_ENABLED")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

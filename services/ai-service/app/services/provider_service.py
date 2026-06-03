@@ -14,6 +14,7 @@ from app.providers.base_provider import BaseProvider, ProviderError, ProviderTim
 from app.providers.groq_provider import GroqProvider
 from app.providers.openrouter_provider import OpenRouterProvider
 from app.schemas.completion import ChatCompletionRequest, ChatCompletionResponse, TokenUsage
+from app.services.event_publisher import publish_event
 
 
 @dataclass
@@ -81,12 +82,23 @@ class ProviderService:
             total_tokens=usage.get("total_tokens"),
         )
 
-        return ChatCompletionResponse(
+        response = ChatCompletionResponse(
             generated_text=result.get("generated_text", ""),
             provider=resolved_provider.record.provider_type,
             model=resolved_provider.adapter.model_name,
             usage=TokenUsage(**usage),
         )
+        publish_event(
+            "ai.completion.generated",
+            payload={
+                "provider": response.provider,
+                "model": response.model,
+                "usage": usage,
+            },
+            entity_type="ai_completion",
+            entity_id=str(resolved_provider.record.id),
+        )
+        return response
 
     def resolve_provider(
         self,

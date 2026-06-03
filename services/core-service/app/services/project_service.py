@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectTeamCreate, ProjectUpdate
+from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
 
 
@@ -44,6 +45,15 @@ class ProjectService:
                 entity_type="project",
                 entity_id=str(project.id),
             )
+        publish_event(
+            "core.project.created",
+            payload={"name": project.name, "status": project.status},
+            workspace_id=project.workspace_id,
+            organization_id=workspace.organization_id,
+            actor_user_id=current_user.id,
+            entity_type="project",
+            entity_id=str(project.id),
+        )
         return project
 
     def list(self, current_user: User) -> list[Project]:

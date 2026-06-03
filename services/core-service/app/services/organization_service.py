@@ -9,6 +9,7 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
+from app.services.event_publisher import publish_event
 
 
 class OrganizationService:
@@ -22,12 +23,21 @@ class OrganizationService:
     ) -> Organization:
         self._ensure_active_user(current_user)
         slug = self._build_unique_slug(organization_create.name)
-        return self.organization_repository.create_with_owner(
+        organization = self.organization_repository.create_with_owner(
             name=organization_create.name.strip(),
             slug=slug,
             description=organization_create.description,
             created_by_id=current_user.id,
         )
+        publish_event(
+            "core.organization.created",
+            payload={"name": organization.name},
+            organization_id=organization.id,
+            actor_user_id=current_user.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+        )
+        return organization
 
     def list(self, current_user: User) -> list[Organization]:
         self._ensure_active_user(current_user)
