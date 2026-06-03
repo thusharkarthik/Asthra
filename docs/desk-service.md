@@ -4,7 +4,7 @@ Asthra Desk is Asthra's service management app for support tickets, service requ
 
 ## Purpose
 
-Desk gives teams a foundation for structured service operations without adding AI, automation, or frontend complexity in the MVP.
+Desk gives teams a foundation for structured service operations. AI assistance is optional and disabled by default.
 
 ## Entities
 
@@ -19,7 +19,13 @@ Desk gives teams a foundation for structured service operations without adding A
 
 ## Endpoints
 
-Tickets support CRUD plus comments, approvals, and escalations. Queues and SLAs support create/list. Incidents and change requests support create/list/get/update.
+Tickets support CRUD plus comments, approvals, escalations, and optional AI classification. Queues and SLAs support create/list. Incidents and change requests support create/list/get/update.
+
+AI ticket classification:
+
+- `POST /api/v1/tickets/{ticket_id}/ai-classify`
+
+The AI classification response includes category, priority suggestion, severity suggestion, routing suggestion, duplicate hints, and recommended next action. It does not automatically update ticket fields.
 
 API docs are available at `/docs` when the service is running.
 
@@ -54,14 +60,22 @@ docker compose up --build desk-service
 
 The service is exposed on `http://localhost:8006`.
 
+## AI Configuration
+
+```text
+AI_SERVICE_URL=http://localhost:8003
+AI_FEATURES_ENABLED=false
+```
+
+AI calls are fail-safe. If AI is disabled or the AI Service URL is missing, the endpoint returns a clean `503` response.
+
 ## Future AI Roadmap
 
 Later tiers may add:
 
-- AI ticket classification
 - AI routing
 - AI incident summaries
 - AI duplicate detection
 - AI resolution suggestions
 
-No AI calls are implemented in this MVP.
+Ticket classification can later feed reviewed routing or automation workflows, but this MVP does not auto-apply AI output.

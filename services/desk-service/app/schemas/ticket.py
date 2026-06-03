@@ -36,3 +36,14 @@ class TicketRead(FullTimestampedRead):
     priority: str
     requester_id: int | None = None
     assignee_id: int | None = None
+
+
+class TicketAIClassificationRead(BaseModel):
+    ticket_id: int
+    category: str | None = None
+    priority_suggestion: str | None = None
+    severity_suggestion: str | None = None
+    routing_suggestion: str | None = None
+    possible_duplicate_hints: list[str] = []
+    recommended_next_action: str | None = None
+    raw_response: str | None = None

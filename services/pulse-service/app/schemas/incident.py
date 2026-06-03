@@ -29,3 +29,14 @@ class IncidentRead(FullTimestampedRead):
     severity: str
     status: str
     commander_id: int | None = None
+
+
+class IncidentAISummaryRead(BaseModel):
+    incident_id: int
+    current_situation: str | None = None
+    impact: str | None = None
+    likely_cause: str | None = None
+    timeline_summary: str | None = None
+    next_actions: list[str] = []
+    customer_facing_update_draft: str | None = None
+    raw_response: str | None = None

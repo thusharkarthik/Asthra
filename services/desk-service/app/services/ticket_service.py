@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.repositories.queue_repository import QueueRepository
 from app.repositories.ticket_repository import TicketRepository
-from app.schemas.ticket import TicketCreate, TicketUpdate
+from app.schemas.ticket import TicketAIClassificationRead, TicketCreate, TicketUpdate
+from app.services.ai_client import AIClient
 
 
 class TicketService:
@@ -33,4 +34,27 @@ class TicketService:
     def delete(self, ticket_id: int) -> None:
         self.repository.delete(self.get(ticket_id))
 
-    # TODO: Add AI ticket classification, routing, duplicate detection, and resolution suggestions later.
+    def ai_classify(self, ticket_id: int, request_id: str | None = None) -> TicketAIClassificationRead:
+        ticket = self.get(ticket_id)
+        # TODO: Future tiers can optionally auto-apply classification after human approval.
+        prompt = (
+            "Classify this support ticket. Respond as JSON with keys: category, priority_suggestion, "
+            "severity_suggestion, routing_suggestion, possible_duplicate_hints, recommended_next_action.\n\n"
+            f"Title: {ticket.title}\nDescription: {ticket.description}\n"
+            f"Current priority: {ticket.priority}\nStatus: {ticket.status}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You are a service desk triage specialist. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return TicketAIClassificationRead(
+            ticket_id=ticket.id,
+            category=result.get("category"),
+            priority_suggestion=result.get("priority_suggestion"),
+            severity_suggestion=result.get("severity_suggestion"),
+            routing_suggestion=result.get("routing_suggestion"),
+            possible_duplicate_hints=result.get("possible_duplicate_hints") or [],
+            recommended_next_action=result.get("recommended_next_action"),
+            raw_response=result.get("raw_response"),
+        )
