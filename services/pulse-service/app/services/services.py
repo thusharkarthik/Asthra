@@ -11,6 +11,8 @@ from app.repositories.repositories import (
     StatusPageRepository,
     TimelineRepository,
 )
+from app.schemas.incident import IncidentAISummaryRead
+from app.services.ai_client import AIClient
 
 SEVERITIES = {"low", "medium", "high", "critical"}
 ALERT_STATUSES = {"open", "acknowledged", "resolved"}
@@ -87,7 +89,32 @@ class IncidentService:
         if status_value not in INCIDENT_STATUSES:
             raise HTTPException(status_code=400, detail="Invalid incident status.")
 
-    # TODO: Add AI root cause analysis, incident summary, outage update drafting, and anomaly pattern detection later.
+    def ai_summary(self, item_id: int, request_id: str | None = None) -> IncidentAISummaryRead:
+        incident = self.get(item_id)
+        timeline = TimelineRepository(self.repo.db).list_by_incident(incident.id)
+        timeline_text = "\n".join(f"- {event.event_type}: {event.content}" for event in timeline) or "No timeline events yet."
+        # TODO: Future tiers can use this to draft outage updates/postmortems after human approval.
+        prompt = (
+            "Summarize this incident. Respond as JSON with keys: current_situation, impact, likely_cause, "
+            "timeline_summary, next_actions, customer_facing_update_draft.\n\n"
+            f"Title: {incident.title}\nDescription: {incident.description or 'No description'}\n"
+            f"Severity: {incident.severity}\nStatus: {incident.status}\nTimeline:\n{timeline_text}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You are an incident commander. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return IncidentAISummaryRead(
+            incident_id=incident.id,
+            current_situation=result.get("current_situation"),
+            impact=result.get("impact"),
+            likely_cause=result.get("likely_cause"),
+            timeline_summary=result.get("timeline_summary"),
+            next_actions=result.get("next_actions") or [],
+            customer_facing_update_draft=result.get("customer_facing_update_draft"),
+            raw_response=result.get("raw_response"),
+        )
 
 
 class TimelineService:

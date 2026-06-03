@@ -150,11 +150,14 @@ Later tiers may add event-driven indexing, stronger source citations, retrieval 
 
 ## Current AI Feature Consumers
 
-The first AI feature pack uses `POST /api/v1/completions/chat` from:
+The AI feature packs use `POST /api/v1/completions/chat` from:
 
 - Discover idea analysis
 - Flow task breakdown
 - Docs page summary
+- Desk ticket classification
+- Pulse incident summary
+- Dev release summary
 
 These consumers keep AI optional with `AI_FEATURES_ENABLED=false` by default and mock AI calls in tests.
 

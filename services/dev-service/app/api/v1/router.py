@@ -59,6 +59,8 @@ def create_release(d: ReleaseCreate, db: Session = Depends(get_db)): return Rele
 def list_releases(workspace_id: int | None = None, status: str | None = None, service_id: int | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)): return ReleaseService(db).list(workspace_id=workspace_id, status=status, service_id=service_id, limit=limit, offset=offset)
 @api_router.get("/releases/{release_id}", response_model=ReleaseRead)
 def get_release(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).get(release_id)
+@api_router.post("/releases/{release_id}/ai-summary", response_model=ReleaseAISummaryRead)
+def ai_summary_release(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).ai_summary(release_id)
 @api_router.patch("/releases/{release_id}", response_model=ReleaseRead)
 def update_release(release_id: int, d: ReleaseUpdate, db: Session = Depends(get_db)): return ReleaseService(db).update(release_id, d)
 

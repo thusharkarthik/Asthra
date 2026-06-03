@@ -1,6 +1,8 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.repositories.repositories import DependencyRepo, DeploymentRepo, EnvironmentRepo, OwnerRepo, PullRequestRepo, ReleaseRepo, RepositoryRepo, ServiceRepo
+from app.schemas.schemas import ReleaseAISummaryRead
+from app.services.ai_client import AIClient
 
 PROVIDERS = {"github", "gitlab", "bitbucket", "other"}
 PR_STATUSES = {"open", "merged", "closed"}
@@ -111,7 +113,33 @@ class ReleaseService:
         if d.status is not None and d.status not in RELEASE_STATUSES: invalid("Invalid release status.")
         if d.service_id is not None: self.services.get(d.service_id)
         return self.repo.update(self.get(i), d)
-    # TODO: Add AI release summary later.
+    def ai_summary(self, i: int, request_id: str | None = None) -> ReleaseAISummaryRead:
+        release = self.get(i)
+        service = self.services.get(release.service_id) if release.service_id is not None else None
+        deployments = DeploymentRepo(self.repo.db).list(workspace_id=release.workspace_id, service_id=release.service_id, limit=10, offset=0) if release.service_id is not None else []
+        deployment_text = "\n".join(f"- version={deployment.version} status={deployment.status}" for deployment in deployments) or "No related deployments found."
+        service_text = f"{service.name} ({service.lifecycle_status})" if service is not None else "No service linked"
+        prompt = (
+            "Summarize this software release. Respond as JSON with keys: release_overview, shipped_changes, "
+            "deployment_risk, rollback_considerations, stakeholder_summary, qa_notes.\n\n"
+            f"Version: {release.version}\nStatus: {release.status}\nNotes: {release.notes or 'No notes'}\n"
+            f"Service: {service_text}\nDeployments:\n{deployment_text}"
+        )
+        result = AIClient().complete(
+            prompt,
+            system_prompt="You are an engineering release manager. Return concise JSON only.",
+            request_id=request_id,
+        )
+        return ReleaseAISummaryRead(
+            release_id=release.id,
+            release_overview=result.get("release_overview"),
+            shipped_changes=result.get("shipped_changes") or [],
+            deployment_risk=result.get("deployment_risk"),
+            rollback_considerations=result.get("rollback_considerations"),
+            stakeholder_summary=result.get("stakeholder_summary"),
+            qa_notes=result.get("qa_notes") or [],
+            raw_response=result.get("raw_response"),
+        )
 
 
 class OwnerService:

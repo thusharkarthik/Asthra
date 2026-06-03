@@ -115,6 +115,17 @@ class ReleaseUpdate(BaseModel):
 class ReleaseRead(ReleaseCreate, FullRead): pass
 
 
+class ReleaseAISummaryRead(BaseModel):
+    release_id: int
+    release_overview: str | None = None
+    shipped_changes: list[str] = []
+    deployment_risk: str | None = None
+    rollback_considerations: str | None = None
+    stakeholder_summary: str | None = None
+    qa_notes: list[str] = []
+    raw_response: str | None = None
+
+
 class ServiceOwnerCreate(BaseModel):
     owner_id: int
     role: str | None = None
