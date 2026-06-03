@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.work_item import WorkItem
-from app.schemas.work_item import WorkItemCreate, WorkItemRead, WorkItemUpdate
+from app.schemas.work_item import WorkItemAIBreakdownRead, WorkItemCreate, WorkItemRead, WorkItemUpdate
 from app.services.work_item_service import WorkItemService
 
 router = APIRouter()
@@ -51,6 +51,15 @@ def get_work_item(
     _: None = Depends(auth_placeholder),
 ) -> WorkItem:
     return WorkItemService(db).get(work_item_id)
+
+
+@router.post("/{work_item_id}/ai-breakdown", response_model=WorkItemAIBreakdownRead)
+def ai_breakdown_work_item(
+    work_item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> WorkItemAIBreakdownRead:
+    return WorkItemService(db).ai_breakdown(work_item_id)
 
 
 @router.patch("/{work_item_id}", response_model=WorkItemRead)

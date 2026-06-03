@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.page import Page
-from app.schemas.page import PageCreate, PageMemoryDocumentPayload, PageRead, PageUpdate
+from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageRead, PageUpdate
 from app.services.page_service import PageService
 
 router = APIRouter()
@@ -60,6 +60,15 @@ def prepare_memory_document(
     _: None = Depends(auth_placeholder),
 ) -> PageMemoryDocumentPayload:
     return PageService(db).prepare_memory_document(page_id)
+
+
+@router.post("/{page_id}/ai-summary", response_model=PageAISummaryRead)
+def summarize_page(
+    page_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> PageAISummaryRead:
+    return PageService(db).ai_summary(page_id)
 
 
 @router.patch("/{page_id}", response_model=PageRead)

@@ -32,3 +32,16 @@ class IdeaRead(FullTimestampedRead):
     target_users: str | None = None
     status: str
     created_by_id: int
+
+
+class IdeaAIAnalysisRead(BaseModel):
+    idea_id: int
+    summary: str | None = None
+    problem_clarity: str | None = None
+    target_users: str | None = None
+    feasibility: str | None = None
+    risks: str | None = None
+    mvp_suggestion: str | None = None
+    monetization_angle: str | None = None
+    next_steps: str | None = None
+    raw_response: str | None = None

@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.idea import IdeaCreate, IdeaRead, IdeaUpdate
+from app.schemas.idea import IdeaAIAnalysisRead, IdeaCreate, IdeaRead, IdeaUpdate
 from app.schemas.impact_score import ImpactScoreCreate, ImpactScoreRead
 from app.schemas.mvp_plan import MVPPlanCreate, MVPPlanRead, MVPPlanUpdate
 from app.schemas.validation_note import ValidationNoteCreate, ValidationNoteRead
 from app.services.idea_service import IdeaService
+from app.services.idea_ai_service import IdeaAIService, to_read_model
 from app.services.impact_score_service import ImpactScoreService
 from app.services.mvp_plan_service import MVPPlanService
 from app.services.validation_note_service import ValidationNoteService
@@ -88,3 +89,8 @@ def get_mvp_plan(idea_id: int, db: Session = Depends(get_db)):
 @router.patch("/{idea_id}/mvp-plan", response_model=MVPPlanRead)
 def update_mvp_plan(idea_id: int, data: MVPPlanUpdate, db: Session = Depends(get_db)):
     return MVPPlanService(db).update(idea_id, data)
+
+
+@router.post("/{idea_id}/ai-analysis", response_model=IdeaAIAnalysisRead)
+def analyze_idea(idea_id: int, db: Session = Depends(get_db)):
+    return to_read_model(IdeaAIService(db).analyze(idea_id))

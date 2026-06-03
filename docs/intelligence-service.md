@@ -148,6 +148,16 @@ Request fields:
 
 Later tiers may add event-driven indexing, stronger source citations, retrieval policies, production embeddings, vector database integration, and gateway-mediated cross-service auth.
 
+## Current AI Feature Consumers
+
+The first AI feature pack uses `POST /api/v1/completions/chat` from:
+
+- Discover idea analysis
+- Flow task breakdown
+- Docs page summary
+
+These consumers keep AI optional with `AI_FEATURES_ENABLED=false` by default and mock AI calls in tests.
+
 ## Future Agent Roadmap
 
 Later tiers may add tool-aware assistants, planning workflows, approval gates, execution logs, and automation coordination. Agent behavior is intentionally out of scope for the current service foundation.
