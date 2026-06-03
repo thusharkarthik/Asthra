@@ -4,12 +4,19 @@ import { Select } from "@/components/ui/select";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function ProjectSwitcher() {
-  const { projects, activeProjectId, activeWorkspaceId, setActiveProject } = useWorkspaceStore();
-  const visibleProjects = projects.filter((project) => project.workspaceId === activeWorkspaceId);
+  const { projects, selectedProjectId, setSelectedProject } = useWorkspaceStore();
+
+  if (projects.length === 0) {
+    return (
+      <Select aria-label="Project" disabled>
+        <option>No projects</option>
+      </Select>
+    );
+  }
 
   return (
-    <Select aria-label="Project" value={activeProjectId} onChange={(event) => setActiveProject(event.target.value)}>
-      {visibleProjects.map((project) => (
+    <Select aria-label="Project" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProject(Number(event.target.value))}>
+      {projects.map((project) => (
         <option key={project.id} value={project.id}>
           {project.name}
         </option>

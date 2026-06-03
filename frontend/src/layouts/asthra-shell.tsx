@@ -1,6 +1,11 @@
-import { Bell, Menu, UserCircle } from "lucide-react";
+"use client";
+
+import { Bell, LogOut, Menu, UserCircle } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
+import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { SidebarNav } from "@/components/navigation/sidebar-nav";
 import { ProjectSwitcher } from "@/components/navigation/project-switcher";
 import { SearchBar } from "@/components/search/search-bar";
@@ -8,10 +13,55 @@ import { SearchDialog } from "@/components/search/search-dialog";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
+import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
+import { useAuthStore } from "@/stores/auth-store";
+
+const publicPaths = new Set(["/login", "/register"]);
+
+function WorkspaceContextLoader() {
+  useWorkspaceContextQueries();
+  return null;
+}
 
 export function AsthraShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const logout = useAuthStore((state) => state.logout);
+  const isPublicPath = publicPaths.has(pathname);
+
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated && !isPublicPath) {
+      router.replace("/login");
+    }
+  }, [hasHydrated, isAuthenticated, isPublicPath, router]);
+
+  if (isPublicPath) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
+        <div className="w-full max-w-md">{children}</div>
+      </main>
+    );
+  }
+
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Loading Asthra...
+      </main>
+    );
+  }
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
+      <WorkspaceContextLoader />
       <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
         <div className="flex h-14 items-center border-b px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
@@ -29,6 +79,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
             <Menu className="h-4 w-4" />
           </Button>
           <div className="hidden items-center gap-2 md:flex">
+            <OrganizationSwitcher />
             <WorkspaceSwitcher />
             <ProjectSwitcher />
           </div>
@@ -39,8 +90,15 @@ export function AsthraShell({ children }: { children: ReactNode }) {
             <Bell className="h-4 w-4" />
           </Button>
           <ThemeToggle />
-          <Button size="icon" variant="ghost" aria-label="User menu">
+          <div className="hidden min-w-0 max-w-40 text-right text-xs leading-tight text-muted-foreground lg:block">
+            <div className="truncate font-medium text-foreground">{currentUser?.full_name ?? currentUser?.email}</div>
+            <div className="truncate">{currentUser?.email}</div>
+          </div>
+          <Button size="icon" variant="ghost" aria-label="User menu" title={currentUser?.email ?? "User"}>
             <UserCircle className="h-5 w-5" />
+          </Button>
+          <Button size="icon" variant="ghost" aria-label="Log out" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
           </Button>
         </header>
         <div className="flex min-h-0 flex-1">
