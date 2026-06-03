@@ -61,6 +61,9 @@ NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8010
 NEXT_PUBLIC_CORE_AUTH_LOGIN_PATH=/api/core/api/v1/auth/login
 NEXT_PUBLIC_CORE_AUTH_REGISTER_PATH=/api/core/api/v1/auth/register
 NEXT_PUBLIC_CORE_AUTH_ME_PATH=/api/core/api/v1/auth/me
+NEXT_PUBLIC_ASSISTANT_CHAT_PATH=/api/ai/api/v1/assistant/chat
+NEXT_PUBLIC_ASSISTANT_SESSIONS_PATH=/api/ai/api/v1/assistant/sessions
+NEXT_PUBLIC_WORKSPACE_SEARCH_PATH=/api/memory/api/v1/workspace-search
 ```
 
 The path variables are optional and exist so the auth routes can be adjusted without code changes if the gateway route shape changes.
@@ -96,6 +99,8 @@ Current tests cover:
 - login and register page rendering
 - auth store behavior
 - workspace selector behavior
+- assistant panel rendering, no-workspace state, and mocked send-message flow
+- global search rendering, grouped results, no-workspace state, and API error handling
 
 ## API Foundation
 
@@ -119,6 +124,9 @@ Typed API modules:
 - `coreApi`: current user and organizations
 - `workspaceApi`: workspaces
 - `projectApi`: projects
+- `assistantApi`: assistant sessions, messages, and chat
+- `memoryApi`: workspace memory search
+- `searchApi`: frontend search facade over workspace memory search
 
 Current core-service gateway paths:
 
@@ -128,6 +136,14 @@ Current core-service gateway paths:
 - `GET /api/core/api/v1/organizations`
 - `GET /api/core/api/v1/workspaces`
 - `GET /api/core/api/v1/projects`
+
+Current AI/search gateway paths:
+
+- `POST /api/ai/api/v1/assistant/chat`
+- `GET /api/ai/api/v1/assistant/sessions`
+- `POST /api/ai/api/v1/assistant/sessions`
+- `GET /api/ai/api/v1/assistant/sessions/{session_id}/messages`
+- `POST /api/memory/api/v1/workspace-search`
 
 ## Auth Flow
 
@@ -155,12 +171,56 @@ Workspace context is loaded from core-service through the gateway after authenti
 
 Selected organization, workspace, and project IDs are persisted in local storage. API failures show non-crashing empty/error states.
 
+## AI Assistant
+
+The right assistant panel is workspace-aware:
+
+- Loads assistant sessions for the selected workspace.
+- Creates a session on first message if none exists.
+- Sends messages through the API Gateway to ai-service.
+- Stores local message history in the assistant store.
+- Shows assistant responses, sources, loading state, and API errors.
+
+The assistant is read-only in this phase. It does not execute tools, mutate services, run agents, or trigger automation.
+
+## Workspace Search
+
+The global search dialog uses workspace memory search through the gateway. It debounces input and groups results by source type:
+
+- `docs_page`
+- `work_item`
+- `idea`
+- `support_ticket`
+- `incident`
+- `release`
+- `discussion_thread`
+
+Each result shows a title, source type, snippet/chunk text, and relevance score when returned. If no workspace is selected, search shows an empty state instead of calling the backend.
+
+## Dashboard AI Widgets
+
+The dashboard includes simple AI-native widgets for:
+
+- Ask Asthra quick prompt
+- Recent AI conversations placeholder
+- Workspace memory status
+- Search across workspace
+
+These are shell-level widgets only. Full module-specific AI screens are intentionally deferred.
+
 ## State Stores
 
 - `auth-store`: token, current user, login/register/logout, session reload
 - `workspace-store`: organizations, workspaces, projects, selected context
 - `ui-store`: assistant/search panel state
-- `assistant-store`: mock assistant conversations
+- `assistant-store`: assistant sessions, local message history, active session, and error state
+
+## Known Limitations
+
+- Assistant and search require API Gateway routes to be available for real backend data.
+- Search is only as complete as memory-service indexing.
+- Assistant tools are read-only placeholders on the backend foundation.
+- No frontend agent workflow or automation execution UI is implemented yet.
 
 ## Future Module Integration
 
