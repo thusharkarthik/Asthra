@@ -11,6 +11,7 @@ from app.schemas.completion import (
     RAGCompletionRequest,
     RAGCompletionResponse,
     RAGSourceChunk,
+    WorkspaceRAGCompletionRequest,
 )
 from app.services.provider_service import ProviderService
 
@@ -35,6 +36,38 @@ class RAGService:
                     ),
                 ],
             ),
+        )
+
+    def generate_workspace_rag_completion(self, rag_request: WorkspaceRAGCompletionRequest) -> RAGCompletionResponse:
+        retrieval_payload = self._retrieve_workspace_context(rag_request)
+        sources = self._build_workspace_sources(retrieval_payload)
+        context = self._build_context(sources)
+        completion = ProviderService(self.db).generate_chat_completion(
+            ChatCompletionRequest(
+                provider=rag_request.provider,
+                model=rag_request.model,
+                system_prompt=rag_request.system_prompt
+                or "Answer using the provided workspace context. If the context is insufficient, say so.",
+                messages=[
+                    ChatMessage(
+                        role="user",
+                        content=f"Workspace Context:\n{context}\n\nQuestion:\n{rag_request.query}",
+                    ),
+                ],
+            ),
+        )
+        return RAGCompletionResponse(
+            answer=completion.generated_text,
+            sources=sources,
+            provider=completion.provider,
+            model=completion.model,
+            usage=completion.usage,
+            retrieval_metadata={
+                "retrieval_type": "workspace_semantic",
+                "workspace_id": rag_request.workspace_id,
+                "top_k": retrieval_payload.get("top_k"),
+                "result_count": retrieval_payload.get("result_count"),
+            },
         )
         return RAGCompletionResponse(
             answer=completion.generated_text,
@@ -74,6 +107,30 @@ class RAGService:
             )
         return response.json()
 
+    def _retrieve_workspace_context(self, rag_request: WorkspaceRAGCompletionRequest) -> dict:
+        memory_url = (rag_request.memory_service_url or settings.memory_service_url).rstrip("/")
+        try:
+            response = httpx.post(
+                f"{memory_url}/api/v1/workspace-search",
+                json={
+                    "query": rag_request.query,
+                    "top_k": rag_request.top_k or 5,
+                    "workspace_id": rag_request.workspace_id,
+                },
+                timeout=10.0,
+            )
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Memory Service is unavailable.",
+            ) from exc
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Memory Service workspace search failed.",
+            )
+        return response.json()
+
     def _build_sources(self, retrieval_payload: dict) -> list[RAGSourceChunk]:
         sources: list[RAGSourceChunk] = []
         for result in retrieval_payload.get("results", []):
@@ -88,6 +145,25 @@ class RAGService:
                     workspace_id=result.get("workspace_id"),
                     score=result.get("score"),
                     metadata=result.get("metadata"),
+                ),
+            )
+        return sources
+
+    def _build_workspace_sources(self, retrieval_payload: dict) -> list[RAGSourceChunk]:
+        sources: list[RAGSourceChunk] = []
+        for result in retrieval_payload.get("results", []):
+            sources.append(
+                RAGSourceChunk(
+                    chunk_id=result.get("chunk_id"),
+                    document_id=result.get("document_id"),
+                    document_title=result.get("title"),
+                    content=result.get("chunk", ""),
+                    source_id=0,
+                    workspace_id=retrieval_payload.get("workspace_id"),
+                    score=result.get("relevance_score"),
+                    metadata=result.get("metadata"),
+                    source_type=result.get("source_type"),
+                    source_reference=result.get("source_reference"),
                 ),
             )
         return sources

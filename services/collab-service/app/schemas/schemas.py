@@ -30,6 +30,15 @@ class ThreadUpdate(BaseModel):
 class ThreadRead(ThreadCreate, FullRead): pass
 
 
+class ThreadMemoryDocumentPayload(BaseModel):
+    source_type: str = "discussion_thread"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict
+
+
 class MessageCreate(BaseModel):
     author_id: int | None = None
     content: str = Field(min_length=1)

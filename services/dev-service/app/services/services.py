@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.repositories.repositories import DependencyRepo, DeploymentRepo, EnvironmentRepo, OwnerRepo, PullRequestRepo, ReleaseRepo, RepositoryRepo, ServiceRepo
-from app.schemas.schemas import ReleaseAISummaryRead
+from app.schemas.schemas import ReleaseAISummaryRead, ReleaseMemoryDocumentPayload
 from app.services.ai_client import AIClient
 
 PROVIDERS = {"github", "gitlab", "bitbucket", "other"}
@@ -139,6 +139,22 @@ class ReleaseService:
             stakeholder_summary=result.get("stakeholder_summary"),
             qa_notes=result.get("qa_notes") or [],
             raw_response=result.get("raw_response"),
+        )
+    def prepare_memory_document(self, i: int) -> ReleaseMemoryDocumentPayload:
+        release = self.get(i)
+        service = self.services.get(release.service_id) if release.service_id is not None else None
+        service_text = f"Service: {service.name}" if service is not None else "Service: none"
+        return ReleaseMemoryDocumentPayload(
+            external_reference=f"release:{release.id}",
+            workspace_id=release.workspace_id,
+            title=f"Release {release.version}",
+            content="\n\n".join(part for part in [f"Version: {release.version}", f"Status: {release.status}", service_text, release.notes] if part),
+            metadata={
+                "release_id": release.id,
+                "service_id": release.service_id,
+                "status": release.status,
+                "version": release.version,
+            },
         )
 
 

@@ -45,3 +45,12 @@ class IdeaAIAnalysisRead(BaseModel):
     monetization_angle: str | None = None
     next_steps: str | None = None
     raw_response: str | None = None
+
+
+class IdeaMemoryDocumentPayload(BaseModel):
+    source_type: str = "idea"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict

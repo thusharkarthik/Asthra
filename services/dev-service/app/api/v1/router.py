@@ -61,6 +61,8 @@ def list_releases(workspace_id: int | None = None, status: str | None = None, se
 def get_release(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).get(release_id)
 @api_router.post("/releases/{release_id}/ai-summary", response_model=ReleaseAISummaryRead)
 def ai_summary_release(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).ai_summary(release_id)
+@api_router.post("/releases/{release_id}/prepare-memory-document", response_model=ReleaseMemoryDocumentPayload)
+def prepare_memory_document(release_id: int, db: Session = Depends(get_db)): return ReleaseService(db).prepare_memory_document(release_id)
 @api_router.patch("/releases/{release_id}", response_model=ReleaseRead)
 def update_release(release_id: int, d: ReleaseUpdate, db: Session = Depends(get_db)): return ReleaseService(db).update(release_id, d)
 

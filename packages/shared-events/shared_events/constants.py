@@ -9,6 +9,9 @@ class EventNames:
     AI_COMPLETION_GENERATED = "ai.completion.generated"
     MEMORY_DOCUMENT_CREATED = "memory.document.created"
     MEMORY_DOCUMENT_CHUNKED = "memory.document.chunked"
+    MEMORY_DOCUMENT_INGESTED = "memory.document.ingested"
+    MEMORY_EMBEDDING_GENERATED = "memory.embedding.generated"
+    MEMORY_WORKSPACE_SEARCH = "memory.workspace.search"
     DISCOVER_IDEA_CREATED = "discover.idea.created"
     DESK_TICKET_CREATED = "desk.ticket.created"
     PULSE_INCIDENT_CREATED = "pulse.incident.created"
@@ -26,6 +29,9 @@ COMMON_EVENT_NAMES = {
     EventNames.AI_COMPLETION_GENERATED,
     EventNames.MEMORY_DOCUMENT_CREATED,
     EventNames.MEMORY_DOCUMENT_CHUNKED,
+    EventNames.MEMORY_DOCUMENT_INGESTED,
+    EventNames.MEMORY_EMBEDDING_GENERATED,
+    EventNames.MEMORY_WORKSPACE_SEARCH,
     EventNames.DISCOVER_IDEA_CREATED,
     EventNames.DESK_TICKET_CREATED,
     EventNames.PULSE_INCIDENT_CREATED,

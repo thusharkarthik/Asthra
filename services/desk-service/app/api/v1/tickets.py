@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.schemas.approval import ApprovalCreate, ApprovalRead
 from app.schemas.comment import TicketCommentCreate, TicketCommentRead
 from app.schemas.escalation import EscalationCreate, EscalationRead
-from app.schemas.ticket import TicketAIClassificationRead, TicketCreate, TicketRead, TicketUpdate
+from app.schemas.ticket import TicketAIClassificationRead, TicketCreate, TicketMemoryDocumentPayload, TicketRead, TicketUpdate
 from app.services.approval_service import ApprovalService
 from app.services.comment_service import CommentService
 from app.services.escalation_service import EscalationService
@@ -53,6 +53,11 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
 @router.post("/{ticket_id}/ai-classify", response_model=TicketAIClassificationRead)
 def ai_classify_ticket(ticket_id: int, db: Session = Depends(get_db)):
     return TicketService(db).ai_classify(ticket_id)
+
+
+@router.post("/{ticket_id}/prepare-memory-document", response_model=TicketMemoryDocumentPayload)
+def prepare_memory_document(ticket_id: int, db: Session = Depends(get_db)):
+    return TicketService(db).prepare_memory_document(ticket_id)
 
 
 @router.patch("/{ticket_id}", response_model=TicketRead)

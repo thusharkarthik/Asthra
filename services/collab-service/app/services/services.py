@@ -16,6 +16,23 @@ class ThreadService:
         return x
     def update(self, i, d): return self.repo.update(self.get(i), d)
     def delete(self, i): self.repo.delete(self.get(i))
+    def prepare_memory_document(self, i):
+        thread = self.get(i)
+        return {
+            "source_type": "discussion_thread",
+            "external_reference": f"discussion_thread:{thread.id}",
+            "workspace_id": thread.workspace_id,
+            "title": thread.title,
+            "content": thread.title,
+            "metadata": {
+                "thread_id": thread.id,
+                "project_id": thread.project_id,
+                "entity_type": thread.entity_type,
+                "entity_id": thread.entity_id,
+                "status": thread.status,
+                "created_by_id": thread.created_by_id,
+            },
+        }
     # TODO: Add AI conversation summaries and discussion extraction later.
 
 

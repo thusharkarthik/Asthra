@@ -126,6 +126,15 @@ class ReleaseAISummaryRead(BaseModel):
     raw_response: str | None = None
 
 
+class ReleaseMemoryDocumentPayload(BaseModel):
+    source_type: str = "release"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict
+
+
 class ServiceOwnerCreate(BaseModel):
     owner_id: int
     role: str | None = None

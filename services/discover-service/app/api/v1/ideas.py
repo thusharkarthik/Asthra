@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.idea import IdeaAIAnalysisRead, IdeaCreate, IdeaRead, IdeaUpdate
+from app.schemas.idea import IdeaAIAnalysisRead, IdeaCreate, IdeaMemoryDocumentPayload, IdeaRead, IdeaUpdate
 from app.schemas.impact_score import ImpactScoreCreate, ImpactScoreRead
 from app.schemas.mvp_plan import MVPPlanCreate, MVPPlanRead, MVPPlanUpdate
 from app.schemas.validation_note import ValidationNoteCreate, ValidationNoteRead
@@ -94,3 +94,8 @@ def update_mvp_plan(idea_id: int, data: MVPPlanUpdate, db: Session = Depends(get
 @router.post("/{idea_id}/ai-analysis", response_model=IdeaAIAnalysisRead)
 def analyze_idea(idea_id: int, db: Session = Depends(get_db)):
     return to_read_model(IdeaAIService(db).analyze(idea_id))
+
+
+@router.post("/{idea_id}/prepare-memory-document", response_model=IdeaMemoryDocumentPayload)
+def prepare_memory_document(idea_id: int, db: Session = Depends(get_db)):
+    return IdeaService(db).prepare_memory_document(idea_id)

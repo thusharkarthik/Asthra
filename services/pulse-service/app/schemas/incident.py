@@ -40,3 +40,12 @@ class IncidentAISummaryRead(BaseModel):
     next_actions: list[str] = []
     customer_facing_update_draft: str | None = None
     raw_response: str | None = None
+
+
+class IncidentMemoryDocumentPayload(BaseModel):
+    source_type: str = "incident"
+    external_reference: str
+    workspace_id: int
+    title: str
+    content: str
+    metadata: dict

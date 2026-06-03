@@ -15,6 +15,16 @@ class SourceService:
     def create(self, source_create: KnowledgeSourceCreate) -> KnowledgeSource:
         return self.source_repository.create(source_create)
 
+    def get_or_create(self, source_create: KnowledgeSourceCreate) -> KnowledgeSource:
+        existing = self.source_repository.get_by_identity(
+            workspace_id=source_create.workspace_id,
+            source_type=source_create.source_type,
+            external_reference=source_create.external_reference,
+        )
+        if existing is not None:
+            return existing
+        return self.create(source_create)
+
     def list(self, *, workspace_id: int | None = None) -> list[KnowledgeSource]:
         return self.source_repository.list(workspace_id=workspace_id)
 

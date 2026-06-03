@@ -8,6 +8,7 @@ from app.models.embedding_record import EmbeddingRecord
 from app.providers.embedding_provider_factory import get_embedding_provider
 from app.repositories.embedding_repository import EmbeddingRepository
 from app.services.document_service import DocumentService
+from app.services.event_publisher import publish_event
 from app.vectorstores.in_memory_vector_store import get_vector_store
 
 
@@ -39,6 +40,11 @@ class EmbeddingService:
                     "chunk_id": chunk.id,
                     "document_id": chunk.document_id,
                     "chunk_index": chunk.chunk_index,
+                    "source_id": chunk.document.source_id,
+                    "source_type": chunk.document.source.source_type,
+                    "external_reference": chunk.document.source.external_reference,
+                    "workspace_id": chunk.document.source.workspace_id,
+                    "document_title": chunk.document.title,
                 },
             )
             record, created = self.embedding_repository.upsert_placeholder(
@@ -52,6 +58,19 @@ class EmbeddingService:
                 created_count += 1
             else:
                 updated_count += 1
+        publish_event(
+            "memory.embedding.generated",
+            payload={
+                "document_id": document_id,
+                "chunks_processed": len(records),
+                "records_created": created_count,
+                "records_updated": updated_count,
+                "provider": settings.embedding_provider,
+                "model": provider.model_name,
+            },
+            entity_type="knowledge_document",
+            entity_id=str(document_id),
+        )
         return records, created_count, updated_count
 
     def provider_summary(self) -> tuple[str, str]:

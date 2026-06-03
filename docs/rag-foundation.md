@@ -1,22 +1,28 @@
 # Asthra RAG Foundation
 
-Phase 2 connects Docs, Memory, and Intelligence into the first RAG-ready architecture without paid APIs, vector database requirements, agents, frontend code, or automation execution.
+Phase 2 connects source services, Memory, and Intelligence into the first RAG-ready architecture without paid APIs, vector database requirements, agents, frontend code, or automation execution.
 
 ## Service Roles
 
 | Service | Role |
 | --- | --- |
 | docs-service | content source for documentation pages |
-| memory-service | ingestion, chunking, mock embeddings, vector store abstraction, retrieval |
+| flow-service | work item source |
+| discover-service | idea and feature request source |
+| desk-service | support ticket source |
+| pulse-service | incident source |
+| dev-service | release source |
+| collab-service | discussion thread source |
+| memory-service | ingestion, chunking, mock embeddings, vector store abstraction, retrieval, workspace search |
 | ai-service | answer generation through the existing completion provider flow |
 
 ## Current Flow
 
-1. Docs prepares a normalized memory document payload with `POST /api/v1/pages/{page_id}/prepare-memory-document`.
-2. Memory ingests documents through its existing document APIs and automatically chunks content.
-3. Memory generates deterministic mock embeddings with `POST /api/v1/embeddings/generate/{document_id}`.
-4. Memory stores vectors in an in-memory vector store for local/test usage.
-5. AI calls Memory semantic retrieval through `POST /api/v1/completions/rag`.
+1. Source services prepare normalized memory payloads with `prepare-memory-document` endpoints.
+2. Memory ingests normalized payloads with `POST /api/v1/ingest`.
+3. Memory chunks content, generates deterministic mock embeddings, and indexes vectors.
+4. Memory supports document semantic retrieval and workspace search.
+5. AI calls Memory through `POST /api/v1/completions/rag` or `POST /api/v1/completions/workspace-rag`.
 6. AI builds context from retrieved chunks and calls the existing completion provider service.
 
 ## Defaults

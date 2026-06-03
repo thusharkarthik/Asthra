@@ -11,6 +11,8 @@ from app.schemas.retrieval_log import (
     RetrievalSearchResponse,
     RetrievalSearchResult,
 )
+from app.schemas.workspace_search import WorkspaceSearchRequest, WorkspaceSearchResponse, WorkspaceSearchResult
+from app.services.event_publisher import publish_event
 from app.vectorstores.in_memory_vector_store import get_vector_store
 
 
@@ -53,6 +55,46 @@ class RetrievalService:
             top_k=top_k,
             result_count=len(results),
             latency_ms=latency_ms,
+            results=results,
+        )
+
+    def workspace_search(self, search_request: WorkspaceSearchRequest) -> WorkspaceSearchResponse:
+        response = self.semantic_search(
+            RetrievalSearchRequest(
+                query=search_request.query,
+                top_k=search_request.top_k,
+                workspace_id=search_request.workspace_id,
+            ),
+        )
+        results = [
+            WorkspaceSearchResult(
+                source_type=(result.metadata or {}).get("source_type") or "unknown",
+                title=result.document_title,
+                chunk=result.chunk.content,
+                relevance_score=result.score,
+                source_reference=(result.metadata or {}).get("external_reference"),
+                document_id=result.document_id,
+                chunk_id=result.chunk.id,
+                metadata=result.metadata,
+            )
+            for result in response.results
+        ]
+        publish_event(
+            "memory.workspace.search",
+            payload={
+                "query": search_request.query,
+                "top_k": search_request.top_k,
+                "result_count": len(results),
+            },
+            workspace_id=search_request.workspace_id,
+            entity_type="workspace_memory",
+            entity_id=str(search_request.workspace_id),
+        )
+        return WorkspaceSearchResponse(
+            workspace_id=search_request.workspace_id,
+            query=search_request.query,
+            top_k=search_request.top_k,
+            result_count=len(results),
             results=results,
         )
 

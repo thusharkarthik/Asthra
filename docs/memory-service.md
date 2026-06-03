@@ -1,6 +1,6 @@
 # Asthra Memory Service
 
-Asthra Memory manages durable knowledge context for Asthra. The Phase 2 foundation supports source and document ingestion, chunk creation, mock embeddings, in-memory vector indexing, keyword retrieval, semantic retrieval, and retrieval logs.
+Asthra Memory manages durable knowledge context for Asthra. The Phase 2 foundation supports source and document ingestion, workspace memory collections, chunk creation, mock embeddings, in-memory vector indexing, keyword retrieval, semantic retrieval, workspace search, and retrieval logs.
 
 No external embedding API, GPU, Qdrant instance, agents, automation, or frontend is required.
 
@@ -12,13 +12,45 @@ No external embedding API, GPU, Qdrant instance, agents, automation, or frontend
 - Generate deterministic mock embeddings by default.
 - Store vectors in an in-memory vector store for local/test use.
 - Support keyword and semantic retrieval.
+- Support workspace-wide search across indexed source types.
 - Log retrieval requests for later observability.
+
+## Source Registry
+
+Supported source types:
+
+- `docs_page`
+- `work_item`
+- `idea`
+- `feature_request`
+- `support_ticket`
+- `incident`
+- `release`
+- `discussion_thread`
+
+Each source type has an owning service. Memory stores retrieval copies and metadata only; source services remain authoritative.
+
+## Collections
+
+Endpoints:
+
+- `POST /api/v1/collections`
+- `GET /api/v1/collections`
+- `GET /api/v1/collections/{collection_id}`
+- `PATCH /api/v1/collections/{collection_id}`
+- `DELETE /api/v1/collections/{collection_id}`
 
 ## Ingestion Pipeline
 
 Create a `KnowledgeSource`, then create `KnowledgeDocument` records linked to that source.
 
 When a document is created or content is updated, chunks are generated automatically.
+
+Generic ingest endpoint:
+
+- `POST /api/v1/ingest`
+
+This endpoint creates or reuses a source, creates a document, chunks it, generates embeddings, indexes vectors, and returns document/chunk/embedding counts.
 
 ## Chunking Lifecycle
 
@@ -64,6 +96,10 @@ Semantic retrieval:
 
 - `POST /api/v1/retrieval/semantic-search`
 
+Workspace search:
+
+- `POST /api/v1/workspace-search`
+
 Semantic request:
 
 ```json
@@ -77,6 +113,17 @@ Semantic request:
 ```
 
 Each retrieval writes a `RetrievalLog`.
+
+## Event Publishing
+
+Optional no-op-safe events:
+
+- `memory.document.ingested`
+- `memory.document.chunked`
+- `memory.embedding.generated`
+- `memory.workspace.search`
+
+Publishing is disabled unless `EVENT_PUBLISHING_ENABLED=true` and `EVENT_SERVICE_URL` is configured.
 
 ## Future Vector DB Roadmap
 
