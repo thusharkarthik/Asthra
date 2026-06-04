@@ -1,8 +1,17 @@
 import type { ActivityItem, WorkspaceDashboardSummary } from "@/types/platform";
+import { platformApi } from "@/services/api/platform-api";
 
 const now = new Date("2026-06-04T10:00:00.000Z").toISOString();
 
-export async function getWorkspaceActivity(): Promise<ActivityItem[]> {
+export async function getWorkspaceActivity(token?: string | null): Promise<ActivityItem[]> {
+  if (token) {
+    try {
+      const response = await platformApi.listActivity(token);
+      return response.items;
+    } catch {
+      // Fall back to demo data when gateway platform endpoints are not available.
+    }
+  }
   return [
     { id: "act-1", source: "flow", actor: "Maya", action: "updated", entity: { source: "flow", entity_type: "work_item", entity_id: 101, title: "API gateway routing", href: "/flow/work-items/101" }, timestamp: now },
     { id: "act-2", source: "docs", actor: "Thushar", action: "published", entity: { source: "docs", entity_type: "docs_page", entity_id: 44, title: "Platform beta guide", href: "/docs/pages/44" }, timestamp: now },
@@ -12,12 +21,21 @@ export async function getWorkspaceActivity(): Promise<ActivityItem[]> {
   ];
 }
 
-export async function getWorkspaceDashboardSummary(): Promise<WorkspaceDashboardSummary> {
+export async function getWorkspaceDashboardSummary(token?: string | null): Promise<WorkspaceDashboardSummary> {
+  if (token) {
+    try {
+      return await platformApi.getDashboard(token);
+    } catch {
+      // Fall back to demo data when gateway platform endpoints are not available.
+    }
+  }
   return {
     work: { label: "Open work items", value: 8, href: "/flow/work-items" },
     docs: { label: "Recent pages", value: 12, href: "/docs/pages" },
-    incidents: { label: "Active incidents", value: 1, href: "/pulse/incidents" },
-    engineering: { label: "Deployments", value: 4, href: "/dev/deployments" },
+    discovery: { label: "Ideas in validation", value: 5, href: "/discover/ideas" },
+    desk: { label: "Open tickets", value: 4, href: "/desk/tickets" },
+    pulse: { label: "Active incidents", value: 1, href: "/pulse/incidents" },
+    dev: { label: "Deployments", value: 4, href: "/dev/deployments" },
     ai: { label: "Assistant sessions", value: 3, href: "/settings/preferences" }
   };
 }
