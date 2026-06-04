@@ -21,6 +21,9 @@ export const docsApi = {
   createSpace(accessToken: string, payload: SpaceCreate) {
     return apiRequest<Space>(`${DOCS_PREFIX}/spaces`, { method: "POST", authToken: accessToken, json: payload });
   },
+  getSpace(accessToken: string, id: string | number) {
+    return apiRequest<Space>(`${DOCS_PREFIX}/spaces/${id}`, { method: "GET", authToken: accessToken });
+  },
   listPages(accessToken: string, filters: PageFilters = {}) {
     return apiRequest<Page[]>(`${DOCS_PREFIX}/pages${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
