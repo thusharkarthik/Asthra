@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AsthraShell } from "@/layouts/asthra-shell";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
+import { useNotificationStore } from "@/stores/notification-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -75,5 +76,21 @@ describe("AsthraShell", () => {
 
     expect(screen.getByRole("dialog", { name: /command palette/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /go to flow/i })).toBeInTheDocument();
+  });
+
+  it("opens the notification center", () => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
+    useNotificationStore.getState().addNotification({ id: "shell-test", type: "approval", title: "Approval needed", message: "Review a request", unread: true, created_at: "2026-06-04T10:00:00.000Z" });
+
+    renderShell(<div>Test content</div>);
+    fireEvent.click(screen.getByLabelText("Notifications"));
+
+    expect(screen.getByRole("dialog", { name: /notification center/i })).toBeInTheDocument();
+    expect(screen.getByText("Approval needed")).toBeInTheDocument();
   });
 });

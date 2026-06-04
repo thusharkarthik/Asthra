@@ -32,7 +32,10 @@ describe("HomePage", () => {
     expect(screen.getByText("Projects")).toBeInTheDocument();
     expect(screen.getByText("Module Quick Launch")).toBeInTheDocument();
     expect(screen.getByText("Continue where you left off")).toBeInTheDocument();
-    expect(screen.getByText("Recent Activity")).toBeInTheDocument();
     expect(screen.getByText("System Status")).toBeInTheDocument();
+    expect(screen.getByText("Global Activity Feed")).toBeInTheDocument();
+    expect(screen.getByText("Cross-Module Links")).toBeInTheDocument();
+    expect(screen.getByText("Recently Viewed")).toBeInTheDocument();
+    expect(screen.getByText("Recently Modified")).toBeInTheDocument();
   });
 });
