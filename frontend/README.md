@@ -486,16 +486,34 @@ These are shell-level widgets only. Full module-specific AI screens are intentio
 The Home route includes:
 
 - context count cards for organizations, workspaces, and projects
+- workspace dashboard summary cards for work, docs, incidents, engineering, and AI
 - module quick launch grid
 - assistant shortcut
 - workspace search shortcut
-- pinned modules placeholder
+- favorites
+- recently viewed items
+- recently modified items
 - system status placeholder
-- recent activity placeholder
+- global activity feed
 - recent AI assistant conversations placeholder
 - recent search results placeholder
 - module status cards
 - continue-where-you-left-off links
+- cross-module links
+
+## Platform Beta Integration
+
+Current beta integration surfaces:
+
+- global activity feed contract and frontend aggregation service
+- notification center with unread count
+- generic entity reference and cross-module links
+- recently viewed and recently modified items
+- favorites for common entities
+- route-aware global search results with source/entity badges
+- workspace settings sections for General, Members, Projects, Integrations, AI Preferences, and Notifications
+
+These foundations are frontend-side and demo-ready. Backend aggregation, realtime notification delivery, and persisted user preferences are deferred.
 
 ## Flow UI
 
@@ -696,6 +714,7 @@ Planned frontend passes:
 - `docs/demo-guide.md`
 - `docs/frontend-beta-status.md`
 - `docs/component-map.md`
+- `docs/platform-beta-guide.md`
 
 ## Future Module Integration
 

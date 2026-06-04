@@ -53,8 +53,8 @@ describe("SearchDialog", () => {
     fireEvent.change(screen.getByPlaceholderText(/search work items/i), { target: { value: "memory" } });
 
     await waitFor(() => expect(screen.getByText("Memory plan")).toBeInTheDocument());
-    expect(screen.getByText("Docs")).toBeInTheDocument();
-    expect(screen.getByText("Work")).toBeInTheDocument();
+    expect(screen.getAllByText("Docs").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Work").length).toBeGreaterThan(0);
     expect(screen.getByText("Task breakdown")).toBeInTheDocument();
   });
 

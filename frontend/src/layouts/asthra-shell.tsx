@@ -10,6 +10,7 @@ import { CommandPalette } from "@/components/navigation/command-palette";
 import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { SidebarNav } from "@/components/navigation/sidebar-nav";
 import { ProjectSwitcher } from "@/components/navigation/project-switcher";
+import { NotificationCenter } from "@/components/platform/notification-center";
 import { SearchBar } from "@/components/search/search-bar";
 import { SearchDialog } from "@/components/search/search-dialog";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
@@ -17,6 +18,7 @@ import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { useAuthStore } from "@/stores/auth-store";
+import { useNotificationStore } from "@/stores/notification-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -35,8 +37,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const logout = useAuthStore((state) => state.logout);
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
+  const unreadNotifications = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const isPublicPath = publicPaths.has(pathname);
 
   useEffect(() => {
@@ -113,9 +117,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1">
             <SearchBar />
           </div>
-          <Button size="icon" variant="ghost" aria-label="Notifications">
-            <Bell className="h-4 w-4" />
-          </Button>
+          <div className="relative">
+            <Button size="icon" variant="ghost" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}>
+              <Bell className="h-4 w-4" />
+              {unreadNotifications > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">{unreadNotifications}</span> : null}
+            </Button>
+            <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+          </div>
           <ThemeToggle />
           <div className="hidden min-w-0 max-w-40 text-right text-xs leading-tight text-muted-foreground lg:block">
             <div className="truncate font-medium text-foreground">{currentUser?.full_name ?? currentUser?.email}</div>

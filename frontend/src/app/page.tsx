@@ -1,13 +1,21 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Bot, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { CardSkeleton, ErrorState, EmptyModuleState } from "@/components/layout/ui-states";
 import { navSections } from "@/components/navigation/nav-items";
+import { PlatformActivityFeed } from "@/components/platform/activity-feed";
+import { CrossModuleLinks } from "@/components/platform/cross-module-links";
+import { FavoritesList, RecentItemsList } from "@/components/platform/recent-favorites";
+import { WorkspaceDashboardSummaryCards } from "@/components/platform/workspace-dashboard-summary";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
+import { getWorkspaceActivity, getWorkspaceDashboardSummary } from "@/services/platform/activity-service";
+import { useFavoritesStore } from "@/stores/favorites-store";
+import { useRecentItemsStore } from "@/stores/recent-items-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -16,18 +24,27 @@ const quickLaunch = navSections
   .filter((item) => item.href && item.href !== "/" && !item.disabled)
   .slice(0, 12);
 
-const recentActivity = [
-  "Workspace context loaded through core-service",
-  "Assistant and search are available from the shell",
-  "Module dashboards are connected through API Gateway"
-];
-
 const recentAssistantConversations = ["Sprint planning questions", "Release risk summary", "Workspace onboarding notes"];
 const recentSearchResults = ["Architecture diagram", "API gateway routing", "Open incident timeline"];
 const moduleStatus = [
   { title: "Work modules", status: "Ready for demo", description: "Flow, Discover, Docs, Collab" },
   { title: "Operations modules", status: "Ready for demo", description: "Desk, Pulse, Automation" },
   { title: "Platform modules", status: "Shell-ready", description: "Connect, Guard, Insights, Media" }
+];
+
+const crossModuleLinks = [
+  {
+    id: "link-1",
+    relation: "Idea to work item",
+    from: { source: "discover" as const, entity_type: "idea", entity_id: 17, title: "Customer onboarding idea", href: "/discover/ideas/17" },
+    to: { source: "flow" as const, entity_type: "work_item", entity_id: 101, title: "Build onboarding checklist", href: "/flow/work-items/101" }
+  },
+  {
+    id: "link-2",
+    relation: "Ticket to incident",
+    from: { source: "desk" as const, entity_type: "ticket", entity_id: 12, title: "Login troubleshooting", href: "/desk/tickets/12" },
+    to: { source: "pulse" as const, entity_type: "incident", entity_id: 7, title: "API latency", href: "/pulse/incidents/7" }
+  }
 ];
 
 const continueItems = [
@@ -45,6 +62,11 @@ const pinnedModules = [
 export default function HomePage() {
   const { isLoading, error } = useWorkspaceContextQueries();
   const { organizations, workspaces, projects } = useWorkspaceStore();
+  const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: getWorkspaceActivity, retry: 0 });
+  const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: getWorkspaceDashboardSummary, retry: 0 });
+  const favorites = useFavoritesStore((state) => state.favorites);
+  const viewed = useRecentItemsStore((state) => state.viewed);
+  const modified = useRecentItemsStore((state) => state.modified);
   const setSearchOpen = useUIStore((state) => state.setSearchOpen);
   const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const countCards = [
@@ -65,6 +87,11 @@ export default function HomePage() {
             </DashboardCard>
           ))}
       </section>
+      {summaryQuery.data ? (
+        <section className="mb-4">
+          <WorkspaceDashboardSummaryCards summary={summaryQuery.data} />
+        </section>
+      ) : null}
       <section className="mb-4 grid gap-4 lg:grid-cols-4">
         <DashboardCard title="Ask Asthra">
           <Sparkles className="mb-3 h-5 w-5 text-primary" />
@@ -80,16 +107,9 @@ export default function HomePage() {
           <ShieldCheck className="mb-3 h-5 w-5 text-primary" />
           <p className="text-sm text-muted-foreground">Local service health appears here once platform aggregation is wired into the frontend.</p>
         </DashboardCard>
-        <DashboardCard title="Pinned Modules">
+        <DashboardCard title="Favorites">
           <Bot className="mb-3 h-5 w-5 text-primary" />
-          <div className="space-y-2">
-            {pinnedModules.map((item) => (
-              <Link key={item.href} href={item.href} className="block rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/70">
-                <span className="font-medium">{item.title}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{item.description}</span>
-              </Link>
-            ))}
-          </div>
+          <FavoritesList items={favorites.slice(0, 3)} />
         </DashboardCard>
       </section>
       <section className="mb-4">
@@ -113,8 +133,16 @@ export default function HomePage() {
             {continueItems.map((item) => <Link key={item.href} href={item.href} className="block rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/70">{item.title}</Link>)}
           </div>
         </DashboardCard>
-        <DashboardCard title="Recent Activity">
-          <ul className="space-y-2 text-sm">{recentActivity.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
+        <DashboardCard title="Recently Viewed">
+          <RecentItemsList title="Viewed across modules" items={viewed.slice(0, 3)} />
+        </DashboardCard>
+        <DashboardCard title="Recently Modified">
+          <RecentItemsList title="Modified across modules" items={modified.slice(0, 3)} />
+        </DashboardCard>
+      </section>
+      <section className="mt-4 grid gap-4 lg:grid-cols-3">
+        <DashboardCard title="Global Activity Feed">
+          <PlatformActivityFeed items={activityQuery.data ?? []} />
         </DashboardCard>
         <DashboardCard title="Workspace Memory">
           {workspaces.length > 0 ? (
@@ -123,11 +151,11 @@ export default function HomePage() {
             <EmptyModuleState title="No workspace selected" description="Select a workspace to enable assistant context and workspace search." />
           )}
         </DashboardCard>
-      </section>
-      <section className="mt-4 grid gap-4 lg:grid-cols-3">
         <DashboardCard title="Recent AI Conversations">
           <ul className="space-y-2 text-sm">{recentAssistantConversations.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
         </DashboardCard>
+      </section>
+      <section className="mt-4 grid gap-4 lg:grid-cols-3">
         <DashboardCard title="Recent Search Results">
           <ul className="space-y-2 text-sm">{recentSearchResults.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
         </DashboardCard>
@@ -140,6 +168,21 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </DashboardCard>
+        <DashboardCard title="Pinned Modules">
+          <div className="space-y-2">
+            {pinnedModules.map((item) => (
+              <Link key={item.href} href={item.href} className="block rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/70">
+                <span className="font-medium">{item.title}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{item.description}</span>
+              </Link>
+            ))}
+          </div>
+        </DashboardCard>
+      </section>
+      <section className="mt-4">
+        <DashboardCard title="Cross-Module Links">
+          <CrossModuleLinks links={crossModuleLinks} />
         </DashboardCard>
       </section>
     </>

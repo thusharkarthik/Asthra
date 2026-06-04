@@ -2,10 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Clock, FileText, Lightbulb, MessageSquare, Search, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyModuleState, ErrorState, TableSkeleton } from "@/components/layout/ui-states";
+import { EntityBadge, SourceBadge } from "@/components/platform/entity-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildEntityHref } from "@/services/platform/entity-links";
 import { searchApi } from "@/services/api/search-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -29,6 +32,17 @@ function sourceIcon(sourceType: string) {
   if (sourceType === "idea") return Lightbulb;
   if (sourceType === "support_ticket" || sourceType === "discussion_thread") return MessageSquare;
   return Search;
+}
+
+function routeSource(sourceType: string) {
+  if (sourceType === "docs_page") return "docs";
+  if (sourceType === "work_item") return "flow";
+  if (sourceType === "idea") return "discover";
+  if (sourceType === "support_ticket") return "desk";
+  if (sourceType === "incident") return "pulse";
+  if (sourceType === "release") return "dev";
+  if (sourceType === "discussion_thread") return "collab";
+  return sourceType;
 }
 
 function groupResults(results: WorkspaceSearchResult[]) {
@@ -114,7 +128,12 @@ export function SearchDialog() {
                     {sourceLabels[sourceType] ?? sourceType}
                   </div>
                   {results.map((result, index) => (
-                    <div key={`${sourceType}-${result.id ?? index}`} className="flex items-start gap-3 rounded-md p-3 hover:bg-muted">
+                    <Link
+                      key={`${sourceType}-${result.id ?? index}`}
+                      href={buildEntityHref({ source: routeSource(sourceType), entity_type: sourceType, entity_id: result.entity_id ?? result.id ?? index, href: "" })}
+                      className="flex items-start gap-3 rounded-md p-3 hover:bg-muted"
+                      onClick={() => setSearchOpen(false)}
+                    >
                       <Icon className="mt-0.5 h-4 w-4 text-primary" />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{result.title}</div>
@@ -122,11 +141,12 @@ export function SearchDialog() {
                           {result.snippet ?? result.chunk ?? "No snippet available."}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {sourceLabels[sourceType] ?? sourceType}
+                          <span className="mr-2"><SourceBadge source={sourceLabels[sourceType] ?? sourceType} /></span>
+                          <EntityBadge entityType={sourceType} />
                           {typeof result.score === "number" ? ` · ${result.score.toFixed(2)}` : ""}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </section>
               );
