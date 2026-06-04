@@ -32,6 +32,8 @@ export type FeatureRequest = {
   source?: string | null;
   requested_by?: string | null;
   status: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type Feedback = {
@@ -43,6 +45,7 @@ export type Feedback = {
   author?: string | null;
   content: string;
   sentiment?: string | null;
+  created_at?: string;
 };
 
 export type MVPPlan = {
@@ -63,6 +66,8 @@ export type RoadmapItem = {
   target_quarter?: string | null;
   status: string;
   sort_order?: number | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type IdeaAIAnalysis = {
@@ -73,4 +78,24 @@ export type IdeaAIAnalysis = {
   mvp_suggestion?: string | null;
   next_steps?: string | null;
   raw_response?: string | null;
+};
+
+export type FeatureRequestCreate = {
+  idea_id?: number | null;
+  workspace_id: number;
+  title: string;
+  description: string;
+  source?: string | null;
+  requested_by?: string | null;
+  status?: string;
+};
+
+export type FeedbackCreate = {
+  workspace_id: number;
+  idea_id?: number | null;
+  feature_request_id?: number | null;
+  source: string;
+  author?: string | null;
+  content: string;
+  sentiment?: string | null;
 };

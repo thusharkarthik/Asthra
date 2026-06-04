@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { FeatureRequest, Feedback, Idea, IdeaAIAnalysis, IdeaCreate, MVPPlan, RoadmapItem } from "@/types/discover";
+import type { FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, MVPPlan, RoadmapItem } from "@/types/discover";
 
 const DISCOVER_PREFIX = "/api/discover/api/v1";
 
@@ -25,8 +25,14 @@ export const discoverApi = {
   listFeatureRequests(accessToken: string, filters: { workspace_id?: number | null; status?: string; limit?: number } = {}) {
     return apiRequest<FeatureRequest[]>(`${DISCOVER_PREFIX}/feature-requests${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
+  createFeatureRequest(accessToken: string, payload: FeatureRequestCreate) {
+    return apiRequest<FeatureRequest>(`${DISCOVER_PREFIX}/feature-requests`, { method: "POST", authToken: accessToken, json: payload });
+  },
   listFeedback(accessToken: string, filters: { workspace_id?: number | null; limit?: number } = {}) {
     return apiRequest<Feedback[]>(`${DISCOVER_PREFIX}/feedback${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createFeedback(accessToken: string, payload: FeedbackCreate) {
+    return apiRequest<Feedback>(`${DISCOVER_PREFIX}/feedback`, { method: "POST", authToken: accessToken, json: payload });
   },
   getMvpPlan(accessToken: string, ideaId: string | number) {
     return apiRequest<MVPPlan>(`${DISCOVER_PREFIX}/ideas/${ideaId}/mvp-plan`, { method: "GET", authToken: accessToken });

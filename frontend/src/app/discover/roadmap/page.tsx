@@ -1,17 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { CreateRoadmapItemDialog } from "@/components/discover/discover-create-dialogs";
+import { DiscoverSetupState } from "@/components/discover/discover-setup-state";
+import { DiscoverSubnav } from "@/components/discover/discover-subnav";
+import { roadmapBucket } from "@/components/discover/discover-utils";
 import { RoadmapStatusBadge } from "@/components/modules/roadmap-status-badge";
+import { Button } from "@/components/ui/button";
 import { discoverApi } from "@/services/api/discover-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function RoadmapPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const [open, setOpen] = useState(false);
   const roadmapQuery = useQuery({
     queryKey: ["discover", "roadmap", selectedWorkspaceId],
     queryFn: () => discoverApi.listRoadmapItems(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
@@ -19,28 +26,48 @@ export default function RoadmapPage() {
     retry: 1
   });
 
+  const roadmap = roadmapQuery.data ?? [];
+
   return (
-    <div className="space-y-4">
-      <PageHeader title="Roadmap" description="Planned product outcomes by quarter and status." />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to view roadmap" /> : roadmapQuery.isLoading ? <LoadingState /> : (roadmapQuery.data ?? []).length === 0 ? <EmptyState title="No roadmap items yet" /> : (
-        <div className="grid gap-4 md:grid-cols-3">
-          {["planned", "in_progress", "shipped"].map((status) => (
-            <section key={status} className="space-y-3">
-              <h2 className="text-sm font-semibold capitalize">{status.replace("_", " ")}</h2>
-              {(roadmapQuery.data ?? []).filter((item) => item.status === status).map((item) => (
-                <div key={item.id} className="rounded-md border bg-card p-3">
-                  <div className="font-medium">{item.title}</div>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.description ?? "No description"}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <RoadmapStatusBadge value={item.status} />
-                    <span className="text-xs text-muted-foreground">{item.target_quarter ?? "TBD"}</span>
-                  </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Roadmap"
+        description="Turn validated opportunities into visible product outcomes."
+        actions={<Button onClick={() => setOpen(true)}>Create roadmap item</Button>}
+      />
+      <DiscoverSubnav />
+      {!selectedOrganizationId || !selectedWorkspaceId ? <DiscoverSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="context" /> : roadmapQuery.isLoading ? <LoadingState /> : roadmap.length === 0 ? <DiscoverSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="roadmap" /> : (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {["Now", "Next", "Later"].map((bucket) => {
+            const items = roadmap.filter((item) => roadmapBucket(item) === bucket);
+            return (
+              <section key={bucket} className="rounded-lg border bg-card p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">{bucket}</h2>
+                  <span className="text-xs text-muted-foreground">{items.length} items</span>
                 </div>
-              ))}
-            </section>
-          ))}
+                {items.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">No {bucket.toLowerCase()} roadmap items.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <div key={item.id} className="rounded-md border bg-background p-3">
+                        <div className="font-medium">{item.title}</div>
+                        <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{item.description ?? "No description"}</p>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <RoadmapStatusBadge value={item.status} />
+                          <span className="text-xs text-muted-foreground">{item.target_quarter ?? "TBD"}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
+      <CreateRoadmapItemDialog open={open} onOpenChange={setOpen} />
     </div>
   );
 }

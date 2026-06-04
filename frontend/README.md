@@ -48,7 +48,11 @@ src/
 - `/discover`
 - `/discover/ideas`
 - `/discover/ideas/[id]`
+- `/discover/feature-requests`
+- `/discover/feedback`
 - `/discover/roadmap`
+- `/discover/validation`
+- `/discover/prioritization`
 - `/desk`
 - `/desk/tickets`
 - `/desk/tickets/[id]`
@@ -310,7 +314,9 @@ Current Discover gateway paths:
 - `POST /api/discover/api/v1/ideas/{id}/ai-analysis`
 - `GET /api/discover/api/v1/ideas/{id}/mvp-plan`
 - `GET /api/discover/api/v1/feature-requests`
+- `POST /api/discover/api/v1/feature-requests`
 - `GET /api/discover/api/v1/feedback`
+- `POST /api/discover/api/v1/feedback`
 - `GET /api/discover/api/v1/roadmap-items`
 - `POST /api/discover/api/v1/roadmap-items`
 
@@ -544,12 +550,16 @@ Docs UI uses the selected workspace where needed. Rich editing, nested page tree
 
 Implemented first-pass Discover screens:
 
-- `/discover`: dashboard with idea, feature request, and roadmap counts plus recent ideas and roadmap preview.
-- `/discover/ideas`: workspace-scoped ideas table and create dialog.
-- `/discover/ideas/[id]`: idea detail with impact placeholder, MVP plan section, roadmap fit, and optional AI idea analysis action.
-- `/discover/roadmap`: simple roadmap board grouped by planned, in-progress, and shipped status.
+- `/discover`: product discovery dashboard with idea, feature request, validated idea, roadmap, and high-impact idea cards.
+- `/discover/ideas`: workspace-scoped ideas table with search, status filter, project filter, and create dialog.
+- `/discover/ideas/[id]`: idea detail with overview, problem statement, target users, validation notes, impact placeholder, MVP plan, roadmap links, linked work placeholders, and optional AI idea analysis.
+- `/discover/feature-requests`: feature request intake with search, status filter, and create dialog.
+- `/discover/feedback`: feedback capture surface with source, author, sentiment, and create dialog.
+- `/discover/roadmap`: Now/Next/Later roadmap board with create dialog.
+- `/discover/validation`: focused view for ideas that need validation.
+- `/discover/prioritization`: lightweight prioritization view for impact signals.
 
-Discover UI uses the selected workspace and selected project where available. Impact scoring controls, validation note editing, and roadmap drag-and-drop are deferred.
+Discover UI uses the selected organization, workspace, and selected project where available. Impact scoring controls, validation note editing, roadmap drag-and-drop, and persisted cross-module links are deferred.
 
 ## Desk UI
 
@@ -687,7 +697,7 @@ Settings persistence beyond auth/workspace local storage is deferred.
 - Flow create forms use simple numeric defaults for type/status/priority until lookup UI is added.
 - Docs uses a basic text input/textarea flow; no rich editor is implemented yet.
 - Kanban boards are read-only and do not support drag-and-drop yet.
-- Discover impact scoring and roadmap updates are read-only placeholders beyond basic idea creation.
+- Discover impact scoring and validation note editing are placeholders beyond idea, request, feedback, and roadmap creation.
 - Desk queue/SLA management is currently summary-focused; ticket comments are supported.
 - Pulse status pages and postmortems are display-focused; incident creation is supported.
 - Dev screens are read-mostly; release AI summary is optional and service ownership/dependency editing is deferred.
