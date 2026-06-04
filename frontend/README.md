@@ -68,16 +68,36 @@ src/
 - `/collab/announcements`
 - `/collab/team-updates`
 - `/automation`
+- `/automation/workflows`
+- `/automation/workflows/[id]`
+- `/automation/executions`
+- `/automation/schedules`
+- `/connect`
+- `/connect/integrations`
+- `/connect/webhooks`
+- `/connect/sync-jobs`
+- `/connect/api-connections`
+- `/guard`
+- `/guard/policies`
+- `/guard/audit-events`
+- `/guard/risks`
+- `/guard/compliance`
+- `/guard/access-reviews`
 - `/insights`
 - `/insights/dashboards`
 - `/insights/reports`
 - `/insights/metrics`
 - `/insights/usage`
+- `/media`
+- `/media/assets`
+- `/media/assets/[id]`
+- `/media/collections`
+- `/media/processing-jobs`
 - `/settings`
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-Flow, Docs, Discover, Desk, Pulse, Dev, Collab, and Insights now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
+Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
 
 ## Environment
 
@@ -161,7 +181,11 @@ Typed API modules:
 - `pulseApi`: alerts, incidents, timelines, schedules, escalation policies, status pages, postmortems, and AI summaries
 - `devApi`: repositories, pull requests, environments, deployments, releases, service catalog, owners, dependencies, and AI release summary
 - `collabApi`: threads, messages, mentions, reactions, announcements, activity stream, and team updates
+- `automationApi`: workflows, triggers, conditions, actions, executions, schedules, and audit logs
+- `connectApi`: integrations, connectors, webhooks, deliveries, subscriptions, sync jobs, and API connections
+- `guardApi`: security policies, access reviews, compliance checks, audit events, retention policies, risk findings, and security exceptions
 - `insightsApi`: dashboards, widgets, metric definitions, metric snapshots, reports, report runs, insight events, and usage metrics
+- `mediaApi`: media assets, collections, transcripts, annotations, processing jobs, and tags
 
 Current core-service gateway paths:
 
@@ -270,6 +294,37 @@ Current Collab gateway paths:
 - `GET /api/collab/api/v1/activity-stream`
 - `GET /api/collab/api/v1/team-updates`
 
+Current Automation gateway paths:
+
+- `GET /api/automation/api/v1/workflows`
+- `GET /api/automation/api/v1/workflows/{id}`
+- `GET /api/automation/api/v1/workflows/{id}/triggers`
+- `GET /api/automation/api/v1/workflows/{id}/conditions`
+- `GET /api/automation/api/v1/workflows/{id}/actions`
+- `GET /api/automation/api/v1/executions`
+- `GET /api/automation/api/v1/schedules`
+- `GET /api/automation/api/v1/audit-logs`
+
+Current Connect gateway paths:
+
+- `GET /api/connect/api/v1/integrations`
+- `GET /api/connect/api/v1/connectors`
+- `GET /api/connect/api/v1/webhooks`
+- `GET /api/connect/api/v1/webhook-deliveries`
+- `GET /api/connect/api/v1/event-subscriptions`
+- `GET /api/connect/api/v1/sync-jobs`
+- `GET /api/connect/api/v1/api-connections`
+
+Current Guard gateway paths:
+
+- `GET /api/guard/api/v1/security-policies`
+- `GET /api/guard/api/v1/access-reviews`
+- `GET /api/guard/api/v1/compliance-checks`
+- `GET /api/guard/api/v1/audit-events`
+- `GET /api/guard/api/v1/data-retention-policies`
+- `GET /api/guard/api/v1/risk-findings`
+- `GET /api/guard/api/v1/security-exceptions`
+
 Current Insights gateway paths:
 
 - `GET /api/insights/api/v1/dashboards`
@@ -280,6 +335,17 @@ Current Insights gateway paths:
 - `GET /api/insights/api/v1/reports/{id}/runs`
 - `GET /api/insights/api/v1/insight-events`
 - `GET /api/insights/api/v1/usage-metrics`
+
+Current Media gateway paths:
+
+- `GET /api/media/api/v1/media-assets`
+- `GET /api/media/api/v1/media-assets/{id}`
+- `GET /api/media/api/v1/media-assets/{id}/transcripts`
+- `GET /api/media/api/v1/media-assets/{id}/annotations`
+- `GET /api/media/api/v1/media-assets/{id}/tags`
+- `GET /api/media/api/v1/media-collections`
+- `GET /api/media/api/v1/processing-jobs`
+- `GET /api/media/api/v1/media-tags`
 
 ## Auth Flow
 
@@ -425,6 +491,43 @@ Implemented first-pass Collab screens:
 
 Collab UI uses the selected workspace and selected project where available. Realtime transport, reactions UI, mention creation, and rich-thread editing are deferred.
 
+## Automation UI
+
+Implemented first-pass Automation screens:
+
+- `/automation`: dashboard with workflow, execution, and schedule summaries.
+- `/automation/workflows`: workflow list with status badges.
+- `/automation/workflows/[id]`: workflow detail with triggers, conditions, actions, and execution history.
+- `/automation/executions`: execution history timeline/list.
+- `/automation/schedules`: scheduled job list.
+
+Automation UI is read-only in this phase. Workflow creation, trigger/action editing, and real execution controls are deferred.
+
+## Connect UI
+
+Implemented first-pass Connect screens:
+
+- `/connect`: dashboard with integrations, webhooks, sync jobs, and event subscription summaries.
+- `/connect/integrations`: integration list and connector count.
+- `/connect/webhooks`: webhook endpoint list plus recent delivery status.
+- `/connect/sync-jobs`: sync job list with execution logs.
+- `/connect/api-connections`: API connection list with connection status.
+
+Connect UI is read-only in this phase. Real external connector setup, webhook retry controls, and credential management are deferred.
+
+## Guard UI
+
+Implemented first-pass Guard screens:
+
+- `/guard`: dashboard with policies, reviews, compliance checks, and risk findings.
+- `/guard/policies`: security policy list.
+- `/guard/audit-events`: audit event table.
+- `/guard/risks`: risk finding list with severity badges.
+- `/guard/compliance`: compliance check list.
+- `/guard/access-reviews`: access review list.
+
+Guard UI is read-only in this phase. Policy authoring, review workflows, exception approvals, and compliance evidence uploads are deferred.
+
 ## Insights UI
 
 Implemented first-pass Insights screens:
@@ -436,6 +539,18 @@ Implemented first-pass Insights screens:
 - `/insights/usage`: usage metrics table.
 
 Insights UI uses the selected workspace. Advanced charts, cross-service aggregation, scheduled report runs, and custom dashboard builders are deferred.
+
+## Media UI
+
+Implemented first-pass Media screens:
+
+- `/media`: dashboard with media asset, collection, tag, and processing job summaries.
+- `/media/assets`: asset list with media type badges.
+- `/media/assets/[id]`: asset detail with transcripts, annotations, tags, and processing jobs.
+- `/media/collections`: media collection list.
+- `/media/processing-jobs`: processing job list with status badges.
+
+Media UI uses metadata only. File upload/storage, OCR, transcription, image understanding, and multimodal embeddings are deferred.
 
 ## State Stores
 
@@ -458,16 +573,20 @@ Insights UI uses the selected workspace. Advanced charts, cross-service aggregat
 - Pulse status pages and postmortems are display-focused; incident creation is supported.
 - Dev screens are read-mostly; release AI summary is optional and service ownership/dependency editing is deferred.
 - Collab does not implement realtime, reactions, mentions, or rich text yet.
+- Automation screens are read-only and do not execute workflows from the UI.
+- Connect screens do not configure credentials or run external integrations yet.
+- Guard screens are read-only and do not enforce policies from the frontend.
 - Insights uses tables and metric cards only; advanced charts and analytics composition are deferred.
+- Media uses metadata-only screens; upload, OCR, transcription, and multimodal processing are not implemented in the frontend yet.
 
-## Next Frontend Modules
+## Next Frontend Work
 
-Planned next module UI passes:
+Planned frontend passes:
 
-- Automation
-- Connect
-- Guard
-- Media
+- Mutation/edit flows for Automation, Connect, Guard, Insights, and Media where the backend already supports them.
+- Better lookup selectors for workspace/project/entity references.
+- Rich editors, drag-and-drop boards, realtime collaboration, and advanced analytics charts.
+- Full AI assistant integration into module-specific workflows.
 
 ## Future Module Integration
 
