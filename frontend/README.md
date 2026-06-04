@@ -46,8 +46,18 @@ src/
 - `/docs/pages`
 - `/docs/pages/[id]`
 - `/discover`
+- `/discover/ideas`
+- `/discover/ideas/[id]`
+- `/discover/roadmap`
 - `/desk`
+- `/desk/tickets`
+- `/desk/tickets/[id]`
+- `/desk/queues`
 - `/pulse`
+- `/pulse/alerts`
+- `/pulse/incidents`
+- `/pulse/incidents/[id]`
+- `/pulse/status-pages`
 - `/dev`
 - `/collab`
 - `/automation`
@@ -56,7 +66,7 @@ src/
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-Flow and Docs now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for the next frontend phase.
+Flow, Docs, Discover, Desk, and Pulse now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
 
 ## Environment
 
@@ -135,6 +145,9 @@ Typed API modules:
 - `searchApi`: frontend search facade over workspace memory search
 - `flowApi`: work items, boards, board columns, and work item comments
 - `docsApi`: spaces, pages, page comments, and page search
+- `discoverApi`: ideas, feature requests, feedback, MVP plans, roadmap items, and AI idea analysis
+- `deskApi`: tickets, queues, SLAs, approvals, incidents, change requests, comments, and AI classification
+- `pulseApi`: alerts, incidents, timelines, schedules, escalation policies, status pages, postmortems, and AI summaries
 
 Current core-service gateway paths:
 
@@ -176,6 +189,46 @@ Current Docs gateway paths:
 - `GET /api/docs/api/v1/pages/{id}/comments`
 - `POST /api/docs/api/v1/pages/{id}/comments`
 - `GET /api/docs/api/v1/search/pages?q=...`
+
+Current Discover gateway paths:
+
+- `GET /api/discover/api/v1/ideas`
+- `POST /api/discover/api/v1/ideas`
+- `GET /api/discover/api/v1/ideas/{id}`
+- `POST /api/discover/api/v1/ideas/{id}/ai-analysis`
+- `GET /api/discover/api/v1/ideas/{id}/mvp-plan`
+- `GET /api/discover/api/v1/feature-requests`
+- `GET /api/discover/api/v1/feedback`
+- `GET /api/discover/api/v1/roadmap-items`
+- `POST /api/discover/api/v1/roadmap-items`
+
+Current Desk gateway paths:
+
+- `GET /api/desk/api/v1/tickets`
+- `POST /api/desk/api/v1/tickets`
+- `GET /api/desk/api/v1/tickets/{id}`
+- `POST /api/desk/api/v1/tickets/{id}/ai-classify`
+- `GET /api/desk/api/v1/tickets/{id}/comments`
+- `POST /api/desk/api/v1/tickets/{id}/comments`
+- `GET /api/desk/api/v1/tickets/{id}/approvals`
+- `GET /api/desk/api/v1/queues`
+- `GET /api/desk/api/v1/slas`
+- `GET /api/desk/api/v1/incidents`
+- `GET /api/desk/api/v1/change-requests`
+
+Current Pulse gateway paths:
+
+- `GET /api/pulse/api/v1/alerts`
+- `GET /api/pulse/api/v1/incidents`
+- `POST /api/pulse/api/v1/incidents`
+- `GET /api/pulse/api/v1/incidents/{id}`
+- `POST /api/pulse/api/v1/incidents/{id}/ai-summary`
+- `GET /api/pulse/api/v1/incidents/{id}/timeline`
+- `GET /api/pulse/api/v1/incidents/{id}/postmortem`
+- `GET /api/pulse/api/v1/on-call-schedules`
+- `GET /api/pulse/api/v1/escalation-policies`
+- `GET /api/pulse/api/v1/status-pages`
+- `GET /api/pulse/api/v1/status-pages/{id}/components`
 
 ## Auth Flow
 
@@ -262,6 +315,40 @@ Implemented first-pass Docs screens:
 
 Docs UI uses the selected workspace where needed. Rich editing, nested page tree UX, and realtime collaboration are intentionally deferred.
 
+## Discover UI
+
+Implemented first-pass Discover screens:
+
+- `/discover`: dashboard with idea, feature request, and roadmap counts plus recent ideas and roadmap preview.
+- `/discover/ideas`: workspace-scoped ideas table and create dialog.
+- `/discover/ideas/[id]`: idea detail with impact placeholder, MVP plan section, roadmap fit, and optional AI idea analysis action.
+- `/discover/roadmap`: simple roadmap board grouped by planned, in-progress, and shipped status.
+
+Discover UI uses the selected workspace and selected project where available. Impact scoring controls, validation note editing, and roadmap drag-and-drop are deferred.
+
+## Desk UI
+
+Implemented first-pass Desk screens:
+
+- `/desk`: dashboard with ticket, queue, and SLA counts plus recent tickets.
+- `/desk/tickets`: workspace-scoped ticket table and create dialog.
+- `/desk/tickets/[id]`: ticket detail with SLA placeholder, approvals, comments, and optional AI classification action.
+- `/desk/queues`: queue list with SLA summary.
+
+Desk UI uses the selected workspace and selected project where available. Queue creation, SLA editing, approvals workflows, and change request detail screens are deferred.
+
+## Pulse UI
+
+Implemented first-pass Pulse screens:
+
+- `/pulse`: dashboard with alert, incident, and status page counts plus active incidents.
+- `/pulse/alerts`: alert list with severity and status badges.
+- `/pulse/incidents`: workspace-scoped incident table and create dialog.
+- `/pulse/incidents/[id]`: incident detail with timeline, postmortem, and optional AI summary action.
+- `/pulse/status-pages`: status page overview.
+
+Pulse UI uses the selected workspace. Timeline event creation, status page component editing, on-call schedule editing, and realtime incident collaboration are deferred.
+
 ## State Stores
 
 - `auth-store`: token, current user, login/register/logout, session reload
@@ -278,16 +365,21 @@ Docs UI uses the selected workspace where needed. Rich editing, nested page tree
 - Flow create forms use simple numeric defaults for type/status/priority until lookup UI is added.
 - Docs uses a basic text input/textarea flow; no rich editor is implemented yet.
 - Kanban boards are read-only and do not support drag-and-drop yet.
+- Discover impact scoring and roadmap updates are read-only placeholders beyond basic idea creation.
+- Desk queue/SLA management is currently summary-focused; ticket comments are supported.
+- Pulse status pages and postmortems are display-focused; incident creation is supported.
 
 ## Next Frontend Modules
 
 Planned next module UI passes:
 
-- Discover
-- Desk
-- Pulse
 - Dev
 - Collab
+- Automation
+- Connect
+- Guard
+- Insights
+- Media
 
 ## Future Module Integration
 
