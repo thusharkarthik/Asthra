@@ -1,0 +1,9 @@
+export type Dashboard = { id: number; workspace_id: number; name: string; description?: string | null; created_by_id?: number | null };
+export type DashboardWidget = { id: number; dashboard_id: number; widget_type: string; title: string; sort_order?: number | null };
+export type MetricDefinition = { id: number; workspace_id: number; metric_key: string; name: string; description?: string | null; unit?: string | null; source_service?: string | null };
+export type MetricSnapshot = { id: number; workspace_id: number; metric_key: string; value: number; entity_type?: string | null; entity_id?: number | null; captured_at?: string };
+export type Report = { id: number; workspace_id: number; name: string; report_type: string; status: string };
+export type ReportRun = { id: number; report_id: number; status: string; created_at?: string };
+export type InsightEvent = { id: number; workspace_id: number; event_type: string; severity: string; title: string; description?: string | null; created_at?: string };
+export type UsageMetric = { id: number; workspace_id: number; service_name: string; metric_name: string; value: number; captured_at?: string };
+export type Envelope<T> = { success: boolean; data: T; message?: string | null; request_id?: string | null };

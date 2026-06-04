@@ -1,0 +1,9 @@
+export type Repository = { id: number; workspace_id: number; project_id?: number | null; name: string; provider: string; url?: string | null; default_branch?: string | null };
+export type PullRequest = { id: number; repository_id: number; title: string; external_id?: string | null; status: string; author_id?: number | null; url?: string | null };
+export type Environment = { id: number; workspace_id: number; name: string; environment_type: string };
+export type Deployment = { id: number; workspace_id: number; environment_id: number; service_id?: number | null; version?: string | null; status: string };
+export type Release = { id: number; workspace_id: number; service_id?: number | null; version: string; notes?: string | null; status: string };
+export type ServiceCatalogItem = { id: number; workspace_id: number; repository_id?: number | null; name: string; description?: string | null; lifecycle_status: string };
+export type ServiceOwner = { id: number; service_id: number; owner_id: number; role?: string | null };
+export type ServiceDependency = { id: number; service_id: number; depends_on_service_id: number; dependency_type?: string | null };
+export type ReleaseAISummary = { release_id: number; release_overview?: string | null; deployment_risk?: string | null; stakeholder_summary?: string | null; raw_response?: string | null };
