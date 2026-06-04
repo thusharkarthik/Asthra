@@ -2,6 +2,8 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FlowPage from "@/app/flow/page";
+import BoardsPage from "@/app/flow/boards/page";
+import MyWorkPage from "@/app/flow/my-work/page";
 import WorkItemsPage from "@/app/flow/work-items/page";
 import WorkItemDetailPage from "@/app/flow/work-items/[id]/page";
 import { QueryProvider } from "@/providers/query-provider";
@@ -44,13 +46,21 @@ describe("Flow frontend screens", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     navigationMock.params = {};
+    navigationMock.pathname = "/flow";
     useAuthStore.setState({
       accessToken: "token",
       currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
       isAuthenticated: true,
       hasHydrated: true
     });
-    useWorkspaceStore.setState({ selectedWorkspaceId: 2, selectedProjectId: 3 });
+    useWorkspaceStore.setState({
+      organizations: [{ id: 1, name: "Acme", created_at: "" }],
+      workspaces: [{ id: 2, organization_id: 1, name: "Workspace", created_at: "" }],
+      projects: [{ id: 3, workspace_id: 2, name: "Project", created_at: "" }],
+      selectedOrganizationId: 1,
+      selectedWorkspaceId: 2,
+      selectedProjectId: 3
+    });
     mockFlowFetch();
   });
 
@@ -58,30 +68,69 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<FlowPage />);
 
     expect(screen.getByRole("heading", { name: "Flow" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Open Work Items")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
   });
 
+  it("renders guided empty state when no project is selected", () => {
+    useWorkspaceStore.setState({
+      organizations: [{ id: 1, name: "Acme", created_at: "" }],
+      workspaces: [{ id: 2, organization_id: 1, name: "Workspace", created_at: "" }],
+      projects: [],
+      selectedOrganizationId: 1,
+      selectedWorkspaceId: 2,
+      selectedProjectId: null
+    });
+
+    renderWithQuery(<FlowPage />);
+
+    expect(screen.getByText("Create or select a project")).toBeInTheDocument();
+    expect(screen.getByText("Create Project")).toBeInTheDocument();
+  });
+
   it("renders work items page", async () => {
+    navigationMock.pathname = "/flow/work-items";
     renderWithQuery(<WorkItemsPage />);
 
     expect(screen.getByRole("heading", { name: "Work Items" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Search work items")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
   });
 
   it("renders work item create dialog", () => {
+    navigationMock.pathname = "/flow/work-items";
     renderWithQuery(<WorkItemsPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create work item" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Work item title")).toBeInTheDocument();
   });
 
   it("renders work item detail with mock data", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
     navigationMock.params = { id: "7" };
     renderWithQuery(<WorkItemDetailPage />);
 
     await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
     expect(screen.getByText("Looks good")).toBeInTheDocument();
+    expect(screen.getByText("Linked Docs")).toBeInTheDocument();
+  });
+
+  it("renders board page", async () => {
+    navigationMock.pathname = "/flow/boards";
+    renderWithQuery(<BoardsPage />);
+
+    expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Todo").length).toBeGreaterThan(0));
+    expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+  });
+
+  it("renders my work page", async () => {
+    navigationMock.pathname = "/flow/my-work";
+    renderWithQuery(<MyWorkPage />);
+
+    expect(screen.getByRole("heading", { name: "My Work" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Assigned Items")).toBeInTheDocument());
   });
 });
