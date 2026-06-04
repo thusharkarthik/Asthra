@@ -94,10 +94,39 @@ src/
 - `/media/collections`
 - `/media/processing-jobs`
 - `/settings`
+- `/settings/profile`
+- `/settings/workspace`
+- `/settings/preferences`
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
 Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
+
+## Navigation Structure
+
+Sidebar navigation is grouped into platform areas:
+
+- Platform: Home, Search, Assistant
+- Work: Flow, Discover, Docs, Collab
+- Operations: Desk, Pulse, Automation
+- Engineering: Dev, Connect
+- Intelligence: Insights, Memory placeholder
+- Admin: Guard, Media, Settings
+
+Nested routes keep their parent module highlighted. The desktop sidebar supports an icon-only collapsed mode for the current browser session. Persisted compact mode is deferred.
+
+## Command Palette
+
+Press `Ctrl+K` or `Cmd+K` to open the command palette.
+
+Current commands:
+
+- Go to Home
+- Go to module routes
+- Open Assistant
+- Search Workspace
+
+The command palette is shell-local in this phase. It does not run backend mutations, agents, or automation.
 
 ## Environment
 
@@ -164,6 +193,25 @@ The request wrapper adds:
 - `Content-Type`
 - `X-Request-ID`
 - optional `Authorization`
+
+It also normalizes:
+
+- backend error envelopes
+- FastAPI `detail` responses
+- unauthorized/session-expired placeholder messages
+- network failures when the API Gateway is unreachable
+
+## Shared UI States
+
+Reusable shell states live in `src/components/layout/ui-states.tsx`:
+
+- `PageLoading`
+- `SectionLoading`
+- `TableSkeleton`
+- `CardSkeleton`
+- `EmptyModuleState`
+- `ErrorState`
+- `RetryButton`
 
 Typed API modules:
 
@@ -410,6 +458,19 @@ The dashboard includes simple AI-native widgets for:
 
 These are shell-level widgets only. Full module-specific AI screens are intentionally deferred.
 
+## Home Dashboard
+
+The Home route includes:
+
+- context count cards for organizations, workspaces, and projects
+- module quick launch grid
+- assistant shortcut
+- workspace search shortcut
+- pinned modules placeholder
+- system status placeholder
+- recent activity placeholder
+- continue-where-you-left-off links
+
 ## Flow UI
 
 Implemented first-pass Flow screens:
@@ -552,6 +613,17 @@ Implemented first-pass Media screens:
 
 Media UI uses metadata only. File upload/storage, OCR, transcription, image understanding, and multimodal embeddings are deferred.
 
+## Settings UI
+
+Implemented settings foundation:
+
+- `/settings`: settings overview
+- `/settings/profile`: signed-in user display
+- `/settings/workspace`: selected organization/workspace/project context
+- `/settings/preferences`: theme toggle plus notification and compact-mode placeholders
+
+Settings persistence beyond auth/workspace local storage is deferred.
+
 ## State Stores
 
 - `auth-store`: token, current user, login/register/logout, session reload
@@ -578,6 +650,8 @@ Media UI uses metadata only. File upload/storage, OCR, transcription, image unde
 - Guard screens are read-only and do not enforce policies from the frontend.
 - Insights uses tables and metric cards only; advanced charts and analytics composition are deferred.
 - Media uses metadata-only screens; upload, OCR, transcription, and multimodal processing are not implemented in the frontend yet.
+- Settings preference storage is mostly placeholder-only beyond the existing auth and workspace stores.
+- Memory has a navigation placeholder but no dedicated frontend route yet.
 
 ## Next Frontend Work
 
@@ -587,6 +661,12 @@ Planned frontend passes:
 - Better lookup selectors for workspace/project/entity references.
 - Rich editors, drag-and-drop boards, realtime collaboration, and advanced analytics charts.
 - Full AI assistant integration into module-specific workflows.
+
+## Frontend Docs
+
+- `docs/frontend-status.md`
+- `docs/navigation-architecture.md`
+- `docs/ui-components.md`
 
 ## Future Module Integration
 

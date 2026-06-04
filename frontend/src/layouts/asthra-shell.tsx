@@ -1,10 +1,11 @@
 "use client";
 
-import { Bell, LogOut, Menu, UserCircle } from "lucide-react";
+import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
+import { CommandPalette } from "@/components/navigation/command-palette";
 import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { SidebarNav } from "@/components/navigation/sidebar-nav";
 import { ProjectSwitcher } from "@/components/navigation/project-switcher";
@@ -15,6 +16,8 @@ import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
 
 const publicPaths = new Set(["/login", "/register"]);
 
@@ -30,6 +33,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const currentUser = useAuthStore((state) => state.currentUser);
   const logout = useAuthStore((state) => state.logout);
+  const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isPublicPath = publicPaths.has(pathname);
 
   useEffect(() => {
@@ -37,6 +42,17 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       router.replace("/login");
     }
   }, [hasHydrated, isAuthenticated, isPublicPath, router]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setCommandPaletteOpen]);
 
   if (isPublicPath) {
     return (
@@ -62,21 +78,30 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <WorkspaceContextLoader />
-      <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
-        <div className="flex h-14 items-center border-b px-4">
+      <aside className={cn("hidden shrink-0 border-r bg-card transition-[width] md:block", sidebarCollapsed ? "w-16" : "w-64")}>
+        <div className={cn("flex h-14 items-center border-b px-4", sidebarCollapsed && "justify-center px-2")}>
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             A
           </div>
-          <span className="ml-3 text-sm font-semibold">Asthra</span>
+          {!sidebarCollapsed && <span className="ml-3 text-sm font-semibold">Asthra</span>}
         </div>
         <div className="p-3">
-          <SidebarNav />
+          <SidebarNav collapsed={sidebarCollapsed} />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-3 backdrop-blur md:px-4">
           <Button size="icon" variant="ghost" className="md:hidden" aria-label="Open navigation">
             <Menu className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="hidden md:inline-flex"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
           <div className="hidden items-center gap-2 md:flex">
             <OrganizationSwitcher />
@@ -108,6 +133,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
         <footer className="border-t px-4 py-2 text-xs text-muted-foreground">Asthra platform shell foundation</footer>
       </div>
       <SearchDialog />
+      <CommandPalette />
     </div>
   );
 }

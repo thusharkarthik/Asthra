@@ -1,24 +1,44 @@
 "use client";
 
+import Link from "next/link";
+import { Bot, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { PageHeader } from "@/components/layout/page-header";
+import { CardSkeleton, ErrorState, EmptyModuleState } from "@/components/layout/ui-states";
+import { navSections } from "@/components/navigation/nav-items";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
-const sections = [
-  { title: "Recent Work", items: ["Flow service hardening", "Workspace memory foundation", "Assistant shell planning"] },
-  { title: "Recent Docs", items: ["Platform RAG", "Tool registry", "Frontend architecture"] },
-  { title: "Assigned Items", items: ["Review gateway routes", "Verify local compose", "Prepare module backlog"] },
-  { title: "Activity Feed", items: ["Memory indexed workspace context", "AI feature pack tests passed", "Docs updated"] },
-  { title: "AI Suggestions", items: ["Summarize current milestone", "Find service gaps", "Draft next sprint plan"] }
+const quickLaunch = navSections
+  .flatMap((section) => section.items.map((item) => ({ ...item, section: section.label })))
+  .filter((item) => item.href && item.href !== "/" && !item.disabled)
+  .slice(0, 12);
+
+const recentActivity = [
+  "Workspace context loaded through core-service",
+  "Assistant and search are available from the shell",
+  "Module dashboards are connected through API Gateway"
+];
+
+const continueItems = [
+  { title: "Review Flow work items", href: "/flow/work-items" },
+  { title: "Open Docs pages", href: "/docs/pages" },
+  { title: "Check Pulse incidents", href: "/pulse/incidents" }
+];
+
+const pinnedModules = [
+  { title: "Flow", href: "/flow", description: "Plan and track work" },
+  { title: "Docs", href: "/docs", description: "Capture knowledge" },
+  { title: "Insights", href: "/insights", description: "Review platform metrics" }
 ];
 
 export default function HomePage() {
   const { isLoading, error } = useWorkspaceContextQueries();
   const { organizations, workspaces, projects } = useWorkspaceStore();
   const setSearchOpen = useUIStore((state) => state.setSearchOpen);
+  const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const countCards = [
     { title: "Organizations", value: organizations.length, description: "Available core organizations" },
     { title: "Workspaces", value: workspaces.length, description: "Workspaces in the selected organization" },
@@ -27,54 +47,74 @@ export default function HomePage() {
 
   return (
     <>
-      <PageHeader title="Home" description="Workspace overview for the Asthra platform shell." />
-      {error && (
-        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Unable to load workspace context. The shell is still available.
-        </div>
-      )}
+      <PageHeader title="Home" description="One connected workspace for work, knowledge, operations, engineering, and intelligence." />
+      {error && <div className="mb-4"><ErrorState title="Workspace context failed to load" description="The shell is still available. Check the API Gateway and core-service if counts look empty." /></div>}
       <section className="mb-4 grid gap-4 md:grid-cols-3">
-        {countCards.map((card) => (
-          <DashboardCard key={card.title} title={card.title}>
-            <div className="text-3xl font-semibold">{isLoading ? "-" : card.value}</div>
-            <p className="mt-2 text-sm text-muted-foreground">{card.description}</p>
-          </DashboardCard>
-        ))}
+        {isLoading ? [1, 2, 3].map((item) => <CardSkeleton key={item} />) : countCards.map((card) => (
+            <DashboardCard key={card.title} title={card.title}>
+              <div className="text-3xl font-semibold">{card.value}</div>
+              <p className="mt-2 text-sm text-muted-foreground">{card.description}</p>
+            </DashboardCard>
+          ))}
       </section>
-      <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-4 grid gap-4 lg:grid-cols-4">
         <DashboardCard title="Ask Asthra">
-          <p className="mb-3 text-sm text-muted-foreground">Use the assistant panel to ask workspace-aware questions.</p>
-          <Button size="sm" onClick={() => setSearchOpen(true)}>
-            Start with search
-          </Button>
-        </DashboardCard>
-        <DashboardCard title="Recent AI Conversations">
-          <p className="text-sm text-muted-foreground">Conversation history appears in the assistant panel after sessions load.</p>
-        </DashboardCard>
-        <DashboardCard title="Workspace Memory">
-          <p className="text-sm text-muted-foreground">
-            {workspaces.length > 0 ? "Memory search is ready for the selected workspace." : "Select a workspace to enable memory search."}
-          </p>
+          <Sparkles className="mb-3 h-5 w-5 text-primary" />
+          <p className="mb-3 text-sm text-muted-foreground">Ask workspace-aware questions from the assistant panel.</p>
+          <Button size="sm" onClick={() => setAssistantOpen(true)}>Open assistant</Button>
         </DashboardCard>
         <DashboardCard title="Search Workspace">
+          <Search className="mb-3 h-5 w-5 text-primary" />
           <p className="mb-3 text-sm text-muted-foreground">Search docs, work, ideas, tickets, incidents, releases, and discussions.</p>
-          <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>
-            Open search
-          </Button>
+          <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)}>Open search</Button>
+        </DashboardCard>
+        <DashboardCard title="System Status">
+          <ShieldCheck className="mb-3 h-5 w-5 text-primary" />
+          <p className="text-sm text-muted-foreground">Local service health appears here once platform aggregation is wired into the frontend.</p>
+        </DashboardCard>
+        <DashboardCard title="Pinned Modules">
+          <Bot className="mb-3 h-5 w-5 text-primary" />
+          <div className="space-y-2">
+            {pinnedModules.map((item) => (
+              <Link key={item.href} href={item.href} className="block rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/70">
+                <span className="font-medium">{item.title}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{item.description}</span>
+              </Link>
+            ))}
+          </div>
         </DashboardCard>
       </section>
-      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {sections.map((section) => (
-          <DashboardCard key={section.title} title={section.title}>
-            <ul className="space-y-2 text-sm">
-              {section.items.map((item) => (
-                <li key={item} className="rounded-md bg-muted px-3 py-2">
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </DashboardCard>
-        ))}
+      <section className="mb-4">
+        <DashboardCard title="Module Quick Launch">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {quickLaunch.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href ?? "/"} className="rounded-md border p-3 hover:bg-muted">
+                  <div className="flex items-center gap-2 text-sm font-medium"><Icon className="h-4 w-4 text-primary" />{item.label}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.section}</div>
+                </Link>
+              );
+            })}
+          </div>
+        </DashboardCard>
+      </section>
+      <section className="grid gap-4 lg:grid-cols-3">
+        <DashboardCard title="Continue where you left off">
+          <div className="space-y-2">
+            {continueItems.map((item) => <Link key={item.href} href={item.href} className="block rounded-md bg-muted px-3 py-2 text-sm hover:bg-muted/70">{item.title}</Link>)}
+          </div>
+        </DashboardCard>
+        <DashboardCard title="Recent Activity">
+          <ul className="space-y-2 text-sm">{recentActivity.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
+        </DashboardCard>
+        <DashboardCard title="Workspace Memory">
+          {workspaces.length > 0 ? (
+            <p className="text-sm text-muted-foreground">Memory search is ready for the selected workspace. Indexing depth depends on backend content ingestion.</p>
+          ) : (
+            <EmptyModuleState title="No workspace selected" description="Select a workspace to enable assistant context and workspace search." />
+          )}
+        </DashboardCard>
       </section>
     </>
   );
