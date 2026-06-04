@@ -1,8 +1,6 @@
 # Asthra Frontend
 
-Asthra Frontend is the platform shell for future Asthra modules. It provides layout, navigation, workspace context, API client foundations, state stores, theme support, global search UI, and the AI assistant dock.
-
-This foundation does not implement module-specific business screens yet.
+Asthra Frontend is the platform shell for Asthra modules. It provides layout, navigation, workspace context, API client foundations, state stores, theme support, global search UI, the AI assistant dock, and first-pass module screens for the active MVP services.
 
 ## Stack
 
@@ -59,14 +57,27 @@ src/
 - `/pulse/incidents/[id]`
 - `/pulse/status-pages`
 - `/dev`
+- `/dev/repositories`
+- `/dev/deployments`
+- `/dev/releases`
+- `/dev/services`
+- `/dev/services/[id]`
 - `/collab`
+- `/collab/threads`
+- `/collab/threads/[id]`
+- `/collab/announcements`
+- `/collab/team-updates`
 - `/automation`
 - `/insights`
+- `/insights/dashboards`
+- `/insights/reports`
+- `/insights/metrics`
+- `/insights/usage`
 - `/settings`
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-Flow, Docs, Discover, Desk, and Pulse now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
+Flow, Docs, Discover, Desk, Pulse, Dev, Collab, and Insights now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
 
 ## Environment
 
@@ -148,6 +159,9 @@ Typed API modules:
 - `discoverApi`: ideas, feature requests, feedback, MVP plans, roadmap items, and AI idea analysis
 - `deskApi`: tickets, queues, SLAs, approvals, incidents, change requests, comments, and AI classification
 - `pulseApi`: alerts, incidents, timelines, schedules, escalation policies, status pages, postmortems, and AI summaries
+- `devApi`: repositories, pull requests, environments, deployments, releases, service catalog, owners, dependencies, and AI release summary
+- `collabApi`: threads, messages, mentions, reactions, announcements, activity stream, and team updates
+- `insightsApi`: dashboards, widgets, metric definitions, metric snapshots, reports, report runs, insight events, and usage metrics
 
 Current core-service gateway paths:
 
@@ -229,6 +243,43 @@ Current Pulse gateway paths:
 - `GET /api/pulse/api/v1/escalation-policies`
 - `GET /api/pulse/api/v1/status-pages`
 - `GET /api/pulse/api/v1/status-pages/{id}/components`
+
+Current Dev gateway paths:
+
+- `GET /api/dev/api/v1/repositories`
+- `GET /api/dev/api/v1/pull-requests`
+- `GET /api/dev/api/v1/environments`
+- `GET /api/dev/api/v1/deployments`
+- `GET /api/dev/api/v1/releases`
+- `POST /api/dev/api/v1/releases/{id}/ai-summary`
+- `GET /api/dev/api/v1/services`
+- `GET /api/dev/api/v1/services/{id}`
+- `GET /api/dev/api/v1/services/{id}/owners`
+- `GET /api/dev/api/v1/services/{id}/dependencies`
+
+Current Collab gateway paths:
+
+- `GET /api/collab/api/v1/threads`
+- `POST /api/collab/api/v1/threads`
+- `GET /api/collab/api/v1/threads/{id}`
+- `GET /api/collab/api/v1/threads/{id}/messages`
+- `POST /api/collab/api/v1/threads/{id}/messages`
+- `GET /api/collab/api/v1/mentions`
+- `GET /api/collab/api/v1/reactions`
+- `GET /api/collab/api/v1/announcements`
+- `GET /api/collab/api/v1/activity-stream`
+- `GET /api/collab/api/v1/team-updates`
+
+Current Insights gateway paths:
+
+- `GET /api/insights/api/v1/dashboards`
+- `GET /api/insights/api/v1/dashboards/{id}/widgets`
+- `GET /api/insights/api/v1/metrics/definitions`
+- `GET /api/insights/api/v1/metrics/snapshots`
+- `GET /api/insights/api/v1/reports`
+- `GET /api/insights/api/v1/reports/{id}/runs`
+- `GET /api/insights/api/v1/insight-events`
+- `GET /api/insights/api/v1/usage-metrics`
 
 ## Auth Flow
 
@@ -349,6 +400,43 @@ Implemented first-pass Pulse screens:
 
 Pulse UI uses the selected workspace. Timeline event creation, status page component editing, on-call schedule editing, and realtime incident collaboration are deferred.
 
+## Dev UI
+
+Implemented first-pass Dev screens:
+
+- `/dev`: dashboard with repository, deployment, release, and service catalog summaries.
+- `/dev/repositories`: repository list with provider, branch, and project context.
+- `/dev/deployments`: deployment list with environment, service, version, and status.
+- `/dev/releases`: release list with status badges and optional AI release summary action.
+- `/dev/services`: service catalog list with lifecycle status.
+- `/dev/services/[id]`: service detail with owners and dependency sections.
+
+Dev UI uses the selected workspace. Repository creation, deployment mutation, service ownership editing, and dependency graph visuals are deferred.
+
+## Collab UI
+
+Implemented first-pass Collab screens:
+
+- `/collab`: dashboard with thread, announcement, team update, and activity stream summaries.
+- `/collab/threads`: thread list and create thread dialog.
+- `/collab/threads/[id]`: thread detail with messages and message composer.
+- `/collab/announcements`: announcement list.
+- `/collab/team-updates`: team update list.
+
+Collab UI uses the selected workspace and selected project where available. Realtime transport, reactions UI, mention creation, and rich-thread editing are deferred.
+
+## Insights UI
+
+Implemented first-pass Insights screens:
+
+- `/insights`: dashboard with dashboard, metric, report, and insight event summaries.
+- `/insights/dashboards`: dashboard card list and widget placeholder grid.
+- `/insights/reports`: reports table with status badges.
+- `/insights/metrics`: metric snapshot cards and metric definition table.
+- `/insights/usage`: usage metrics table.
+
+Insights UI uses the selected workspace. Advanced charts, cross-service aggregation, scheduled report runs, and custom dashboard builders are deferred.
+
 ## State Stores
 
 - `auth-store`: token, current user, login/register/logout, session reload
@@ -368,17 +456,17 @@ Pulse UI uses the selected workspace. Timeline event creation, status page compo
 - Discover impact scoring and roadmap updates are read-only placeholders beyond basic idea creation.
 - Desk queue/SLA management is currently summary-focused; ticket comments are supported.
 - Pulse status pages and postmortems are display-focused; incident creation is supported.
+- Dev screens are read-mostly; release AI summary is optional and service ownership/dependency editing is deferred.
+- Collab does not implement realtime, reactions, mentions, or rich text yet.
+- Insights uses tables and metric cards only; advanced charts and analytics composition are deferred.
 
 ## Next Frontend Modules
 
 Planned next module UI passes:
 
-- Dev
-- Collab
 - Automation
 - Connect
 - Guard
-- Insights
 - Media
 
 ## Future Module Integration
