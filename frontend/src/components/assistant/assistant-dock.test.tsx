@@ -43,7 +43,7 @@ describe("AssistantDock", () => {
 
     renderAssistant();
 
-    expect(screen.getByText(/select a workspace to ask questions/i)).toBeInTheDocument();
+    expect(screen.getByText("Select a workspace")).toBeInTheDocument();
   });
 
   it("sends a message with mocked gateway responses", async () => {
@@ -75,5 +75,15 @@ describe("AssistantDock", () => {
 
     await waitFor(() => expect(screen.getByText("Here is the workspace answer.")).toBeInTheDocument());
     expect(screen.getByText("Workspace memory plan (docs_page)")).toBeInTheDocument();
+  });
+
+  it("can clear the assistant conversation", () => {
+    useAssistantStore.getState().addMessage({ id: "1", role: "user", content: "Hello" });
+
+    renderAssistant();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Clear assistant conversation"));
+
+    expect(screen.getByText("Ask Asthra anything about this workspace")).toBeInTheDocument();
   });
 });

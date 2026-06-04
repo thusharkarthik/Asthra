@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Send } from "lucide-react";
+import { Bot, RefreshCw, Send, Trash2, User } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { EmptyModuleState, SectionLoading } from "@/components/layout/ui-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { assistantApi } from "@/services/api/assistant-api";
@@ -22,9 +23,11 @@ export function AssistantDock() {
     setActiveSession,
     setConversationMessages,
     addMessage,
-    setError
+    setError,
+    resetAssistant
   } = useAssistantStore();
   const [message, setMessage] = useState("");
+  const [lastMessage, setLastMessage] = useState("");
 
   const sessionsQuery = useQuery({
     queryKey: ["assistant", "sessions", selectedWorkspaceId],
@@ -117,20 +120,33 @@ export function AssistantDock() {
     if (!content || chatMutation.isPending) {
       return;
     }
+    setLastMessage(content);
     chatMutation.mutate(content);
+  };
+
+  const retryLastMessage = () => {
+    if (lastMessage && !chatMutation.isPending) {
+      setError(null);
+      chatMutation.mutate(lastMessage);
+    }
   };
 
   return (
     <aside className="hidden w-80 shrink-0 border-l bg-card xl:flex xl:flex-col" aria-label="AI assistant">
-      <div className="border-b p-4">
-        <div className="text-sm font-semibold">Asthra Assistant</div>
-        <div className="text-xs text-muted-foreground">Workspace-aware assistant</div>
+      <div className="flex items-start justify-between gap-3 border-b p-4">
+        <div>
+          <div className="text-sm font-semibold">Asthra Assistant</div>
+          <div className="text-xs text-muted-foreground">Workspace-aware, read-only assistant</div>
+        </div>
+        <Button size="icon" variant="ghost" aria-label="Clear assistant conversation" onClick={() => { resetAssistant(); setMessage(""); setLastMessage(""); }}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
       <div className="border-b p-3">
         {!selectedWorkspaceId ? (
           <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">Select a workspace to start.</div>
         ) : sessionsQuery.isLoading ? (
-          <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">Loading sessions...</div>
+          <SectionLoading label="Loading assistant sessions..." />
         ) : conversations.length === 0 ? (
           <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">New assistant session</div>
         ) : (
@@ -147,18 +163,17 @@ export function AssistantDock() {
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {!selectedWorkspaceId ? (
-          <div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
-            Select a workspace to ask questions across docs, work, ideas, tickets, incidents, releases, and discussions.
-          </div>
+          <EmptyModuleState title="Select a workspace" description="Assistant context is scoped to the selected workspace." />
         ) : conversation.messages.length === 0 ? (
-          <div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
-            Ask about this workspace. Sources will appear when memory returns them.
-          </div>
+          <EmptyModuleState title="Ask Asthra anything about this workspace" description="Try questions about docs, tickets, incidents, releases, or project status. Sources appear when memory returns them." />
         ) : (
           conversation.messages.map((item) => (
-            <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
-              <div className="mb-1 text-xs uppercase text-muted-foreground">{item.role}</div>
-              <div className="whitespace-pre-wrap">{item.content}</div>
+            <div key={item.id} className={item.role === "user" ? "ml-6 rounded-md border bg-muted p-3 text-sm" : "mr-6 rounded-md border bg-background p-3 text-sm"}>
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                {item.role === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                {item.role}
+              </div>
+              <div className="whitespace-pre-wrap leading-relaxed">{item.content}</div>
               {item.sources && item.sources.length > 0 ? (
                 <div className="mt-3 space-y-1 border-t pt-2">
                   <div className="text-xs font-medium text-muted-foreground">Sources</div>
@@ -173,9 +188,19 @@ export function AssistantDock() {
           ))
         )}
         {chatMutation.isPending ? (
-          <div className="rounded-md border bg-muted p-3 text-sm text-muted-foreground">Asthra is thinking...</div>
+          <div className="mr-6 rounded-md border bg-background p-3 text-sm text-muted-foreground">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase"><Bot className="h-3.5 w-3.5" />assistant</div>
+            <div className="flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" /><span className="h-2 w-2 animate-pulse rounded-full bg-primary delay-75" /><span className="h-2 w-2 animate-pulse rounded-full bg-primary delay-150" />Asthra is thinking...</div>
+          </div>
         ) : null}
-        {error ? <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+        {error ? (
+          <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <div>{error}</div>
+            <Button size="sm" variant="outline" onClick={retryLastMessage} disabled={!lastMessage || chatMutation.isPending}>
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </Button>
+          </div>
+        ) : null}
       </div>
       <form className="flex gap-2 border-t p-3" onSubmit={handleSubmit}>
         <Input

@@ -160,6 +160,19 @@ Run the API Gateway and core-service before using real auth:
 docker compose up --build api-gateway core-service
 ```
 
+## Demo Path
+
+For a beta demo:
+
+1. Start the frontend, API Gateway, and needed backend services.
+2. Register or log in.
+3. Select organization, workspace, and project context.
+4. Review Home for workspace summary, quick launch, assistant/search shortcuts, recent activity placeholders, recent AI conversations, recent search results, and module status.
+5. Use grouped sidebar navigation or `Ctrl+K` / `Cmd+K` command palette to move between modules.
+6. Open global search and the assistant panel.
+7. Visit module dashboards across Work, Operations, Engineering, Intelligence, and Admin.
+8. Review Settings, Profile, Workspace, and Preferences.
+
 ## Tests
 
 ```bash
@@ -212,6 +225,16 @@ Reusable shell states live in `src/components/layout/ui-states.tsx`:
 - `EmptyModuleState`
 - `ErrorState`
 - `RetryButton`
+
+`src/components/layout/module-page-shell.tsx` provides the standard module layout structure:
+
+- `PageHeader`
+- optional primary actions
+- summary cards
+- loading state
+- error state
+- empty state
+- main content area
 
 Typed API modules:
 
@@ -469,6 +492,9 @@ The Home route includes:
 - pinned modules placeholder
 - system status placeholder
 - recent activity placeholder
+- recent AI assistant conversations placeholder
+- recent search results placeholder
+- module status cards
 - continue-where-you-left-off links
 
 ## Flow UI
@@ -667,6 +693,9 @@ Planned frontend passes:
 - `docs/frontend-status.md`
 - `docs/navigation-architecture.md`
 - `docs/ui-components.md`
+- `docs/demo-guide.md`
+- `docs/frontend-beta-status.md`
+- `docs/component-map.md`
 
 ## Future Module Integration
 

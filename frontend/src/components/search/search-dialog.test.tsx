@@ -33,7 +33,7 @@ describe("SearchDialog", () => {
 
     renderSearch();
 
-    expect(screen.getByText(/select a workspace to search/i)).toBeInTheDocument();
+    expect(screen.getByText("Select a workspace")).toBeInTheDocument();
   });
 
   it("groups workspace search results by source type", async () => {
@@ -64,6 +64,13 @@ describe("SearchDialog", () => {
     renderSearch();
     fireEvent.change(screen.getByPlaceholderText(/search work items/i), { target: { value: "memory" } });
 
-    await waitFor(() => expect(screen.getByText("Workspace search failed.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Workspace search failed")).toBeInTheDocument());
+  });
+
+  it("shows recent search placeholders before typing", () => {
+    renderSearch();
+
+    expect(screen.getByText("Recent searches")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "release risk" })).toBeInTheDocument();
   });
 });
