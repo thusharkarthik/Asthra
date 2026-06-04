@@ -1,0 +1,9 @@
+export type Envelope<T> = { success: boolean; data: T; message?: string | null; request_id?: string | null };
+export type Workflow = { id: number; workspace_id: number; name: string; description?: string | null; status: string; created_by_id: number; created_at?: string; updated_at?: string };
+export type WorkflowCreate = { workspace_id: number; name: string; description?: string | null; status?: string; created_by_id: number };
+export type WorkflowTrigger = { id: number; workflow_id: number; trigger_type: string; trigger_config?: Record<string, unknown> | null; is_active: boolean };
+export type WorkflowCondition = { id: number; workflow_id: number; condition_type: string; condition_config?: Record<string, unknown> | null };
+export type WorkflowAction = { id: number; workflow_id: number; action_type: string; action_config?: Record<string, unknown> | null; execution_order: number };
+export type WorkflowExecution = { id: number; workflow_id: number; execution_status: string; started_at?: string; completed_at?: string | null; execution_log?: string | null };
+export type ScheduledJob = { id: number; workflow_id: number; cron_expression?: string | null; interval_seconds?: number | null; next_run_at?: string | null; is_active: boolean };
+export type AutomationAuditLog = { id: number; workflow_id?: number | null; execution_id?: number | null; action: string; status: string; metadata?: Record<string, unknown> | null; created_at?: string };

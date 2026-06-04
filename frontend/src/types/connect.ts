@@ -1,0 +1,9 @@
+export type Envelope<T> = { success: boolean; data: T; message?: string | null; request_id?: string | null };
+export type Integration = { id: number; workspace_id: number; name: string; provider: string; status: string; configuration?: Record<string, unknown> | null; created_by_id?: number | null };
+export type IntegrationCreate = { workspace_id: number; name: string; provider: string; status?: string; configuration?: Record<string, unknown> | null; created_by_id?: number | null };
+export type Connector = { id: number; integration_id: number; connector_type: string; connector_name: string; status: string; config?: Record<string, unknown> | null };
+export type WebhookEndpoint = { id: number; workspace_id: number; name: string; target_url: string; is_active: boolean };
+export type WebhookDelivery = { id: number; webhook_endpoint_id: number; event_type: string; delivery_status: string; response_status?: number | null; delivered_at?: string | null };
+export type EventSubscription = { id: number; workspace_id: number; event_name: string; subscriber_type: string; subscriber_reference?: string | null; is_active: boolean };
+export type SyncJob = { id: number; integration_id: number; job_type: string; status: string; execution_log?: string | null };
+export type APIConnection = { id: number; workspace_id: number; provider: string; base_url?: string | null; auth_type: string; connection_status: string };

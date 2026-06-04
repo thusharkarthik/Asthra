@@ -2,11 +2,13 @@ import {
   Activity,
   Bot,
   Briefcase,
+  Cable,
   FileText,
   Gauge,
   HeartPulse,
   Home,
   Lightbulb,
+  Image,
   MessageSquare,
   Settings,
   ShieldCheck,
@@ -24,8 +26,11 @@ export const navItems: NavItem[] = [
   { label: "Dev", href: "/dev", icon: Wrench },
   { label: "Collab", href: "/collab", icon: Activity },
   { label: "Automation", href: "/automation", icon: Bot },
+  { label: "Connect", href: "/connect", icon: Cable },
+  { label: "Guard", href: "/guard", icon: ShieldCheck },
   { label: "Insights", href: "/insights", icon: Gauge },
+  { label: "Media", href: "/media", icon: Image },
   { label: "Settings", href: "/settings", icon: Settings }
 ];
 
-export const utilityNavItems: NavItem[] = [{ label: "Guard", href: "/settings", icon: ShieldCheck }];
+export const utilityNavItems: NavItem[] = [];
