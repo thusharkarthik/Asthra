@@ -38,7 +38,13 @@ src/
 - `/login`
 - `/register`
 - `/flow`
+- `/flow/work-items`
+- `/flow/work-items/[id]`
+- `/flow/boards`
 - `/docs`
+- `/docs/spaces`
+- `/docs/pages`
+- `/docs/pages/[id]`
 - `/discover`
 - `/desk`
 - `/pulse`
@@ -50,14 +56,14 @@ src/
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-All module routes are placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for the next frontend phase.
+Flow and Docs now have first-pass module screens. Other module routes remain placeholders. The Home route shows real core-service counts where available and keeps placeholder module cards for the next frontend phase.
 
 ## Environment
 
 Create `frontend/.env.local` when running against local services:
 
 ```env
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8010
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 NEXT_PUBLIC_CORE_AUTH_LOGIN_PATH=/api/core/api/v1/auth/login
 NEXT_PUBLIC_CORE_AUTH_REGISTER_PATH=/api/core/api/v1/auth/register
 NEXT_PUBLIC_CORE_AUTH_ME_PATH=/api/core/api/v1/auth/me
@@ -109,7 +115,7 @@ Current tests cover:
 Defaults:
 
 ```text
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8010
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 ```
 
 The request wrapper adds:
@@ -127,6 +133,8 @@ Typed API modules:
 - `assistantApi`: assistant sessions, messages, and chat
 - `memoryApi`: workspace memory search
 - `searchApi`: frontend search facade over workspace memory search
+- `flowApi`: work items, boards, board columns, and work item comments
+- `docsApi`: spaces, pages, page comments, and page search
 
 Current core-service gateway paths:
 
@@ -144,6 +152,30 @@ Current AI/search gateway paths:
 - `POST /api/ai/api/v1/assistant/sessions`
 - `GET /api/ai/api/v1/assistant/sessions/{session_id}/messages`
 - `POST /api/memory/api/v1/workspace-search`
+
+Current Flow gateway paths:
+
+- `GET /api/flow/api/v1/work-items`
+- `POST /api/flow/api/v1/work-items`
+- `GET /api/flow/api/v1/work-items/{id}`
+- `PATCH /api/flow/api/v1/work-items/{id}`
+- `GET /api/flow/api/v1/boards`
+- `POST /api/flow/api/v1/boards`
+- `GET /api/flow/api/v1/boards/{board_id}/columns`
+- `GET /api/flow/api/v1/work-items/{id}/comments`
+- `POST /api/flow/api/v1/work-items/{id}/comments`
+
+Current Docs gateway paths:
+
+- `GET /api/docs/api/v1/spaces`
+- `POST /api/docs/api/v1/spaces`
+- `GET /api/docs/api/v1/pages`
+- `POST /api/docs/api/v1/pages`
+- `GET /api/docs/api/v1/pages/{id}`
+- `PATCH /api/docs/api/v1/pages/{id}`
+- `GET /api/docs/api/v1/pages/{id}/comments`
+- `POST /api/docs/api/v1/pages/{id}/comments`
+- `GET /api/docs/api/v1/search/pages?q=...`
 
 ## Auth Flow
 
@@ -208,6 +240,28 @@ The dashboard includes simple AI-native widgets for:
 
 These are shell-level widgets only. Full module-specific AI screens are intentionally deferred.
 
+## Flow UI
+
+Implemented first-pass Flow screens:
+
+- `/flow`: dashboard with work item count, status summary, recent work items, and board link.
+- `/flow/work-items`: work item list with status/priority badges, filters placeholder, and create dialog.
+- `/flow/work-items/[id]`: detail view with description, status, priority, assignee, comments, and AI breakdown placeholder.
+- `/flow/boards`: simple Kanban columns based on status IDs.
+
+Flow UI uses the selected project from workspace context. If no project is selected, screens show a non-crashing empty state.
+
+## Docs UI
+
+Implemented first-pass Docs screens:
+
+- `/docs`: dashboard with spaces count, pages count, recent pages, and search link.
+- `/docs/spaces`: list spaces and create a workspace-scoped space.
+- `/docs/pages`: list pages, create pages, and basic page search.
+- `/docs/pages/[id]`: page detail with content display/edit mode, version placeholder, comments, and AI summary placeholder.
+
+Docs UI uses the selected workspace where needed. Rich editing, nested page tree UX, and realtime collaboration are intentionally deferred.
+
 ## State Stores
 
 - `auth-store`: token, current user, login/register/logout, session reload
@@ -221,6 +275,19 @@ These are shell-level widgets only. Full module-specific AI screens are intentio
 - Search is only as complete as memory-service indexing.
 - Assistant tools are read-only placeholders on the backend foundation.
 - No frontend agent workflow or automation execution UI is implemented yet.
+- Flow create forms use simple numeric defaults for type/status/priority until lookup UI is added.
+- Docs uses a basic text input/textarea flow; no rich editor is implemented yet.
+- Kanban boards are read-only and do not support drag-and-drop yet.
+
+## Next Frontend Modules
+
+Planned next module UI passes:
+
+- Discover
+- Desk
+- Pulse
+- Dev
+- Collab
 
 ## Future Module Integration
 
