@@ -66,33 +66,62 @@ src/
 - `/pulse/incidents`
 - `/pulse/incidents/[id]`
 - `/pulse/status-pages`
+- `/pulse/on-call`
+- `/pulse/escalations`
+- `/pulse/postmortems`
 - `/dev`
 - `/dev/repositories`
+- `/dev/pull-requests`
+- `/dev/environments`
 - `/dev/deployments`
 - `/dev/releases`
 - `/dev/services`
 - `/dev/services/[id]`
+- `/dev/dependencies`
 - `/collab`
 - `/collab/threads`
 - `/collab/threads/[id]`
+- `/collab/mentions`
 - `/collab/announcements`
 - `/collab/team-updates`
+- `/collab/activity`
 - `/automation`
 - `/automation/workflows`
 - `/automation/workflows/[id]`
 - `/automation/executions`
 - `/automation/schedules`
+- `/automation/templates`
+- `/automation/audit-logs`
 - `/connect`
 - `/connect/integrations`
+- `/connect/connectors`
 - `/connect/webhooks`
 - `/connect/sync-jobs`
 - `/connect/api-connections`
+- `/connect/event-subscriptions`
 - `/guard`
 - `/guard/policies`
 - `/guard/audit-events`
 - `/guard/risks`
 - `/guard/compliance`
 - `/guard/access-reviews`
+- `/guard/retention`
+- `/guard/exceptions`
+- `/insights`
+- `/insights/dashboards`
+- `/insights/widgets`
+- `/insights/reports`
+- `/insights/metrics`
+- `/insights/usage`
+- `/insights/events`
+- `/media`
+- `/media/assets`
+- `/media/assets/[id]`
+- `/media/collections`
+- `/media/processing-jobs`
+- `/media/transcripts`
+- `/media/annotations`
+- `/media/tags`
 - `/insights`
 - `/insights/dashboards`
 - `/insights/reports`
@@ -593,6 +622,9 @@ Implemented first-pass Pulse screens:
 - `/pulse/incidents`: workspace-scoped incident table and create dialog.
 - `/pulse/incidents/[id]`: incident detail with timeline, postmortem, and optional AI summary action.
 - `/pulse/status-pages`: status page overview.
+- `/pulse/on-call`: on-call schedule coverage.
+- `/pulse/escalations`: escalation policy list.
+- `/pulse/postmortems`: incident postmortem follow-up surface.
 
 Pulse UI uses the selected workspace. Timeline event creation, status page component editing, on-call schedule editing, and realtime incident collaboration are deferred.
 
@@ -602,10 +634,13 @@ Implemented first-pass Dev screens:
 
 - `/dev`: dashboard with repository, deployment, release, and service catalog summaries.
 - `/dev/repositories`: repository list with provider, branch, and project context.
+- `/dev/pull-requests`: pull request review surface.
+- `/dev/environments`: environment list.
 - `/dev/deployments`: deployment list with environment, service, version, and status.
 - `/dev/releases`: release list with status badges and optional AI release summary action.
 - `/dev/services`: service catalog list with lifecycle status.
 - `/dev/services/[id]`: service detail with owners and dependency sections.
+- `/dev/dependencies`: dependency risk placeholder surface.
 
 Dev UI uses the selected workspace. Repository creation, deployment mutation, service ownership editing, and dependency graph visuals are deferred.
 
@@ -616,8 +651,10 @@ Implemented first-pass Collab screens:
 - `/collab`: dashboard with thread, announcement, team update, and activity stream summaries.
 - `/collab/threads`: thread list and create thread dialog.
 - `/collab/threads/[id]`: thread detail with messages and message composer.
+- `/collab/mentions`: mentions requiring attention.
 - `/collab/announcements`: announcement list.
 - `/collab/team-updates`: team update list.
+- `/collab/activity`: activity stream view.
 
 Collab UI uses the selected workspace and selected project where available. Realtime transport, reactions UI, mention creation, and rich-thread editing are deferred.
 
@@ -630,6 +667,8 @@ Implemented first-pass Automation screens:
 - `/automation/workflows/[id]`: workflow detail with triggers, conditions, actions, and execution history.
 - `/automation/executions`: execution history timeline/list.
 - `/automation/schedules`: scheduled job list.
+- `/automation/templates`: workflow template placeholders.
+- `/automation/audit-logs`: automation audit log list.
 
 Automation UI is read-only in this phase. Workflow creation, trigger/action editing, and real execution controls are deferred.
 
@@ -639,9 +678,11 @@ Implemented first-pass Connect screens:
 
 - `/connect`: dashboard with integrations, webhooks, sync jobs, and event subscription summaries.
 - `/connect/integrations`: integration list and connector count.
+- `/connect/connectors`: connector list.
 - `/connect/webhooks`: webhook endpoint list plus recent delivery status.
 - `/connect/sync-jobs`: sync job list with execution logs.
 - `/connect/api-connections`: API connection list with connection status.
+- `/connect/event-subscriptions`: event subscription list.
 
 Connect UI is read-only in this phase. Real external connector setup, webhook retry controls, and credential management are deferred.
 
@@ -655,6 +696,8 @@ Implemented first-pass Guard screens:
 - `/guard/risks`: risk finding list with severity badges.
 - `/guard/compliance`: compliance check list.
 - `/guard/access-reviews`: access review list.
+- `/guard/retention`: data retention policy list.
+- `/guard/exceptions`: security exception list.
 
 Guard UI is read-only in this phase. Policy authoring, review workflows, exception approvals, and compliance evidence uploads are deferred.
 
@@ -664,9 +707,11 @@ Implemented first-pass Insights screens:
 
 - `/insights`: dashboard with dashboard, metric, report, and insight event summaries.
 - `/insights/dashboards`: dashboard card list and widget placeholder grid.
+- `/insights/widgets`: widget planning surface.
 - `/insights/reports`: reports table with status badges.
 - `/insights/metrics`: metric snapshot cards and metric definition table.
 - `/insights/usage`: usage metrics table.
+- `/insights/events`: insight event feed.
 
 Insights UI uses the selected workspace. Advanced charts, cross-service aggregation, scheduled report runs, and custom dashboard builders are deferred.
 
@@ -679,6 +724,9 @@ Implemented first-pass Media screens:
 - `/media/assets/[id]`: asset detail with transcripts, annotations, tags, and processing jobs.
 - `/media/collections`: media collection list.
 - `/media/processing-jobs`: processing job list with status badges.
+- `/media/transcripts`: transcript readiness surface.
+- `/media/annotations`: annotation placeholder surface.
+- `/media/tags`: media tag list.
 
 Media UI uses metadata only. File upload/storage, OCR, transcription, image understanding, and multimodal embeddings are deferred.
 
@@ -730,6 +778,7 @@ Planned frontend passes:
 - Better lookup selectors for workspace/project/entity references.
 - Rich editors, drag-and-drop boards, realtime collaboration, and advanced analytics charts.
 - Full AI assistant integration into module-specific workflows.
+- See `frontend/docs/product-experience-status.md` for the product experience status matrix.
 
 ## Frontend Docs
 

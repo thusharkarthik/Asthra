@@ -54,9 +54,9 @@ describe("Flow frontend screens", () => {
       hasHydrated: true
     });
     useWorkspaceStore.setState({
-      organizations: [{ id: 1, name: "Acme", created_at: "" }],
-      workspaces: [{ id: 2, organization_id: 1, name: "Workspace", created_at: "" }],
-      projects: [{ id: 3, workspace_id: 2, name: "Project", created_at: "" }],
+      organizations: [{ id: 1, name: "Acme" }],
+      workspaces: [{ id: 2, organization_id: 1, name: "Workspace" }],
+      projects: [{ id: 3, workspace_id: 2, name: "Project" }],
       selectedOrganizationId: 1,
       selectedWorkspaceId: 2,
       selectedProjectId: 3
@@ -74,8 +74,8 @@ describe("Flow frontend screens", () => {
 
   it("renders guided empty state when no project is selected", () => {
     useWorkspaceStore.setState({
-      organizations: [{ id: 1, name: "Acme", created_at: "" }],
-      workspaces: [{ id: 2, organization_id: 1, name: "Workspace", created_at: "" }],
+      organizations: [{ id: 1, name: "Acme" }],
+      workspaces: [{ id: 2, organization_id: 1, name: "Workspace" }],
       projects: [],
       selectedOrganizationId: 1,
       selectedWorkspaceId: 2,
