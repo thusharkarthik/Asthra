@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Building2, Lightbulb, Map, PanelsTopLeft } from "lucide-react";
+import { Lightbulb, Map } from "lucide-react";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 
 export function DiscoverSetupState({
   hasOrganization,
@@ -10,17 +11,17 @@ export function DiscoverSetupState({
   hasWorkspace: boolean;
   mode?: "context" | "ideas" | "roadmap" | "feature-requests";
 }) {
-  const step = !hasOrganization
-    ? { icon: Building2, title: "Create an organization before capturing product discovery.", body: "Discover is workspace-scoped so ideas, requests, feedback, and roadmap decisions stay connected.", action: "Create Organization", href: "/settings/workspace" }
-    : !hasWorkspace
-      ? { icon: PanelsTopLeft, title: "Select or create a workspace to start capturing product ideas.", body: "A workspace gives product discovery a shared home for your team.", action: "Create Workspace", href: "/settings/workspace" }
-      : mode === "ideas"
+  if (!hasOrganization || !hasWorkspace) {
+    return <PlatformSetupGuide moduleName="Discover" hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} />;
+  }
+
+  const step = mode === "ideas"
         ? { icon: Lightbulb, title: "Start with an idea. Capture a problem, opportunity, or product improvement.", body: "Ideas become validated concepts, MVP plans, and eventually planned work.", action: "Create First Idea", href: "/discover/ideas" }
         : mode === "roadmap"
           ? { icon: Map, title: "Prioritized ideas can become roadmap items.", body: "Use the roadmap to communicate Now, Next, and Later product bets.", action: "Create Roadmap Item", href: "/discover/roadmap" }
           : mode === "feature-requests"
             ? { icon: Lightbulb, title: "Feature requests turn customer asks into product signals.", body: "Capture the source, requester, and requested outcome so ideas can be prioritized with real demand.", action: "Add Feature Request", href: "/discover/feature-requests" }
-          : { icon: Lightbulb, title: "Discover is ready for product planning.", body: "Capture ideas, validate them, prioritize impact, and convert the best ones into roadmap items.", action: "Browse Ideas", href: "/discover/ideas" };
+            : { icon: Lightbulb, title: "Discover is ready for product planning.", body: "Capture ideas, validate them, prioritize impact, and convert the best ones into roadmap items.", action: "Browse Ideas", href: "/discover/ideas" };
   const Icon = step.icon;
   return (
     <section className="rounded-lg border bg-card p-6">

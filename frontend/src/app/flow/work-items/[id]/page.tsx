@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Link2 } from "lucide-react";
+import { Activity } from "lucide-react";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { CommentList } from "@/components/modules/comment-list";
 import { DetailPanel } from "@/components/modules/detail-panel";
+import { EntityActivityPanel, EntityDangerZone, EntityDetailLayout, EntityLinksPanel, EntityMetadataPanel } from "@/components/modules/entity-detail-layout";
 import { EntityDetailHeader } from "@/components/modules/entity-detail-header";
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
@@ -51,13 +52,13 @@ export default function WorkItemDetailPage() {
   return (
     <div className="space-y-4">
       <FlowSubnav />
-      <EntityDetailHeader
-        title={item.title}
-        description={`Work item #${item.id}`}
-        actions={<Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/work-items">Back to Work Items</Link>}
-      />
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-        <div className="space-y-4">
+      <EntityDetailLayout
+        header={<EntityDetailHeader
+          title={item.title}
+          description={`Work item #${item.id}`}
+          actions={<Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/work-items">Back to Work Items</Link>}
+        />}
+        overview={
           <DetailPanel title="Overview">
             <div className="space-y-3">
               <p className="whitespace-pre-wrap text-sm">{item.description || "No description."}</p>
@@ -70,30 +71,29 @@ export default function WorkItemDetailPage() {
               <Button variant="outline" size="sm">AI breakdown placeholder</Button>
             </div>
           </DetailPanel>
-          <DetailPanel title="Comments">
-            <div className="space-y-3">
-              <CommentList comments={commentsQuery.data ?? []} />
-              <CommentComposer onSubmit={(content) => commentMutation.mutate(content)} isSubmitting={commentMutation.isPending} />
-            </div>
-          </DetailPanel>
-          <DetailPanel title="Activity">
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Created {item.created_at ? new Date(item.created_at).toLocaleString() : "recently"}.</div>
-              <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Last updated {item.updated_at ? new Date(item.updated_at).toLocaleString() : "not available"}.</div>
-            </div>
-          </DetailPanel>
-        </div>
-        <DetailPanel title="Links">
-          <div className="space-y-3 text-sm">
-            {["Linked Docs", "Linked Tickets", "Linked Incidents"].map((label) => (
-              <div key={label} className="rounded-md border border-dashed p-3">
-                <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> {label}</div>
-                <p className="mt-1 text-muted-foreground">Future cross-module references will appear here.</p>
-              </div>
-            ))}
+        }
+        activity={<EntityActivityPanel>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Created {item.created_at ? new Date(item.created_at).toLocaleString() : "recently"}.</div>
+            <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Last updated {item.updated_at ? new Date(item.updated_at).toLocaleString() : "not available"}.</div>
           </div>
-        </DetailPanel>
-      </div>
+        </EntityActivityPanel>}
+        metadata={<EntityMetadataPanel>
+          <div className="grid gap-3 text-sm">
+            <div><div className="text-muted-foreground">Project</div><div className="font-medium">{item.project_id}</div></div>
+            <div><div className="text-muted-foreground">Assignee</div><div className="font-medium">{item.assignee_id ?? "Unassigned"}</div></div>
+            <div><div className="text-muted-foreground">Reporter</div><div className="font-medium">{item.reporter_id ?? "Unknown"}</div></div>
+          </div>
+        </EntityMetadataPanel>}
+        links={<EntityLinksPanel labels={["Linked Docs", "Linked Tickets", "Linked Incidents"]} />}
+        dangerZone={<EntityDangerZone label="Delete/archive placeholder" />}
+      />
+      <DetailPanel title="Comments">
+        <div className="space-y-3">
+          <CommentList comments={commentsQuery.data ?? []} />
+          <CommentComposer onSubmit={(content) => commentMutation.mutate(content)} isSubmitting={commentMutation.isPending} />
+        </div>
+      </DetailPanel>
     </div>
   );
 }

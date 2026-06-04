@@ -11,6 +11,7 @@ import { automationNavItems } from "@/components/modules/module-navs";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { WorkflowStatusBadge } from "@/components/modules/workflow-status-badge";
 import { automationApi } from "@/services/api/automation-api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -28,7 +29,7 @@ export default function AutomationPage() {
     <div className="space-y-6">
       <PageHeader title="Automation" description="Workflow orchestration foundation for triggers, conditions, actions, executions, and schedules." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/automation/workflows">Create Workflow</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/automation/schedules">Schedule Workflow</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/automation/templates">Use Template</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={automationNavItems} activePath={pathname} />
-      {!workspaceId ? <EmptyState title="Select a workspace to load Automation" /> : (
+      {!workspaceId ? <PlatformSetupGuide moduleName="Automation" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Workflows", value: (workflows.data ?? []).length, description: "Configured workflow definitions" },

@@ -12,6 +12,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { collabApi } from "@/services/api/collab-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -30,7 +31,7 @@ export default function CollabPage() {
     <div className="space-y-6">
       <PageHeader title="Collab" description="Async collaboration layer for threads, announcements, team updates, and activity streams." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/collab/threads">Create Thread</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/collab/announcements">Create Announcement</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/collab/team-updates">Post Team Update</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={collabNavItems} activePath={pathname} />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to load Collab" /> : (
+      {!selectedWorkspaceId ? <PlatformSetupGuide moduleName="Collab" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Threads", value: (threadsQuery.data ?? []).length, description: "Open collaboration threads" },

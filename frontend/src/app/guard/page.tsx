@@ -12,6 +12,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { RiskSeverityBadge } from "@/components/modules/risk-severity-badge";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { guardApi } from "@/services/api/guard-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -29,7 +30,7 @@ export default function GuardPage() {
     <div className="space-y-6">
       <PageHeader title="Guard" description="Security, governance, compliance, audit, and risk visibility." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/guard/policies">Create Policy</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/guard/access-reviews">Start Access Review</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/guard/risks">Add Risk Finding</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={guardNavItems} activePath={pathname} />
-      {!workspaceId ? <EmptyState title="Select a workspace to load Guard" /> : (
+      {!workspaceId ? <PlatformSetupGuide moduleName="Guard" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Active Policies", value: (policies.data ?? []).filter((item) => item.status === "active").length, description: "Security and governance rules" },

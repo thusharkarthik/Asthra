@@ -13,6 +13,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { WidgetGrid } from "@/components/modules/widget-grid";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { insightsApi } from "@/services/api/insights-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -30,7 +31,7 @@ export default function InsightsPage() {
     <div className="space-y-6">
       <PageHeader title="Insights" description="Analytics workspace for dashboards, metrics, reports, usage, and insight events." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/insights/dashboards">Create Dashboard</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/insights/widgets">Add Widget</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/insights/reports">Create Report</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={insightsNavItems} activePath={pathname} />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to load Insights" /> : (
+      {!selectedWorkspaceId ? <PlatformSetupGuide moduleName="Insights" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Dashboards", value: (dashboardsQuery.data ?? []).length, description: "Configured dashboard surfaces" },

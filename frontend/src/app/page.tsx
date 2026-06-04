@@ -10,6 +10,7 @@ import { navSections } from "@/components/navigation/nav-items";
 import { PlatformActivityFeed } from "@/components/platform/activity-feed";
 import { CrossModuleLinks } from "@/components/platform/cross-module-links";
 import { FavoritesList, RecentItemsList } from "@/components/platform/recent-favorites";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { WorkspaceDashboardSummaryCards } from "@/components/platform/workspace-dashboard-summary";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
@@ -81,6 +82,11 @@ export default function HomePage() {
     <>
       <PageHeader title="Home" description="One connected workspace for work, knowledge, operations, engineering, and intelligence." />
       {error && <div className="mb-4"><ErrorState title="Workspace context failed to load" description="The shell is still available. Check the API Gateway and core-service if counts look empty." /></div>}
+      {(organizations.length === 0 || workspaces.length === 0 || projects.length === 0) ? (
+        <div className="mb-4">
+          <PlatformSetupGuide moduleName="Home" hasOrganization={organizations.length > 0} hasWorkspace={workspaces.length > 0} hasProject={projects.length > 0} requiresProject />
+        </div>
+      ) : null}
       <section className="mb-4 grid gap-4 md:grid-cols-3">
         {isLoading ? [1, 2, 3].map((item) => <CardSkeleton key={item} />) : countCards.map((card) => (
             <DashboardCard key={card.title} title={card.title}>

@@ -13,6 +13,7 @@ import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { ReleaseStatusBadge } from "@/components/modules/release-status-badge";
 import { ServiceLifecycleBadge } from "@/components/modules/service-lifecycle-badge";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { devApi } from "@/services/api/dev-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -30,7 +31,7 @@ export default function DevPage() {
     <div className="space-y-6">
       <PageHeader title="Dev" description="Engineering and DevOps visibility across repositories, deployments, releases, and service ownership." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/dev/repositories">Add Repository</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/dev/services">Register Service</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/dev/releases">Create Release</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={devNavItems} activePath={pathname} />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to load Dev" /> : (
+      {!selectedWorkspaceId ? <PlatformSetupGuide moduleName="Dev" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Repositories", value: (reposQuery.data ?? []).length, description: "Connected codebases" },

@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FavoritesPage from "@/app/favorites/page";
+import CrudChecklistPage from "@/app/platform/crud-checklist/page";
 import PlatformHealthPage from "@/app/platform/health/page";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
@@ -37,5 +38,13 @@ describe("platform beta pages", () => {
 
     expect(screen.getByRole("heading", { name: "Favorites" })).toBeInTheDocument();
     expect(screen.getByText("Platform beta guide")).toBeInTheDocument();
+  });
+
+  it("renders CRUD checklist page", () => {
+    render(<CrudChecklistPage />);
+
+    expect(screen.getByRole("heading", { name: "CRUD Checklist" })).toBeInTheDocument();
+    expect(screen.getByText("Flow")).toBeInTheDocument();
+    expect(screen.getByText("Delete/Archive")).toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { pulseNavItems } from "@/components/modules/module-navs";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { SeverityBadge } from "@/components/modules/severity-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
 import { pulseApi } from "@/services/api/pulse-api";
@@ -40,7 +41,7 @@ export default function PulsePage() {
     <div className="space-y-6">
       <PageHeader title="Pulse" description="Reliability workspace for alerts, incidents, on-call readiness, status pages, and postmortems." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/pulse/incidents">Create Incident</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/pulse/alerts">Create Alert</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/pulse/status-pages">Create Status Page</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={pulseNavItems} activePath={pathname} />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to load Pulse" /> : (
+      {!selectedWorkspaceId ? <PlatformSetupGuide moduleName="Pulse" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid
             stats={[
