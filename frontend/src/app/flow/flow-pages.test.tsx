@@ -84,7 +84,7 @@ describe("Flow frontend screens", () => {
 
     renderWithQuery(<FlowPage />);
 
-    expect(screen.getByText("Create or select a project")).toBeInTheDocument();
+    expect(screen.getByText("Create or select a project for Flow")).toBeInTheDocument();
     expect(screen.getByText("Create Project")).toBeInTheDocument();
   });
 

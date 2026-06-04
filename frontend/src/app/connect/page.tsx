@@ -10,6 +10,7 @@ import { connectNavItems } from "@/components/modules/module-navs";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { connectApi } from "@/services/api/connect-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -28,7 +29,7 @@ export default function ConnectPage() {
     <div className="space-y-6">
       <PageHeader title="Connect" description="Integration platform for connectors, webhooks, subscriptions, sync jobs, and API connections." actions={<ModulePrimaryActions><Link className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground" href="/connect/integrations">Add Integration</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/connect/webhooks">Create Webhook</Link><Link className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium" href="/connect/api-connections">Create API Connection</Link></ModulePrimaryActions>} />
       <ModuleSubnav items={connectNavItems} activePath={pathname} />
-      {!workspaceId ? <EmptyState title="Select a workspace to load Connect" /> : (
+      {!workspaceId ? <PlatformSetupGuide moduleName="Connect" hasWorkspace={false} /> : (
         <>
           <ModuleStatsGrid stats={[
             { title: "Active Integrations", value: (integrations.data ?? []).filter((item) => item.status === "active").length, description: "Connected systems" },

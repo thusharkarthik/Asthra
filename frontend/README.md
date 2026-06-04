@@ -35,6 +35,7 @@ src/
 - `/`
 - `/favorites`
 - `/login`
+- `/platform/crud-checklist`
 - `/platform/health`
 - `/register`
 - `/flow`
@@ -139,13 +140,13 @@ src/
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
+Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and setup guidance when organization, workspace, or project context is missing.
 
 ## Navigation Structure
 
 Sidebar navigation is grouped into platform areas:
 
-- Platform: Home, Search, Assistant, Favorites, Platform Health
+- Platform: Home, Search, Assistant, Favorites, CRUD Checklist, Platform Health
 - Work: Flow, Discover, Docs, Collab
 - Operations: Desk, Pulse, Automation
 - Engineering: Dev, Connect
@@ -210,7 +211,20 @@ For a beta demo:
 5. Use grouped sidebar navigation or `Ctrl+K` / `Cmd+K` command palette to move between modules.
 6. Open global search and the assistant panel.
 7. Visit module dashboards across Work, Operations, Engineering, Intelligence, and Admin.
-8. Review Settings, Profile, Workspace, and Preferences.
+8. Open `/platform/crud-checklist` to track CRUD readiness during manual testing.
+9. Review Settings, Profile, Workspace, and Preferences.
+
+## Product Usability Pass
+
+The current usability pass adds:
+
+- Shared setup guidance for organization, workspace, and project prerequisites.
+- Shared form primitives for required labels, cancel actions, loading states, and errors.
+- Toast feedback for adopted create and validation flows.
+- Shared detail layout primitives for metadata, activity, linked entities, and danger-zone placeholders.
+- Internal CRUD checklist at `/platform/crud-checklist`.
+
+See `frontend/docs/product-usability-pass.md` and `frontend/docs/ui-testing-guide.md`.
 
 ## Tests
 

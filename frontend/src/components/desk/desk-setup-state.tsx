@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Building2, Gauge, Inbox, PanelsTopLeft, Ticket } from "lucide-react";
+import { Gauge, Inbox, Ticket } from "lucide-react";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 
 export function DeskSetupState({
   hasOrganization,
@@ -10,11 +11,11 @@ export function DeskSetupState({
   hasWorkspace: boolean;
   mode?: "context" | "tickets" | "queues" | "slas";
 }) {
-  const step = !hasOrganization
-    ? { icon: Building2, title: "Create an organization before managing support operations.", body: "Desk needs organization and workspace context so tickets, queues, SLAs, and approvals stay scoped.", action: "Create Organization", href: "/settings/workspace" }
-    : !hasWorkspace
-      ? { icon: PanelsTopLeft, title: "Select or create a workspace to start managing support requests.", body: "A workspace gives your support team a shared place to route tickets and track service commitments.", action: "Create Workspace", href: "/settings/workspace" }
-      : mode === "tickets"
+  if (!hasOrganization || !hasWorkspace) {
+    return <PlatformSetupGuide moduleName="Desk" hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} />;
+  }
+
+  const step = mode === "tickets"
         ? { icon: Ticket, title: "Create your first ticket to start tracking service requests.", body: "Tickets capture customer issues, service requests, incidents, approvals, comments, and SLA pressure.", action: "Create Ticket", href: "/desk/tickets" }
         : mode === "queues"
           ? { icon: Inbox, title: "Queues help route support work to the right team.", body: "Use queues for Support, Billing, Operations, Engineering, or any team responsible for service requests.", action: "Create Queue", href: "/desk/queues" }

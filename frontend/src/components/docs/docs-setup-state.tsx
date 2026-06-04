@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BookOpen, Building2, FilePlus2, FolderOpen, PanelsTopLeft } from "lucide-react";
+import { BookOpen, FilePlus2, FolderOpen } from "lucide-react";
+import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 
 type DocsSetupStateProps = {
   hasOrganization: boolean;
@@ -10,23 +11,11 @@ type DocsSetupStateProps = {
 };
 
 export function DocsSetupState({ hasOrganization, hasWorkspace, hasSpaces = true, hasPages = true, mode = "context" }: DocsSetupStateProps) {
-  const step = !hasOrganization
-    ? {
-        icon: Building2,
-        title: "Create an organization before building knowledge",
-        body: "Docs belongs to a workspace, and workspaces live inside an organization.",
-        action: "Create Organization",
-        href: "/settings/workspace"
-      }
-    : !hasWorkspace
-      ? {
-          icon: PanelsTopLeft,
-          title: "Select or create a workspace to start building knowledge.",
-          body: "A workspace gives Docs a shared knowledge home for spaces, pages, comments, and AI-ready context.",
-          action: "Create Workspace",
-          href: "/settings/workspace"
-        }
-      : mode === "spaces" && !hasSpaces
+  if (!hasOrganization || !hasWorkspace) {
+    return <PlatformSetupGuide moduleName="Docs" hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} />;
+  }
+
+  const step = mode === "spaces" && !hasSpaces
         ? {
             icon: FolderOpen,
             title: "Knowledge begins with a Space.",

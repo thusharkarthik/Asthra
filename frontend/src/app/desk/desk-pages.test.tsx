@@ -132,6 +132,6 @@ describe("Desk frontend screens", () => {
     useWorkspaceStore.setState({ selectedOrganizationId: 1, selectedWorkspaceId: null, selectedProjectId: null });
     renderWithQuery(<DeskPage />);
 
-    expect(screen.getByText("Select or create a workspace to start managing support requests.")).toBeInTheDocument();
+    expect(screen.getByText("Create or select a workspace for Desk")).toBeInTheDocument();
   });
 });
