@@ -30,15 +30,20 @@ export type Queue = {
   workspace_id: number;
   name: string;
   description?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type SLA = {
   id: number;
   workspace_id: number;
   name: string;
+  description?: string | null;
   response_time_minutes: number;
   resolution_time_minutes: number;
   priority: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type Approval = {
@@ -47,6 +52,8 @@ export type Approval = {
   approver_id?: number | null;
   status: string;
   note?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type DeskIncident = {
@@ -67,6 +74,9 @@ export type ChangeRequest = {
   description: string;
   risk_level: string;
   status: string;
+  requested_by_id?: number | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type TicketComment = {
@@ -83,6 +93,32 @@ export type TicketAIClassification = {
   priority_suggestion?: string | null;
   severity_suggestion?: string | null;
   routing_suggestion?: string | null;
+  possible_duplicate_hints?: string | null;
   recommended_next_action?: string | null;
   raw_response?: string | null;
+};
+
+export type QueueCreate = {
+  workspace_id: number;
+  name: string;
+  description?: string | null;
+};
+
+export type SLACreate = {
+  workspace_id: number;
+  name: string;
+  description?: string | null;
+  response_time_minutes?: number;
+  resolution_time_minutes?: number;
+  priority?: string;
+};
+
+export type ChangeRequestCreate = {
+  workspace_id: number;
+  ticket_id?: number | null;
+  title: string;
+  description: string;
+  risk_level?: string;
+  status?: string;
+  requested_by_id?: number | null;
 };

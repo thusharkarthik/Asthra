@@ -57,6 +57,10 @@ src/
 - `/desk/tickets`
 - `/desk/tickets/[id]`
 - `/desk/queues`
+- `/desk/slas`
+- `/desk/approvals`
+- `/desk/incidents`
+- `/desk/change-requests`
 - `/pulse`
 - `/pulse/alerts`
 - `/pulse/incidents`
@@ -329,10 +333,14 @@ Current Desk gateway paths:
 - `GET /api/desk/api/v1/tickets/{id}/comments`
 - `POST /api/desk/api/v1/tickets/{id}/comments`
 - `GET /api/desk/api/v1/tickets/{id}/approvals`
+- `PATCH /api/desk/api/v1/approvals/{id}`
 - `GET /api/desk/api/v1/queues`
+- `POST /api/desk/api/v1/queues`
 - `GET /api/desk/api/v1/slas`
+- `POST /api/desk/api/v1/slas`
 - `GET /api/desk/api/v1/incidents`
 - `GET /api/desk/api/v1/change-requests`
+- `POST /api/desk/api/v1/change-requests`
 
 Current Pulse gateway paths:
 
@@ -565,12 +573,16 @@ Discover UI uses the selected organization, workspace, and selected project wher
 
 Implemented first-pass Desk screens:
 
-- `/desk`: dashboard with ticket, queue, and SLA counts plus recent tickets.
-- `/desk/tickets`: workspace-scoped ticket table and create dialog.
-- `/desk/tickets/[id]`: ticket detail with SLA placeholder, approvals, comments, and optional AI classification action.
-- `/desk/queues`: queue list with SLA summary.
+- `/desk`: service operations dashboard with open tickets, high-priority tickets, SLA risk, approvals, incidents, change requests, queue summary, SLA overview, and AI support suggestions.
+- `/desk/tickets`: workspace-scoped ticket table with search, status, priority, queue, assignee filters, SLA signal, and create dialog.
+- `/desk/tickets/[id]`: ticket detail with overview, requester, queue, SLA, approvals, comments, escalations placeholder, linked incident, and optional AI classification.
+- `/desk/queues`: queue list with ticket count and owner/team placeholder plus create dialog.
+- `/desk/slas`: SLA target list with response/resolution times plus create dialog.
+- `/desk/approvals`: workspace approval queue aggregated from tickets with approve/reject placeholders.
+- `/desk/incidents`: Desk-linked incident list.
+- `/desk/change-requests`: operational change request list with create dialog.
 
-Desk UI uses the selected workspace and selected project where available. Queue creation, SLA editing, approvals workflows, and change request detail screens are deferred.
+Desk UI uses selected organization, workspace, and project context where available. SLA editing, full approvals workflows, change request detail screens, escalation timelines, and persisted queue ownership are deferred.
 
 ## Pulse UI
 
