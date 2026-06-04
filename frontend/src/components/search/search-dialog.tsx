@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Lightbulb, MessageSquare, Search, X } from "lucide-react";
+import { Clock, FileText, Lightbulb, MessageSquare, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { EmptyModuleState, ErrorState, TableSkeleton } from "@/components/layout/ui-states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { searchApi } from "@/services/api/search-api";
@@ -20,6 +21,8 @@ const sourceLabels: Record<string, string> = {
   release: "Releases",
   discussion_thread: "Discussions"
 };
+
+const recentSearches = ["release risk", "open incidents", "customer feedback", "architecture docs"];
 
 function sourceIcon(sourceType: string) {
   if (sourceType === "docs_page") return FileText;
@@ -81,24 +84,27 @@ export function SearchDialog() {
         </div>
         <div className="max-h-80 overflow-y-auto p-2">
           {!selectedWorkspaceId ? (
-            <div className="rounded-md p-4 text-sm text-muted-foreground">Select a workspace to search Asthra memory.</div>
+            <EmptyModuleState title="Select a workspace" description="Workspace search is scoped to memory for the selected workspace." />
           ) : debouncedQuery.length <= 1 ? (
-            <div className="rounded-md p-4 text-sm text-muted-foreground">Type at least two characters to search this workspace.</div>
+            <div className="space-y-3 p-2">
+              <div className="rounded-md p-2 text-sm text-muted-foreground">Type at least two characters to search this workspace.</div>
+              <div>
+                <div className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase text-muted-foreground"><Clock className="h-3.5 w-3.5" />Recent searches</div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {recentSearches.map((item) => (
+                    <button key={item} type="button" className="rounded-md border px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => setQuery(item)}>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           ) : searchQuery.isLoading ? (
-            <div className="space-y-2 p-2">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="h-14 rounded-md bg-muted" />
-              ))}
-            </div>
+            <TableSkeleton rows={4} />
           ) : searchQuery.error ? (
-            <div className="space-y-3 rounded-md p-4 text-sm text-destructive">
-              <div>Workspace search failed.</div>
-              <Button size="sm" variant="outline" onClick={() => searchQuery.refetch()}>
-                Retry
-              </Button>
-            </div>
+            <ErrorState title="Workspace search failed" description="Check the API Gateway and memory-service, then retry." onRetry={() => searchQuery.refetch()} />
           ) : Object.keys(groupedResults).length === 0 ? (
-            <div className="rounded-md p-4 text-sm text-muted-foreground">No results found.</div>
+            <EmptyModuleState title="No results found" description="Try a broader term or check that memory indexing has data for this workspace." />
           ) : (
             Object.entries(groupedResults).map(([sourceType, results]) => {
               const Icon = sourceIcon(sourceType);
@@ -127,7 +133,8 @@ export function SearchDialog() {
             })
           )}
         </div>
-        <div className="flex justify-end border-t p-3">
+        <div className="flex items-center justify-between border-t p-3">
+          <div className="text-xs text-muted-foreground">Use Tab to move through results. Press Esc or Close to dismiss.</div>
           <Button variant="ghost" onClick={() => setSearchOpen(false)}>
             Close
           </Button>

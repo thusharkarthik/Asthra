@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
@@ -35,6 +36,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const logout = useAuthStore((state) => state.logout);
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const isPublicPath = publicPaths.has(pathname);
 
   useEffect(() => {
@@ -119,12 +121,24 @@ export function AsthraShell({ children }: { children: ReactNode }) {
             <div className="truncate font-medium text-foreground">{currentUser?.full_name ?? currentUser?.email}</div>
             <div className="truncate">{currentUser?.email}</div>
           </div>
-          <Button size="icon" variant="ghost" aria-label="User menu" title={currentUser?.email ?? "User"}>
-            <UserCircle className="h-5 w-5" />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label="Log out" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className="relative">
+            <Button size="icon" variant="ghost" aria-label="User menu" title={currentUser?.email ?? "User"} onClick={() => setUserMenuOpen((value) => !value)}>
+              <UserCircle className="h-5 w-5" />
+            </Button>
+            {userMenuOpen ? (
+              <div className="absolute right-0 mt-2 w-56 rounded-md border bg-card p-2 shadow-lg">
+                <div className="border-b px-2 pb-2 text-xs text-muted-foreground">
+                  <div className="truncate font-medium text-foreground">{currentUser?.full_name ?? "Asthra user"}</div>
+                  <div className="truncate">{currentUser?.email}</div>
+                </div>
+                <Link className="mt-2 block rounded-md px-2 py-2 text-sm hover:bg-muted" href="/settings/profile" onClick={() => setUserMenuOpen(false)}>Profile</Link>
+                <Link className="block rounded-md px-2 py-2 text-sm hover:bg-muted" href="/settings/preferences" onClick={() => setUserMenuOpen(false)}>Preferences</Link>
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-destructive hover:bg-muted" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" /> Log out
+                </button>
+              </div>
+            ) : null}
+          </div>
         </header>
         <div className="flex min-h-0 flex-1">
           <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>

@@ -22,6 +22,14 @@ const recentActivity = [
   "Module dashboards are connected through API Gateway"
 ];
 
+const recentAssistantConversations = ["Sprint planning questions", "Release risk summary", "Workspace onboarding notes"];
+const recentSearchResults = ["Architecture diagram", "API gateway routing", "Open incident timeline"];
+const moduleStatus = [
+  { title: "Work modules", status: "Ready for demo", description: "Flow, Discover, Docs, Collab" },
+  { title: "Operations modules", status: "Ready for demo", description: "Desk, Pulse, Automation" },
+  { title: "Platform modules", status: "Shell-ready", description: "Connect, Guard, Insights, Media" }
+];
+
 const continueItems = [
   { title: "Review Flow work items", href: "/flow/work-items" },
   { title: "Open Docs pages", href: "/docs/pages" },
@@ -114,6 +122,24 @@ export default function HomePage() {
           ) : (
             <EmptyModuleState title="No workspace selected" description="Select a workspace to enable assistant context and workspace search." />
           )}
+        </DashboardCard>
+      </section>
+      <section className="mt-4 grid gap-4 lg:grid-cols-3">
+        <DashboardCard title="Recent AI Conversations">
+          <ul className="space-y-2 text-sm">{recentAssistantConversations.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
+        </DashboardCard>
+        <DashboardCard title="Recent Search Results">
+          <ul className="space-y-2 text-sm">{recentSearchResults.map((item) => <li key={item} className="rounded-md bg-muted px-3 py-2">{item}</li>)}</ul>
+        </DashboardCard>
+        <DashboardCard title="Module Status">
+          <div className="space-y-2">
+            {moduleStatus.map((item) => (
+              <div key={item.title} className="rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2 text-sm"><span className="font-medium">{item.title}</span><span className="text-xs text-primary">{item.status}</span></div>
+                <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+              </div>
+            ))}
+          </div>
         </DashboardCard>
       </section>
     </>
