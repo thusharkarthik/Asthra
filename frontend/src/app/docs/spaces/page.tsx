@@ -1,67 +1,64 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { CreateSpaceDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
+import { DocsSetupState } from "@/components/docs/docs-setup-state";
+import { DocsSubnav } from "@/components/docs/docs-subnav";
+import { docsDate, pageCountForSpace } from "@/components/docs/docs-utils";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { CreateDialog } from "@/components/modules/create-dialog";
 import { EntityTable, EntityTableRow } from "@/components/modules/entity-table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function SpacesPage() {
-  const queryClient = useQueryClient();
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const [isCreateOpen, setCreateOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken), retry: 1 });
-  const createMutation = useMutation({
-    mutationFn: () => docsApi.createSpace(accessToken ?? "", { workspace_id: selectedWorkspaceId ?? 0, name, description, created_by_id: currentUser?.id ?? 1 }),
-    onSuccess: () => {
-      setCreateOpen(false);
-      setName("");
-      setDescription("");
-      queryClient.invalidateQueries({ queryKey: ["docs", "spaces"] });
-    }
-  });
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!name.trim() || !selectedWorkspaceId) return;
-    createMutation.mutate();
-  };
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
+  const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId), retry: 1 });
+  const pagesQuery = useQuery({ queryKey: ["docs", "pages"], queryFn: () => docsApi.listPages(accessToken ?? "", { limit: 100 }), enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId), retry: 1 });
+  const spaces = spacesQuery.data ?? [];
+  const pages = pagesQuery.data ?? [];
 
   return (
     <>
-      <PageHeader title="Spaces" description="Organize documentation by workspace spaces." />
-      {!selectedWorkspaceId ? <EmptyState title="Select a workspace to create spaces" /> : (
+      <PageHeader
+        title="Spaces"
+        description="Spaces group pages by team, domain, product, or operating area."
+        actions={<DocsHeaderActions onCreateSpace={selectedWorkspaceId ? () => setCreateOpen(true) : undefined} />}
+      />
+      <DocsSubnav />
+      {!selectedWorkspaceId ? <DocsSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={false} /> : spacesQuery.isLoading ? <LoadingState /> : (
         <div className="space-y-4">
-          <div className="flex justify-end"><Button onClick={() => setCreateOpen(true)}>Create space</Button></div>
-          {(spacesQuery.data ?? []).length === 0 ? <EmptyState title="No spaces yet" /> : (
-            <EntityTable columns={["Name", "Description", "Workspace"]}>
-              {(spacesQuery.data ?? []).map((space) => (
-                <EntityTableRow key={space.id} columns={3}>
-                  <span className="font-medium">{space.name}</span>
+          {spaces.length === 0 ? (
+            <DocsSetupState hasOrganization hasWorkspace hasSpaces={false} mode="spaces" />
+          ) : spacesQuery.error ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              Unable to load spaces. <Button size="sm" variant="outline" onClick={() => spacesQuery.refetch()}>Retry</Button>
+            </div>
+          ) : (
+            <EntityTable columns={["Space Name", "Description", "Page Count", "Last Updated"]}>
+              {spaces.map((space) => (
+                <EntityTableRow key={space.id} columns={4}>
+                  <Link className="font-medium text-primary hover:underline" href={`/docs/spaces/${space.id}`}>{space.name}</Link>
                   <span>{space.description ?? "-"}</span>
-                  <span>{space.workspace_id}</span>
+                  <span>{pageCountForSpace(space.id, pages)}</span>
+                  <span className="text-muted-foreground">{docsDate(space.updated_at ?? space.created_at)}</span>
                 </EntityTableRow>
               ))}
             </EntityTable>
           )}
+          {spaces.length === 0 ? <EmptyState title="Examples: Engineering, Architecture, Product, Operations" /> : null}
         </div>
       )}
-      <CreateDialog title="Create space" open={isCreateOpen} onOpenChange={setCreateOpen}>
-        <form className="space-y-3" onSubmit={handleSubmit}>
-          <Input aria-label="Space name" placeholder="Space name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Input aria-label="Space description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
-          <Button disabled={createMutation.isPending || !name.trim()}>{createMutation.isPending ? "Creating..." : "Create"}</Button>
-        </form>
-      </CreateDialog>
+      <CreateSpaceDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
     </>
   );
 }
