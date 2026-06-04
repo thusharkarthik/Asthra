@@ -1,9 +1,10 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AsthraShell } from "@/layouts/asthra-shell";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const navigationMock = (
@@ -29,6 +30,7 @@ describe("AsthraShell", () => {
       selectedWorkspaceId: 2,
       selectedProjectId: 3
     });
+    useUIStore.setState({ isAssistantOpen: true, isSearchOpen: false, isCommandPaletteOpen: false });
   });
 
   it("renders shell regions and child content", () => {
@@ -58,5 +60,20 @@ describe("AsthraShell", () => {
     renderShell(<div>Protected content</div>);
 
     expect(navigationMock.replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("opens the command palette with Ctrl+K", () => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
+
+    renderShell(<div>Test content</div>);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+
+    expect(screen.getByRole("dialog", { name: /command palette/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /go to flow/i })).toBeInTheDocument();
   });
 });

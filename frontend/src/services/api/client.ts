@@ -1,16 +1,8 @@
 import { apiConfig } from "@/services/api/config";
 import { generateRequestId } from "@/lib/utils";
+import { ApiError, friendlyNetworkError, parseApiErrorPayload } from "@/services/api/errors";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public payload?: unknown
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
+export { ApiError } from "@/services/api/errors";
 
 export type ApiRequestOptions = RequestInit & {
   requestId?: string;
@@ -28,11 +20,16 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     headers.set("Authorization", `Bearer ${options.authToken}`);
   }
 
-  const response = await fetch(`${apiConfig.gatewayUrl}${path}`, {
-    ...options,
-    headers,
-    body: options.json !== undefined ? JSON.stringify(options.json) : options.body
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiConfig.gatewayUrl}${path}`, {
+      ...options,
+      headers,
+      body: options.json !== undefined ? JSON.stringify(options.json) : options.body
+    });
+  } catch (error) {
+    throw friendlyNetworkError(error);
+  }
 
   if (!response.ok) {
     let payload: unknown;
@@ -41,11 +38,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     } catch {
       payload = undefined;
     }
-    const detail =
-      typeof payload === "object" && payload !== null && "detail" in payload
-        ? String((payload as { detail: unknown }).detail)
-        : `API request failed: ${response.status}`;
-    throw new ApiError(detail, response.status, payload);
+    const parsed = parseApiErrorPayload(payload, response.status);
+    throw new ApiError(parsed.message, response.status, payload, parsed.code);
   }
 
   if (response.status === 204) {

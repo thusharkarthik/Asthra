@@ -19,7 +19,7 @@ describe("HomePage", () => {
     });
   });
 
-  it("renders real context count cards and dashboard placeholders", () => {
+  it("renders real context count cards and platform dashboard sections", () => {
     render(
       <QueryProvider>
         <HomePage />
@@ -30,8 +30,9 @@ describe("HomePage", () => {
     expect(screen.getByText("Organizations")).toBeInTheDocument();
     expect(screen.getByText("Workspaces")).toBeInTheDocument();
     expect(screen.getByText("Projects")).toBeInTheDocument();
-    expect(screen.getByText("Recent Work")).toBeInTheDocument();
-    expect(screen.getByText("Recent Docs")).toBeInTheDocument();
-    expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
+    expect(screen.getByText("Module Quick Launch")).toBeInTheDocument();
+    expect(screen.getByText("Continue where you left off")).toBeInTheDocument();
+    expect(screen.getByText("Recent Activity")).toBeInTheDocument();
+    expect(screen.getByText("System Status")).toBeInTheDocument();
   });
 });
