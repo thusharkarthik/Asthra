@@ -76,7 +76,11 @@ export type FavoriteItem = EntityReference & {
 export type WorkspaceDashboardSummary = {
   work: { label: string; value: string | number; href: string };
   docs: { label: string; value: string | number; href: string };
-  incidents: { label: string; value: string | number; href: string };
-  engineering: { label: string; value: string | number; href: string };
+  discovery?: { label: string; value: string | number; href: string };
+  desk?: { label: string; value: string | number; href: string };
+  pulse?: { label: string; value: string | number; href: string };
+  dev?: { label: string; value: string | number; href: string };
+  incidents?: { label: string; value: string | number; href: string };
+  engineering?: { label: string; value: string | number; href: string };
   ai: { label: string; value: string | number; href: string };
 };

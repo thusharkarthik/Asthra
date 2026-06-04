@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { getWorkspaceActivity, getWorkspaceDashboardSummary } from "@/services/platform/activity-service";
 import { useFavoritesStore } from "@/stores/favorites-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -61,9 +62,10 @@ const pinnedModules = [
 
 export default function HomePage() {
   const { isLoading, error } = useWorkspaceContextQueries();
+  const accessToken = useAuthStore((state) => state.accessToken);
   const { organizations, workspaces, projects } = useWorkspaceStore();
-  const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: getWorkspaceActivity, retry: 0 });
-  const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: getWorkspaceDashboardSummary, retry: 0 });
+  const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: () => getWorkspaceActivity(accessToken), retry: 0 });
+  const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: () => getWorkspaceDashboardSummary(accessToken), retry: 0 });
   const favorites = useFavoritesStore((state) => state.favorites);
   const viewed = useRecentItemsStore((state) => state.viewed);
   const modified = useRecentItemsStore((state) => state.modified);

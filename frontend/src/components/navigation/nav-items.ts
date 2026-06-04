@@ -15,6 +15,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   Wrench
 } from "lucide-react";
 import type { NavItem, NavSection } from "@/types/navigation";
@@ -25,7 +26,9 @@ export const navSections: NavSection[] = [
     items: [
       { label: "Home", href: "/", icon: Home },
       { label: "Search", action: "search", icon: Search },
-      { label: "Assistant", action: "assistant", icon: Sparkles }
+      { label: "Assistant", action: "assistant", icon: Sparkles },
+      { label: "Favorites", href: "/favorites", icon: Star },
+      { label: "Platform Health", href: "/platform/health", icon: ShieldCheck }
     ]
   },
   {

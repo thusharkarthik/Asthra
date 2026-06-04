@@ -33,7 +33,9 @@ src/
 ## Routes
 
 - `/`
+- `/favorites`
 - `/login`
+- `/platform/health`
 - `/register`
 - `/flow`
 - `/flow/work-items`
@@ -106,7 +108,7 @@ Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insi
 
 Sidebar navigation is grouped into platform areas:
 
-- Platform: Home, Search, Assistant
+- Platform: Home, Search, Assistant, Favorites, Platform Health
 - Work: Flow, Discover, Docs, Collab
 - Operations: Desk, Pulse, Automation
 - Engineering: Dev, Connect
@@ -257,6 +259,7 @@ Typed API modules:
 - `guardApi`: security policies, access reviews, compliance checks, audit events, retention policies, risk findings, and security exceptions
 - `insightsApi`: dashboards, widgets, metric definitions, metric snapshots, reports, report runs, insight events, and usage metrics
 - `mediaApi`: media assets, collections, transcripts, annotations, processing jobs, and tags
+- `platformApi`: activity, notifications, recent items, favorites, relationships, dashboard summary, and platform health
 
 Current core-service gateway paths:
 
