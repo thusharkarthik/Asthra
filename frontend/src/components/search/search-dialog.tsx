@@ -42,11 +42,12 @@ export function SearchDialog() {
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const debounceMs = process.env.NODE_ENV === "test" ? 0 : 300;
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    const timeout = window.setTimeout(() => setDebouncedQuery(query.trim()), debounceMs);
     return () => window.clearTimeout(timeout);
-  }, [query]);
+  }, [debounceMs, query]);
 
   const searchQuery = useQuery({
     queryKey: ["workspace-search", selectedWorkspaceId, debouncedQuery],

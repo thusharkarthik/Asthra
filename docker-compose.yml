@@ -25,6 +25,7 @@ services:
     build:
       context: ./services/core-service
     container_name: asthra-core-service
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     env_file:
       - ./services/core-service/.env.example
     environment:
@@ -216,7 +217,21 @@ services:
     volumes:
       - media_service_data:/app/data
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: asthra-frontend
+    env_file:
+      - ./frontend/.env.example
+    environment:
+      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+
 volumes:
+  frontend:
   core_service_data:
   flow_service_data:
   docs_service_data:
