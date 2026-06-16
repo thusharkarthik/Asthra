@@ -14,6 +14,11 @@ class CommentService:
 
     def create(self, work_item_id: int, comment_create: WorkItemCommentCreate) -> WorkItemComment:
         work_item = self._ensure_work_item(work_item_id)
+        if not comment_create.body or not comment_create.body.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Comment content is required.",
+            )
         comment = self.comment_repository.create(work_item_id, comment_create)
         self.activity_service.log_activity(
             action="comment.added",

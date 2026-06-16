@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
@@ -13,13 +13,17 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function BoardsPage() {
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const addToast = useToastStore((state) => state.addToast);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -35,6 +39,15 @@ export default function BoardsPage() {
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
+  });
+
+  const moveMutation = useMutation({
+    mutationFn: ({ id, statusName }: { id: number; statusName: string }) => flowApi.updateWorkItem(accessToken ?? "", id, { status_name: statusName }),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Work item moved" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Move failed", message: error instanceof Error ? error.message : "Unable to move work item." })
   });
 
   return (
@@ -59,13 +72,23 @@ export default function BoardsPage() {
                     </div>
                     <div className="space-y-2 p-3">
                       {columnItems.map((item) => (
-                        <Link key={item.id} href={`/flow/work-items/${item.id}`} className="block rounded-md border bg-background p-3 text-sm hover:bg-muted">
-                          <div className="font-medium">{item.title}</div>
+                        <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
+                          <Link href={`/flow/work-items/${item.id}`} className="font-medium text-primary hover:underline">{item.title}</Link>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <StatusBadge value={item.status_id} />
                             <PriorityBadge value={item.priority_id} />
                           </div>
-                        </Link>
+                          <label className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                            Move to
+                            <Select
+                              aria-label={`Move ${item.title}`}
+                              value={FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === item.status_id)?.name ?? column.name}
+                              onChange={(event) => moveMutation.mutate({ id: item.id, statusName: event.target.value })}
+                            >
+                              {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                            </Select>
+                          </label>
+                        </div>
                       ))}
                       {columnItems.length === 0 ? <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No items in {column.label}.</div> : null}
                     </div>

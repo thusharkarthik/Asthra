@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { Board, BoardColumn, WorkItem, WorkItemComment, WorkItemCreate, WorkItemFilters, WorkItemUpdate } from "@/types/flow";
+import type { Board, BoardColumn, WorkItem, WorkItemComment, WorkItemCreate, WorkItemFilters, WorkItemOperationalUpdate } from "@/types/flow";
 
 const FLOW_PREFIX = "/api/flow/api/v1";
 
@@ -24,8 +24,11 @@ export const flowApi = {
   getWorkItem(accessToken: string, id: string | number) {
     return apiRequest<WorkItem>(`${FLOW_PREFIX}/work-items/${id}`, { method: "GET", authToken: accessToken });
   },
-  updateWorkItem(accessToken: string, id: string | number, payload: WorkItemUpdate) {
+  updateWorkItem(accessToken: string, id: string | number, payload: WorkItemOperationalUpdate) {
     return apiRequest<WorkItem>(`${FLOW_PREFIX}/work-items/${id}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteWorkItem(accessToken: string, id: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/work-items/${id}`, { method: "DELETE", authToken: accessToken });
   },
   listBoards(accessToken: string) {
     return apiRequest<Board[]>(`${FLOW_PREFIX}/boards`, { method: "GET", authToken: accessToken });

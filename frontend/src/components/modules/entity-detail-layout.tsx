@@ -63,7 +63,15 @@ export function EntityLinksPanel({ labels }: { labels: string[] }) {
   );
 }
 
-export function EntityDangerZone({ label = "Archive placeholder", description = "Destructive actions are shown here once backend support and confirmation flows are ready." }: { label?: string; description?: string }) {
+export function EntityDangerZone({
+  label = "Archive placeholder",
+  description = "Destructive actions are shown here once backend support and confirmation flows are ready.",
+  action
+}: {
+  label?: string;
+  description?: string;
+  action?: ReactNode;
+}) {
   return (
     <Panel title="Danger Zone" className="border-destructive/30">
       <div className="flex items-start gap-3 text-sm">
@@ -71,9 +79,7 @@ export function EntityDangerZone({ label = "Archive placeholder", description = 
         <div className="min-w-0 flex-1">
           <p className="font-medium">{label}</p>
           <p className="mt-1 text-muted-foreground">{description}</p>
-          <Button className="mt-3" size="sm" variant="outline" disabled>
-            Delete / Archive
-          </Button>
+          <div className="mt-3">{action ?? <Button size="sm" variant="outline" disabled>Delete / Archive</Button>}</div>
         </div>
       </div>
     </Panel>

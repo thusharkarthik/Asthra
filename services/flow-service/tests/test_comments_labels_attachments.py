@@ -40,3 +40,17 @@ def test_comments_labels_and_attachments(db):
     )
     assert attachment.file_name == "spec.pdf"
     assert len(attachment_service.list_for_work_item(work_item.id)) == 1
+
+
+def test_create_comment_accepts_ui_payload_without_author(db):
+    work_item = create_work_item(db, title="Comment target")
+
+    comment = CommentService(db).create(
+        work_item.id,
+        WorkItemCommentCreate(content="Added from UI"),
+    )
+
+    assert comment.body == "Added from UI"
+    assert comment.content == "Added from UI"
+    assert comment.author_user_id == 0
+    assert comment.user_id == 0

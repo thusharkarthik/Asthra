@@ -39,6 +39,7 @@ services:
     build:
       context: ./services/flow-service
     container_name: asthra-flow-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/flow-service/.env.example
     environment:
@@ -46,6 +47,8 @@ services:
     ports:
       - "8001:8000"
     volumes:
+      - ./services/flow-service/app:/app/app
+      - ./services/flow-service/scripts:/app/scripts
       - flow_service_data:/app/data
 
   docs-service:

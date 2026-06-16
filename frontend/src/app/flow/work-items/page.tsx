@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
@@ -14,16 +14,18 @@ import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { EntityTable, EntityTableRow } from "@/components/modules/entity-table";
 import { PriorityBadge } from "@/components/modules/priority-badge";
-import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function WorkItemsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -45,6 +47,15 @@ export default function WorkItemsPage() {
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, statusName }: { id: number; statusName: string }) => flowApi.updateWorkItem(accessToken ?? "", id, { status_name: statusName }),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Status updated" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Status update failed", message: error instanceof Error ? error.message : "Unable to update status." })
   });
 
   const filteredItems = useMemo(() => {
@@ -100,9 +111,15 @@ export default function WorkItemsPage() {
               {filteredItems.map((item) => (
                 <EntityTableRow key={item.id} columns={5}>
                   <Link className="min-w-0 font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
-                  <StatusBadge value={item.status_id} />
+                  <Select
+                    aria-label={`Status for ${item.title}`}
+                    value={FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === item.status_id)?.name ?? "todo"}
+                    onChange={(event) => statusMutation.mutate({ id: item.id, statusName: event.target.value })}
+                  >
+                    {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                  </Select>
                   <PriorityBadge value={item.priority_id} />
-                  <span>{item.assignee_id ?? "Unassigned"}</span>
+                  <span>{item.assignee_id ? `User ${item.assignee_id}` : "Unassigned"}</span>
                   <span className="text-muted-foreground">{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : "-"}</span>
                 </EntityTableRow>
               ))}
