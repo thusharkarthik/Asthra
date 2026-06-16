@@ -29,7 +29,7 @@ class WorkItem(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     assignee_id: Mapped[int | None] = mapped_column(index=True)
-    reporter_id: Mapped[int] = mapped_column(index=True, nullable=False)
+    reporter_id: Mapped[int | None] = mapped_column(index=True, nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

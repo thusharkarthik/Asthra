@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,17 +49,17 @@ class WorkItemPriorityRead(TimestampedRead):
 
 class WorkItemCreate(BaseModel):
     project_id: int
-    type_id: int
-    status_id: int
-    reporter_id: int
+    type_id: Optional[int] = None
+    status_id: Optional[int] = None
+    priority_id: Optional[int] = None
+    reporter_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
-    description: str | None = None
-    parent_id: int | None = None
-    priority_id: int | None = None
-    board_id: int | None = None
-    board_column_id: int | None = None
-    assignee_id: int | None = None
-    due_date: datetime | None = None
+    description: str | None = Field(default=None)
+    parent_id: int | None = Field(default=None)
+    board_id: int | None = Field(default=None)
+    board_column_id: int | None = Field(default=None)
+    assignee_id: Optional[int] = None
+    due_date: datetime | None = Field(default=None)
 
 
 class WorkItemUpdate(BaseModel):
@@ -87,7 +88,7 @@ class WorkItemRead(TimestampedRead):
     title: str
     description: str | None = None
     assignee_id: int | None = None
-    reporter_id: int
+    reporter_id: int | None = None
     due_date: datetime | None = None
     sort_order: int
     is_active: bool

@@ -105,6 +105,106 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Work item title")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Todo")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Medium")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assignee id")).toHaveAttribute("placeholder", "Assignee ID, optional");
+  });
+
+  it("creates work item with selected project and minimal stable payload", async () => {
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Create from frontend" } });
+    fireEvent.change(screen.getByLabelText("Work item description"), { target: { value: "Created through Flow UI" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Work Item" }).at(-1)!);
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items") && init?.method === "POST");
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(String(postCall?.[1]?.body));
+      expect(body).toEqual({
+        project_id: 3,
+        title: "Create from frontend",
+        description: "Created through Flow UI"
+      });
+      expect(body).not.toHaveProperty("type_id");
+      expect(body).not.toHaveProperty("status_id");
+      expect(body).not.toHaveProperty("priority_id");
+      expect(body).not.toHaveProperty("reporter_id");
+      expect(body).not.toHaveProperty("assignee_id");
+    });
+  });
+
+  it("blocks work item creation when no project is selected", async () => {
+    useWorkspaceStore.setState({
+      organizations: [{ id: 1, name: "Acme" }],
+      workspaces: [{ id: 2, organization_id: 1, name: "Workspace" }],
+      projects: [{ id: 3, workspace_id: 2, name: "Project" }],
+      selectedOrganizationId: 1,
+      selectedWorkspaceId: 2,
+      selectedProjectId: null
+    });
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Blocked item" } });
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form")!);
+
+    await waitFor(() => expect(screen.getByText("Select a project before creating a work item.")).toBeInTheDocument());
+    const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items") && init?.method === "POST");
+    expect(postCall).toBeUndefined();
+  });
+
+  it("shows backend work item create errors", async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/work-items") && init?.method === "POST") {
+        return new Response(JSON.stringify({ detail: "Work item status not found." }), { status: 404 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Create error" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Work Item" }).at(-1)!);
+
+    await waitFor(() => expect(screen.getByText("Work item status not found.")).toBeInTheDocument());
+  });
+
+  it("shows backend 422 validation field details", async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/work-items") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: "validation_error",
+              message: "Request validation failed.",
+              details: [
+                { loc: ["body", "project_id"], msg: "Field required", type: "missing" },
+                { loc: ["body", "title"], msg: "String should have at least 1 character", type: "string_too_short" }
+              ]
+            }
+          }),
+          { status: 422 }
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Create error" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Work Item" }).at(-1)!);
+
+    await waitFor(() => expect(screen.getByText(/project_id: Field required/)).toBeInTheDocument());
+    expect(screen.getByText(/title: String should have at least 1 character/)).toBeInTheDocument();
   });
 
   it("renders work item detail with mock data", async () => {

@@ -68,6 +68,30 @@ class WorkItemRepository:
     def priority_exists(self, priority_id: int) -> bool:
         return self.db.get(WorkItemPriority, priority_id) is not None
 
+    def get_or_create_default_type(self) -> WorkItemType:
+        work_item_type = self.db.scalar(select(WorkItemType).where(WorkItemType.name == "task"))
+        if work_item_type is None:
+            work_item_type = WorkItemType(name="task", description="Default task work item", icon="check-square")
+            self.db.add(work_item_type)
+            self.db.flush()
+        return work_item_type
+
+    def get_or_create_default_status(self) -> WorkItemStatus:
+        status = self.db.scalar(select(WorkItemStatus).where(WorkItemStatus.name == "todo"))
+        if status is None:
+            status = WorkItemStatus(name="todo", description="Default todo status", category="todo", sort_order=0)
+            self.db.add(status)
+            self.db.flush()
+        return status
+
+    def get_or_create_default_priority(self) -> WorkItemPriority:
+        priority = self.db.scalar(select(WorkItemPriority).where(WorkItemPriority.name == "medium"))
+        if priority is None:
+            priority = WorkItemPriority(name="medium", description="Default medium priority", level=2)
+            self.db.add(priority)
+            self.db.flush()
+        return priority
+
     def get_board(self, board_id: int) -> Board | None:
         return self.db.get(Board, board_id)
 

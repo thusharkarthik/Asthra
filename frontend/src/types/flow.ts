@@ -17,11 +17,12 @@ export type WorkItemCreate = {
   project_id: number;
   title: string;
   description?: string | null;
-  type_id: number;
-  status_id: number;
-  priority_id: number;
+  type_id?: number | null;
+  status_id?: number | null;
+  priority_id?: number | null;
   assignee_id?: number | null;
-  reporter_id: number;
+  reporter_id?: number | null;
+  due_date?: string | null;
 };
 
 export type WorkItemUpdate = Partial<Omit<WorkItemCreate, "project_id" | "reporter_id">>;

@@ -121,17 +121,11 @@ Request:
 {
   "project_id": 1,
   "title": "Design task model",
-  "description": "Draft the first task model for Flow",
-  "type_id": 1,
-  "status_id": 1,
-  "priority_id": 1,
-  "assignee_id": 2,
-  "reporter_id": 1,
-  "due_date": null
+  "description": "Draft the first task model for Flow"
 }
 ```
 
-`project_id`, `title`, `type_id`, `status_id`, and `reporter_id` are required. `type_id`, `status_id`, and `priority_id` are validated against Flow lookup tables.
+Only `project_id` and `title` are required. If `type_id`, `status_id`, or `priority_id` are omitted, Flow creates or reuses the MVP defaults `task`, `todo`, and `medium`. If `reporter_id` is omitted, Flow uses a temporary MVP reporter fallback until Core auth context is wired into this service.
 
 ### List Work Items
 

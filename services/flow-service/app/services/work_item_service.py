@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,8 @@ from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
 
+logger = logging.getLogger(__name__)
+
 
 class WorkItemService:
     def __init__(self, db: Session) -> None:
@@ -15,7 +19,21 @@ class WorkItemService:
         self.activity_service = ActivityService(db)
 
     def create(self, work_item_create: WorkItemCreate) -> WorkItem:
-        self._validate_required_ids(work_item_create.project_id, work_item_create.reporter_id)
+        logger.info(
+            "flow.work_item.create.received",
+            extra={"payload": work_item_create.model_dump()},
+        )
+        work_item_create = self._apply_create_defaults(work_item_create)
+        logger.info(
+            "flow.work_item.create.defaults_resolved",
+            extra={
+                "type_id": work_item_create.type_id,
+                "status_id": work_item_create.status_id,
+                "priority_id": work_item_create.priority_id,
+                "reporter_id": work_item_create.reporter_id,
+            },
+        )
+        self._validate_required_ids(work_item_create.project_id)
         self._validate_references(
             type_id=work_item_create.type_id,
             status_id=work_item_create.status_id,
@@ -155,16 +173,25 @@ class WorkItemService:
             },
         )
 
-    def _validate_required_ids(self, project_id: int, reporter_id: int) -> None:
+    def _apply_create_defaults(self, work_item_create: WorkItemCreate) -> WorkItemCreate:
+        update_data: dict[str, int] = {}
+        if work_item_create.type_id is None:
+            update_data["type_id"] = self.work_item_repository.get_or_create_default_type().id
+        if work_item_create.status_id is None:
+            update_data["status_id"] = self.work_item_repository.get_or_create_default_status().id
+        if work_item_create.priority_id is None:
+            update_data["priority_id"] = self.work_item_repository.get_or_create_default_priority().id
+        if work_item_create.reporter_id is None:
+            # MVP fallback for unauthenticated UI creates and existing SQLite volumes
+            # that were created before reporter_id became nullable.
+            update_data["reporter_id"] = 0
+        return work_item_create.model_copy(update=update_data)
+
+    def _validate_required_ids(self, project_id: int) -> None:
         if project_id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="project_id is required.",
-            )
-        if reporter_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="reporter_id is required.",
             )
 
     def _validate_references(

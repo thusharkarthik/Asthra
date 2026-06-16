@@ -4,8 +4,7 @@ import { FormEvent, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { EntityCreateDialog, FormActions, FormField } from "@/components/modules/entity-form";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS } from "@/components/flow/flow-utils";
+import { ApiError } from "@/services/api/client";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -19,53 +18,53 @@ type WorkItemCreateDialogProps = {
 export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialogProps) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [statusId, setStatusId] = useState("1");
-  const [priorityId, setPriorityId] = useState("2");
   const [assigneeId, setAssigneeId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      flowApi.createWorkItem(accessToken ?? "", {
+    mutationFn: () => {
+      const payload = {
         project_id: selectedProjectId ?? 0,
-        title,
-        description,
-        type_id: 1,
-        status_id: Number(statusId),
-        priority_id: Number(priorityId),
-        assignee_id: assigneeId ? Number(assigneeId) : null,
-        reporter_id: currentUser?.id ?? 1
-      }),
+        title: title.trim(),
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(assigneeId.trim() ? { assignee_id: Number(assigneeId) } : {})
+      };
+      return flowApi.createWorkItem(accessToken ?? "", payload);
+    },
     onSuccess: () => {
       setTitle("");
       setDescription("");
-      setStatusId("1");
-      setPriorityId("2");
       setAssigneeId("");
+      setFormError(null);
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["flow"] });
       addToast({ type: "success", title: "Work item created", message: "Flow was updated with the new work item." });
     },
-    onError: () => {
-      addToast({ type: "error", title: "Work item was not created", message: "Check the required fields and try again." });
+    onError: (error) => {
+      const message = error instanceof ApiError ? error.message : error instanceof Error ? error.message : "Check the required fields and try again.";
+      setFormError(message);
+      addToast({ type: "error", title: "Work item was not created", message });
     }
   });
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!title.trim() || !selectedProjectId) {
-      addToast({ type: "error", title: "Missing required fields", message: "Select a project and enter a work item title." });
+      const message = !selectedProjectId ? "Select a project before creating a work item." : "Enter a work item title.";
+      setFormError(message);
+      addToast({ type: "error", title: "Missing required fields", message });
       return;
     }
+    setFormError(null);
     createMutation.mutate();
   };
 
   return (
-    <EntityCreateDialog title="Create work item" open={open} onOpenChange={onOpenChange} onSubmit={handleCreate} error={createMutation.error ? "Unable to create work item. Check required fields and try again." : null}>
+    <EntityCreateDialog title="Create work item" open={open} onOpenChange={onOpenChange} onSubmit={handleCreate} error={formError}>
         <FormField label="Title" required error={!title.trim() ? "Required" : null}>
           <Input aria-label="Work item title" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
         </FormField>
@@ -73,22 +72,14 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
           <Input aria-label="Work item description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
         </FormField>
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Status">
-            <Select aria-label="Work item status" value={statusId} onChange={(event) => setStatusId(event.target.value)}>
-              {FLOW_STATUS_OPTIONS.map((status) => (
-                <option key={status.value} value={status.value}>{status.label}</option>
-              ))}
-            </Select>
+          <FormField label="Status" helpText="Default applied by Flow service.">
+            <Input aria-label="Work item status" value="Todo" readOnly />
           </FormField>
-          <FormField label="Priority">
-            <Select aria-label="Work item priority" value={priorityId} onChange={(event) => setPriorityId(event.target.value)}>
-              {FLOW_PRIORITY_OPTIONS.map((priority) => (
-                <option key={priority.value} value={priority.value}>{priority.label}</option>
-              ))}
-            </Select>
+          <FormField label="Priority" helpText="Default applied by Flow service.">
+            <Input aria-label="Work item priority" value="Medium" readOnly />
           </FormField>
         </div>
-        <FormField label="Assignee ID" helpText="Optional numeric user ID for manual testing.">
+        <FormField label="Assignee ID optional" helpText="Leave empty to create an unassigned work item. Member lookup is pending for Flow.">
           <Input
             aria-label="Assignee id"
             inputMode="numeric"
