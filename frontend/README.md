@@ -750,10 +750,15 @@ Implemented settings foundation:
 
 - `/settings`: settings overview
 - `/settings/profile`: signed-in user display
+- `/settings/account`: account identity display
 - `/settings/workspace`: selected organization/workspace/project context
 - `/settings/preferences`: theme toggle plus notification and compact-mode placeholders
+- `/settings/organizations`: organization creation and listing
+- `/settings/workspaces`: workspace creation and listing
+- `/settings/projects`: project creation and listing
+- `/settings/api-keys`: API key creation and listing
 
-Settings persistence beyond auth/workspace local storage is deferred.
+Settings now provides the internal alpha setup flow: create an organization, create a workspace under it, create a project under that workspace, then use the updated shell selectors to test module CRUD flows such as Flow work items. Advanced security, audit, integrations, and AI preference settings remain placeholders.
 
 ## State Stores
 
@@ -782,6 +787,7 @@ Settings persistence beyond auth/workspace local storage is deferred.
 - Insights uses tables and metric cards only; advanced charts and analytics composition are deferred.
 - Media uses metadata-only screens; upload, OCR, transcription, and multimodal processing are not implemented in the frontend yet.
 - Settings preference storage is mostly placeholder-only beyond the existing auth and workspace stores.
+- Settings organization/workspace/project creation is operational through core-service, while role assignment and member invitation flows are still limited.
 - Memory has a navigation placeholder but no dedicated frontend route yet.
 
 ## Next Frontend Work
@@ -803,6 +809,8 @@ Planned frontend passes:
 - `docs/frontend-beta-status.md`
 - `docs/component-map.md`
 - `docs/platform-beta-guide.md`
+- `docs/settings-operational-review.md`
+- `docs/admin-setup-workflow.md`
 
 ## Future Module Integration
 

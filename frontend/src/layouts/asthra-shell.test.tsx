@@ -48,6 +48,39 @@ describe("AsthraShell", () => {
     expect(screen.getByRole("navigation", { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByText("Test content")).toBeInTheDocument();
     expect(screen.getByLabelText(/ai assistant/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Hide assistant")).toBeInTheDocument();
+  });
+
+  it("toggles the assistant panel from the header", () => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
+
+    renderShell(<div>Test content</div>);
+    fireEvent.click(screen.getByLabelText("Hide assistant"));
+
+    expect(screen.queryByLabelText(/ai assistant/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Show assistant")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Show assistant"));
+    expect(screen.getByLabelText(/ai assistant/i)).toBeInTheDocument();
+  });
+
+  it("uses separate scroll containers for navigation and main content", () => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
+
+    const { container } = renderShell(<div>Test content</div>);
+
+    expect(container.querySelector("aside .overflow-y-auto")).toBeInTheDocument();
+    expect(container.querySelector("main.overflow-y-auto")).toBeInTheDocument();
   });
 
   it("redirects protected routes without auth", () => {

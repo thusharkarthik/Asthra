@@ -21,7 +21,12 @@ export type Organization = {
   id: number;
   name: string;
   description?: string | null;
+  slug?: string;
   owner_id?: number;
+  created_by_id?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type WorkspaceRecord = {
@@ -29,12 +34,96 @@ export type WorkspaceRecord = {
   organization_id: number;
   name: string;
   description?: string | null;
+  slug?: string;
+  created_by_id?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type ProjectRecord = {
   id: number;
   workspace_id: number;
+  team_id?: number | null;
   name: string;
+  key?: string;
   description?: string | null;
   status?: string;
+  owner_id?: number | null;
+  created_by_id?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type OrganizationMember = {
+  id: number;
+  organization_id: number;
+  user_id: number;
+  role_id?: number | null;
+  member_role: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type WorkspaceMember = {
+  id: number;
+  workspace_id: number;
+  user_id: number;
+  role_id?: number | null;
+  member_role: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TeamRecord = {
+  id: number;
+  workspace_id: number;
+  name: string;
+  description?: string | null;
+  slug?: string;
+  created_by_id?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleRecord = {
+  id: number;
+  organization_id?: number | null;
+  name: string;
+  key?: string;
+  description?: string | null;
+  scope: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PermissionRecord = {
+  id: number;
+  role_id?: number | null;
+  key?: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ApiKeyRecord = {
+  id: number;
+  user_id: number;
+  organization_id?: number | null;
+  workspace_id?: number | null;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  api_key?: string;
+  is_active?: boolean;
+  last_used_at?: string | null;
+  expires_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
