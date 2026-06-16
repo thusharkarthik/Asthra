@@ -19,6 +19,7 @@ Settings now behaves more like an administrator control center instead of a setu
 ## What Changed
 
 - Added `/settings/administration` as the admin control center.
+- Added lightweight Settings breadcrumbs, contextual back links, parent context headers, and hierarchy explanation without adding another sidebar or changing the existing Settings structure.
 - Added top-level `/settings/members`, `/settings/teams`, `/settings/roles`, and `/settings/permissions`.
 - Added member detail, team detail, role detail, and permission detail pages.
 - Replaced raw member IDs with profile-aware name, email, role, status, joined date, and actions.
@@ -27,8 +28,69 @@ Settings now behaves more like an administrator control center instead of a setu
 - Added project owner assignment from workspace members.
 - Added organization tabs: Overview, Members, Workspaces, Roles, Permissions.
 - Added workspace tabs: Overview, Members, Teams, Projects.
+- Added scoped organization/workspace headers on child admin pages.
 - Added role and permission search/filtering.
 - Added simple permission matrix display.
+
+## Settings Navigation Map
+
+Personal:
+
+- `/settings/profile`
+- `/settings/account`
+- `/settings/preferences`
+- `/settings/notifications`
+- `/settings/api-keys`
+
+Administration:
+
+- `/settings/administration`
+- `/settings/organizations`
+- `/settings/organizations/[id]`
+- `/settings/organizations/[id]/members`
+- `/settings/organizations/[id]/workspaces`
+- `/settings/organizations/[id]/roles`
+- `/settings/organizations/[id]/permissions`
+- `/settings/workspaces`
+- `/settings/workspaces/[id]`
+- `/settings/workspaces/[id]/members`
+- `/settings/workspaces/[id]/teams`
+- `/settings/workspaces/[id]/projects`
+- `/settings/projects`
+- `/settings/projects/[id]`
+- `/settings/members`
+- `/settings/members/[id]`
+- `/settings/teams`
+- `/settings/teams/[id]`
+- `/settings/roles`
+- `/settings/roles/[id]`
+- `/settings/permissions`
+- `/settings/permissions/[id]`
+
+Platform placeholders:
+
+- `/settings/security`
+- `/settings/audit-logs`
+- `/settings/integrations`
+- `/settings/ai-preferences`
+
+## Relationship Model
+
+Asthra administration follows a clear hierarchy:
+
+`Organization -> Workspaces -> Projects`
+
+`Workspace -> Members -> Teams -> Projects`
+
+Members can belong to an organization or workspace. Teams group workspace members. Projects belong to a workspace. Project owners should be selected from workspace members.
+
+## Navigation Clarity
+
+- Settings child pages now show breadcrumbs such as `Settings / Organizations / demo / Members`.
+- Child pages include explicit back links such as `Back to Settings`, `Back to Organization`, or `Back to Workspace`.
+- Organization-scoped pages keep the organization context visible.
+- Workspace-scoped pages keep both workspace and parent organization context visible where available.
+- Project detail explains that owners should be selected from workspace members when no owner is assigned.
 
 ## Backend Gaps
 
@@ -37,6 +99,8 @@ Settings now behaves more like an administrator control center instead of a setu
 - Permission edit uses detail navigation, but inline edit forms are still light.
 - Team lead is derived from creator until explicit lead assignment exists.
 - Project/team linking is documented on team detail but not fully surfaced.
+- Some profile details still depend on core-service user lookup; when only membership IDs are available, the UI shows the user ID as secondary text and explains that detailed lookup is pending.
+- Security, audit logs, integrations, and AI preferences are still placeholders.
 
 ## Manual Admin Testing Checklist
 
@@ -54,4 +118,3 @@ Settings now behaves more like an administrator control center instead of a setu
 12. Open the project detail and assign a project owner.
 13. Navigate organization tabs and workspace tabs.
 14. Confirm raw database IDs are not the primary admin experience.
-

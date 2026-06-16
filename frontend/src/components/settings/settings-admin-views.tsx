@@ -20,6 +20,7 @@ import {
   SettingsDangerZone,
   SettingsDataTable,
   SettingsEmptyState,
+  SettingsLayout,
   SettingsSectionHeader
 } from "@/components/settings/settings-components";
 
@@ -94,6 +95,15 @@ function displayUser(user?: CoreUser | null, fallbackId?: number) {
     email: user.email,
     status: user.is_active ? "Active" : "Inactive"
   };
+}
+
+function getOrganizationNameForWorkspace(
+  organizations: Array<{ id: number; name: string }>,
+  workspaces: Array<{ id: number; organization_id: number }>,
+  workspaceId: number
+) {
+  const workspace = workspaces.find((item) => item.id === workspaceId);
+  return organizations.find((item) => item.id === workspace?.organization_id)?.name ?? "Unknown organization";
 }
 
 function useUserProfiles(userIds: number[]) {
@@ -176,11 +186,15 @@ export function SettingsHomeView() {
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
     { title: "Workspaces", value: workspaces.length, href: "/settings/workspaces" },
     { title: "Projects", value: projects.length, href: "/settings/projects" },
+    { title: "Members", value: "Manage", href: "/settings/members" },
+    { title: "Teams", value: "Manage", href: "/settings/teams" },
+    { title: "Roles", value: "Manage", href: "/settings/roles" },
+    { title: "Permissions", value: "Manage", href: "/settings/permissions" },
     { title: "API Keys", value: "Manage", href: "/settings/api-keys" }
   ];
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings" }]} backHref="/" backLabel="Back to Home">
       <SettingsSectionHeader
         title="Settings"
         description="Admin center for account preferences, organizations, workspaces, projects, members, roles, and platform setup."
@@ -199,6 +213,25 @@ export function SettingsHomeView() {
           <SettingsLinkButton href="/settings/organizations" variant="outline">Create Organization</SettingsLinkButton>
           <SettingsLinkButton href="/settings/workspaces" variant="outline">Create Workspace</SettingsLinkButton>
           <SettingsLinkButton href="/settings/projects" variant="outline">Create Project</SettingsLinkButton>
+        </div>
+      </SettingsCard>
+      <SettingsCard title="Administration hierarchy" description="Use this relationship map when setting up Asthra for module CRUD testing.">
+        <div className="grid gap-4 text-sm md:grid-cols-3">
+          <div className="rounded-md border bg-muted/20 p-3">
+            <div className="font-medium">Organization</div>
+            <div className="mt-2 text-muted-foreground">-&gt; Workspaces</div>
+            <div className="text-muted-foreground">-&gt; Projects</div>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3">
+            <div className="font-medium">Workspace</div>
+            <div className="mt-2 text-muted-foreground">-&gt; Members</div>
+            <div className="text-muted-foreground">-&gt; Teams</div>
+            <div className="text-muted-foreground">-&gt; Projects</div>
+          </div>
+          <div className="rounded-md border bg-muted/20 p-3">
+            <div className="font-medium">Project Owners</div>
+            <div className="mt-2 text-muted-foreground">Owners must come from workspace members.</div>
+          </div>
         </div>
       </SettingsCard>
       <SettingsCard title="Settings navigation" description="Operational administration areas are grouped for admin use.">
@@ -234,7 +267,7 @@ export function SettingsHomeView() {
           </div>
         </div>
       </SettingsCard>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -255,7 +288,7 @@ export function AdministrationDashboardView() {
   ];
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Administration" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title="Administration" description="Operational control center for setup, members, teams, roles, and permissions." />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
@@ -267,7 +300,7 @@ export function AdministrationDashboardView() {
           </SettingsCard>
         ))}
       </div>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -303,7 +336,7 @@ export function OrganizationsView() {
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Organizations" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title="Organizations" description="Create and manage the top-level homes for Asthra work." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>} />
       <SettingsDataTable
         columns={["Name", "Description", "Status", "Actions"]}
@@ -326,7 +359,7 @@ export function OrganizationsView() {
         </FormField>
         <FormActions submitLabel="Create Organization" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -370,7 +403,37 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={
+        organizationId
+          ? [
+              { label: "Settings", href: "/settings" },
+              { label: "Organizations", href: "/settings/organizations" },
+              { label: organizations.find((organization) => organization.id === organizationId)?.name ?? `Organization ${organizationId}`, href: `/settings/organizations/${organizationId}` },
+              { label: "Workspaces" }
+            ]
+          : [{ label: "Settings", href: "/settings" }, { label: "Workspaces" }]
+      }
+      backHref={organizationId ? `/settings/organizations/${organizationId}` : "/settings"}
+      backLabel={organizationId ? "Back to Organization" : "Back to Settings"}
+      parentContext={organizationId ? {
+        label: "Organization",
+        title: organizations.find((organization) => organization.id === organizationId)?.name ?? `Organization ${organizationId}`,
+        description: organizations.find((organization) => organization.id === organizationId)?.description ?? undefined,
+        meta: `Scoped workspaces for this organization`
+      } : undefined}
+    >
+      {organizationId ? (
+        <AdminTabs
+          tabs={[
+            { label: "Overview", href: `/settings/organizations/${organizationId}` },
+            { label: "Members", href: `/settings/organizations/${organizationId}/members` },
+            { label: "Workspaces", href: `/settings/organizations/${organizationId}/workspaces`, active: true },
+            { label: "Roles", href: `/settings/organizations/${organizationId}/roles` },
+            { label: "Permissions", href: `/settings/organizations/${organizationId}/permissions` }
+          ]}
+        />
+      ) : null}
       <SettingsSectionHeader title="Workspaces" description="Workspaces connect teams, projects, and module data under an organization." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton>} />
       {!organizations.length ? (
         <SettingsEmptyState title="Create an organization first" description="A workspace must belong to an organization." action={<SettingsLinkButton href="/settings/organizations">Create Organization</SettingsLinkButton>} />
@@ -406,12 +469,12 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
         </FormField>
         <FormActions submitLabel="Create Workspace" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
-  const { accessToken, workspaces, projects } = useSettingsData();
+  const { accessToken, organizations, workspaces, projects } = useSettingsData();
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -450,7 +513,36 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={
+        workspaceId
+          ? [
+              { label: "Settings", href: "/settings" },
+              { label: "Workspaces", href: "/settings/workspaces" },
+              { label: workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? `Workspace ${workspaceId}`, href: `/settings/workspaces/${workspaceId}` },
+              { label: "Projects" }
+            ]
+          : [{ label: "Settings", href: "/settings" }, { label: "Projects" }]
+      }
+      backHref={workspaceId ? `/settings/workspaces/${workspaceId}` : "/settings"}
+      backLabel={workspaceId ? "Back to Workspace" : "Back to Settings"}
+      parentContext={workspaceId ? {
+        label: "Workspace",
+        title: workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? `Workspace ${workspaceId}`,
+        description: workspaces.find((workspace) => workspace.id === workspaceId)?.description ?? undefined,
+        meta: `Organization: ${getOrganizationNameForWorkspace(organizations, workspaces, workspaceId)}`
+      } : undefined}
+    >
+      {workspaceId ? (
+        <AdminTabs
+          tabs={[
+            { label: "Overview", href: `/settings/workspaces/${workspaceId}` },
+            { label: "Members", href: `/settings/workspaces/${workspaceId}/members` },
+            { label: "Teams", href: `/settings/workspaces/${workspaceId}/teams` },
+            { label: "Projects", href: `/settings/workspaces/${workspaceId}/projects`, active: true }
+          ]}
+        />
+      ) : null}
       <SettingsSectionHeader title="Projects" description="Projects scope Flow work, Docs knowledge, discovery, tickets, and operations." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Project</QuickCreateButton>} />
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
@@ -486,7 +578,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
         </FormField>
         <FormActions submitLabel="Create Project" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -500,7 +592,17 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Organizations", href: "/settings/organizations" }, { label: organization.name }]}
+      backHref="/settings/organizations"
+      backLabel="Back to Organizations"
+      parentContext={{
+        label: "Organization",
+        title: organization.name,
+        description: organization.description ?? undefined,
+        meta: `Status: ${organization.is_active === false ? "Inactive" : "Active"}`
+      }}
+    >
       <SettingsSectionHeader title={organization.name} description={organization.description ?? "Organization administration and setup."} />
       <AdminTabs
         tabs={[
@@ -525,12 +627,12 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         emptyMessage="No workspaces in this organization"
       />
       <SettingsDangerZone description="Organization deletion and ownership transfer are intentionally deferred for the operational foundation." />
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
-  const { workspaces, projects } = useSettingsData();
+  const { organizations, workspaces, projects } = useSettingsData();
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const scopedProjects = projects.filter((project) => project.workspace_id === workspaceId);
 
@@ -539,7 +641,17 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Workspaces", href: "/settings/workspaces" }, { label: workspace.name }]}
+      backHref="/settings/workspaces"
+      backLabel="Back to Workspaces"
+      parentContext={{
+        label: "Workspace",
+        title: workspace.name,
+        description: workspace.description ?? undefined,
+        meta: `Organization: ${getOrganizationNameForWorkspace(organizations, workspaces, workspaceId)}`
+      }}
+    >
       <SettingsSectionHeader title={workspace.name} description={workspace.description ?? "Workspace administration and project setup."} />
       <AdminTabs
         tabs={[
@@ -563,7 +675,7 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
         emptyMessage="No projects in this workspace"
       />
       <SettingsDangerZone description="Workspace archive and permanent deletion are placeholders until audit and retention policies are added." />
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -596,7 +708,17 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     return <SettingsEmptyState title="Project not found" description="Refresh the page or open the projects list." action={<SettingsLinkButton href="/settings/projects">Projects</SettingsLinkButton>} />;
   }
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Projects", href: "/settings/projects" }, { label: project.name }]}
+      backHref="/settings/projects"
+      backLabel="Back to Projects"
+      parentContext={{
+        label: "Project",
+        title: project.name,
+        description: project.description ?? undefined,
+        meta: `Workspace: ${workspaces.find((workspace) => workspace.id === project.workspace_id)?.name ?? project.workspace_id}`
+      }}
+    >
       <SettingsSectionHeader
         title={project.name}
         description={project.description ?? "Project settings and operational metadata."}
@@ -610,8 +732,15 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           <div><dt className="text-muted-foreground">Owner Name</dt><dd>{owner?.name ?? "Not assigned"}</dd></div>
           <div><dt className="text-muted-foreground">Owner Email</dt><dd>{owner?.email ?? "Not assigned"}</dd></div>
         </dl>
+        {!owner ? (
+          <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+            <div className="font-medium text-foreground">No owner assigned yet.</div>
+            <p className="mt-1">Owners should be selected from workspace members.</p>
+          </div>
+        ) : null}
       </SettingsCard>
       <SettingsCard title="Ownership actions">
+        <p className="mb-3 text-sm text-muted-foreground">Project owners should be selected from workspace members. If no members are available, invite members to the workspace first.</p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Change Owner</Button>
           <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} />
@@ -634,7 +763,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         </FormField>
         <FormActions submitLabel="Assign Owner" isSubmitting={ownerMutation.isPending} onCancel={() => setOwnerOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -662,6 +791,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const profiles = userProfiles.data ?? new Map<number, CoreUser>();
   const scopeOrganizationId = organizationId ?? workspaces.find((workspace) => workspace.id === workspaceId)?.organization_id ?? organizations[0]?.id;
   const scopeWorkspaceId = workspaceId ?? null;
+  const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
+  const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
   const filteredMembers = members.filter((member) => {
     const user = displayUser(profiles.get(member.user_id), member.user_id);
     const role = roles.find((item) => item.id === member.role_id)?.name ?? member.member_role;
@@ -711,7 +842,43 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[
+        { label: "Settings", href: "/settings" },
+        ...(organizationId
+          ? [
+              { label: "Organizations", href: "/settings/organizations" },
+              { label: scopedOrganization?.name ?? `Organization ${organizationId}`, href: `/settings/organizations/${organizationId}` },
+              { label: "Members" }
+            ]
+          : workspaceId
+            ? [
+                { label: "Workspaces", href: "/settings/workspaces" },
+                { label: scopedWorkspace?.name ?? `Workspace ${workspaceId}`, href: `/settings/workspaces/${workspaceId}` },
+                { label: "Members" }
+              ]
+            : [{ label: "Members" }])
+      ]}
+      backHref={organizationId ? `/settings/organizations/${organizationId}` : workspaceId ? `/settings/workspaces/${workspaceId}` : "/settings"}
+      backLabel={organizationId ? "Back to Organization" : workspaceId ? "Back to Workspace" : "Back to Settings"}
+      parentContext={
+        organizationId
+          ? {
+              label: "Organization",
+              title: scopedOrganization?.name ?? `Organization ${organizationId}`,
+              description: scopedOrganization?.description ?? undefined,
+              meta: `Status: ${scopedOrganization?.is_active === false ? "Inactive" : "Active"}`
+            }
+          : workspaceId
+            ? {
+                label: "Workspace",
+                title: scopedWorkspace?.name ?? `Workspace ${workspaceId}`,
+                description: scopedWorkspace?.description ?? undefined,
+                meta: `Organization: ${getOrganizationNameForWorkspace(organizations, workspaces, workspaceId)}`
+              }
+            : undefined
+      }
+    >
       {organizationId ? (
         <AdminTabs
           tabs={[
@@ -741,8 +908,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           const user = displayUser(profiles.get(member.user_id), member.user_id);
           const role = roles.find((item) => item.id === member.role_id)?.name ?? member.member_role;
           return [
-            user.name,
-            user.email,
+            <div key={`${member.user_id}-name`}><div>{user.name}</div><div className="text-xs text-muted-foreground">User ID {member.user_id}</div></div>,
+            <div key={`${member.user_id}-email`}><div>{user.email}</div>{!profiles.get(member.user_id) ? <div className="text-xs text-muted-foreground">Detailed user profile lookup pending</div> : null}</div>,
             role,
             user.status,
             "Current member",
@@ -796,7 +963,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         </FormField>
         <FormActions submitLabel="Assign Role" isSubmitting={roleMutation.isPending} onCancel={() => setRoleOpen(null)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -807,7 +974,12 @@ export function MemberDetailView({ userId }: { userId: number }) {
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const user = userQuery.data;
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members", href: "/settings/members" }, { label: displayUser(user, userId).name }]}
+      backHref="/settings/members"
+      backLabel="Back to Members"
+      parentContext={{ label: "Member", title: displayUser(user, userId).name, meta: "Detailed user profile lookup pending when core-service returns only membership IDs." }}
+    >
       <SettingsSectionHeader title={displayUser(user, userId).name} description="Member details, assigned roles, teams, projects, and activity placeholders." />
       <SettingsCard title="Overview">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -827,7 +999,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
       <SettingsCard title="Teams" description="Team membership is shown from team detail pages in this pass. Assignment is available under team administration." />
       <SettingsCard title="Projects" description="Project ownership can be assigned from project detail pages." />
       <SettingsCard title="Activity Placeholder" description="Member audit and activity stream integration is planned for a later platform pass." />
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -875,7 +1047,21 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
     mutation.mutate({ workspace_id: targetWorkspaceId, name, description: getFormValue(event.currentTarget, "description") || undefined });
   }
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[
+        { label: "Settings", href: "/settings" },
+        workspaceId ? { label: "Workspaces", href: "/settings/workspaces" } : { label: "Teams", href: "/settings/teams" },
+        ...(workspaceId ? [{ label: workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? `Workspace ${workspaceId}`, href: `/settings/workspaces/${workspaceId}` }, { label: "Teams" }] : [])
+      ]}
+      backHref={workspaceId ? `/settings/workspaces/${workspaceId}` : "/settings"}
+      backLabel={workspaceId ? "Back to Workspace" : "Back to Settings"}
+      parentContext={workspaceId ? {
+        label: "Workspace",
+        title: workspaces.find((workspace) => workspace.id === workspaceId)?.name ?? `Workspace ${workspaceId}`,
+        description: workspaces.find((workspace) => workspace.id === workspaceId)?.description ?? undefined,
+        meta: "Teams group workspace members."
+      } : undefined}
+    >
       {workspaceId ? (
         <AdminTabs
           tabs={[
@@ -909,7 +1095,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
         <FormField label="Description"><Input name="description" placeholder="Build and operations team" /></FormField>
         <FormActions submitLabel="Create Team" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -959,7 +1145,17 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Teams", href: "/settings/teams" }, { label: team.name }]}
+      backHref="/settings/teams"
+      backLabel="Back to Teams"
+      parentContext={{
+        label: "Team",
+        title: team.name,
+        description: team.description ?? undefined,
+        meta: `Workspace: ${workspaces.find((workspace) => workspace.id === team.workspace_id)?.name ?? team.workspace_id}`
+      }}
+    >
       <SettingsSectionHeader title={team.name} description={team.description ?? "Team administration."} actions={<QuickCreateButton onClick={() => setAssignOpen(true)}>Assign Member</QuickCreateButton>} />
       <SettingsCard title="Overview">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -999,12 +1195,12 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
         </FormField>
         <FormActions submitLabel="Assign Member" isSubmitting={assignMutation.isPending} onCancel={() => setAssignOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function RolesView({ organizationId }: { organizationId?: number }) {
-  const { accessToken } = useSettingsData();
+  const { accessToken, organizations } = useSettingsData();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -1013,6 +1209,7 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
   const roles = (rolesQuery.data ?? [])
     .filter((role: RoleRecord) => (organizationId ? role.organization_id === organizationId || role.organization_id == null : true))
     .filter((role: RoleRecord) => `${role.name} ${role.description ?? ""} ${role.scope}`.toLowerCase().includes(search.toLowerCase()));
+  const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const mutation = useMutation({
     mutationFn: (payload: { name: string; description?: string; organization_id?: number; scope?: string }) => settingsApi.createRole(accessToken ?? "", payload),
     onSuccess: async () => {
@@ -1036,7 +1233,12 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
     if (name) mutation.mutate({ name, description: getFormValue(event.currentTarget, "description") || undefined, organization_id: organizationId, scope: "organization" });
   }
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: organizationId ? "Organizations" : "Roles", href: organizationId ? "/settings/organizations" : "/settings/roles" }, ...(organizationId ? [{ label: scopedOrganization?.name ?? `Organization ${organizationId}`, href: `/settings/organizations/${organizationId}` }, { label: "Roles" }] : [])]}
+      backHref={organizationId ? `/settings/organizations/${organizationId}` : "/settings"}
+      backLabel={organizationId ? "Back to Organization" : "Back to Settings"}
+      parentContext={organizationId ? { label: "Organization", title: scopedOrganization?.name ?? `Organization ${organizationId}`, description: scopedOrganization?.description ?? undefined, meta: "Scoped roles for this organization." } : undefined}
+    >
       {organizationId ? (
         <AdminTabs
           tabs={[
@@ -1070,18 +1272,19 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
         <FormField label="Description"><Input name="description" placeholder="Can manage workspace setup" /></FormField>
         <FormActions submitLabel="Create Role" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function PermissionsView({ organizationId }: { organizationId?: number } = {}) {
-  const { accessToken } = useSettingsData();
+  const { accessToken, organizations } = useSettingsData();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissions = (permissionsQuery.data ?? []).filter((permission: PermissionRecord) => `${permission.code} ${permission.name} ${permission.description ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const mutation = useMutation({
     mutationFn: (payload: { code: string; name: string; description?: string }) => settingsApi.createPermission(accessToken ?? "", payload),
     onSuccess: async () => {
@@ -1106,7 +1309,12 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
     if (code && name) mutation.mutate({ code, name, description: getFormValue(event.currentTarget, "description") || undefined });
   }
   return (
-    <div className="space-y-6">
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: organizationId ? "Organizations" : "Permissions", href: organizationId ? "/settings/organizations" : "/settings/permissions" }, ...(organizationId ? [{ label: scopedOrganization?.name ?? `Organization ${organizationId}`, href: `/settings/organizations/${organizationId}` }, { label: "Permissions" }] : [])]}
+      backHref={organizationId ? `/settings/organizations/${organizationId}` : "/settings"}
+      backLabel={organizationId ? "Back to Organization" : "Back to Settings"}
+      parentContext={organizationId ? { label: "Organization", title: scopedOrganization?.name ?? `Organization ${organizationId}`, description: scopedOrganization?.description ?? undefined, meta: "Scoped permission planning for this organization." } : undefined}
+    >
       {organizationId ? (
         <AdminTabs
           tabs={[
@@ -1154,7 +1362,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
         <FormField label="Description"><Input name="description" placeholder="Allows workspace setup changes" /></FormField>
         <FormActions submitLabel="Create Permission" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -1167,7 +1375,7 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
   if (!role) return <SettingsEmptyState title="Role not found" description="Open the roles list or refresh the page." action={<SettingsLinkButton href="/settings/roles">Roles</SettingsLinkButton>} />;
   const linkedPermissionIds = new Set((rolePermissionsQuery.data ?? []).map((item) => item.permission_id));
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Roles", href: "/settings/roles" }, { label: role.name }]} backHref="/settings/roles" backLabel="Back to Roles" parentContext={{ label: "Role", title: role.name, description: role.description ?? undefined, meta: `Scope: ${role.scope}` }}>
       <SettingsSectionHeader title={role.name} description={role.description ?? "Role detail and permission mapping."} />
       <SettingsCard title="Overview">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -1185,7 +1393,7 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
         />
       </SettingsCard>
       <SettingsCard title="Assigned Members" description="User-role assignments are shown on member detail pages. Bulk role membership editing is planned." />
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -1195,7 +1403,7 @@ export function PermissionDetailView({ permissionId }: { permissionId: number })
   const permission = permissionsQuery.data?.find((item) => item.id === permissionId);
   if (!permission) return <SettingsEmptyState title="Permission not found" description="Open the permissions list or refresh the page." action={<SettingsLinkButton href="/settings/permissions">Permissions</SettingsLinkButton>} />;
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Permissions", href: "/settings/permissions" }, { label: permission.name }]} backHref="/settings/permissions" backLabel="Back to Permissions" parentContext={{ label: "Permission", title: permission.name, description: permission.description ?? undefined, meta: `Code: ${permission.code}` }}>
       <SettingsSectionHeader title={permission.name} description={permission.description ?? "Permission detail."} />
       <SettingsCard title="Overview">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -1208,7 +1416,7 @@ export function PermissionDetailView({ permissionId }: { permissionId: number })
       <SettingsCard title="Permission matrix">
         <SettingsDataTable columns={["Owner", "Admin", "Manager", "Member", "Viewer"]} rows={[["Full", "Full", "Manage", "Use", "Read"]]} emptyMessage="No matrix mapping" />
       </SettingsCard>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -1233,7 +1441,7 @@ export function ApiKeysView() {
     if (name) mutation.mutate({ name, organization_id: organizations[0]?.id ?? null, workspace_id: workspaces[0]?.id ?? null, scopes: ["read"] });
   }
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "API Keys" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title="API Keys" description="Create and review personal API keys for future integrations." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create API Key</QuickCreateButton>} />
       {createdKey ? <SettingsCard title="New API key" description="Copy this value now. Core-service only returns it once."><code className="break-all rounded bg-muted px-2 py-1 text-sm">{createdKey}</code></SettingsCard> : null}
       <SettingsDataTable columns={["Name", "Prefix", "Scopes", "Status"]} rows={apiKeys.map((key) => [key.name, key.key_prefix, key.scopes.join(", ") || "None", key.is_active === false ? "Revoked" : "Active"])} emptyMessage="No API keys yet" />
@@ -1241,23 +1449,23 @@ export function ApiKeysView() {
         <FormField label="Name" required><Input name="name" placeholder="Local testing key" /></FormField>
         <FormActions submitLabel="Create API Key" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function PlaceholderSettingsView({ title, description }: { title: string; description: string }) {
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: title }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title={title} description={description} />
       <SettingsEmptyState title={`${title} is planned`} description="This settings area is intentionally a placeholder for the operational foundation. No backend behavior is required yet." />
-    </div>
+    </SettingsLayout>
   );
 }
 
 export function AccountSettingsView() {
   const user = useAuthStore((state) => state.currentUser);
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Account" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title="Account" description="Signed-in user identity and account metadata." />
       <SettingsCard title="Profile">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -1267,7 +1475,7 @@ export function AccountSettingsView() {
           <div><dt className="text-muted-foreground">Status</dt><dd>{user?.is_active ? "Active" : "Unknown"}</dd></div>
         </dl>
       </SettingsCard>
-    </div>
+    </SettingsLayout>
   );
 }
 
@@ -1285,10 +1493,10 @@ export function WorkspaceContextSettingsView() {
     [organizations, projects, selectedOrganizationId, selectedProjectId, selectedWorkspaceId, workspaces]
   );
   return (
-    <div className="space-y-6">
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Workspace Context" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader title="Workspace Context" description="Current organization, workspace, and project selection used across Asthra." />
       <SetupSummary />
       <SettingsDataTable columns={["Context", "Selected"]} rows={summary} emptyMessage="No context selected" />
-    </div>
+    </SettingsLayout>
   );
 }
