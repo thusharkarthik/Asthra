@@ -2,6 +2,6 @@
 
 import { AccountSettingsView } from "@/components/settings/settings-admin-views";
 
-export default function ProfileSettingsPage() {
+export default function AccountSettingsPage() {
   return <AccountSettingsView />;
 }

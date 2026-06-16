@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
+import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -37,6 +37,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const logout = useAuthStore((state) => state.logout);
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
+  const isAssistantOpen = useUIStore((state) => state.isAssistantOpen);
+  const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const unreadNotifications = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -82,20 +84,20 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <WorkspaceContextLoader />
-      <aside className={cn("hidden shrink-0 border-r bg-card transition-[width] md:block", sidebarCollapsed ? "w-16" : "w-64")}>
+      <aside className={cn("hidden h-screen shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
         <div className={cn("flex h-14 items-center border-b px-4", sidebarCollapsed && "justify-center px-2")}>
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             A
           </div>
           {!sidebarCollapsed && <span className="ml-3 text-sm font-semibold">Asthra</span>}
         </div>
-        <div className="p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <SidebarNav collapsed={sidebarCollapsed} />
         </div>
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-3 backdrop-blur md:px-4">
           <Button size="icon" variant="ghost" className="md:hidden" aria-label="Open navigation">
             <Menu className="h-4 w-4" />
@@ -117,6 +119,15 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1">
             <SearchBar />
           </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="hidden xl:inline-flex"
+            aria-label={isAssistantOpen ? "Hide assistant" : "Show assistant"}
+            onClick={() => setAssistantOpen(!isAssistantOpen)}
+          >
+            {isAssistantOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+          </Button>
           <div className="relative">
             <Button size="icon" variant="ghost" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}>
               <Bell className="h-4 w-4" />
@@ -150,7 +161,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
         </header>
         <div className="flex min-h-0 flex-1">
           <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
-          <AssistantDock />
+          {isAssistantOpen ? <AssistantDock /> : null}
         </div>
         <footer className="border-t px-4 py-2 text-xs text-muted-foreground">Asthra platform shell foundation</footer>
       </div>
