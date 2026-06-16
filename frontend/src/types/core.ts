@@ -127,3 +127,35 @@ export type ApiKeyRecord = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type InvitationRecord = {
+  id: number;
+  email: string;
+  organization_id: number;
+  workspace_id?: number | null;
+  invited_by_id: number;
+  role_id?: number | null;
+  status: string;
+  token?: string;
+  expires_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TeamMemberRecord = {
+  id: number;
+  team_id: number;
+  user_id: number;
+  role_id?: number | null;
+  member_role: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type UserRoleRecord = {
+  id: number;
+  user_id: number;
+  role_id: number;
+  created_at?: string;
+  updated_at?: string;
+};

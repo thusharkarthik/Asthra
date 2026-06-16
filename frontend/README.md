@@ -757,6 +757,11 @@ Implemented settings foundation:
 - `/settings/workspaces`: workspace creation and listing
 - `/settings/projects`: project creation and listing
 - `/settings/api-keys`: API key creation and listing
+- `/settings/administration`: operational admin dashboard
+- `/settings/members`: member review, invitation, and role assignment
+- `/settings/teams`: team creation and assignment workflows
+- `/settings/roles`: role management
+- `/settings/permissions`: permission management and matrix display
 
 Settings now provides the internal alpha setup flow: create an organization, create a workspace under it, create a project under that workspace, then use the updated shell selectors to test module CRUD flows such as Flow work items. Advanced security, audit, integrations, and AI preference settings remain placeholders.
 
@@ -811,6 +816,7 @@ Planned frontend passes:
 - `docs/platform-beta-guide.md`
 - `docs/settings-operational-review.md`
 - `docs/admin-setup-workflow.md`
+- `docs/settings-operational-pass-2.md`
 
 ## Future Module Integration
 
