@@ -142,6 +142,44 @@ Optional query parameters:
 - `limit`
 - `offset`
 
+### Update Work Item
+
+```http
+PATCH /api/v1/work-items/{work_item_id}
+```
+
+The update endpoint accepts lookup IDs or stable lookup names for operational UI flows:
+
+```json
+{
+  "title": "Updated title",
+  "description": "Updated description",
+  "status_name": "in_progress",
+  "priority_name": "high",
+  "assignee_id": null,
+  "due_date": null
+}
+```
+
+Supported status names include `todo`, `in_progress`, `review`, and `done`. Supported priority names include `low`, `medium`, `high`, and `critical`.
+
+### Comments
+
+```http
+POST /api/v1/work-items/{work_item_id}/comments
+```
+
+Flow accepts backend-native and UI-friendly comment payloads:
+
+```json
+{
+  "content": "This needs a follow-up",
+  "user_id": 1
+}
+```
+
+If no author is supplied, Flow uses a temporary MVP system fallback until Core auth propagation is wired in.
+
 ### Get Work Item
 
 ```http

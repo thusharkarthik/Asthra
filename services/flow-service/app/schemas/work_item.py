@@ -65,7 +65,9 @@ class WorkItemCreate(BaseModel):
 class WorkItemUpdate(BaseModel):
     type_id: int | None = None
     status_id: int | None = None
+    status_name: str | None = Field(default=None, min_length=1, max_length=100)
     priority_id: int | None = None
+    priority_name: str | None = Field(default=None, min_length=1, max_length=100)
     board_id: int | None = None
     board_column_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=255)

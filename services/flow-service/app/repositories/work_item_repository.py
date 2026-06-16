@@ -46,7 +46,10 @@ class WorkItemRepository:
         return self.db.get(WorkItem, work_item_id)
 
     def update(self, work_item: WorkItem, work_item_update: WorkItemUpdate) -> WorkItem:
-        update_data = work_item_update.model_dump(exclude_unset=True)
+        update_data = work_item_update.model_dump(
+            exclude_unset=True,
+            exclude={"status_name", "priority_name"},
+        )
         for field, value in update_data.items():
             setattr(work_item, field, value)
         self.db.add(work_item)
@@ -77,17 +80,49 @@ class WorkItemRepository:
         return work_item_type
 
     def get_or_create_default_status(self) -> WorkItemStatus:
-        status = self.db.scalar(select(WorkItemStatus).where(WorkItemStatus.name == "todo"))
+        status = self.get_or_create_status_by_name("todo")
+        return status
+
+    def get_or_create_status_by_name(self, name: str) -> WorkItemStatus:
+        normalized = name.strip().lower().replace("_", " ")
+        canonical = {
+            "todo": ("todo", "todo", 0),
+            "to do": ("todo", "todo", 0),
+            "in progress": ("in_progress", "in_progress", 1),
+            "review": ("review", "review", 2),
+            "done": ("done", "done", 3),
+        }.get(normalized, (normalized.replace(" ", "_"), normalized.replace(" ", "_"), 0))
+        status = self.db.scalar(select(WorkItemStatus).where(WorkItemStatus.name == canonical[0]))
         if status is None:
-            status = WorkItemStatus(name="todo", description="Default todo status", category="todo", sort_order=0)
+            status = WorkItemStatus(
+                name=canonical[0],
+                description=f"Default {canonical[0].replace('_', ' ')} status",
+                category=canonical[1],
+                sort_order=canonical[2],
+            )
             self.db.add(status)
             self.db.flush()
         return status
 
     def get_or_create_default_priority(self) -> WorkItemPriority:
-        priority = self.db.scalar(select(WorkItemPriority).where(WorkItemPriority.name == "medium"))
+        priority = self.get_or_create_priority_by_name("medium")
+        return priority
+
+    def get_or_create_priority_by_name(self, name: str) -> WorkItemPriority:
+        normalized = name.strip().lower().replace("_", " ")
+        canonical = {
+            "low": ("low", 1),
+            "medium": ("medium", 2),
+            "high": ("high", 3),
+            "critical": ("critical", 4),
+        }.get(normalized, (normalized.replace(" ", "_"), 0))
+        priority = self.db.scalar(select(WorkItemPriority).where(WorkItemPriority.name == canonical[0]))
         if priority is None:
-            priority = WorkItemPriority(name="medium", description="Default medium priority", level=2)
+            priority = WorkItemPriority(
+                name=canonical[0],
+                description=f"Default {canonical[0].replace('_', ' ')} priority",
+                level=canonical[1],
+            )
             self.db.add(priority)
             self.db.flush()
         return priority

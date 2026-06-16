@@ -26,6 +26,10 @@ export type WorkItemCreate = {
 };
 
 export type WorkItemUpdate = Partial<Omit<WorkItemCreate, "project_id" | "reporter_id">>;
+export type WorkItemOperationalUpdate = WorkItemUpdate & {
+  status_name?: string | null;
+  priority_name?: string | null;
+};
 
 export type Board = {
   id: number;

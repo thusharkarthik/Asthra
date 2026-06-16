@@ -14,7 +14,11 @@ class CommentRepository:
         return self.db.get(WorkItem, work_item_id)
 
     def create(self, work_item_id: int, comment_create: WorkItemCommentCreate) -> WorkItemComment:
-        comment = WorkItemComment(work_item_id=work_item_id, **comment_create.model_dump())
+        comment = WorkItemComment(
+            work_item_id=work_item_id,
+            author_user_id=comment_create.author_user_id if comment_create.author_user_id is not None else 0,
+            body=comment_create.body or "",
+        )
         self.db.add(comment)
         self.db.commit()
         self.db.refresh(comment)

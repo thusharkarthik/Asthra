@@ -15,3 +15,11 @@ class WorkItemComment(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     work_item = relationship("WorkItem", back_populates="comments")
+
+    @property
+    def user_id(self) -> int:
+        return self.author_user_id
+
+    @property
+    def content(self) -> str:
+        return self.body

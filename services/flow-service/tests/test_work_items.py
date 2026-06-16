@@ -139,3 +139,18 @@ def test_work_item_api_routes_create_list_and_get(db, monkeypatch):
 
     fetched = get_work_item(created.id, db=db)
     assert fetched.id == created.id
+
+
+def test_update_work_item_accepts_status_and_priority_names(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    work_item = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Move on board"))
+
+    updated = WorkItemService(db).update(
+        work_item.id,
+        WorkItemUpdate(status_name="in_progress", priority_name="high"),
+    )
+
+    assert updated.status_id is not None
+    assert updated.priority_id is not None
+    assert db.get(WorkItemStatus, updated.status_id).name == "in_progress"
+    assert db.get(WorkItemPriority, updated.priority_id).name == "high"

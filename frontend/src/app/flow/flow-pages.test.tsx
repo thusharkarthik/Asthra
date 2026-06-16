@@ -23,11 +23,23 @@ function renderWithQuery(ui: React.ReactNode) {
 function mockFlowFetch() {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url.includes("/work-items/7/comments") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
+    }
     if (url.includes("/work-items/7/comments")) {
       return new Response(JSON.stringify([{ id: 1, work_item_id: 7, user_id: 1, content: "Looks good" }]), { status: 200 });
     }
+    if (url.includes("/work-items/7") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3 }), { status: 200 });
+    }
+    if (url.includes("/work-items/7") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
     if (url.includes("/work-items/7")) {
       return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Build Flow UI", description: "Wire work items", status_id: 1, priority_id: 2 }), { status: 200 });
+    }
+    if (url.includes("/work-items") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Build Flow UI", status_id: 2, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
@@ -217,6 +229,59 @@ describe("Flow frontend screens", () => {
     expect(screen.getByText("Linked Docs")).toBeInTheDocument();
   });
 
+  it("edits a work item from detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByDisplayValue("Build Flow UI"), { target: { value: "Updated Flow UI" } });
+    fireEvent.change(screen.getByDisplayValue("Wire work items"), { target: { value: "Updated details" } });
+    fireEvent.change(screen.getByDisplayValue("Todo"), { target: { value: "in_progress" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
+      expect(patchCall).toBeTruthy();
+      const body = JSON.parse(String(patchCall?.[1]?.body));
+      expect(body.title).toBe("Updated Flow UI");
+      expect(body.status_name).toBe("in_progress");
+    });
+  });
+
+  it("submits comments from work item detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Looks good")).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText("Add a comment"), { target: { value: "New comment" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7/comments") && init?.method === "POST");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ content: "New comment", user_id: 1 });
+    });
+  });
+
+  it("archives work item from detail after confirmation", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+
+    await waitFor(() => {
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "DELETE");
+      expect(deleteCall).toBeTruthy();
+      expect(navigationMock.push).toHaveBeenCalledWith("/flow/work-items");
+    });
+  });
+
   it("renders board page", async () => {
     navigationMock.pathname = "/flow/boards";
     renderWithQuery(<BoardsPage />);
@@ -224,6 +289,20 @@ describe("Flow frontend screens", () => {
     expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Todo").length).toBeGreaterThan(0));
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+  });
+
+  it("moves a board card with status dropdown", async () => {
+    navigationMock.pathname = "/flow/boards";
+    renderWithQuery(<BoardsPage />);
+
+    await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Move Build Flow UI"), { target: { value: "review" } });
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ status_name: "review" });
+    });
   });
 
   it("renders my work page", async () => {

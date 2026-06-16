@@ -93,6 +93,7 @@ class WorkItemService:
 
     def update(self, work_item_id: int, work_item_update: WorkItemUpdate) -> WorkItem:
         work_item = self.get(work_item_id)
+        work_item_update = self._apply_update_lookup_names(work_item_update)
         self._validate_references(
             type_id=work_item_update.type_id,
             status_id=work_item_update.status_id,
@@ -186,6 +187,16 @@ class WorkItemService:
             # that were created before reporter_id became nullable.
             update_data["reporter_id"] = 0
         return work_item_create.model_copy(update=update_data)
+
+    def _apply_update_lookup_names(self, work_item_update: WorkItemUpdate) -> WorkItemUpdate:
+        update_data: dict[str, int] = {}
+        if work_item_update.status_name:
+            update_data["status_id"] = self.work_item_repository.get_or_create_status_by_name(work_item_update.status_name).id
+        if work_item_update.priority_name:
+            update_data["priority_id"] = self.work_item_repository.get_or_create_priority_by_name(work_item_update.priority_name).id
+        if not update_data:
+            return work_item_update
+        return work_item_update.model_copy(update=update_data)
 
     def _validate_required_ids(self, project_id: int) -> None:
         if project_id is None:
