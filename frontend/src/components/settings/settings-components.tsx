@@ -2,11 +2,59 @@
 
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
-import { AlertTriangle, ChevronRight, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EntityCreateDialog, FormActions, FormField, RequiredFieldLabel } from "@/components/modules/entity-form";
 
 export { FormActions, FormField, RequiredFieldLabel };
+
+export function SettingsLayout({
+  breadcrumbs,
+  backHref,
+  backLabel,
+  parentContext,
+  children
+}: {
+  breadcrumbs: Array<{ label: string; href?: string }>;
+  backHref?: string | null;
+  backLabel?: string | null;
+  parentContext?: {
+    label: string;
+    title: string;
+    description?: string;
+    meta?: string;
+  };
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <SettingsBreadcrumbs items={breadcrumbs} />
+        {backHref && backLabel ? (
+          <SettingsBackLink href={backHref}>{backLabel}</SettingsBackLink>
+        ) : null}
+      </div>
+      {parentContext ? (
+        <section className="rounded-lg border bg-muted/20 p-4">
+          <div className="text-sm font-medium text-muted-foreground">{parentContext.label}</div>
+          <h2 className="mt-1 text-xl font-semibold">{parentContext.title}</h2>
+          {parentContext.description ? <p className="mt-1 text-sm text-muted-foreground">{parentContext.description}</p> : null}
+          {parentContext.meta ? <p className="mt-2 text-sm text-muted-foreground">{parentContext.meta}</p> : null}
+        </section>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+export function SettingsBackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+      <ArrowLeft className="h-4 w-4" />
+      {children}
+    </Link>
+  );
+}
 
 export function SettingsBreadcrumbs({ items }: { items: Array<{ label: string; href?: string }> }) {
   return (
