@@ -4,6 +4,7 @@ export type ApiErrorPayload = {
   error?: {
     code?: unknown;
     message?: unknown;
+    details?: unknown;
   };
 };
 
@@ -19,6 +20,24 @@ export class ApiError extends Error {
   }
 }
 
+function parseValidationDetail(detail: unknown) {
+  if (!Array.isArray(detail)) return undefined;
+  const messages = detail
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const error = item as { loc?: unknown; msg?: unknown; type?: unknown };
+      const location = Array.isArray(error.loc)
+        ? error.loc.filter((part) => part !== "body").join(".")
+        : undefined;
+      const message = typeof error.msg === "string" ? error.msg : undefined;
+      const type = typeof error.type === "string" ? error.type : undefined;
+      if (!location && !message) return null;
+      return [location, message ?? type].filter(Boolean).join(": ");
+    })
+    .filter(Boolean);
+  return messages.length ? `Validation failed: ${messages.join("; ")}` : undefined;
+}
+
 export function parseApiErrorPayload(payload: unknown, status: number) {
   const fallback = status === 401 ? "Your session may have expired. Please sign in again." : `API request failed with status ${status}.`;
   if (!payload || typeof payload !== "object") {
@@ -28,9 +47,10 @@ export function parseApiErrorPayload(payload: unknown, status: number) {
   const nestedMessage = typeof data.error?.message === "string" ? data.error.message : undefined;
   const nestedCode = typeof data.error?.code === "string" ? data.error.code : undefined;
   const detail = typeof data.detail === "string" ? data.detail : undefined;
+  const validationDetail = parseValidationDetail(data.detail) ?? parseValidationDetail(data.error?.details);
   const message = typeof data.message === "string" ? data.message : undefined;
   return {
-    message: nestedMessage ?? detail ?? message ?? fallback,
+    message: validationDetail ?? nestedMessage ?? detail ?? message ?? fallback,
     code: nestedCode ?? (status === 401 ? "unauthorized" : "api_error")
   };
 }
