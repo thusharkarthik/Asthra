@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -14,6 +14,7 @@ const items = [
   { href: "/flow/sprints", label: "Sprints", icon: CalendarDays },
   { href: "/flow/releases", label: "Releases", icon: Rocket },
   { href: "/flow/roadmap", label: "Roadmap", icon: Map },
+  { href: "/flow/capacity", label: "Capacity", icon: Clock3 },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },
   { href: "/flow/reports", label: "Reports", icon: BarChart3 },

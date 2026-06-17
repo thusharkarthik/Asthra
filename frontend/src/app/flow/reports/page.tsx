@@ -39,8 +39,22 @@ export default function FlowReportsPage() {
     retry: 1
   });
   const items = workItemsQuery.data ?? [];
+  const capacityQuery = useQuery({
+    queryKey: ["flow", "capacity", selectedProjectId],
+    queryFn: () => flowApi.listCapacity(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const workLogsQuery = useQuery({
+    queryKey: ["flow", "report-work-logs", items.map((item) => item.id).join(",")],
+    queryFn: async () => (await Promise.all(items.map((item) => flowApi.listWorkLogs(accessToken ?? "", item.id)))).flat(),
+    enabled: Boolean(accessToken) && items.length > 0,
+    retry: 1
+  });
   const sprints = sprintsQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
+  const capacities = capacityQuery.data ?? [];
+  const workLogs = workLogsQuery.data ?? [];
   const completedSprints = sprints.filter((sprint) => sprint.status === "completed");
   const activeSprint = sprints.find((sprint) => sprint.status === "active");
   const sprintVelocity = completedSprints.length ? Math.round(completedSprints.reduce((sum, sprint) => sum + sprint.completed_work_count, 0) / completedSprints.length) : 0;
@@ -58,6 +72,11 @@ export default function FlowReportsPage() {
   const countByStatus = (statusId: number) => items.filter((item) => item.status_id === statusId).length;
   const countByPriority = (priorityId: number) => items.filter((item) => item.priority_id === priorityId).length;
   const countByEffort = (effortSize: string) => items.filter((item) => item.effort_size === effortSize).length;
+  const capacityMinutes = capacities.reduce((sum, entry) => sum + entry.capacity_minutes, 0);
+  const originalEstimateMinutes = items.reduce((sum, item) => sum + (item.original_estimate_minutes ?? 0), 0);
+  const remainingEstimateMinutes = items.reduce((sum, item) => sum + (item.remaining_estimate_minutes ?? 0), 0);
+  const loggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
+  const overCapacityItems = items.filter((item) => (item.remaining_estimate_minutes ?? 0) > (item.original_estimate_minutes ?? Number.MAX_SAFE_INTEGER)).length;
 
   return (
     <>
@@ -82,6 +101,14 @@ export default function FlowReportsPage() {
           </ModuleDashboardCard>
           <ModuleDashboardCard title="Sprint Completion" value={`${activeSprintCompletion}%`} />
           <ModuleDashboardCard title="Effort Completed" value={effortCompleted} />
+          <ModuleDashboardCard title="Capacity Summary" value={formatMinutes(capacityMinutes)}>
+            <p className="text-sm text-muted-foreground">Manual project and sprint capacity entries.</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Estimate vs Actual" value={`${formatMinutes(originalEstimateMinutes)} / ${formatMinutes(loggedMinutes)}`}>
+            <p className="text-sm text-muted-foreground">Original estimate compared with logged time.</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Remaining Estimate" value={formatMinutes(remainingEstimateMinutes)} />
+          <ModuleDashboardCard title="Over Capacity Items" value={overCapacityItems} />
           <ModuleDashboardCard title="Release Summary" value={releases.length}>
             <p className="text-sm text-muted-foreground">{activeRelease ? `Active: ${activeRelease.name}` : "No active release."}</p>
           </ModuleDashboardCard>
@@ -105,6 +132,13 @@ export default function FlowReportsPage() {
       )}
     </>
   );
+}
+
+function formatMinutes(value: number) {
+  if (!value) return "0h";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 function MetricList({ items }: { items: Array<[string, number]> }) {

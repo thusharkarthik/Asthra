@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FlowPage from "@/app/flow/page";
 import BacklogPage from "@/app/flow/backlog/page";
 import BoardsPage from "@/app/flow/boards/page";
+import FlowCapacityPage from "@/app/flow/capacity/page";
 import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
@@ -119,6 +120,15 @@ function mockFlowFetch() {
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
+    if (url.includes("/work-items/7/work-logs") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 12, work_item_id: 7, user_id: 1, description: "Implementation", time_spent_minutes: 45, logged_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" }), { status: 201 });
+    }
+    if (url.includes("/work-items/7/work-logs/12") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/work-items/7/work-logs") && init?.method === "GET") {
+      return new Response(JSON.stringify([{ id: 12, work_item_id: 7, user_id: 1, description: "Implementation", time_spent_minutes: 45, logged_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" }]), { status: 200 });
+    }
     if (url.includes("/work-items/7/children")) {
       return new Response(JSON.stringify([{ id: 10, project_id: 3, parent_id: 7, item_level: "subtask", title: "Subtask A", status_id: 1, priority_id: 2 }]), { status: 200 });
     }
@@ -128,7 +138,7 @@ function mockFlowFetch() {
     if (url.includes("/work-items/7/attachments") && init?.method === "GET") {
       return new Response(JSON.stringify([{ id: 4, work_item_id: 7, file_name: "design.pdf", file_url: "/tmp/design.pdf", file_type: "application/pdf", file_size: 2048, uploaded_at: "2026-01-01T00:00:00Z" }]), { status: 200 });
     }
-    if (url.includes("/work-items/8/attachments") || url.includes("/work-items/8/comments") || url.includes("/work-items/8/relations")) {
+    if (url.includes("/work-items/8/attachments") || url.includes("/work-items/8/comments") || url.includes("/work-items/8/relations") || url.includes("/work-items/8/work-logs")) {
       return new Response(JSON.stringify([]), { status: 200 });
     }
     if (url.includes("/work-items/7/relations") && init?.method === "POST") {
@@ -178,6 +188,8 @@ function mockFlowFetch() {
         release_id: 40,
         effort_size: "M",
         effort_score: 5,
+        original_estimate_minutes: 240,
+        remaining_estimate_minutes: 120,
         business_value: "high",
         risk_level: "high",
         complexity: "medium",
@@ -193,7 +205,16 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, original_estimate_minutes: 240, remaining_estimate_minutes: 120, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2, original_estimate_minutes: 120, remaining_estimate_minutes: 90 }]), { status: 200 });
+    }
+    if (url.includes("/capacity/99") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/capacity") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 100, project_id: 3, user_id: 2, sprint_id: 30, capacity_minutes: 480, notes: "New capacity" }), { status: 201 });
+    }
+    if (url.includes("/capacity")) {
+      return new Response(JSON.stringify([{ id: 99, project_id: 3, user_id: 1, sprint_id: 30, capacity_minutes: 960, notes: "Two days" }]), { status: 200 });
     }
     if (url.includes("/projects/3/hierarchy")) {
       return new Response(JSON.stringify({
@@ -460,7 +481,26 @@ describe("Flow frontend screens", () => {
     expect(screen.getAllByText("Login outage").length).toBeGreaterThan(0);
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getByText("Acceptance")).toBeInTheDocument();
+    expect(screen.getByText("Time Tracking")).toBeInTheDocument();
+    expect(screen.getAllByText(/45m/).length).toBeGreaterThan(0);
     expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
+  });
+
+  it("adds work log from work item detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Time Tracking")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Time spent minutes"), { target: { value: "45" } });
+    fireEvent.change(screen.getByLabelText("Work log description"), { target: { value: "Implementation" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Work Log" }));
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7/work-logs") && init?.method === "POST");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ user_id: 1, description: "Implementation", time_spent_minutes: 45 });
+    });
   });
 
   it("adds and removes linked resources from work item detail", async () => {
@@ -673,11 +713,30 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Sprint 1" })).toBeInTheDocument());
     expect(screen.getByText("Ship planning")).toBeInTheDocument();
     expect(screen.getByText("Progress")).toBeInTheDocument();
+    expect(screen.getAllByText("Capacity").length).toBeGreaterThan(0);
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Complete Sprint" }));
     await waitFor(() => {
       const completeCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/complete") && init?.method === "POST");
       expect(completeCall).toBeTruthy();
+    });
+  });
+
+  it("renders capacity page and creates capacity entry", async () => {
+    navigationMock.pathname = "/flow/capacity";
+    renderWithQuery(<FlowCapacityPage />);
+
+    expect(screen.getByRole("heading", { name: "Capacity" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Capacity Entries")).toBeInTheDocument());
+    expect(screen.getByText("Two days")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Capacity hours"), { target: { value: "8" } });
+    fireEvent.change(screen.getByLabelText("Capacity user id"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Capacity Entry" }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/capacity") && init?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ project_id: 3, user_id: 2, capacity_minutes: 480 });
     });
   });
 
@@ -745,6 +804,8 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Flow Reports" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("High Risk")).toBeInTheDocument());
+    expect(screen.getByText("Capacity Summary")).toBeInTheDocument();
+    expect(screen.getByText("Estimate vs Actual")).toBeInTheDocument();
     expect(screen.getByText("By Effort")).toBeInTheDocument();
   });
 

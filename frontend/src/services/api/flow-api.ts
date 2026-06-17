@@ -11,6 +11,9 @@ import type {
   Sprint,
   SprintCreate,
   SprintUpdate,
+  TeamCapacity,
+  TeamCapacityCreate,
+  TeamCapacityUpdate,
   Workflow,
   WorkflowCreate,
   WorkflowStatus,
@@ -26,7 +29,9 @@ import type {
   WorkItemFilters,
   WorkItemOperationalUpdate,
   WorkItemRelation,
-  WorkItemRelationCreate
+  WorkItemRelationCreate,
+  WorkLog,
+  WorkLogCreate
 } from "@/types/flow";
 
 const FLOW_PREFIX = "/api/flow/api/v1";
@@ -202,5 +207,26 @@ export const flowApi = {
       authToken: accessToken,
       json: payload
     });
+  },
+  listWorkLogs(accessToken: string, workItemId: string | number) {
+    return apiRequest<WorkLog[]>(`${FLOW_PREFIX}/work-items/${workItemId}/work-logs`, { method: "GET", authToken: accessToken });
+  },
+  createWorkLog(accessToken: string, workItemId: string | number, payload: WorkLogCreate) {
+    return apiRequest<WorkLog>(`${FLOW_PREFIX}/work-items/${workItemId}/work-logs`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  deleteWorkLog(accessToken: string, workItemId: string | number, workLogId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/work-logs/${workLogId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listCapacity(accessToken: string, filters: { project_id?: number | null; sprint_id?: number | null; user_id?: number | null; team_id?: number | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<TeamCapacity[]>(`${FLOW_PREFIX}/capacity${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createCapacity(accessToken: string, payload: TeamCapacityCreate) {
+    return apiRequest<TeamCapacity>(`${FLOW_PREFIX}/capacity`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateCapacity(accessToken: string, capacityId: string | number, payload: TeamCapacityUpdate) {
+    return apiRequest<TeamCapacity>(`${FLOW_PREFIX}/capacity/${capacityId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteCapacity(accessToken: string, capacityId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/capacity/${capacityId}`, { method: "DELETE", authToken: accessToken });
   }
 };

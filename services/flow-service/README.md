@@ -175,6 +175,8 @@ Advanced work item fields:
 
 - `effort_score`: positive integer
 - `effort_size`: `XS`, `S`, `M`, `L`, `XL`
+- `original_estimate_minutes`: optional integer estimate
+- `remaining_estimate_minutes`: optional integer estimate
 - `business_value`: `low`, `medium`, `high`, `critical`
 - `risk_level`: `low`, `medium`, `high`
 - `complexity`: `low`, `medium`, `high`
@@ -217,6 +219,27 @@ List children for a work item:
 ```http
 GET /api/v1/work-items/{work_item_id}/children
 ```
+
+## Capacity And Time Tracking
+
+Work item time logs:
+
+```http
+POST /api/v1/work-items/{work_item_id}/work-logs
+GET /api/v1/work-items/{work_item_id}/work-logs
+DELETE /api/v1/work-items/{work_item_id}/work-logs/{work_log_id}
+```
+
+Capacity entries:
+
+```http
+POST /api/v1/capacity
+GET /api/v1/capacity
+PATCH /api/v1/capacity/{capacity_id}
+DELETE /api/v1/capacity/{capacity_id}
+```
+
+Capacity is project-scoped and can optionally reference a sprint, user ID, or team ID. Detailed member and team lookup remains a future Core integration.
 
 Create a relation between work items:
 

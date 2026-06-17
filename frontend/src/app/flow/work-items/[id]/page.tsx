@@ -70,6 +70,8 @@ export default function WorkItemDetailPage() {
     dueDate: "",
     effortScore: "",
     effortSize: "",
+    originalEstimateHours: "",
+    remainingEstimateHours: "",
     businessValue: "",
     riskLevel: "",
     complexity: "",
@@ -86,10 +88,13 @@ export default function WorkItemDetailPage() {
   const [linkEntityId, setLinkEntityId] = useState("");
   const [linkTitle, setLinkTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [workLogMinutes, setWorkLogMinutes] = useState("");
+  const [workLogDescription, setWorkLogDescription] = useState("");
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const commentsQuery = useQuery({ queryKey: ["flow", "comments", id], queryFn: () => flowApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const attachmentsQuery = useQuery({ queryKey: ["flow", "attachments", id], queryFn: () => flowApi.listAttachments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const workLogsQuery = useQuery({ queryKey: ["flow", "work-logs", id], queryFn: () => flowApi.listWorkLogs(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const linksQuery = useQuery({ queryKey: ["flow", "links", id], queryFn: () => flowApi.listLinks(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
@@ -124,6 +129,8 @@ export default function WorkItemDetailPage() {
       dueDate: item.due_date ? item.due_date.slice(0, 10) : "",
       effortScore: item.effort_score ? String(item.effort_score) : "",
       effortSize: item.effort_size ?? "",
+      originalEstimateHours: item.original_estimate_minutes ? String(item.original_estimate_minutes / 60) : "",
+      remainingEstimateHours: item.remaining_estimate_minutes ? String(item.remaining_estimate_minutes / 60) : "",
       businessValue: item.business_value ?? "",
       riskLevel: item.risk_level ?? "",
       complexity: item.complexity ?? "",
@@ -144,6 +151,8 @@ export default function WorkItemDetailPage() {
       due_date: draft.dueDate ? `${draft.dueDate}T00:00:00Z` : null,
       effort_score: draft.effortScore ? Number(draft.effortScore) : null,
       effort_size: draft.effortSize || null,
+      original_estimate_minutes: draft.originalEstimateHours ? Math.round(Number(draft.originalEstimateHours) * 60) : null,
+      remaining_estimate_minutes: draft.remainingEstimateHours ? Math.round(Number(draft.remainingEstimateHours) * 60) : null,
       business_value: draft.businessValue || null,
       risk_level: draft.riskLevel || null,
       complexity: draft.complexity || null,
@@ -198,6 +207,27 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow", "attachments", id] });
     },
     onError: (error) => addToast({ type: "error", title: "Attachment delete failed", message: error instanceof Error ? error.message : "Unable to delete attachment." })
+  });
+  const workLogMutation = useMutation({
+    mutationFn: () => flowApi.createWorkLog(accessToken ?? "", id, {
+      user_id: currentUser?.id,
+      description: workLogDescription.trim() || null,
+      time_spent_minutes: Number(workLogMinutes)
+    }),
+    onSuccess: () => {
+      setWorkLogMinutes("");
+      setWorkLogDescription("");
+      addToast({ type: "success", title: "Work log added" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "work-logs", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Work log failed", message: error instanceof Error ? error.message : "Unable to add work log." })
+  });
+  const deleteWorkLogMutation = useMutation({
+    mutationFn: (workLogId: number) => flowApi.deleteWorkLog(accessToken ?? "", id, workLogId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Work log deleted" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "work-logs", id] });
+    }
   });
   const subtaskMutation = useMutation({
     mutationFn: () => flowApi.createSubtask(accessToken ?? "", id, {
@@ -293,6 +323,8 @@ export default function WorkItemDetailPage() {
   const linksByType = groupLinksByType(linksQuery.data ?? []);
   const releases = releasesQuery.data ?? [];
   const currentRelease = releases.find((release) => release.id === item.release_id);
+  const workLogs = workLogsQuery.data ?? [];
+  const totalLoggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
 
   return (
     <div className="space-y-4">
@@ -354,6 +386,14 @@ export default function WorkItemDetailPage() {
                     <label className="grid gap-1 text-sm">
                       <span className="font-medium">Effort Score</span>
                       <Input inputMode="numeric" value={draft.effortScore} onChange={(event) => setDraft((value) => ({ ...value, effortScore: event.target.value }))} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Original estimate hours</span>
+                      <Input inputMode="decimal" value={draft.originalEstimateHours} onChange={(event) => setDraft((value) => ({ ...value, originalEstimateHours: event.target.value }))} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Remaining estimate hours</span>
+                      <Input inputMode="decimal" value={draft.remainingEstimateHours} onChange={(event) => setDraft((value) => ({ ...value, remainingEstimateHours: event.target.value }))} />
                     </label>
                     <label className="grid gap-1 text-sm">
                       <span className="font-medium">Business Value</span>
@@ -434,6 +474,37 @@ export default function WorkItemDetailPage() {
               <div><div className="text-muted-foreground">Business Value</div><div className="font-medium">{planningLabel(item.business_value)}</div></div>
               <div><div className="text-muted-foreground">Risk</div><div className="font-medium">{planningLabel(item.risk_level)}</div></div>
               <div><div className="text-muted-foreground">Complexity</div><div className="font-medium">{planningLabel(item.complexity)}</div></div>
+              <div><div className="text-muted-foreground">Original Estimate</div><div className="font-medium">{formatTimeMinutes(item.original_estimate_minutes)}</div></div>
+              <div><div className="text-muted-foreground">Remaining Estimate</div><div className="font-medium">{formatTimeMinutes(item.remaining_estimate_minutes)}</div></div>
+            </div>
+          </DetailPanel>
+          <DetailPanel title="Time Tracking">
+            <div className="space-y-4 text-sm">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div><div className="text-muted-foreground">Original Estimate</div><div className="font-medium">{formatTimeMinutes(item.original_estimate_minutes)}</div></div>
+                <div><div className="text-muted-foreground">Remaining Estimate</div><div className="font-medium">{formatTimeMinutes(item.remaining_estimate_minutes)}</div></div>
+                <div><div className="text-muted-foreground">Time Logged</div><div className="font-medium">{formatTimeMinutes(totalLoggedMinutes)}</div></div>
+              </div>
+              <form className="grid gap-2 rounded-md border p-3" onSubmit={(event) => { event.preventDefault(); if (Number(workLogMinutes) > 0) workLogMutation.mutate(); }}>
+                <Input aria-label="Time spent minutes" inputMode="numeric" placeholder="Time spent minutes" value={workLogMinutes} onChange={(event) => setWorkLogMinutes(event.target.value)} />
+                <Input aria-label="Work log description" placeholder="Description optional" value={workLogDescription} onChange={(event) => setWorkLogDescription(event.target.value)} />
+                <Button size="sm" disabled={Number(workLogMinutes) <= 0 || workLogMutation.isPending}>{workLogMutation.isPending ? "Adding..." : "Add Work Log"}</Button>
+              </form>
+              <div className="space-y-2">
+                {workLogs.length === 0 ? <p className="rounded-md border border-dashed p-3 text-muted-foreground">No work logs yet.</p> : null}
+                {workLogs.map((log) => (
+                  <div key={log.id} className="rounded-md border p-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{formatTimeMinutes(log.time_spent_minutes)}</div>
+                        <div className="text-xs text-muted-foreground">{log.logged_at ? new Date(log.logged_at).toLocaleString() : "Logged recently"} · {log.user_id ? `User ${log.user_id}` : "No user"}</div>
+                        {log.description ? <p className="mt-1 text-muted-foreground">{log.description}</p> : null}
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => deleteWorkLogMutation.mutate(log.id)}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </DetailPanel>
           <DetailPanel title="Release">
@@ -604,6 +675,13 @@ function formatFileSize(value?: number | null) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatTimeMinutes(value?: number | null) {
+  if (!value) return "0h";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 function attachmentHref(workItemId: string, attachmentId: number, fileUrl?: string | null) {
