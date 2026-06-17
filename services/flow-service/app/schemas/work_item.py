@@ -66,6 +66,7 @@ class WorkItemCreate(BaseModel):
     status_name: str | None = Field(default=None, min_length=1, max_length=100)
     priority_id: Optional[int] = None
     sprint_id: int | None = None
+    release_id: int | None = None
     priority_name: str | None = Field(default=None, min_length=1, max_length=100)
     reporter_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
@@ -121,6 +122,7 @@ class WorkItemUpdate(BaseModel):
     status_name: str | None = Field(default=None, min_length=1, max_length=100)
     priority_id: int | None = None
     sprint_id: int | None = None
+    release_id: int | None = None
     priority_name: str | None = Field(default=None, min_length=1, max_length=100)
     parent_id: int | None = None
     board_id: int | None = None
@@ -181,6 +183,7 @@ class WorkItemRead(TimestampedRead):
     status_id: int
     priority_id: int | None = None
     sprint_id: int | None = None
+    release_id: int | None = None
     board_id: int | None = None
     board_column_id: int | None = None
     title: str

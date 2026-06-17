@@ -3,6 +3,7 @@ from app.db.base_class import Base
 from app.models.board import Board, BoardColumn  # noqa: E402,F401
 from app.models.flow_activity import FlowActivity  # noqa: E402,F401
 from app.models.linked_entity import LinkedEntity  # noqa: E402,F401
+from app.models.release import Release  # noqa: E402,F401
 from app.models.sprint import Sprint  # noqa: E402,F401
 from app.models.work_item import WorkItem, work_item_labels  # noqa: E402,F401
 from app.models.work_item_attachment import WorkItemAttachment  # noqa: E402,F401

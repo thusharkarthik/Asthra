@@ -9,6 +9,7 @@ export type WorkItem = {
   status_id?: number | null;
   priority_id?: number | null;
   sprint_id?: number | null;
+  release_id?: number | null;
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
@@ -33,6 +34,7 @@ export type WorkItemCreate = {
   status_id?: number | null;
   priority_id?: number | null;
   sprint_id?: number | null;
+  release_id?: number | null;
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
@@ -223,6 +225,7 @@ export type WorkItemFilters = {
   assignee_id?: number | null;
   priority_id?: number | null;
   sprint_id?: number | null;
+  release_id?: number | null;
   limit?: number;
   offset?: number;
 };
@@ -254,3 +257,33 @@ export type SprintCreate = {
 };
 
 export type SprintUpdate = Partial<Omit<SprintCreate, "project_id">>;
+
+export type ReleaseStatus = "planned" | "active" | "released" | "cancelled";
+
+export type Release = {
+  id: number;
+  project_id: number;
+  name: string;
+  version: string;
+  description?: string | null;
+  target_date?: string | null;
+  actual_release_date?: string | null;
+  status: ReleaseStatus;
+  work_item_count: number;
+  completed_work_count: number;
+  completion_percentage: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ReleaseCreate = {
+  project_id: number;
+  name: string;
+  version: string;
+  description?: string | null;
+  target_date?: string | null;
+  actual_release_date?: string | null;
+  status?: ReleaseStatus;
+};
+
+export type ReleaseUpdate = Partial<Omit<ReleaseCreate, "project_id">>;

@@ -48,14 +48,24 @@ export default function FlowPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const releasesQuery = useQuery({
+    queryKey: ["flow", "releases", selectedProjectId],
+    queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
 
   const items = workItemsQuery.data ?? [];
+  const releases = releasesQuery.data ?? [];
   const recentItems = sortedByUpdatedAt(items).slice(0, 6);
   const assignedToMe = items.filter((item) => item.assignee_id === currentUser?.id).slice(0, 5);
   const openCount = items.filter(isOpenWorkItem).length;
   const inProgressCount = items.filter(isInProgressWorkItem).length;
   const blockedCount = items.filter(isBlockedWorkItem).length;
   const completedCount = items.filter(isCompletedWorkItem).length;
+  const upcomingReleases = releases.filter((release) => release.status === "planned").slice(0, 3);
+  const activeReleases = releases.filter((release) => release.status === "active");
+  const releaseProgress = releases.length ? Math.round(releases.reduce((sum, release) => sum + release.completion_percentage, 0) / releases.length) : 0;
 
   const stats = [
     { title: "Open Work Items", value: openCount, icon: Clock3, tone: "text-blue-600" },
@@ -94,6 +104,28 @@ export default function FlowPage() {
                 </ModuleDashboardCard>
               );
             })}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <ModuleDashboardCard title="Upcoming Releases" value={upcomingReleases.length}>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                {upcomingReleases.map((release) => (
+                  <Link key={release.id} className="block truncate hover:text-foreground" href={`/flow/releases/${release.id}`}>{release.name} · {release.version}</Link>
+                ))}
+                {upcomingReleases.length === 0 ? <span>No upcoming releases planned.</span> : null}
+              </div>
+            </ModuleDashboardCard>
+            <ModuleDashboardCard title="Active Releases" value={activeReleases.length}>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                {activeReleases.slice(0, 3).map((release) => (
+                  <Link key={release.id} className="block truncate hover:text-foreground" href={`/flow/releases/${release.id}`}>{release.name} · {release.completion_percentage}%</Link>
+                ))}
+                {activeReleases.length === 0 ? <span>No release is active.</span> : null}
+              </div>
+            </ModuleDashboardCard>
+            <ModuleDashboardCard title="Release Progress" value={`${releaseProgress}%`}>
+              <p className="text-sm text-muted-foreground">Average completion across project releases.</p>
+            </ModuleDashboardCard>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">

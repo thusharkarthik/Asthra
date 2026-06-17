@@ -32,13 +32,23 @@ export default function FlowReportsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const releasesQuery = useQuery({
+    queryKey: ["flow", "releases", selectedProjectId],
+    queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const items = workItemsQuery.data ?? [];
   const sprints = sprintsQuery.data ?? [];
+  const releases = releasesQuery.data ?? [];
   const completedSprints = sprints.filter((sprint) => sprint.status === "completed");
   const activeSprint = sprints.find((sprint) => sprint.status === "active");
   const sprintVelocity = completedSprints.length ? Math.round(completedSprints.reduce((sum, sprint) => sum + sprint.completed_work_count, 0) / completedSprints.length) : 0;
   const activeSprintCompletion = activeSprint?.planned_work_count ? Math.round((activeSprint.completed_work_count / activeSprint.planned_work_count) * 100) : 0;
   const effortCompleted = sprints.reduce((sum, sprint) => sprint.status === "completed" ? sum + sprint.total_effort : sum, 0);
+  const activeRelease = releases.find((release) => release.status === "active");
+  const releaseCompletion = releases.length ? Math.round(releases.reduce((sum, release) => sum + release.completion_percentage, 0) / releases.length) : 0;
+  const releaseRisk = activeRelease ? items.filter((item) => item.release_id === activeRelease.id && (isBlockedWorkItem(item) || isHighRiskWorkItem(item))).length : 0;
   const workflowStatuses = workflowQuery.data?.statuses.length
     ? workflowQuery.data.statuses
     : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, category: status.name === "done" ? "completed" : status.name === "review" ? "review" : status.name === "in_progress" ? "active" : "backlog" }));
@@ -72,6 +82,16 @@ export default function FlowReportsPage() {
           </ModuleDashboardCard>
           <ModuleDashboardCard title="Sprint Completion" value={`${activeSprintCompletion}%`} />
           <ModuleDashboardCard title="Effort Completed" value={effortCompleted} />
+          <ModuleDashboardCard title="Release Summary" value={releases.length}>
+            <p className="text-sm text-muted-foreground">{activeRelease ? `Active: ${activeRelease.name}` : "No active release."}</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Release Completion" value={`${releaseCompletion}%`} />
+          <ModuleDashboardCard title="Release Risk" value={releaseRisk}>
+            <p className="text-sm text-muted-foreground">Blocked or high-risk items in the active release.</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Work Distribution" value={items.filter((item) => item.release_id).length}>
+            <MetricList items={releases.slice(0, 5).map((release) => [release.name, items.filter((item) => item.release_id === release.id).length])} />
+          </ModuleDashboardCard>
           <ModuleDashboardCard title="By Status" value={items.length}>
             <MetricList items={workflowStatuses.map((status) => [status.name, countByStatus(status.id)])} />
           </ModuleDashboardCard>

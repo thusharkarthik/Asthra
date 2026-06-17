@@ -5,6 +5,9 @@ import type {
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
+  Release,
+  ReleaseCreate,
+  ReleaseUpdate,
   Sprint,
   SprintCreate,
   SprintUpdate,
@@ -108,6 +111,30 @@ export const flowApi = {
   },
   assignWorkItemToSprint(accessToken: string, sprintId: string | number, workItemId: string | number) {
     return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}/work-items`, { method: "POST", authToken: accessToken, json: { work_item_id: Number(workItemId) } });
+  },
+  listReleases(accessToken: string, filters: { project_id?: number | null; status?: string | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<Release[]>(`${FLOW_PREFIX}/releases${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createRelease(accessToken: string, payload: ReleaseCreate) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  getRelease(accessToken: string, releaseId: string | number) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases/${releaseId}`, { method: "GET", authToken: accessToken });
+  },
+  updateRelease(accessToken: string, releaseId: string | number, payload: ReleaseUpdate) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases/${releaseId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteRelease(accessToken: string, releaseId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/releases/${releaseId}`, { method: "DELETE", authToken: accessToken });
+  },
+  activateRelease(accessToken: string, releaseId: string | number) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases/${releaseId}/activate`, { method: "POST", authToken: accessToken });
+  },
+  markReleaseReleased(accessToken: string, releaseId: string | number) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases/${releaseId}/release`, { method: "POST", authToken: accessToken });
+  },
+  assignWorkItemToRelease(accessToken: string, releaseId: string | number, workItemId: string | number) {
+    return apiRequest<Release>(`${FLOW_PREFIX}/releases/${releaseId}/work-items`, { method: "POST", authToken: accessToken, json: { work_item_id: Number(workItemId) } });
   },
   listAttachments(accessToken: string, workItemId: string | number) {
     return apiRequest<WorkItemAttachment[]>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "GET", authToken: accessToken });

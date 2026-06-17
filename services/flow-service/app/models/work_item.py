@@ -25,6 +25,7 @@ class WorkItem(TimestampMixin, Base):
     status_id: Mapped[int] = mapped_column(ForeignKey("work_item_statuses.id"), nullable=False)
     priority_id: Mapped[int | None] = mapped_column(ForeignKey("work_item_priorities.id"))
     sprint_id: Mapped[int | None] = mapped_column(ForeignKey("sprints.id"), index=True)
+    release_id: Mapped[int | None] = mapped_column(ForeignKey("releases.id"), index=True)
     board_id: Mapped[int | None] = mapped_column(ForeignKey("boards.id"))
     board_column_id: Mapped[int | None] = mapped_column(ForeignKey("board_columns.id"))
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -49,6 +50,7 @@ class WorkItem(TimestampMixin, Base):
     status = relationship("WorkItemStatus", back_populates="work_items")
     priority = relationship("WorkItemPriority", back_populates="work_items")
     sprint = relationship("Sprint", back_populates="work_items")
+    release = relationship("Release", back_populates="work_items")
     board = relationship("Board", back_populates="work_items")
     board_column = relationship("BoardColumn", back_populates="work_items")
     comments = relationship(
