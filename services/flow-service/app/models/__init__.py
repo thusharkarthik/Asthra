@@ -1,3 +1,4 @@
+from app.models.audit_event import AuditEvent
 from app.models.board import Board, BoardColumn
 from app.models.custom_field import CustomFieldDefinition, CustomFieldValue
 from app.models.flow_activity import FlowActivity
@@ -20,6 +21,7 @@ from app.models.work_item_type import WorkItemType
 __all__ = [
     "Board",
     "BoardColumn",
+    "AuditEvent",
     "CustomFieldDefinition",
     "CustomFieldValue",
     "FlowActivity",

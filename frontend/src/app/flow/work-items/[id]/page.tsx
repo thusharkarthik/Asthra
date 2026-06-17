@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
+import { AuditEventGroups, groupAuditEventsByDay } from "@/components/flow/audit-event-list";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import {
   FLOW_BUSINESS_VALUE_OPTIONS,
@@ -99,6 +100,7 @@ export default function WorkItemDetailPage() {
   const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const linksQuery = useQuery({ queryKey: ["flow", "links", id], queryFn: () => flowApi.listLinks(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const auditQuery = useQuery({ queryKey: ["flow", "audit-events", "work-item", id], queryFn: () => flowApi.listWorkItemAuditEvents(accessToken ?? "", id, { limit: 100 }), enabled: Boolean(accessToken && id) });
   const item = itemQuery.data;
   const workflowQuery = useQuery({
     queryKey: ["flow", "project-workflow", item?.project_id],
@@ -191,6 +193,7 @@ export default function WorkItemDetailPage() {
       addToast({ type: "success", title: "Work item updated" });
       queryClient.invalidateQueries({ queryKey: ["flow"] });
       queryClient.invalidateQueries({ queryKey: ["flow", "notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Update failed", message: error instanceof Error ? error.message : "Unable to update work item." })
   });
@@ -212,6 +215,7 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow", "comments", id] });
       queryClient.invalidateQueries({ queryKey: ["flow", "work-item", id] });
       queryClient.invalidateQueries({ queryKey: ["flow", "notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Comment failed", message: error instanceof Error ? error.message : "Unable to add comment." })
   });
@@ -224,6 +228,7 @@ export default function WorkItemDetailPage() {
       setSelectedFile(null);
       addToast({ type: "success", title: "Attachment uploaded" });
       queryClient.invalidateQueries({ queryKey: ["flow", "attachments", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Attachment upload failed", message: error instanceof Error ? error.message : "Unable to upload attachment." })
   });
@@ -232,6 +237,7 @@ export default function WorkItemDetailPage() {
     onSuccess: () => {
       addToast({ type: "success", title: "Attachment deleted" });
       queryClient.invalidateQueries({ queryKey: ["flow", "attachments", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Attachment delete failed", message: error instanceof Error ? error.message : "Unable to delete attachment." })
   });
@@ -280,6 +286,7 @@ export default function WorkItemDetailPage() {
       setRelationDescription("");
       addToast({ type: "success", title: "Related work added" });
       queryClient.invalidateQueries({ queryKey: ["flow", "relations", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Relation failed", message: error instanceof Error ? error.message : "Unable to add relation." })
   });
@@ -288,6 +295,7 @@ export default function WorkItemDetailPage() {
     onSuccess: () => {
       addToast({ type: "success", title: "Relation removed" });
       queryClient.invalidateQueries({ queryKey: ["flow", "relations", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     }
   });
   const linkMutation = useMutation({
@@ -301,6 +309,7 @@ export default function WorkItemDetailPage() {
       setLinkTitle("");
       addToast({ type: "success", title: "Link added" });
       queryClient.invalidateQueries({ queryKey: ["flow", "links", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Link failed", message: error instanceof Error ? error.message : "Unable to add link." })
   });
@@ -309,6 +318,7 @@ export default function WorkItemDetailPage() {
     onSuccess: () => {
       addToast({ type: "success", title: "Link removed" });
       queryClient.invalidateQueries({ queryKey: ["flow", "links", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "audit-events"] });
     },
     onError: (error) => addToast({ type: "error", title: "Link remove failed", message: error instanceof Error ? error.message : "Unable to remove link." })
   });
@@ -372,6 +382,7 @@ export default function WorkItemDetailPage() {
   const currentRelease = releases.find((release) => release.id === item.release_id);
   const workLogs = workLogsQuery.data ?? [];
   const totalLoggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
+  const auditGroups = groupAuditEventsByDay(auditQuery.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -707,6 +718,15 @@ export default function WorkItemDetailPage() {
           <CommentList comments={commentsQuery.data ?? []} />
           <CommentComposer onSubmit={(content) => commentMutation.mutate(content)} isSubmitting={commentMutation.isPending} />
         </div>
+      </DetailPanel>
+      <DetailPanel title="Audit Trail">
+        {auditQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading audit trail...</p> : null}
+        {auditQuery.isError ? <p className="text-sm text-destructive">Unable to load audit trail.</p> : null}
+        {!auditQuery.isLoading && !auditQuery.isError && auditGroups.length === 0 ? (
+          <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No audit events yet.</p>
+        ) : (
+          <AuditEventGroups grouped={auditGroups} />
+        )}
       </DetailPanel>
       <DetailPanel title="Attachments">
         <div className="space-y-4">

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
+from app.schemas.audit_event import AuditEventCreate
 from app.schemas.work_item import (
     LinkedEntityCreate,
     LinkedEntityRead,
@@ -22,6 +23,7 @@ from app.schemas.work_item import (
 )
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
+from app.services.audit_service import AuditService
 from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
 from app.services.workflow_service import WorkflowService
@@ -33,6 +35,7 @@ class WorkItemService:
     def __init__(self, db: Session) -> None:
         self.work_item_repository = WorkItemRepository(db)
         self.activity_service = ActivityService(db)
+        self.audit_service = AuditService(db)
         self.notification_service = NotificationService(db)
 
     def create(self, work_item_create: WorkItemCreate) -> WorkItem:
@@ -75,6 +78,18 @@ class WorkItemService:
             project_id=work_item.project_id,
             work_item_id=work_item.id,
             description=f"Work item '{work_item.title}' was created.",
+        )
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="work_item",
+                entity_id=str(work_item.id),
+                action="work_item.created",
+                actor_id=work_item.reporter_id,
+                new_value=work_item.title,
+                metadata={"title": work_item.title},
+            )
         )
         publish_event(
             "flow.work_item.created",
@@ -123,6 +138,8 @@ class WorkItemService:
         previous_priority_id = work_item.priority_id
         previous_assignee_id = work_item.assignee_id
         previous_due_date = work_item.due_date
+        previous_title = work_item.title
+        previous_description = work_item.description
         work_item_update = self._apply_update_lookup_names(work_item_update, work_item.project_id)
         effective_level = work_item_update.item_level if work_item_update.item_level is not None else work_item.item_level
         effective_parent_id = work_item_update.parent_id if "parent_id" in work_item_update.model_fields_set else work_item.parent_id
@@ -174,11 +191,32 @@ class WorkItemService:
             updated_work_item=updated_work_item,
             updated_fields=set(work_item_update.model_dump(exclude_unset=True)),
         )
+        self._create_update_audit_events(
+            previous_status_id=previous_status_id,
+            previous_priority_id=previous_priority_id,
+            previous_assignee_id=previous_assignee_id,
+            previous_due_date=previous_due_date,
+            previous_title=previous_title,
+            previous_description=previous_description,
+            updated_work_item=updated_work_item,
+            updated_fields=set(work_item_update.model_dump(exclude_unset=True)),
+        )
         return updated_work_item
 
     def delete(self, work_item_id: int) -> None:
         work_item = self.get(work_item_id)
         self.work_item_repository.delete(work_item)
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="work_item",
+                entity_id=str(work_item.id),
+                action="work_item.archived",
+                actor_id=work_item.reporter_id,
+                old_value=work_item.title,
+            )
+        )
 
     def get_project_hierarchy(self, project_id: int) -> ProjectHierarchyRead:
         items = self.work_item_repository.list_by_project(project_id)
@@ -232,7 +270,20 @@ class WorkItemService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Work item relation cannot target itself.")
         if source.project_id != target.project_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Related work must belong to the same project.")
-        return self.work_item_repository.create_relation(work_item_id, relation_create)
+        relation = self.work_item_repository.create_relation(work_item_id, relation_create)
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=source.project_id,
+                work_item_id=source.id,
+                entity_type="relation",
+                entity_id=str(relation.id),
+                action="relation.added",
+                actor_id=relation.created_by_id,
+                new_value=f"{relation.relation_type}:{target.title}",
+                metadata={"target_work_item_id": target.id, "relation_type": relation.relation_type},
+            )
+        )
+        return relation
 
     def list_relations(self, work_item_id: int) -> list[WorkItemRelationRead]:
         self.get(work_item_id)
@@ -265,7 +316,25 @@ class WorkItemService:
             relation.source_work_item_id != work_item_id and relation.target_work_item_id != work_item_id
         ):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Work item relation not found.")
+        source = self.get(relation.source_work_item_id)
+        related = self.get(relation.target_work_item_id)
+        relation_type = relation.relation_type
+        created_by_id = relation.created_by_id
+        related_id = related.id
+        related_title = related.title
         self.work_item_repository.delete_relation(relation)
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=source.project_id,
+                work_item_id=work_item_id,
+                entity_type="relation",
+                entity_id=str(relation_id),
+                action="relation.removed",
+                actor_id=created_by_id,
+                old_value=f"{relation_type}:{related_title}",
+                metadata={"target_work_item_id": related_id, "relation_type": relation_type},
+            )
+        )
 
     def create_link(self, work_item_id: int, link_create: LinkedEntityCreate):
         work_item = self.get(work_item_id)
@@ -283,6 +352,22 @@ class WorkItemService:
                 "entity_title": link.entity_title,
                 "entity_url": link.entity_url,
             },
+        )
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="linked_entity",
+                entity_id=str(link.id),
+                action="link.linked",
+                new_value=link.entity_title,
+                metadata={
+                    "entity_type": link.entity_type,
+                    "entity_id": link.entity_id,
+                    "entity_title": link.entity_title,
+                    "entity_url": link.entity_url,
+                },
+            )
         )
         return link
 
@@ -312,6 +397,17 @@ class WorkItemService:
             work_item_id=work_item.id,
             description=f"Removed {entity_type} '{entity_title}' from work item '{work_item.title}'.",
             metadata=metadata,
+        )
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="linked_entity",
+                entity_id=str(link_id),
+                action="link.unlinked",
+                old_value=entity_title,
+                metadata=metadata,
+            )
         )
 
     def ai_breakdown(self, work_item_id: int, request_id: str | None = None) -> WorkItemAIBreakdownRead:
@@ -426,6 +522,61 @@ class WorkItemService:
                 message=f"Due date updated for '{updated_work_item.title}'.",
                 user_id=updated_work_item.assignee_id,
             )
+
+    def _create_update_audit_events(
+        self,
+        *,
+        previous_status_id: int | None,
+        previous_priority_id: int | None,
+        previous_assignee_id: int | None,
+        previous_due_date: object,
+        previous_title: str | None,
+        previous_description: str | None,
+        updated_work_item: WorkItem,
+        updated_fields: set[str],
+    ) -> None:
+        actor_id = updated_work_item.reporter_id
+        if "title" in updated_fields and previous_title != updated_work_item.title:
+            self._record_work_item_audit(updated_work_item, "work_item.updated", actor_id, previous_title, updated_work_item.title, {"field": "title"})
+        if "description" in updated_fields and previous_description != updated_work_item.description:
+            self._record_work_item_audit(updated_work_item, "work_item.updated", actor_id, previous_description, updated_work_item.description, {"field": "description"})
+        if {"status_id", "status_name"} & updated_fields and previous_status_id != updated_work_item.status_id:
+            self._record_work_item_audit(updated_work_item, "status.changed", actor_id, previous_status_id, updated_work_item.status_id, {"field": "status_id"})
+        if {"priority_id", "priority_name"} & updated_fields and previous_priority_id != updated_work_item.priority_id:
+            self._record_work_item_audit(updated_work_item, "priority.changed", actor_id, previous_priority_id, updated_work_item.priority_id, {"field": "priority_id"})
+        if "assignee_id" in updated_fields and previous_assignee_id != updated_work_item.assignee_id:
+            self._record_work_item_audit(updated_work_item, "assignee.changed", actor_id, previous_assignee_id, updated_work_item.assignee_id, {"field": "assignee_id"})
+        if "due_date" in updated_fields and previous_due_date != updated_work_item.due_date:
+            self._record_work_item_audit(updated_work_item, "due_date.updated", actor_id, previous_due_date, updated_work_item.due_date, {"field": "due_date"})
+
+    def _record_work_item_audit(
+        self,
+        work_item: WorkItem,
+        action: str,
+        actor_id: int | None,
+        old_value: object,
+        new_value: object,
+        metadata: dict | None = None,
+    ) -> None:
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="work_item",
+                entity_id=str(work_item.id),
+                action=action,
+                actor_id=actor_id,
+                old_value=self._stringify_audit_value(old_value),
+                new_value=self._stringify_audit_value(new_value),
+                metadata=metadata,
+            )
+        )
+
+    @staticmethod
+    def _stringify_audit_value(value: object) -> str | None:
+        if value is None:
+            return None
+        return str(value)
 
     def _validate_required_ids(self, project_id: int) -> None:
         if project_id is None:

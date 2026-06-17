@@ -19,6 +19,7 @@ const items = [
   { href: "/flow/releases", label: "Releases", icon: Rocket },
   { href: "/flow/roadmap", label: "Roadmap", icon: Map },
   { href: "/flow/capacity", label: "Capacity", icon: Clock3 },
+  { href: "/flow/activity", label: "Activity", icon: BarChart3 },
   { href: "/flow/notifications", label: "Notifications", icon: Bell, showUnread: true },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },

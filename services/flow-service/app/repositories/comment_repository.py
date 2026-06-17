@@ -34,3 +34,18 @@ class CommentRepository:
             .order_by(WorkItemComment.id)
         )
         return list(self.db.scalars(statement).all())
+
+    def get_by_id(self, comment_id: int) -> WorkItemComment | None:
+        return self.db.get(WorkItemComment, comment_id)
+
+    def update(self, comment: WorkItemComment, body: str) -> WorkItemComment:
+        comment.body = body
+        self.db.add(comment)
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def delete(self, comment: WorkItemComment) -> None:
+        comment.is_active = False
+        self.db.add(comment)
+        self.db.commit()
