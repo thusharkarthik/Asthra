@@ -584,6 +584,39 @@ GET /api/v1/work-items/{work_item_id}/audit-events
 
 Workspace ID is nullable until Flow receives consistent workspace context from Core/API Gateway.
 
+## Flow Automation Rules
+
+Flow stores project-scoped MVP automation rules in `flow_automation_rules`.
+
+Supported triggers:
+
+- `work_item_created`
+- `status_changed`
+- `priority_changed`
+- `assignee_changed`
+- `comment_added`
+
+Supported actions:
+
+- create notification
+- add comment
+- update priority
+- update status
+- assign user when `assignee_id` is provided
+
+Automation API:
+
+```http
+POST /api/v1/automation-rules
+GET /api/v1/automation-rules
+GET /api/v1/automation-rules/{rule_id}
+PATCH /api/v1/automation-rules/{rule_id}
+DELETE /api/v1/automation-rules/{rule_id}
+POST /api/v1/automation-rules/{rule_id}/test
+```
+
+Rules execute synchronously inside Flow event paths and fail safely. Successful rule executions write `automation_rule.executed` audit events. Background workers, retries, and cross-service automation actions are intentionally out of scope for this MVP.
+
 ## Flow Notifications
 
 Flow stores project-scoped notifications in `flow_notifications` for operational updates that need user attention:

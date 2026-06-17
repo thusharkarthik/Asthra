@@ -392,3 +392,42 @@ export type FlowAuditEvent = {
   metadata?: Record<string, unknown> | null;
   created_at: string;
 };
+
+export type FlowAutomationTrigger = "work_item_created" | "status_changed" | "priority_changed" | "assignee_changed" | "comment_added";
+export type FlowAutomationAction = "create_notification" | "add_comment" | "update_priority" | "update_status" | "assign_user";
+
+export type FlowAutomationRule = {
+  id: number;
+  workspace_id?: number | null;
+  project_id: number;
+  name: string;
+  description?: string | null;
+  trigger_type: FlowAutomationTrigger;
+  condition_config?: Record<string, unknown> | null;
+  action_config?: Record<string, unknown> | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FlowAutomationRuleCreate = {
+  workspace_id?: number | null;
+  project_id: number;
+  name: string;
+  description?: string | null;
+  trigger_type: FlowAutomationTrigger;
+  condition_config?: Record<string, unknown> | null;
+  action_config?: Record<string, unknown> | null;
+  is_active?: boolean;
+};
+
+export type FlowAutomationRuleUpdate = Partial<Omit<FlowAutomationRuleCreate, "project_id">> & {
+  project_id?: number | null;
+};
+
+export type FlowAutomationRuleTestResult = {
+  rule_id: number;
+  matched: boolean;
+  executed: boolean;
+  message: string;
+};

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Bell, CalendarDays, Clock3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound } from "lucide-react";
+import { BarChart3, Bell, CalendarDays, Clock3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -20,6 +20,7 @@ const items = [
   { href: "/flow/roadmap", label: "Roadmap", icon: Map },
   { href: "/flow/capacity", label: "Capacity", icon: Clock3 },
   { href: "/flow/activity", label: "Activity", icon: BarChart3 },
+  { href: "/flow/automation", label: "Automation", icon: Workflow },
   { href: "/flow/notifications", label: "Notifications", icon: Bell, showUnread: true },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },

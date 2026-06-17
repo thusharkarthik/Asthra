@@ -24,6 +24,7 @@ from app.schemas.work_item import (
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.audit_service import AuditService
+from app.services.automation_rule_service import AutomationRuleService
 from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
 from app.services.workflow_service import WorkflowService
@@ -97,6 +98,11 @@ class WorkItemService:
             actor_user_id=work_item.reporter_id,
             entity_type="work_item",
             entity_id=str(work_item.id),
+        )
+        AutomationRuleService(self.work_item_repository.db).execute_for_event(
+            "work_item_created",
+            work_item,
+            event_payload={"title": work_item.title, "project_id": work_item.project_id},
         )
         return work_item
 
@@ -198,6 +204,13 @@ class WorkItemService:
             previous_due_date=previous_due_date,
             previous_title=previous_title,
             previous_description=previous_description,
+            updated_work_item=updated_work_item,
+            updated_fields=set(work_item_update.model_dump(exclude_unset=True)),
+        )
+        self._execute_update_automation_rules(
+            previous_status_id=previous_status_id,
+            previous_priority_id=previous_priority_id,
+            previous_assignee_id=previous_assignee_id,
             updated_work_item=updated_work_item,
             updated_fields=set(work_item_update.model_dump(exclude_unset=True)),
         )
@@ -571,6 +584,35 @@ class WorkItemService:
                 metadata=metadata,
             )
         )
+
+    def _execute_update_automation_rules(
+        self,
+        *,
+        previous_status_id: int | None,
+        previous_priority_id: int | None,
+        previous_assignee_id: int | None,
+        updated_work_item: WorkItem,
+        updated_fields: set[str],
+    ) -> None:
+        automation_service = AutomationRuleService(self.work_item_repository.db)
+        if {"status_id", "status_name"} & updated_fields and previous_status_id != updated_work_item.status_id:
+            automation_service.execute_for_event(
+                "status_changed",
+                updated_work_item,
+                event_payload={"old_status_id": previous_status_id, "new_status_id": updated_work_item.status_id},
+            )
+        if {"priority_id", "priority_name"} & updated_fields and previous_priority_id != updated_work_item.priority_id:
+            automation_service.execute_for_event(
+                "priority_changed",
+                updated_work_item,
+                event_payload={"old_priority_id": previous_priority_id, "new_priority_id": updated_work_item.priority_id},
+            )
+        if "assignee_id" in updated_fields and previous_assignee_id != updated_work_item.assignee_id:
+            automation_service.execute_for_event(
+                "assignee_changed",
+                updated_work_item,
+                event_payload={"old_assignee_id": previous_assignee_id, "new_assignee_id": updated_work_item.assignee_id},
+            )
 
     @staticmethod
     def _stringify_audit_value(value: object) -> str | None:

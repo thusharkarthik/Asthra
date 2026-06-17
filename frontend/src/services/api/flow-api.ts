@@ -9,6 +9,10 @@ import type {
   CustomFieldValueUpsert,
   FlowNotification,
   FlowAuditEvent,
+  FlowAutomationRule,
+  FlowAutomationRuleCreate,
+  FlowAutomationRuleTestResult,
+  FlowAutomationRuleUpdate,
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
@@ -271,5 +275,20 @@ export const flowApi = {
   },
   listWorkItemAuditEvents(accessToken: string, workItemId: string | number, filters: { actor_id?: number | null; action?: string | null; created_from?: string | null; created_to?: string | null; limit?: number; offset?: number } = {}) {
     return apiRequest<FlowAuditEvent[]>(`${FLOW_PREFIX}/work-items/${workItemId}/audit-events${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  listAutomationRules(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; trigger_type?: string | null; is_active?: boolean | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<FlowAutomationRule[]>(`${FLOW_PREFIX}/automation-rules${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createAutomationRule(accessToken: string, payload: FlowAutomationRuleCreate) {
+    return apiRequest<FlowAutomationRule>(`${FLOW_PREFIX}/automation-rules`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateAutomationRule(accessToken: string, ruleId: string | number, payload: FlowAutomationRuleUpdate) {
+    return apiRequest<FlowAutomationRule>(`${FLOW_PREFIX}/automation-rules/${ruleId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteAutomationRule(accessToken: string, ruleId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/automation-rules/${ruleId}`, { method: "DELETE", authToken: accessToken });
+  },
+  testAutomationRule(accessToken: string, ruleId: string | number, workItemId?: number | null) {
+    return apiRequest<FlowAutomationRuleTestResult>(`${FLOW_PREFIX}/automation-rules/${ruleId}/test`, { method: "POST", authToken: accessToken, json: workItemId ? { work_item_id: workItemId } : {} });
   }
 };
