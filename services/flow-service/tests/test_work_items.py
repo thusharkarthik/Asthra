@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.api.v1.work_items import create_work_item as create_work_item_endpoint
 from app.api.v1.work_items import get_work_item, list_work_items
@@ -154,3 +155,77 @@ def test_update_work_item_accepts_status_and_priority_names(db, monkeypatch):
     assert updated.priority_id is not None
     assert db.get(WorkItemStatus, updated.status_id).name == "in_progress"
     assert db.get(WorkItemPriority, updated.priority_id).name == "high"
+
+
+def test_create_work_item_with_advanced_fields(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+
+    work_item = WorkItemService(db).create(
+        WorkItemCreate(
+            project_id=42,
+            title="Advanced work item",
+            description="Richer planning item",
+            status_name="review",
+            priority_name="critical",
+            effort_score=8,
+            effort_size="L",
+            business_value="high",
+            risk_level="medium",
+            complexity="high",
+            acceptance_criteria="Given the feature is enabled, users can complete the flow.",
+            definition_of_done="Tests pass\nDocs updated",
+        )
+    )
+
+    assert work_item.effort_score == 8
+    assert work_item.effort_size == "L"
+    assert work_item.business_value == "high"
+    assert work_item.risk_level == "medium"
+    assert work_item.complexity == "high"
+    assert work_item.acceptance_criteria.startswith("Given")
+    assert work_item.definition_of_done.startswith("Tests")
+    assert db.get(WorkItemStatus, work_item.status_id).name == "review"
+    assert db.get(WorkItemPriority, work_item.priority_id).name == "critical"
+
+
+def test_update_work_item_advanced_fields_and_parent(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    parent = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Parent work"))
+    child = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Child work"))
+
+    updated = WorkItemService(db).update(
+        child.id,
+        WorkItemUpdate(
+            parent_id=parent.id,
+            effort_size="XL",
+            effort_score=13,
+            business_value="critical",
+            risk_level="high",
+            complexity="medium",
+            acceptance_criteria="Accepted when rollout is complete.",
+            definition_of_done="Release notes published.",
+        ),
+    )
+
+    assert updated.parent_id == parent.id
+    assert updated.effort_size == "XL"
+    assert updated.effort_score == 13
+    assert updated.business_value == "critical"
+    assert updated.risk_level == "high"
+    assert updated.complexity == "medium"
+
+
+def test_invalid_advanced_work_item_values_are_rejected():
+    try:
+        WorkItemCreate(project_id=1, title="Invalid", effort_size="XXL")
+    except ValidationError as exc:
+        assert "effort_size" in str(exc)
+    else:
+        raise AssertionError("Invalid effort_size should fail validation.")
+
+    try:
+        WorkItemCreate(project_id=1, title="Invalid", business_value="urgent")
+    except ValidationError as exc:
+        assert "business_value" in str(exc)
+    else:
+        raise AssertionError("Invalid business_value should fail validation.")

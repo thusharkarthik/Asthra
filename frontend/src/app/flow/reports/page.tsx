@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { isBlockedWorkItem, isCompletedWorkItem, isInProgressWorkItem, isOpenWorkItem } from "@/components/flow/flow-utils";
+import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, isBlockedWorkItem, isCompletedWorkItem, isHighRiskWorkItem, isInProgressWorkItem, isOpenWorkItem, isOverdueWorkItem } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -22,6 +22,9 @@ export default function FlowReportsPage() {
   });
   const items = workItemsQuery.data ?? [];
   const completionRate = items.length ? Math.round((items.filter(isCompletedWorkItem).length / items.length) * 100) : 0;
+  const countByStatus = (statusId: number) => items.filter((item) => item.status_id === statusId).length;
+  const countByPriority = (priorityId: number) => items.filter((item) => item.priority_id === priorityId).length;
+  const countByEffort = (effortSize: string) => items.filter((item) => item.effort_size === effortSize).length;
 
   return (
     <>
@@ -33,11 +36,35 @@ export default function FlowReportsPage() {
           <ModuleDashboardCard title="Open" value={items.filter(isOpenWorkItem).length} />
           <ModuleDashboardCard title="In Progress" value={items.filter(isInProgressWorkItem).length} />
           <ModuleDashboardCard title="Blocked" value={items.filter(isBlockedWorkItem).length} />
+          <ModuleDashboardCard title="High Risk" value={items.filter(isHighRiskWorkItem).length} />
+          <ModuleDashboardCard title="Overdue" value={items.filter(isOverdueWorkItem).length} />
           <ModuleDashboardCard title="Completion Rate" value={`${completionRate}%`}>
             <p className="text-sm text-muted-foreground">Advanced charts are planned for the Insights integration.</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="By Status" value={items.length}>
+            <MetricList items={FLOW_STATUS_OPTIONS.map((status) => [status.label, countByStatus(Number(status.value))])} />
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="By Priority" value={items.length}>
+            <MetricList items={FLOW_PRIORITY_OPTIONS.map((priority) => [priority.label, countByPriority(Number(priority.value))])} />
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="By Effort" value={items.filter((item) => item.effort_size).length}>
+            <MetricList items={FLOW_EFFORT_SIZE_OPTIONS.map((effort) => [effort, countByEffort(effort)])} />
           </ModuleDashboardCard>
         </div>
       )}
     </>
+  );
+}
+
+function MetricList({ items }: { items: Array<[string, number]> }) {
+  return (
+    <div className="space-y-1 text-sm">
+      {items.map(([label, value]) => (
+        <div key={label} className="flex justify-between gap-3">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="font-medium">{value}</span>
+        </div>
+      ))}
+    </div>
   );
 }

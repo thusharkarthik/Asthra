@@ -1,6 +1,7 @@
 export type WorkItem = {
   id: number;
   project_id: number;
+  parent_id?: number | null;
   title: string;
   description?: string | null;
   type_id?: number | null;
@@ -9,12 +10,20 @@ export type WorkItem = {
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
+  effort_score?: number | null;
+  effort_size?: string | null;
+  business_value?: string | null;
+  risk_level?: string | null;
+  complexity?: string | null;
+  acceptance_criteria?: string | null;
+  definition_of_done?: string | null;
   created_at?: string;
   updated_at?: string;
 };
 
 export type WorkItemCreate = {
   project_id: number;
+  parent_id?: number | null;
   title: string;
   description?: string | null;
   type_id?: number | null;
@@ -23,6 +32,15 @@ export type WorkItemCreate = {
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
+  effort_score?: number | null;
+  effort_size?: string | null;
+  business_value?: string | null;
+  risk_level?: string | null;
+  complexity?: string | null;
+  acceptance_criteria?: string | null;
+  definition_of_done?: string | null;
+  status_name?: string | null;
+  priority_name?: string | null;
 };
 
 export type WorkItemUpdate = Partial<Omit<WorkItemCreate, "project_id" | "reporter_id">>;

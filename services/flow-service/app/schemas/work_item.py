@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import TimestampedRead
 
@@ -51,7 +51,9 @@ class WorkItemCreate(BaseModel):
     project_id: int
     type_id: Optional[int] = None
     status_id: Optional[int] = None
+    status_name: str | None = Field(default=None, min_length=1, max_length=100)
     priority_id: Optional[int] = None
+    priority_name: str | None = Field(default=None, min_length=1, max_length=100)
     reporter_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None)
@@ -60,6 +62,38 @@ class WorkItemCreate(BaseModel):
     board_column_id: int | None = Field(default=None)
     assignee_id: Optional[int] = None
     due_date: datetime | None = Field(default=None)
+    effort_score: int | None = Field(default=None, gt=0)
+    effort_size: str | None = None
+    business_value: str | None = None
+    risk_level: str | None = None
+    complexity: str | None = None
+    acceptance_criteria: str | None = None
+    definition_of_done: str | None = None
+
+    @field_validator("effort_size")
+    @classmethod
+    def validate_effort_size(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().upper()
+        if normalized not in {"XS", "S", "M", "L", "XL"}:
+            raise ValueError("effort_size must be one of XS, S, M, L, XL")
+        return normalized
+
+    @field_validator("business_value")
+    @classmethod
+    def validate_business_value(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high", "critical"}, "business_value")
+
+    @field_validator("risk_level")
+    @classmethod
+    def validate_risk_level(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high"}, "risk_level")
+
+    @field_validator("complexity")
+    @classmethod
+    def validate_complexity(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high"}, "complexity")
 
 
 class WorkItemUpdate(BaseModel):
@@ -68,6 +102,7 @@ class WorkItemUpdate(BaseModel):
     status_name: str | None = Field(default=None, min_length=1, max_length=100)
     priority_id: int | None = None
     priority_name: str | None = Field(default=None, min_length=1, max_length=100)
+    parent_id: int | None = None
     board_id: int | None = None
     board_column_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=255)
@@ -75,8 +110,40 @@ class WorkItemUpdate(BaseModel):
     assignee_id: int | None = None
     reporter_id: int | None = None
     due_date: datetime | None = None
+    effort_score: int | None = Field(default=None, gt=0)
+    effort_size: str | None = None
+    business_value: str | None = None
+    risk_level: str | None = None
+    complexity: str | None = None
+    acceptance_criteria: str | None = None
+    definition_of_done: str | None = None
     sort_order: int | None = None
     is_active: bool | None = None
+
+    @field_validator("effort_size")
+    @classmethod
+    def validate_effort_size(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().upper()
+        if normalized not in {"XS", "S", "M", "L", "XL"}:
+            raise ValueError("effort_size must be one of XS, S, M, L, XL")
+        return normalized
+
+    @field_validator("business_value")
+    @classmethod
+    def validate_business_value(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high", "critical"}, "business_value")
+
+    @field_validator("risk_level")
+    @classmethod
+    def validate_risk_level(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high"}, "risk_level")
+
+    @field_validator("complexity")
+    @classmethod
+    def validate_complexity(cls, value: str | None) -> str | None:
+        return validate_choice(value, {"low", "medium", "high"}, "complexity")
 
 
 class WorkItemRead(TimestampedRead):
@@ -92,6 +159,13 @@ class WorkItemRead(TimestampedRead):
     assignee_id: int | None = None
     reporter_id: int | None = None
     due_date: datetime | None = None
+    effort_score: int | None = None
+    effort_size: str | None = None
+    business_value: str | None = None
+    risk_level: str | None = None
+    complexity: str | None = None
+    acceptance_criteria: str | None = None
+    definition_of_done: str | None = None
     sort_order: int
     is_active: bool
 
@@ -113,3 +187,12 @@ class WorkItemMemoryDocumentPayload(BaseModel):
     title: str
     content: str
     metadata: dict
+
+
+def validate_choice(value: str | None, allowed: set[str], field_name: str) -> str | None:
+    if value is None:
+        return value
+    normalized = value.strip().lower()
+    if normalized not in allowed:
+        raise ValueError(f"{field_name} must be one of {', '.join(sorted(allowed))}")
+    return normalized

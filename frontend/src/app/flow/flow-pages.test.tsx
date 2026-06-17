@@ -2,8 +2,10 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FlowPage from "@/app/flow/page";
+import BacklogPage from "@/app/flow/backlog/page";
 import BoardsPage from "@/app/flow/boards/page";
 import MyWorkPage from "@/app/flow/my-work/page";
+import FlowReportsPage from "@/app/flow/reports/page";
 import WorkItemsPage from "@/app/flow/work-items/page";
 import WorkItemDetailPage from "@/app/flow/work-items/[id]/page";
 import { QueryProvider } from "@/providers/query-provider";
@@ -30,13 +32,28 @@ function mockFlowFetch() {
       return new Response(JSON.stringify([{ id: 1, work_item_id: 7, user_id: 1, content: "Looks good" }]), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "PATCH") {
-      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3 }), { status: 200 });
+      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3, effort_size: "L", risk_level: "high" }), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "DELETE") {
       return new Response(null, { status: 204 });
     }
     if (url.includes("/work-items/7")) {
-      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Build Flow UI", description: "Wire work items", status_id: 1, priority_id: 2 }), { status: 200 });
+      return new Response(JSON.stringify({
+        id: 7,
+        project_id: 3,
+        title: "Build Flow UI",
+        description: "Wire work items",
+        status_id: 1,
+        priority_id: 2,
+        effort_size: "M",
+        effort_score: 5,
+        business_value: "high",
+        risk_level: "high",
+        complexity: "medium",
+        acceptance_criteria: "User can create and move work.",
+        definition_of_done: "Tests pass.",
+        parent_id: null
+      }), { status: 200 });
     }
     if (url.includes("/work-items") && init?.method === "PATCH") {
       return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Build Flow UI", status_id: 2, priority_id: 2 }), { status: 200 });
@@ -45,7 +62,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", status_id: 1, priority_id: 2 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", status_id: 1, priority_id: 2, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }]), { status: 200 });
     }
     if (url.includes("/boards")) {
       return new Response(JSON.stringify([{ id: 1, name: "Main board" }]), { status: 200 });
@@ -117,9 +134,22 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Work item title")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Todo")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Medium")).toBeInTheDocument();
-    expect(screen.getByLabelText("Assignee id")).toHaveAttribute("placeholder", "Assignee ID, optional");
+    expect(screen.getByRole("button", { name: "Show advanced fields" })).toBeInTheDocument();
+  });
+
+  it("create dialog shows advanced work item fields", () => {
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+
+    expect(screen.getByLabelText("Effort size")).toBeInTheDocument();
+    expect(screen.getByLabelText("Business value")).toBeInTheDocument();
+    expect(screen.getByLabelText("Risk level")).toBeInTheDocument();
+    expect(screen.getByLabelText("Complexity")).toBeInTheDocument();
+    expect(screen.getByLabelText("Acceptance criteria")).toBeInTheDocument();
+    expect(screen.getByLabelText("Completion checklist")).toBeInTheDocument();
   });
 
   it("creates work item with selected project and minimal stable payload", async () => {
@@ -145,6 +175,40 @@ describe("Flow frontend screens", () => {
       expect(body).not.toHaveProperty("priority_id");
       expect(body).not.toHaveProperty("reporter_id");
       expect(body).not.toHaveProperty("assignee_id");
+    });
+  });
+
+  it("creates work item with advanced field payload", async () => {
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+    fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Advanced item" } });
+    fireEvent.change(screen.getByLabelText("Effort size"), { target: { value: "L" } });
+    fireEvent.change(screen.getByLabelText("Effort score"), { target: { value: "8" } });
+    fireEvent.change(screen.getByLabelText("Business value"), { target: { value: "high" } });
+    fireEvent.change(screen.getByLabelText("Risk level"), { target: { value: "high" } });
+    fireEvent.change(screen.getByLabelText("Complexity"), { target: { value: "medium" } });
+    fireEvent.change(screen.getByLabelText("Acceptance criteria"), { target: { value: "Accepted when users can finish the flow." } });
+    fireEvent.change(screen.getByLabelText("Completion checklist"), { target: { value: "Tests pass." } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Work Item" }).at(-1)!);
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items") && init?.method === "POST");
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(String(postCall?.[1]?.body));
+      expect(body).toMatchObject({
+        project_id: 3,
+        title: "Advanced item",
+        effort_size: "L",
+        effort_score: 8,
+        business_value: "high",
+        risk_level: "high",
+        complexity: "medium",
+        acceptance_criteria: "Accepted when users can finish the flow.",
+        definition_of_done: "Tests pass."
+      });
     });
   });
 
@@ -227,6 +291,9 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
     expect(screen.getByText("Looks good")).toBeInTheDocument();
     expect(screen.getByText("Linked Docs")).toBeInTheDocument();
+    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByText("Acceptance")).toBeInTheDocument();
+    expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
   });
 
   it("edits a work item from detail", async () => {
@@ -247,6 +314,28 @@ describe("Flow frontend screens", () => {
       const body = JSON.parse(String(patchCall?.[1]?.body));
       expect(body.title).toBe("Updated Flow UI");
       expect(body.status_name).toBe("in_progress");
+    });
+  });
+
+  it("edits advanced fields from detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByDisplayValue("M"), { target: { value: "XL" } });
+    fireEvent.change(screen.getByDisplayValue("5"), { target: { value: "13" } });
+    fireEvent.change(screen.getByDisplayValue("User can create and move work."), { target: { value: "Accepted after review." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
+      expect(patchCall).toBeTruthy();
+      const body = JSON.parse(String(patchCall?.[1]?.body));
+      expect(body.effort_size).toBe("XL");
+      expect(body.effort_score).toBe(13);
+      expect(body.acceptance_criteria).toBe("Accepted after review.");
     });
   });
 
@@ -289,6 +378,8 @@ describe("Flow frontend screens", () => {
     expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Todo").length).toBeGreaterThan(0));
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+    expect(screen.getByText("Effort: M / 5")).toBeInTheDocument();
+    expect(screen.getByText("High risk")).toBeInTheDocument();
   });
 
   it("moves a board card with status dropdown", async () => {
@@ -311,5 +402,24 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "My Work" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Assigned Items")).toBeInTheDocument());
+  });
+
+  it("renders backlog planning fields", async () => {
+    navigationMock.pathname = "/flow/backlog";
+    renderWithQuery(<BacklogPage />);
+
+    expect(screen.getByRole("heading", { name: "Backlog" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Business Value")).toBeInTheDocument());
+    expect(screen.getByText("M / 5")).toBeInTheDocument();
+    expect(screen.getAllByText("High").length).toBeGreaterThan(0);
+  });
+
+  it("renders report metrics for effort and risk", async () => {
+    navigationMock.pathname = "/flow/reports";
+    renderWithQuery(<FlowReportsPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Reports" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("High Risk")).toBeInTheDocument());
+    expect(screen.getByText("By Effort")).toBeInTheDocument();
   });
 });

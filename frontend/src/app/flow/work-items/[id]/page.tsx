@@ -6,7 +6,20 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, assigneeLabel, priorityNameFromId, reporterLabel, statusNameFromId } from "@/components/flow/flow-utils";
+import {
+  FLOW_BUSINESS_VALUE_OPTIONS,
+  FLOW_COMPLEXITY_OPTIONS,
+  FLOW_EFFORT_SIZE_OPTIONS,
+  FLOW_PRIORITY_OPTIONS,
+  FLOW_RISK_OPTIONS,
+  FLOW_STATUS_OPTIONS,
+  assigneeLabel,
+  effortLabel,
+  planningLabel,
+  priorityNameFromId,
+  reporterLabel,
+  statusNameFromId
+} from "@/components/flow/flow-utils";
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { CommentList } from "@/components/modules/comment-list";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -39,7 +52,15 @@ export default function WorkItemDetailPage() {
     statusName: "todo",
     priorityName: "medium",
     assigneeId: "",
-    dueDate: ""
+    dueDate: "",
+    effortScore: "",
+    effortSize: "",
+    businessValue: "",
+    riskLevel: "",
+    complexity: "",
+    acceptanceCriteria: "",
+    definitionOfDone: "",
+    parentId: ""
   });
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
@@ -54,7 +75,15 @@ export default function WorkItemDetailPage() {
       statusName: statusNameFromId(item.status_id),
       priorityName: priorityNameFromId(item.priority_id),
       assigneeId: item.assignee_id ? String(item.assignee_id) : "",
-      dueDate: item.due_date ? item.due_date.slice(0, 10) : ""
+      dueDate: item.due_date ? item.due_date.slice(0, 10) : "",
+      effortScore: item.effort_score ? String(item.effort_score) : "",
+      effortSize: item.effort_size ?? "",
+      businessValue: item.business_value ?? "",
+      riskLevel: item.risk_level ?? "",
+      complexity: item.complexity ?? "",
+      acceptanceCriteria: item.acceptance_criteria ?? "",
+      definitionOfDone: item.definition_of_done ?? "",
+      parentId: item.parent_id ? String(item.parent_id) : ""
     });
   }, [item]);
 
@@ -65,7 +94,15 @@ export default function WorkItemDetailPage() {
       status_name: draft.statusName,
       priority_name: draft.priorityName,
       assignee_id: draft.assigneeId ? Number(draft.assigneeId) : null,
-      due_date: draft.dueDate ? `${draft.dueDate}T00:00:00Z` : null
+      due_date: draft.dueDate ? `${draft.dueDate}T00:00:00Z` : null,
+      effort_score: draft.effortScore ? Number(draft.effortScore) : null,
+      effort_size: draft.effortSize || null,
+      business_value: draft.businessValue || null,
+      risk_level: draft.riskLevel || null,
+      complexity: draft.complexity || null,
+      acceptance_criteria: draft.acceptanceCriteria.trim() || null,
+      definition_of_done: draft.definitionOfDone.trim() || null,
+      parent_id: draft.parentId ? Number(draft.parentId) : null
     }),
     onSuccess: () => {
       setEditing(false);
@@ -114,6 +151,8 @@ export default function WorkItemDetailPage() {
   }
 
   const project = projects.find((candidate) => candidate.id === item.project_id) ?? projects.find((candidate) => candidate.id === selectedProjectId);
+  const siblingWorkItems = queryClient.getQueryData<Array<{ id: number; title: string }>>(["flow", "work-items", item.project_id]) ?? [];
+  const parentWork = siblingWorkItems.find((candidate) => candidate.id === item.parent_id);
 
   return (
     <div className="space-y-4">
@@ -162,6 +201,58 @@ export default function WorkItemDetailPage() {
                     <Input type="date" value={draft.dueDate} onChange={(event) => setDraft((value) => ({ ...value, dueDate: event.target.value }))} />
                   </label>
                 </div>
+                <div className="rounded-md border p-3">
+                  <h3 className="mb-3 text-sm font-semibold">Planning</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Effort Size</span>
+                      <Select value={draft.effortSize} onChange={(event) => setDraft((value) => ({ ...value, effortSize: event.target.value }))}>
+                        <option value="">Not set</option>
+                        {FLOW_EFFORT_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </Select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Effort Score</span>
+                      <Input inputMode="numeric" value={draft.effortScore} onChange={(event) => setDraft((value) => ({ ...value, effortScore: event.target.value }))} />
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Business Value</span>
+                      <Select value={draft.businessValue} onChange={(event) => setDraft((value) => ({ ...value, businessValue: event.target.value }))}>
+                        <option value="">Not set</option>
+                        {FLOW_BUSINESS_VALUE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </Select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Risk Level</span>
+                      <Select value={draft.riskLevel} onChange={(event) => setDraft((value) => ({ ...value, riskLevel: event.target.value }))}>
+                        <option value="">Not set</option>
+                        {FLOW_RISK_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </Select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Complexity</span>
+                      <Select value={draft.complexity} onChange={(event) => setDraft((value) => ({ ...value, complexity: event.target.value }))}>
+                        <option value="">Not set</option>
+                        {FLOW_COMPLEXITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </Select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Parent Work</span>
+                      <Input inputMode="numeric" placeholder="Parent work item ID" value={draft.parentId} onChange={(event) => setDraft((value) => ({ ...value, parentId: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <h3 className="mb-3 text-sm font-semibold">Acceptance</h3>
+                  <label className="grid gap-1 text-sm">
+                    <span className="font-medium">Acceptance Criteria</span>
+                    <textarea className="min-h-20 rounded-md border bg-background px-3 py-2 text-sm" value={draft.acceptanceCriteria} onChange={(event) => setDraft((value) => ({ ...value, acceptanceCriteria: event.target.value }))} />
+                  </label>
+                  <label className="mt-3 grid gap-1 text-sm">
+                    <span className="font-medium">Completion Checklist</span>
+                    <textarea className="min-h-20 rounded-md border bg-background px-3 py-2 text-sm" value={draft.definitionOfDone} onChange={(event) => setDraft((value) => ({ ...value, definitionOfDone: event.target.value }))} />
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <Button disabled={updateMutation.isPending}>{updateMutation.isPending ? "Saving..." : "Save"}</Button>
                   <Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
@@ -181,12 +272,28 @@ export default function WorkItemDetailPage() {
             )}
           </DetailPanel>
         }
-        activity={<EntityActivityPanel>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Created {item.created_at ? new Date(item.created_at).toLocaleString() : "recently"}.</div>
-            <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Last updated {item.updated_at ? new Date(item.updated_at).toLocaleString() : "not available"}.</div>
-          </div>
-        </EntityActivityPanel>}
+        activity={<>
+          <EntityActivityPanel>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Created {item.created_at ? new Date(item.created_at).toLocaleString() : "recently"}.</div>
+              <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Last updated {item.updated_at ? new Date(item.updated_at).toLocaleString() : "not available"}.</div>
+            </div>
+          </EntityActivityPanel>
+          <DetailPanel title="Planning">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div><div className="text-muted-foreground">Effort</div><div className="font-medium">{effortLabel(item.effort_size, item.effort_score)}</div></div>
+              <div><div className="text-muted-foreground">Business Value</div><div className="font-medium">{planningLabel(item.business_value)}</div></div>
+              <div><div className="text-muted-foreground">Risk</div><div className="font-medium">{planningLabel(item.risk_level)}</div></div>
+              <div><div className="text-muted-foreground">Complexity</div><div className="font-medium">{planningLabel(item.complexity)}</div></div>
+            </div>
+          </DetailPanel>
+          <DetailPanel title="Acceptance">
+            <div className="space-y-3 text-sm">
+              <div><div className="font-medium">Acceptance Criteria</div><p className="mt-1 whitespace-pre-wrap text-muted-foreground">{item.acceptance_criteria || "No acceptance criteria yet."}</p></div>
+              <div><div className="font-medium">Completion Checklist</div><p className="mt-1 whitespace-pre-wrap text-muted-foreground">{item.definition_of_done || "No completion checklist yet."}</p></div>
+            </div>
+          </DetailPanel>
+        </>}
         metadata={<EntityMetadataPanel>
           <div className="grid gap-3 text-sm">
             <div><div className="text-muted-foreground">Project</div><div className="font-medium">{project?.name ?? "Selected project"}</div><div className="text-xs text-muted-foreground">ID {item.project_id}</div></div>
@@ -195,7 +302,16 @@ export default function WorkItemDetailPage() {
             <div><div className="text-muted-foreground">Due date</div><div className="font-medium">{item.due_date ? new Date(item.due_date).toLocaleDateString() : "No due date"}</div></div>
           </div>
         </EntityMetadataPanel>}
-        links={<EntityLinksPanel labels={["Linked Docs", "Linked Tickets", "Linked Incidents"]} />}
+        links={<>
+          <DetailPanel title="Relationships">
+            <div className="space-y-3 text-sm">
+              <div><div className="text-muted-foreground">Parent Work</div><div className="font-medium">{parentWork?.title ?? (item.parent_id ? `Work item #${item.parent_id}` : "No parent work")}</div></div>
+              <div className="rounded-md border border-dashed p-3 text-muted-foreground">Blocks / Blocked By dependency graph placeholder.</div>
+              <div className="rounded-md border border-dashed p-3 text-muted-foreground">Related Work placeholder.</div>
+            </div>
+          </DetailPanel>
+          <EntityLinksPanel labels={["Linked Docs", "Linked Tickets", "Linked Incidents", "Linked Discover Items"]} />
+        </>}
         dangerZone={<EntityDangerZone
           label="Archive work item"
           description="Archiving hides this item from active Flow lists."
