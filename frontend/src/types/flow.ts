@@ -329,3 +329,37 @@ export type TeamCapacityCreate = {
 };
 
 export type TeamCapacityUpdate = Partial<Omit<TeamCapacityCreate, "project_id">>;
+
+export type CustomFieldType = "text" | "number" | "select" | "date" | "checkbox";
+
+export type CustomFieldDefinition = {
+  id: number;
+  project_id: number;
+  name: string;
+  field_type: CustomFieldType;
+  required: boolean;
+  options?: string[] | null;
+  created_at?: string;
+};
+
+export type CustomFieldDefinitionCreate = {
+  project_id: number;
+  name: string;
+  field_type: CustomFieldType;
+  required?: boolean;
+  options?: string[] | null;
+};
+
+export type CustomFieldDefinitionUpdate = Partial<Omit<CustomFieldDefinitionCreate, "project_id">>;
+
+export type CustomFieldValue = {
+  id: number;
+  work_item_id: number;
+  custom_field_id: number;
+  value?: string | null;
+};
+
+export type CustomFieldValueUpsert = {
+  custom_field_id: number;
+  value?: string | number | boolean | null;
+};

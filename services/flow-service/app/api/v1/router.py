@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import attachments, boards, capacity, comments, labels, releases, sprints, work_items, work_logs, workflows
+from app.api.v1 import attachments, boards, capacity, comments, custom_fields, labels, releases, sprints, work_items, work_logs, workflows
 
 
 api_router = APIRouter()
@@ -14,6 +14,8 @@ api_router.include_router(boards.router, prefix="/boards", tags=["boards"])
 api_router.include_router(comments.router, tags=["comments"])
 api_router.include_router(labels.router, prefix="/labels", tags=["labels"])
 api_router.include_router(labels.work_item_router, tags=["work-item-labels"])
+api_router.include_router(custom_fields.router, prefix="/custom-field-definitions", tags=["custom-fields"])
+api_router.include_router(custom_fields.work_item_router, tags=["custom-field-values"])
 api_router.include_router(attachments.router, tags=["attachments"])
 api_router.include_router(work_logs.router, tags=["work-logs"])
 api_router.include_router(capacity.router, prefix="/capacity", tags=["capacity"])

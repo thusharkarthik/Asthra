@@ -39,7 +39,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { FlowItemLevel, LinkedEntity, LinkedEntityType, WorkItemRelationType } from "@/types/flow";
+import type { CustomFieldDefinition, FlowItemLevel, LinkedEntity, LinkedEntityType, WorkItemRelationType } from "@/types/flow";
 
 const LINK_TYPE_OPTIONS: { value: LinkedEntityType; label: string; section: string }[] = [
   { value: "doc_page", label: "Document", section: "Documents" },
@@ -90,6 +90,7 @@ export default function WorkItemDetailPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [workLogMinutes, setWorkLogMinutes] = useState("");
   const [workLogDescription, setWorkLogDescription] = useState("");
+  const [customFieldDraft, setCustomFieldDraft] = useState<Record<number, string>>({});
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const commentsQuery = useQuery({ queryKey: ["flow", "comments", id], queryFn: () => flowApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
@@ -117,6 +118,20 @@ export default function WorkItemDetailPage() {
     enabled: Boolean(accessToken && item?.project_id),
     retry: 1
   });
+  const customFieldDefinitionsQuery = useQuery({
+    queryKey: ["flow", "custom-fields", item?.project_id],
+    queryFn: () => flowApi.listCustomFieldDefinitions(accessToken ?? "", { project_id: item?.project_id }),
+    enabled: Boolean(accessToken && item?.project_id),
+    retry: 1
+  });
+  const customFieldValuesQuery = useQuery({
+    queryKey: ["flow", "custom-field-values", id],
+    queryFn: () => flowApi.listCustomFieldValues(accessToken ?? "", id),
+    enabled: Boolean(accessToken && id),
+    retry: 1
+  });
+  const customFieldDefinitions = customFieldDefinitionsQuery.data ?? [];
+  const customFieldValues = customFieldValuesQuery.data ?? [];
 
   useEffect(() => {
     if (!item) return;
@@ -140,6 +155,16 @@ export default function WorkItemDetailPage() {
       itemLevel: (item.item_level ?? "work_item") as FlowItemLevel
     });
   }, [item, workflowQuery.data]);
+
+  useEffect(() => {
+    if (!customFieldDefinitions.length) return;
+    const nextDraft: Record<number, string> = {};
+    for (const definition of customFieldDefinitions) {
+      const existing = customFieldValues.find((value) => value.custom_field_id === definition.id);
+      nextDraft[definition.id] = existing?.value ?? "";
+    }
+    setCustomFieldDraft(nextDraft);
+  }, [customFieldDefinitions, customFieldValues]);
 
   const updateMutation = useMutation({
     mutationFn: () => flowApi.updateWorkItem(accessToken ?? "", id, {
@@ -297,6 +322,26 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow"] });
     },
     onError: (error) => addToast({ type: "error", title: "Release assignment failed", message: error instanceof Error ? error.message : "Unable to update release assignment." })
+  });
+  const customFieldMutation = useMutation({
+    mutationFn: async () => {
+      const definitions = customFieldDefinitionsQuery.data ?? [];
+      for (const definition of definitions) {
+        const value = customFieldDraft[definition.id] ?? "";
+        if (definition.required && value === "") {
+          throw new Error(`${definition.name} is required.`);
+        }
+        await flowApi.saveCustomFieldValue(accessToken ?? "", id, {
+          custom_field_id: definition.id,
+          value: normalizeCustomFieldValue(definition, value)
+        });
+      }
+    },
+    onSuccess: () => {
+      addToast({ type: "success", title: "Custom fields saved" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "custom-field-values", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Custom field save failed", message: error instanceof Error ? error.message : "Unable to save custom fields." })
   });
 
   if (itemQuery.isLoading) {
@@ -506,6 +551,27 @@ export default function WorkItemDetailPage() {
                 ))}
               </div>
             </div>
+          </DetailPanel>
+          <DetailPanel title="Custom Fields">
+            {customFieldDefinitions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No custom fields are configured for this project.</p>
+            ) : (
+              <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); customFieldMutation.mutate(); }}>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {customFieldDefinitions.map((definition) => (
+                    <label key={definition.id} className="grid gap-1 text-sm">
+                      <span className="font-medium">{definition.name}{definition.required ? " *" : ""}</span>
+                      <CustomFieldInput
+                        definition={definition}
+                        value={customFieldDraft[definition.id] ?? ""}
+                        onChange={(value) => setCustomFieldDraft((current) => ({ ...current, [definition.id]: value }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <Button size="sm" disabled={customFieldMutation.isPending}>{customFieldMutation.isPending ? "Saving..." : "Save Custom Fields"}</Button>
+              </form>
+            )}
           </DetailPanel>
           <DetailPanel title="Release">
             <div className="space-y-3 text-sm">
@@ -720,4 +786,41 @@ function groupLinksByType(links: LinkedEntity[]) {
 
 function linkTypeLabel(type: LinkedEntityType) {
   return LINK_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+}
+
+function CustomFieldInput({ definition, value, onChange }: { definition: CustomFieldDefinition; value: string; onChange: (value: string) => void }) {
+  if (definition.field_type === "select") {
+    return (
+      <Select value={value} required={definition.required} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select</option>
+        {(definition.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
+      </Select>
+    );
+  }
+  if (definition.field_type === "checkbox") {
+    return (
+      <label className="flex items-center gap-2 rounded-md border px-3 py-2">
+        <input type="checkbox" checked={value === "true"} onChange={(event) => onChange(event.target.checked ? "true" : "false")} />
+        <span>{value === "true" ? "Checked" : "Unchecked"}</span>
+      </label>
+    );
+  }
+  return (
+    <Input
+      type={definition.field_type === "number" ? "number" : definition.field_type === "date" ? "date" : "text"}
+      value={value}
+      required={definition.required}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
+function normalizeCustomFieldValue(definition: CustomFieldDefinition, value: string) {
+  if (definition.field_type === "checkbox") {
+    return value === "true";
+  }
+  if (definition.field_type === "number" && value !== "") {
+    return Number(value);
+  }
+  return value || null;
 }
