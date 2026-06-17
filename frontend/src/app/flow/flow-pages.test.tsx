@@ -9,6 +9,7 @@ import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowNotificationsPage from "@/app/flow/notifications/page";
+import FlowActivityPage from "@/app/flow/activity/page";
 import FlowReportsPage from "@/app/flow/reports/page";
 import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
 import FlowReleasesPage from "@/app/flow/releases/page";
@@ -109,6 +110,14 @@ function mockFlowFetch() {
     if (url.includes("/notifications")) {
       const unreadOnly = url.includes("unread_only=true");
       return new Response(JSON.stringify(unreadOnly ? notificationPayload.filter((item) => !item.is_read) : notificationPayload), { status: 200 });
+    }
+    const auditPayload = [
+      { id: 120, project_id: 3, work_item_id: 7, entity_type: "work_item", entity_id: "7", action: "status.changed", actor_id: 1, actor_name: "Leo", old_value: "Todo", new_value: "In Progress", metadata: null, created_at: "2026-06-18T10:20:00Z" },
+      { id: 121, project_id: 3, work_item_id: 7, entity_type: "comment", entity_id: "1", action: "comment.added", actor_id: 1, actor_name: "Leo", old_value: null, new_value: "Looks good", metadata: null, created_at: "2026-06-18T10:25:00Z" },
+      { id: 122, project_id: 3, work_item_id: 7, entity_type: "work_item", entity_id: "7", action: "priority.changed", actor_id: 1, actor_name: "Leo", old_value: "Medium", new_value: "High", metadata: null, created_at: "2026-06-18T10:40:00Z" }
+    ];
+    if (url.includes("/audit-events")) {
+      return new Response(JSON.stringify(auditPayload), { status: 200 });
     }
     const sprintPayload = { id: 30, project_id: 3, name: "Sprint 1", goal: "Ship planning", status: "active", planned_work_count: 2, completed_work_count: 1, total_effort: 8, start_date: "2026-01-01T00:00:00Z", end_date: "2026-01-14T00:00:00Z" };
     if (url.includes("/sprints/30/start") && init?.method === "POST") {
@@ -509,7 +518,7 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<WorkItemDetailPage />);
 
     await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
-    expect(screen.getByText("Looks good")).toBeInTheDocument();
+    expect(screen.getAllByText("Looks good").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Hierarchy").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Related Work").length).toBeGreaterThan(0);
     expect(screen.getByText("Attachments")).toBeInTheDocument();
@@ -527,6 +536,10 @@ describe("Flow frontend screens", () => {
     expect(screen.getByText("Customer Tier *")).toBeInTheDocument();
     expect(screen.getAllByText(/45m/).length).toBeGreaterThan(0);
     expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
+    expect(screen.getByText("Audit Trail")).toBeInTheDocument();
+    expect(screen.getByText("Leo status changed")).toBeInTheDocument();
+    expect(screen.getAllByText("Todo").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("In Progress").length).toBeGreaterThan(0);
   });
 
   it("saves custom field values from work item detail", async () => {
@@ -631,7 +644,7 @@ describe("Flow frontend screens", () => {
     navigationMock.params = { id: "7" };
     renderWithQuery(<WorkItemDetailPage />);
 
-    await waitFor(() => expect(screen.getByText("Looks good")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Looks good").length).toBeGreaterThan(0));
     fireEvent.change(screen.getByPlaceholderText("Add a comment"), { target: { value: "New comment" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
@@ -752,6 +765,27 @@ describe("Flow frontend screens", () => {
       expect(readCall).toBeTruthy();
       expect(readAllCall).toBeTruthy();
       expect(deleteCall).toBeTruthy();
+    });
+  });
+
+  it("renders Flow activity feed with grouped audit events and filters", async () => {
+    navigationMock.pathname = "/flow/activity";
+    renderWithQuery(<FlowActivityPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Activity" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Search audit events")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Leo status changed")).toBeInTheDocument());
+    expect(screen.getByText("Leo comment added")).toBeInTheDocument();
+    expect(screen.getByText("Medium")).toBeInTheDocument();
+    expect(screen.getByText("High")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search audit events"), { target: { value: "priority" } });
+    fireEvent.change(screen.getByLabelText("Audit action"), { target: { value: "priority.changed" } });
+    fireEvent.change(screen.getByLabelText("Actor ID"), { target: { value: "1" } });
+
+    await waitFor(() => {
+      const auditCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).includes("/api/flow/api/v1/audit-events") && String(url).includes("action=priority.changed"));
+      expect(auditCall).toBeTruthy();
     });
   });
 

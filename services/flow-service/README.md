@@ -560,6 +560,30 @@ Flow writes simple internal activity events to `flow_activities` for:
 
 These events are local to Flow and are not a cross-service audit log yet.
 
+## Flow Audit Trail
+
+Flow stores queryable audit events in `audit_events` for traceability. Audit events capture the entity, action, actor, timestamp, and optional before/after values.
+
+Tracked actions include:
+
+- work item created, updated, and archived
+- status, priority, assignee, and due date changes
+- comments added, edited, and deleted
+- attachments uploaded and deleted
+- relations added and removed
+- links linked and unlinked
+
+Audit API:
+
+```http
+GET /api/v1/audit-events
+GET /api/v1/work-items/{work_item_id}/audit-events
+```
+
+`GET /api/v1/audit-events` supports `project_id`, `work_item_id`, `actor_id`, `action`, `created_from`, `created_to`, `search`, `limit`, and `offset`.
+
+Workspace ID is nullable until Flow receives consistent workspace context from Core/API Gateway.
+
 ## Flow Notifications
 
 Flow stores project-scoped notifications in `flow_notifications` for operational updates that need user attention:
@@ -613,6 +637,7 @@ The tests use a disposable SQLite database at `tests/test_asthra_flow.db`. They 
 - add comment
 - add label
 - add attachment metadata
+- audit events for work item updates, comments, attachments, relations, and links
 
 ## Optional Event Publishing
 

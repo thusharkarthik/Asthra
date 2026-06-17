@@ -9,14 +9,17 @@ from app.core.config import settings
 from app.models.work_item import WorkItem
 from app.models.work_item_attachment import WorkItemAttachment
 from app.repositories.attachment_repository import AttachmentRepository
+from app.schemas.audit_event import AuditEventCreate
 from app.schemas.attachment import WorkItemAttachmentCreate
 from app.services.activity_service import ActivityService
+from app.services.audit_service import AuditService
 
 
 class AttachmentService:
     def __init__(self, db: Session) -> None:
         self.attachment_repository = AttachmentRepository(db)
         self.activity_service = ActivityService(db)
+        self.audit_service = AuditService(db)
 
     def create(
         self,
@@ -35,6 +38,7 @@ class AttachmentService:
             description=f"Attachment added to work item '{work_item.title}'.",
             metadata={"file_name": attachment.file_name, "file_type": attachment.file_type},
         )
+        self._record_attachment_uploaded(work_item, attachment)
         return attachment
 
     async def create_from_upload(
@@ -73,6 +77,7 @@ class AttachmentService:
             description=f"Attachment added to work item '{work_item.title}'.",
             metadata={"file_name": attachment.file_name, "file_type": attachment.file_type},
         )
+        self._record_attachment_uploaded(work_item, attachment)
         return attachment
 
     def list_for_work_item(self, work_item_id: int) -> list[WorkItemAttachment]:
@@ -80,7 +85,7 @@ class AttachmentService:
         return self.attachment_repository.list_for_work_item(work_item_id)
 
     def delete(self, work_item_id: int, attachment_id: int) -> None:
-        self._get_active_work_item(work_item_id)
+        work_item = self._get_active_work_item(work_item_id)
         attachment = self.attachment_repository.get_by_id(attachment_id)
         if (
             attachment is None
@@ -91,7 +96,23 @@ class AttachmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Attachment not found.",
             )
+        audit_attachment_id = attachment.id
+        uploaded_by_id = attachment.uploaded_by_id
+        file_name = attachment.file_name
+        file_type = attachment.file_type
         self.attachment_repository.delete(attachment)
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="attachment",
+                entity_id=str(audit_attachment_id),
+                action="attachment.deleted",
+                actor_id=uploaded_by_id,
+                old_value=file_name,
+                metadata={"file_name": file_name, "file_type": file_type},
+            )
+        )
 
     def get_download_path(self, work_item_id: int, attachment_id: int) -> Path:
         self._get_active_work_item(work_item_id)
@@ -121,3 +142,17 @@ class AttachmentService:
                 detail="Work item not found.",
             )
         return work_item
+
+    def _record_attachment_uploaded(self, work_item: WorkItem, attachment: WorkItemAttachment) -> None:
+        self.audit_service.record(
+            AuditEventCreate(
+                project_id=work_item.project_id,
+                work_item_id=work_item.id,
+                entity_type="attachment",
+                entity_id=str(attachment.id),
+                action="attachment.uploaded",
+                actor_id=attachment.uploaded_by_id,
+                new_value=attachment.file_name,
+                metadata={"file_name": attachment.file_name, "file_type": attachment.file_type},
+            )
+        )

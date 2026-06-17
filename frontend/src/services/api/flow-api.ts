@@ -8,6 +8,7 @@ import type {
   CustomFieldValue,
   CustomFieldValueUpsert,
   FlowNotification,
+  FlowAuditEvent,
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
@@ -264,5 +265,11 @@ export const flowApi = {
   },
   deleteNotification(accessToken: string, notificationId: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/notifications/${notificationId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listAuditEvents(accessToken: string, filters: { project_id?: number | null; work_item_id?: number | null; actor_id?: number | null; action?: string | null; created_from?: string | null; created_to?: string | null; search?: string | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<FlowAuditEvent[]>(`${FLOW_PREFIX}/audit-events${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  listWorkItemAuditEvents(accessToken: string, workItemId: string | number, filters: { actor_id?: number | null; action?: string | null; created_from?: string | null; created_to?: string | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<FlowAuditEvent[]>(`${FLOW_PREFIX}/work-items/${workItemId}/audit-events${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   }
 };

@@ -376,3 +376,19 @@ export type FlowNotification = {
   is_read: boolean;
   created_at: string;
 };
+
+export type FlowAuditEvent = {
+  id: number;
+  workspace_id?: number | null;
+  project_id?: number | null;
+  work_item_id?: number | null;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor_id?: number | null;
+  actor_name?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+};
