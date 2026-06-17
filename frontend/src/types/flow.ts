@@ -90,6 +90,26 @@ export type WorkItemRelationCreate = {
   created_by_id?: number | null;
 };
 
+export type LinkedEntityType = "work_item" | "doc_page" | "discover_idea" | "desk_ticket" | "pulse_incident" | "dev_release";
+
+export type LinkedEntity = {
+  id: number;
+  work_item_id: number;
+  entity_type: LinkedEntityType;
+  entity_id: string;
+  entity_title: string;
+  entity_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type LinkedEntityCreate = {
+  entity_type: LinkedEntityType;
+  entity_id: string;
+  entity_title: string;
+  entity_url?: string | null;
+};
+
 export type WorkItemAttachment = {
   id: number;
   work_item_id: number;

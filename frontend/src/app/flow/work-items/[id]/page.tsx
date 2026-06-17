@@ -27,7 +27,7 @@ import {
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { CommentList } from "@/components/modules/comment-list";
 import { DetailPanel } from "@/components/modules/detail-panel";
-import { EntityActivityPanel, EntityDangerZone, EntityDetailLayout, EntityLinksPanel, EntityMetadataPanel } from "@/components/modules/entity-detail-layout";
+import { EntityActivityPanel, EntityDangerZone, EntityDetailLayout, EntityMetadataPanel } from "@/components/modules/entity-detail-layout";
 import { EntityDetailHeader } from "@/components/modules/entity-detail-header";
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
@@ -39,7 +39,16 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { FlowItemLevel, WorkItemRelationType } from "@/types/flow";
+import type { FlowItemLevel, LinkedEntity, LinkedEntityType, WorkItemRelationType } from "@/types/flow";
+
+const LINK_TYPE_OPTIONS: { value: LinkedEntityType; label: string; section: string }[] = [
+  { value: "doc_page", label: "Document", section: "Documents" },
+  { value: "discover_idea", label: "Idea", section: "Ideas" },
+  { value: "desk_ticket", label: "Ticket", section: "Tickets" },
+  { value: "pulse_incident", label: "Incident", section: "Incidents" },
+  { value: "dev_release", label: "Release", section: "Releases" },
+  { value: "work_item", label: "Work Item", section: "Related Work" }
+];
 
 export default function WorkItemDetailPage() {
   const params = useParams<{ id: string }>();
@@ -73,6 +82,9 @@ export default function WorkItemDetailPage() {
   const [relationTargetId, setRelationTargetId] = useState("");
   const [relationType, setRelationType] = useState<WorkItemRelationType>("blocks");
   const [relationDescription, setRelationDescription] = useState("");
+  const [linkType, setLinkType] = useState<LinkedEntityType>("doc_page");
+  const [linkEntityId, setLinkEntityId] = useState("");
+  const [linkTitle, setLinkTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
@@ -80,6 +92,7 @@ export default function WorkItemDetailPage() {
   const attachmentsQuery = useQuery({ queryKey: ["flow", "attachments", id], queryFn: () => flowApi.listAttachments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const linksQuery = useQuery({ queryKey: ["flow", "links", id], queryFn: () => flowApi.listLinks(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const item = itemQuery.data;
   const workflowQuery = useQuery({
     queryKey: ["flow", "project-workflow", item?.project_id],
@@ -214,6 +227,28 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow", "relations", id] });
     }
   });
+  const linkMutation = useMutation({
+    mutationFn: () => flowApi.createLink(accessToken ?? "", id, {
+      entity_type: linkType,
+      entity_id: linkEntityId.trim(),
+      entity_title: linkTitle.trim()
+    }),
+    onSuccess: () => {
+      setLinkEntityId("");
+      setLinkTitle("");
+      addToast({ type: "success", title: "Link added" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "links", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Link failed", message: error instanceof Error ? error.message : "Unable to add link." })
+  });
+  const deleteLinkMutation = useMutation({
+    mutationFn: (linkId: number) => flowApi.deleteLink(accessToken ?? "", id, linkId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Link removed" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "links", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Link remove failed", message: error instanceof Error ? error.message : "Unable to remove link." })
+  });
 
   if (itemQuery.isLoading) {
     return (
@@ -236,6 +271,7 @@ export default function WorkItemDetailPage() {
   const project = projects.find((candidate) => candidate.id === item.project_id) ?? projects.find((candidate) => candidate.id === selectedProjectId);
   const siblingWorkItems = queryClient.getQueryData<Array<{ id: number; title: string }>>(["flow", "work-items", item.project_id]) ?? [];
   const parentWork = siblingWorkItems.find((candidate) => candidate.id === item.parent_id);
+  const linksByType = groupLinksByType(linksQuery.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -366,6 +402,9 @@ export default function WorkItemDetailPage() {
             <div className="space-y-3 text-sm text-muted-foreground">
               <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Created {item.created_at ? new Date(item.created_at).toLocaleString() : "recently"}.</div>
               <div className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Last updated {item.updated_at ? new Date(item.updated_at).toLocaleString() : "not available"}.</div>
+              {(linksQuery.data ?? []).slice(0, 4).map((link) => (
+                <div key={link.id} className="flex gap-2"><Activity className="mt-0.5 h-4 w-4" /> Linked {linkTypeLabel(link.entity_type)}: {link.entity_title}.</div>
+              ))}
             </div>
           </EntityActivityPanel>
           <DetailPanel title="Planning">
@@ -437,7 +476,43 @@ export default function WorkItemDetailPage() {
               </div>
             </div>
           </DetailPanel>
-          <EntityLinksPanel labels={["Linked Docs", "Linked Tickets", "Linked Incidents", "Linked Discover Items"]} />
+          <DetailPanel title="Linked Resources">
+            <div className="space-y-4 text-sm">
+              <form className="grid gap-2 rounded-md border p-3" onSubmit={(event) => { event.preventDefault(); if (linkEntityId.trim() && linkTitle.trim()) linkMutation.mutate(); }}>
+                <div className="grid gap-2 md:grid-cols-[160px_1fr]">
+                  <Select aria-label="Link type" value={linkType} onChange={(event) => setLinkType(event.target.value as LinkedEntityType)}>
+                    {LINK_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </Select>
+                  <Input aria-label="Linked entity ID" placeholder="Entity ID" value={linkEntityId} onChange={(event) => setLinkEntityId(event.target.value)} />
+                </div>
+                <Input aria-label="Linked entity title" placeholder="Title" value={linkTitle} onChange={(event) => setLinkTitle(event.target.value)} />
+                <Button size="sm" disabled={!linkEntityId.trim() || !linkTitle.trim() || linkMutation.isPending}>{linkMutation.isPending ? "Adding..." : "Add Link"}</Button>
+              </form>
+              {LINK_TYPE_OPTIONS.map((option) => {
+                const links = linksByType[option.value] ?? [];
+                return (
+                  <section key={option.value} className="rounded-md border p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="font-medium">{option.section}</h3>
+                      <span className="rounded-md bg-muted px-2 py-0.5 text-xs">{links.length}</span>
+                    </div>
+                    {links.length === 0 ? <p className="text-muted-foreground">No {option.section.toLowerCase()} linked yet.</p> : (
+                      <div className="space-y-2">
+                        {links.map((link) => (
+                          <div key={link.id} className="rounded-md bg-muted p-2">
+                            <div className="font-medium">{link.entity_title}</div>
+                            <div className="text-xs text-muted-foreground">{linkTypeLabel(link.entity_type)} · {link.entity_id}</div>
+                            {link.entity_url ? <a className="text-xs text-primary hover:underline" href={link.entity_url}>Open resource</a> : null}
+                            <Button className="mt-2" size="sm" variant="outline" disabled={deleteLinkMutation.isPending} onClick={() => deleteLinkMutation.mutate(link.id)}>Remove Link</Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          </DetailPanel>
         </>}
         dangerZone={<EntityDangerZone
           label="Archive work item"
@@ -513,4 +588,15 @@ function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWork
     return statusNameFromId(statusId);
   }
   return workflow.statuses.find((statusOption) => statusOption.id === statusId)?.key ?? workflow.statuses[0]?.key ?? "todo";
+}
+
+function groupLinksByType(links: LinkedEntity[]) {
+  return links.reduce<Record<LinkedEntityType, LinkedEntity[]>>((groups, link) => {
+    groups[link.entity_type] = [...(groups[link.entity_type] ?? []), link];
+    return groups;
+  }, {} as Record<LinkedEntityType, LinkedEntity[]>);
+}
+
+function linkTypeLabel(type: LinkedEntityType) {
+  return LINK_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
 }

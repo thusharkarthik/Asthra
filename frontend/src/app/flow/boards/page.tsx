@@ -159,16 +159,29 @@ function BoardCardIndicators({ accessToken, workItemId }: { accessToken: string;
     enabled: Boolean(accessToken),
     retry: 1
   });
+  const linksQuery = useQuery({
+    queryKey: ["flow", "board-links", workItemId],
+    queryFn: () => flowApi.listLinks(accessToken, workItemId),
+    enabled: Boolean(accessToken),
+    retry: 1
+  });
 
   const attachments = attachmentsQuery.data?.length ?? 0;
   const comments = commentsQuery.data?.length ?? 0;
   const relations = relationsQuery.data?.length ?? 0;
+  const links = linksQuery.data ?? [];
+  const hasDocument = links.some((link) => link.entity_type === "doc_page");
+  const hasIdea = links.some((link) => link.entity_type === "discover_idea");
+  const hasIncident = links.some((link) => link.entity_type === "pulse_incident");
 
   return (
     <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><Paperclip className="h-3 w-3" />{attachments}</span>
       <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><MessageSquare className="h-3 w-3" />{comments}</span>
       <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><Link2 className="h-3 w-3" />{relations}</span>
+      {hasDocument ? <span className="rounded-md border px-2 py-0.5">Doc</span> : null}
+      {hasIdea ? <span className="rounded-md border px-2 py-0.5">Idea</span> : null}
+      {hasIncident ? <span className="rounded-md border px-2 py-0.5">Incident</span> : null}
     </div>
   );
 }

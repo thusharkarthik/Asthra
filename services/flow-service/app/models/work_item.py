@@ -59,6 +59,11 @@ class WorkItem(TimestampMixin, Base):
         back_populates="work_item",
         cascade="all, delete-orphan",
     )
+    linked_entities = relationship(
+        "LinkedEntity",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
     labels = relationship(
         "WorkItemLabel",
         secondary=work_item_labels,

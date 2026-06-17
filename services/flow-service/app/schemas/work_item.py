@@ -8,6 +8,14 @@ from app.schemas.base import TimestampedRead
 
 ALLOWED_ITEM_LEVELS = {"initiative", "feature", "work_item", "subtask"}
 ALLOWED_RELATION_TYPES = {"blocks", "blocked_by", "related_to", "duplicate_of"}
+ALLOWED_LINKED_ENTITY_TYPES = {
+    "work_item",
+    "doc_page",
+    "discover_idea",
+    "desk_ticket",
+    "pulse_incident",
+    "dev_release",
+}
 
 
 class WorkItemTypeCreate(BaseModel):
@@ -214,6 +222,38 @@ class WorkItemRelationRead(TimestampedRead):
     target_title: str | None = None
     target_status_id: int | None = None
     target_priority_id: int | None = None
+
+
+class LinkedEntityCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    entity_title: str = Field(min_length=1, max_length=255)
+    entity_url: str | None = Field(default=None, max_length=500)
+
+    @field_validator("entity_type")
+    @classmethod
+    def validate_entity_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in ALLOWED_LINKED_ENTITY_TYPES:
+            allowed = ", ".join(sorted(ALLOWED_LINKED_ENTITY_TYPES))
+            raise ValueError(f"entity_type must be one of: {allowed}")
+        return normalized
+
+    @field_validator("entity_id")
+    @classmethod
+    def validate_entity_id(cls, value: str) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("entity_id is required")
+        return normalized
+
+
+class LinkedEntityRead(TimestampedRead):
+    work_item_id: int
+    entity_type: str
+    entity_id: str
+    entity_title: str
+    entity_url: str | None = None
 
 
 class WorkItemHierarchyNode(BaseModel):

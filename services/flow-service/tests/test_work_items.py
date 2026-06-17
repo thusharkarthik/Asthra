@@ -9,7 +9,8 @@ from app.main import create_app
 from app.models.work_item_priority import WorkItemPriority
 from app.models.work_item_status import WorkItemStatus
 from app.models.work_item_type import WorkItemType
-from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.models.flow_activity import FlowActivity
+from app.schemas.work_item import LinkedEntityCreate, WorkItemCreate, WorkItemUpdate
 from app.schemas.work_item import WorkItemParentUpdate, WorkItemRelationCreate
 from app.services.work_item_service import WorkItemService
 from tests.conftest import create_work_item
@@ -296,3 +297,35 @@ def test_work_item_relations_add_reject_self_and_remove(db, monkeypatch):
 
     service.delete_relation(first.id, relation.id)
     assert service.list_relations(first.id) == []
+
+
+def test_work_item_links_create_list_remove_and_log_activity(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    service = WorkItemService(db)
+    work_item = service.create(WorkItemCreate(project_id=42, title="Traceable work"))
+
+    link = service.create_link(
+        work_item.id,
+        LinkedEntityCreate(entity_type="doc_page", entity_id="page-123", entity_title="Architecture Notes"),
+    )
+
+    links = service.list_links(work_item.id)
+    assert len(links) == 1
+    assert links[0].id == link.id
+    assert links[0].entity_type == "doc_page"
+    assert links[0].entity_title == "Architecture Notes"
+
+    service.delete_link(work_item.id, link.id)
+    assert service.list_links(work_item.id) == []
+    activity_actions = [activity.action for activity in db.query(FlowActivity).filter(FlowActivity.work_item_id == work_item.id).all()]
+    assert "link_added" in activity_actions
+    assert "link_removed" in activity_actions
+
+
+def test_work_item_link_invalid_entity_type_rejected():
+    try:
+        LinkedEntityCreate(entity_type="unknown", entity_id="1", entity_title="Bad Link")
+    except ValidationError as exc:
+        assert "entity_type must be one of" in str(exc)
+    else:
+        raise AssertionError("Invalid linked entity type should fail validation.")
