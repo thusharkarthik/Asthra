@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
 def ensure_flow_sqlite_columns() -> None:
     if engine.dialect.name != "sqlite":
         return
-    expected_columns = {
+    expected_work_item_columns = {
         "effort_score": "INTEGER",
         "item_level": "VARCHAR(30) DEFAULT 'work_item' NOT NULL",
         "effort_size": "VARCHAR(10)",
@@ -43,9 +43,15 @@ def ensure_flow_sqlite_columns() -> None:
             row[1]
             for row in connection.execute(text("PRAGMA table_info(work_items)")).fetchall()
         }
-        for column_name, column_type in expected_columns.items():
+        for column_name, column_type in expected_work_item_columns.items():
             if column_name not in existing:
                 connection.execute(text(f"ALTER TABLE work_items ADD COLUMN {column_name} {column_type}"))
+        existing_attachments = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(work_item_attachments)")).fetchall()
+        }
+        if "uploaded_at" not in existing_attachments:
+            connection.execute(text("ALTER TABLE work_item_attachments ADD COLUMN uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL"))
 
 
 def create_app() -> FastAPI:

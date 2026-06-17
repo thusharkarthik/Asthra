@@ -30,6 +30,50 @@ export const FLOW_RELATION_TYPE_OPTIONS = [
   { value: "related_to", label: "Related" },
   { value: "duplicate_of", label: "Duplicate Of" }
 ] as const;
+export const FLOW_WORK_ITEM_TEMPLATES = [
+  {
+    value: "blank",
+    label: "Blank",
+    description: "",
+    acceptanceCriteria: "",
+    definitionOfDone: ""
+  },
+  {
+    value: "bug",
+    label: "Bug",
+    description: "Problem Summary:\n\nEnvironment:\n\nSteps To Reproduce:\n1. \n2. \n3. \n\nExpected Result:\n\nActual Result:\n",
+    acceptanceCriteria: "- Issue is reproduced or root cause is confirmed.\n- Fix covers the reported behavior.\n- Regression coverage is added where practical.",
+    definitionOfDone: "- Fix implemented\n- Tests pass\n- Regression checked"
+  },
+  {
+    value: "feature",
+    label: "Feature",
+    description: "Problem:\n\nProposed Solution:\n\nUser Impact:\n",
+    acceptanceCriteria: "- User can complete the intended workflow.\n- Edge states are handled.\n- Documentation or release notes are updated if needed.",
+    definitionOfDone: "- Implementation complete\n- Acceptance criteria verified\n- Product review complete"
+  },
+  {
+    value: "task",
+    label: "Task",
+    description: "Task Summary:\n\nImplementation Notes:\n",
+    acceptanceCriteria: "- Task outcome is complete and verifiable.",
+    definitionOfDone: "- Work completed\n- Reviewed where needed"
+  },
+  {
+    value: "research",
+    label: "Research",
+    description: "Goal:\n\nQuestions:\n- \n\nFindings:\n\nRecommendation:\n",
+    acceptanceCriteria: "- Key questions are answered.\n- Recommendation is documented.\n- Follow-up work is identified.",
+    definitionOfDone: "- Findings documented\n- Recommendation shared"
+  },
+  {
+    value: "incident",
+    label: "Incident",
+    description: "Impact:\n\nTimeline:\n\nRoot Cause:\n\nResolution:\n\nFollow-Up Actions:\n",
+    acceptanceCriteria: "- Incident impact is understood.\n- Resolution or mitigation is documented.\n- Follow-up actions are captured.",
+    definitionOfDone: "- Incident notes complete\n- Follow-up actions assigned"
+  }
+] as const;
 
 export function statusLabel(statusId?: number | null) {
   return FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === statusId)?.label ?? "Untracked";

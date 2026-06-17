@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link2, MessageSquare, Paperclip } from "lucide-react";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
@@ -82,6 +83,7 @@ export default function BoardsPage() {
                             {isHighRiskWorkItem(item) ? <span className="rounded-md border border-destructive/40 px-2 py-0.5 text-xs text-destructive">High risk</span> : null}
                             {item.parent_id ? <span className="rounded-md border px-2 py-0.5 text-xs">Parent #{item.parent_id}</span> : null}
                           </div>
+                          <BoardCardIndicators accessToken={accessToken ?? ""} workItemId={item.id} />
                           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                             <div>{assigneeLabel(item.assignee_id)}</div>
                             {item.due_date ? <div>Due {new Date(item.due_date).toLocaleDateString()}</div> : null}
@@ -109,5 +111,38 @@ export default function BoardsPage() {
       )}
       <WorkItemCreateDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
     </>
+  );
+}
+
+function BoardCardIndicators({ accessToken, workItemId }: { accessToken: string; workItemId: number }) {
+  const attachmentsQuery = useQuery({
+    queryKey: ["flow", "board-attachments", workItemId],
+    queryFn: () => flowApi.listAttachments(accessToken, workItemId),
+    enabled: Boolean(accessToken),
+    retry: 1
+  });
+  const commentsQuery = useQuery({
+    queryKey: ["flow", "board-comments", workItemId],
+    queryFn: () => flowApi.listComments(accessToken, workItemId),
+    enabled: Boolean(accessToken),
+    retry: 1
+  });
+  const relationsQuery = useQuery({
+    queryKey: ["flow", "board-relations", workItemId],
+    queryFn: () => flowApi.listRelations(accessToken, workItemId),
+    enabled: Boolean(accessToken),
+    retry: 1
+  });
+
+  const attachments = attachmentsQuery.data?.length ?? 0;
+  const comments = commentsQuery.data?.length ?? 0;
+  const relations = relationsQuery.data?.length ?? 0;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><Paperclip className="h-3 w-3" />{attachments}</span>
+      <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><MessageSquare className="h-3 w-3" />{comments}</span>
+      <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5"><Link2 className="h-3 w-3" />{relations}</span>
+    </div>
   );
 }

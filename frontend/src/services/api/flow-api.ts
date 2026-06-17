@@ -4,6 +4,8 @@ import type {
   BoardColumn,
   ProjectHierarchy,
   WorkItem,
+  WorkItemAttachment,
+  WorkItemAttachmentCreate,
   WorkItemComment,
   WorkItemCreate,
   WorkItemFilters,
@@ -61,6 +63,24 @@ export const flowApi = {
   },
   deleteRelation(accessToken: string, workItemId: string | number, relationId: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/relations/${relationId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listAttachments(accessToken: string, workItemId: string | number) {
+    return apiRequest<WorkItemAttachment[]>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "GET", authToken: accessToken });
+  },
+  createAttachment(accessToken: string, workItemId: string | number, payload: WorkItemAttachmentCreate) {
+    return apiRequest<WorkItemAttachment>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  uploadAttachment(accessToken: string, workItemId: string | number, file: File, uploadedById?: number | null) {
+    const formData = new FormData();
+    formData.set("file", file);
+    if (uploadedById) formData.set("uploaded_by_id", String(uploadedById));
+    return apiRequest<WorkItemAttachment>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "POST", authToken: accessToken, body: formData });
+  },
+  deleteAttachment(accessToken: string, workItemId: string | number, attachmentId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments/${attachmentId}`, { method: "DELETE", authToken: accessToken });
+  },
+  attachmentDownloadPath(workItemId: string | number, attachmentId: string | number) {
+    return `${FLOW_PREFIX}/work-items/${workItemId}/attachments/${attachmentId}/download`;
   },
   listBoards(accessToken: string) {
     return apiRequest<Board[]>(`${FLOW_PREFIX}/boards`, { method: "GET", authToken: accessToken });

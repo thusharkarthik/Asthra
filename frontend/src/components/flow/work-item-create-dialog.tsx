@@ -9,7 +9,8 @@ import {
   FLOW_ITEM_LEVEL_OPTIONS,
   FLOW_PRIORITY_OPTIONS,
   FLOW_RISK_OPTIONS,
-  FLOW_STATUS_OPTIONS
+  FLOW_STATUS_OPTIONS,
+  FLOW_WORK_ITEM_TEMPLATES
 } from "@/components/flow/flow-utils";
 import { EntityCreateDialog, FormActions, FormField } from "@/components/modules/entity-form";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
   const addToast = useToastStore((state) => state.addToast);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [title, setTitle] = useState("");
+  const [template, setTemplate] = useState("blank");
   const [description, setDescription] = useState("");
   const [itemLevel, setItemLevel] = useState<FlowItemLevel>("work_item");
   const [statusName, setStatusName] = useState("");
@@ -80,6 +82,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
     },
     onSuccess: () => {
       setTitle("");
+      setTemplate("blank");
       setDescription("");
       setItemLevel("work_item");
       setStatusName("");
@@ -125,6 +128,21 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
           <h3 className="text-sm font-semibold">Basics</h3>
         <FormField label="Title" required error={!title.trim() ? "Required" : null}>
           <Input aria-label="Work item title" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
+        </FormField>
+        <FormField label="Template">
+          <Select
+            aria-label="Work item template"
+            value={template}
+            onChange={(event) => {
+              const selectedTemplate = FLOW_WORK_ITEM_TEMPLATES.find((option) => option.value === event.target.value) ?? FLOW_WORK_ITEM_TEMPLATES[0];
+              setTemplate(selectedTemplate.value);
+              setDescription(selectedTemplate.description);
+              setAcceptanceCriteria(selectedTemplate.acceptanceCriteria);
+              setDefinitionOfDone(selectedTemplate.definitionOfDone);
+            }}
+          >
+            {FLOW_WORK_ITEM_TEMPLATES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </Select>
         </FormField>
         <FormField label="Description">
           <textarea className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm" aria-label="Work item description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />

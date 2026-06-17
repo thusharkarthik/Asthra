@@ -33,6 +33,15 @@ function mockFlowFetch() {
     if (url.includes("/work-items/7/children")) {
       return new Response(JSON.stringify([{ id: 10, project_id: 3, parent_id: 7, item_level: "subtask", title: "Subtask A", status_id: 1, priority_id: 2 }]), { status: 200 });
     }
+    if (url.includes("/work-items/7/attachments") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 4, work_item_id: 7, file_name: "design.pdf", file_url: "/tmp/design.pdf", file_type: "application/pdf", file_size: 2048, uploaded_at: "2026-01-01T00:00:00Z" }), { status: 201 });
+    }
+    if (url.includes("/work-items/7/attachments") && init?.method === "GET") {
+      return new Response(JSON.stringify([{ id: 4, work_item_id: 7, file_name: "design.pdf", file_url: "/tmp/design.pdf", file_type: "application/pdf", file_size: 2048, uploaded_at: "2026-01-01T00:00:00Z" }]), { status: 200 });
+    }
+    if (url.includes("/work-items/8/attachments") || url.includes("/work-items/8/comments") || url.includes("/work-items/8/relations")) {
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
     if (url.includes("/work-items/7/relations") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 3, source_work_item_id: 7, target_work_item_id: 8, relation_type: "blocks", target_title: "Target item" }), { status: 201 });
     }
@@ -181,6 +190,18 @@ describe("Flow frontend screens", () => {
     expect(screen.getByLabelText("Completion checklist")).toBeInTheDocument();
   });
 
+  it("applies bug template content in create dialog", () => {
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.change(screen.getByLabelText("Work item template"), { target: { value: "bug" } });
+
+    expect(screen.getByDisplayValue(/Problem Summary:/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+    expect(screen.getByDisplayValue(/Issue is reproduced/)).toBeInTheDocument();
+  });
+
   it("creates work item with selected project and minimal stable payload", async () => {
     navigationMock.pathname = "/flow/work-items";
     renderWithQuery(<WorkItemsPage />);
@@ -323,6 +344,8 @@ describe("Flow frontend screens", () => {
     expect(screen.getByText("Linked Docs")).toBeInTheDocument();
     expect(screen.getAllByText("Hierarchy").length).toBeGreaterThan(0);
     expect(screen.getByText("Related Work")).toBeInTheDocument();
+    expect(screen.getByText("Attachments")).toBeInTheDocument();
+    expect(screen.getByText("design.pdf")).toBeInTheDocument();
     expect(screen.getByText("Subtask A")).toBeInTheDocument();
     expect(screen.getAllByText("Target item").length).toBeGreaterThan(0);
     expect(screen.getByText("Planning")).toBeInTheDocument();

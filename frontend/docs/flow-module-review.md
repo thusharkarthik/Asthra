@@ -26,6 +26,7 @@ Flow now presents a project-scoped work management experience:
 - Work items now include planning fields: effort size, effort score, business value, risk level, and complexity.
 - Work item detail pages now include Planning, Acceptance, Relationships, and Knowledge Links sections.
 - Create Work Item includes optional advanced fields behind a collapsed section.
+- Create Work Item includes Blank, Bug, Feature, Task, Research, and Incident templates.
 - Work item list rows can update status without opening the detail page.
 - Work item list supports effort, risk, and business value filters.
 - Board cards can move between Todo, In Progress, Review, and Done with a status action dropdown.
@@ -38,7 +39,9 @@ Flow now presents a project-scoped work management experience:
 - Hierarchy page for Initiatives, Features, Work Items, and Subtasks.
 - Dependencies page for blocks, blocked by, related, and duplicate relationships.
 - Work item detail pages now show child work and related work.
+- Work item detail pages now support attachment upload, open/download, and delete.
 - Board and backlog views show level and parent indicators where available.
+- Board cards now show attachment, comment, and dependency indicators.
 - Board view grouped into Todo, In Progress, Review, and Done columns.
 - My Work, Backlog, and Reports pages added as lightweight product surfaces.
 
@@ -52,3 +55,4 @@ Flow now presents a project-scoped work management experience:
 - Cross-module links are placeholders until platform references are persisted.
 - Assignee selection still needs workspace member lookup so names and email addresses can replace raw user IDs everywhere.
 - Sprints, dependency graph visualization, custom fields, workflow customization, and AI estimation remain future Flow gaps.
+- File previews, access-controlled downloads, and Media Service-backed storage remain future attachment gaps.

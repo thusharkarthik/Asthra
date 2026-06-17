@@ -1,6 +1,11 @@
+from pathlib import Path
+from uuid import uuid4
+
 from fastapi import HTTPException, status
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.work_item import WorkItem
 from app.models.work_item_attachment import WorkItemAttachment
 from app.repositories.attachment_repository import AttachmentRepository
@@ -32,6 +37,44 @@ class AttachmentService:
         )
         return attachment
 
+    async def create_from_upload(
+        self,
+        work_item_id: int,
+        uploaded_file: UploadFile,
+        uploaded_by_id: int | None = None,
+    ) -> WorkItemAttachment:
+        work_item = self._get_active_work_item(work_item_id)
+        original_name = uploaded_file.filename or "attachment"
+        safe_name = Path(original_name).name.replace("/", "_").replace("\\", "_")
+        stored_name = f"{uuid4().hex}_{safe_name}"
+        storage_dir = Path(settings.attachment_storage_dir)
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        storage_path = storage_dir / stored_name
+        content = await uploaded_file.read()
+        storage_path.write_bytes(content)
+
+        attachment = self.attachment_repository.create(
+            work_item_id,
+            WorkItemAttachmentCreate(
+                file_name=safe_name,
+                file_url=str(storage_path),
+                file_type=uploaded_file.content_type,
+                file_size=len(content),
+                uploaded_by_id=uploaded_by_id,
+            ),
+        )
+        self.activity_service.log_activity(
+            action="attachment.added",
+            entity_type="attachment",
+            entity_id=str(attachment.id),
+            actor_user_id=attachment.uploaded_by_id,
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            description=f"Attachment added to work item '{work_item.title}'.",
+            metadata={"file_name": attachment.file_name, "file_type": attachment.file_type},
+        )
+        return attachment
+
     def list_for_work_item(self, work_item_id: int) -> list[WorkItemAttachment]:
         self._get_active_work_item(work_item_id)
         return self.attachment_repository.list_for_work_item(work_item_id)
@@ -49,6 +92,26 @@ class AttachmentService:
                 detail="Attachment not found.",
             )
         self.attachment_repository.delete(attachment)
+
+    def get_download_path(self, work_item_id: int, attachment_id: int) -> Path:
+        self._get_active_work_item(work_item_id)
+        attachment = self.attachment_repository.get_by_id(attachment_id)
+        if (
+            attachment is None
+            or not attachment.is_active
+            or attachment.work_item_id != work_item_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment not found.",
+            )
+        path = Path(attachment.file_url)
+        if not path.exists() or not path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment file not found.",
+            )
+        return path
 
     def _get_active_work_item(self, work_item_id: int) -> WorkItem:
         work_item = self.attachment_repository.get_work_item(work_item_id)
