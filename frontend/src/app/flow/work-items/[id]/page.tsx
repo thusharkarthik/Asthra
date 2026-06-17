@@ -34,6 +34,7 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { apiConfig } from "@/services/api/config";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -72,9 +73,11 @@ export default function WorkItemDetailPage() {
   const [relationTargetId, setRelationTargetId] = useState("");
   const [relationType, setRelationType] = useState<WorkItemRelationType>("blocks");
   const [relationDescription, setRelationDescription] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const commentsQuery = useQuery({ queryKey: ["flow", "comments", id], queryFn: () => flowApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const attachmentsQuery = useQuery({ queryKey: ["flow", "attachments", id], queryFn: () => flowApi.listAttachments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const item = itemQuery.data;
@@ -150,6 +153,26 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow", "work-item", id] });
     },
     onError: (error) => addToast({ type: "error", title: "Comment failed", message: error instanceof Error ? error.message : "Unable to add comment." })
+  });
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedFile) throw new Error("Choose a file before uploading.");
+      return flowApi.uploadAttachment(accessToken ?? "", id, selectedFile, currentUser?.id);
+    },
+    onSuccess: () => {
+      setSelectedFile(null);
+      addToast({ type: "success", title: "Attachment uploaded" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "attachments", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Attachment upload failed", message: error instanceof Error ? error.message : "Unable to upload attachment." })
+  });
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: number) => flowApi.deleteAttachment(accessToken ?? "", id, attachmentId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Attachment deleted" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "attachments", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Attachment delete failed", message: error instanceof Error ? error.message : "Unable to delete attachment." })
   });
   const subtaskMutation = useMutation({
     mutationFn: () => flowApi.createSubtask(accessToken ?? "", id, {
@@ -422,6 +445,46 @@ export default function WorkItemDetailPage() {
           <CommentComposer onSubmit={(content) => commentMutation.mutate(content)} isSubmitting={commentMutation.isPending} />
         </div>
       </DetailPanel>
+      <DetailPanel title="Attachments">
+        <div className="space-y-4">
+          <form className="grid gap-2 rounded-md border p-3" onSubmit={(event) => { event.preventDefault(); uploadAttachmentMutation.mutate(); }}>
+            <Input aria-label="Attachment file" type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{selectedFile ? `${selectedFile.name} · ${formatFileSize(selectedFile.size)}` : "Images, PDFs, text files, docs, spreadsheets, and generic files are supported for dev upload."}</p>
+              <Button size="sm" disabled={!selectedFile || uploadAttachmentMutation.isPending}>{uploadAttachmentMutation.isPending ? "Uploading..." : "Upload"}</Button>
+            </div>
+          </form>
+          {attachmentsQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading attachments...</p> : null}
+          {!attachmentsQuery.isLoading && (attachmentsQuery.data ?? []).length === 0 ? <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No attachments yet.</p> : null}
+          <div className="space-y-2">
+            {(attachmentsQuery.data ?? []).map((attachment) => (
+              <div key={attachment.id} className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <a className="font-medium text-primary hover:underline" href={attachmentHref(id, attachment.id, attachment.file_url)} target="_blank" rel="noreferrer">{attachment.file_name}</a>
+                  <div className="text-xs text-muted-foreground">
+                    {attachment.file_type ?? "File"} · {formatFileSize(attachment.file_size)} · Uploaded {attachment.uploaded_at ? new Date(attachment.uploaded_at).toLocaleString() : "recently"}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" disabled={deleteAttachmentMutation.isPending} onClick={() => deleteAttachmentMutation.mutate(attachment.id)}>Delete</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </DetailPanel>
     </div>
   );
+}
+
+function formatFileSize(value?: number | null) {
+  if (!value) return "Unknown size";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function attachmentHref(workItemId: string, attachmentId: number, fileUrl?: string | null) {
+  if (fileUrl?.startsWith("http://") || fileUrl?.startsWith("https://")) {
+    return fileUrl;
+  }
+  return `${apiConfig.gatewayUrl}${flowApi.attachmentDownloadPath(workItemId, attachmentId)}`;
 }

@@ -90,6 +90,27 @@ export type WorkItemRelationCreate = {
   created_by_id?: number | null;
 };
 
+export type WorkItemAttachment = {
+  id: number;
+  work_item_id: number;
+  uploaded_by_id?: number | null;
+  file_name: string;
+  file_url: string;
+  file_type?: string | null;
+  file_size?: number | null;
+  uploaded_at?: string | null;
+  created_at?: string;
+  is_active?: boolean;
+};
+
+export type WorkItemAttachmentCreate = {
+  file_name: string;
+  file_url: string;
+  file_type?: string | null;
+  file_size?: number | null;
+  uploaded_by_id?: number | null;
+};
+
 export type Board = {
   id: number;
   project_id?: number | null;

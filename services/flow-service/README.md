@@ -75,6 +75,7 @@ ENVIRONMENT=development
 API_V1_PREFIX=/api/v1
 ASTHRA_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 DATABASE_URL=sqlite:///./asthra_flow.db
+FLOW_ATTACHMENT_STORAGE_DIR=./data/flow_attachments
 ```
 
 ## Current Structure
@@ -404,7 +405,9 @@ The label must belong to the same project as the work item.
 
 ## Attachment Endpoints
 
-Attachments store metadata only. Flow does not upload files, store file bytes, or integrate with external storage yet.
+Attachments store metadata and support local development uploads. Uploaded files are stored under `FLOW_ATTACHMENT_STORAGE_DIR`.
+
+Supported MVP file categories include images, PDFs, text files, documents, spreadsheets, and generic files. Production-grade asset storage and previews should move to Media Service later.
 
 ### Add Attachment Metadata
 
@@ -424,10 +427,22 @@ Request:
 }
 ```
 
+Multipart upload is also supported with a `file` field:
+
+```bash
+curl -F "file=@spec.pdf" http://localhost:8001/api/v1/work-items/1/attachments
+```
+
 ### List Work Item Attachments
 
 ```http
 GET /api/v1/work-items/{work_item_id}/attachments
+```
+
+### Download Attachment
+
+```http
+GET /api/v1/work-items/{work_item_id}/attachments/{attachment_id}/download
 ```
 
 ### Delete Attachment Metadata
