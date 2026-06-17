@@ -42,6 +42,7 @@ def list_work_items(
     assignee_id: int | None = None,
     project_id: int | None = None,
     priority_id: int | None = None,
+    sprint_id: int | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -52,6 +53,7 @@ def list_work_items(
         assignee_id=assignee_id,
         project_id=project_id,
         priority_id=priority_id,
+        sprint_id=sprint_id,
         limit=limit,
         offset=offset,
     )

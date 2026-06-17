@@ -26,7 +26,19 @@ export default function FlowReportsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const sprintsQuery = useQuery({
+    queryKey: ["flow", "sprints", selectedProjectId],
+    queryFn: () => flowApi.listSprints(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const items = workItemsQuery.data ?? [];
+  const sprints = sprintsQuery.data ?? [];
+  const completedSprints = sprints.filter((sprint) => sprint.status === "completed");
+  const activeSprint = sprints.find((sprint) => sprint.status === "active");
+  const sprintVelocity = completedSprints.length ? Math.round(completedSprints.reduce((sum, sprint) => sum + sprint.completed_work_count, 0) / completedSprints.length) : 0;
+  const activeSprintCompletion = activeSprint?.planned_work_count ? Math.round((activeSprint.completed_work_count / activeSprint.planned_work_count) * 100) : 0;
+  const effortCompleted = sprints.reduce((sum, sprint) => sprint.status === "completed" ? sum + sprint.total_effort : sum, 0);
   const workflowStatuses = workflowQuery.data?.statuses.length
     ? workflowQuery.data.statuses
     : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, category: status.name === "done" ? "completed" : status.name === "review" ? "review" : status.name === "in_progress" ? "active" : "backlog" }));
@@ -52,6 +64,14 @@ export default function FlowReportsPage() {
           <ModuleDashboardCard title="Completion Rate" value={`${completionRate}%`}>
             <p className="text-sm text-muted-foreground">Advanced charts are planned for the Insights integration.</p>
           </ModuleDashboardCard>
+          <ModuleDashboardCard title="Sprint Summary" value={sprints.length}>
+            <p className="text-sm text-muted-foreground">{activeSprint ? `Active: ${activeSprint.name}` : "No active sprint."}</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Velocity" value={sprintVelocity}>
+            <p className="text-sm text-muted-foreground">Average completed work items per completed sprint.</p>
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="Sprint Completion" value={`${activeSprintCompletion}%`} />
+          <ModuleDashboardCard title="Effort Completed" value={effortCompleted} />
           <ModuleDashboardCard title="By Status" value={items.length}>
             <MetricList items={workflowStatuses.map((status) => [status.name, countByStatus(status.id)])} />
           </ModuleDashboardCard>

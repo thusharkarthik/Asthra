@@ -27,7 +27,14 @@ export default function BacklogPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const sprintsQuery = useQuery({
+    queryKey: ["flow", "sprints", selectedProjectId],
+    queryFn: () => flowApi.listSprints(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const items = workItemsQuery.data ?? [];
+  const plannedSprints = (sprintsQuery.data ?? []).filter((sprint) => sprint.status !== "completed" && sprint.status !== "cancelled");
   const groomingMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof flowApi.updateWorkItem>[2] }) => flowApi.updateWorkItem(accessToken ?? "", id, payload),
     onSuccess: () => {
@@ -36,13 +43,21 @@ export default function BacklogPage() {
     },
     onError: (error) => addToast({ type: "error", title: "Backlog update failed", message: error instanceof Error ? error.message : "Unable to update backlog item." })
   });
+  const sprintAssignmentMutation = useMutation({
+    mutationFn: ({ sprintId, workItemId }: { sprintId: number; workItemId: number }) => flowApi.assignWorkItemToSprint(accessToken ?? "", sprintId, workItemId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Work item moved to sprint" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint assignment failed", message: error instanceof Error ? error.message : "Unable to move item to sprint." })
+  });
 
   return (
     <>
       <PageHeader title="Backlog" description="Unstarted work ready for grooming and planning." actions={<FlowHeaderActions />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view the backlog" /> : workItemsQuery.isLoading ? <LoadingState /> : items.length === 0 ? <EmptyState title="No backlog items yet" /> : (
-        <EntityTable columns={["Title", "Level", "Priority", "Effort", "Business Value", "Risk", "Parent Work", "Grooming"]}>
+        <EntityTable columns={["Title", "Level", "Priority", "Effort", "Business Value", "Risk", "Parent Work", "Planning"]}>
           {items.map((item) => (
             <EntityTableRow key={item.id} columns={8}>
               <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
@@ -64,6 +79,10 @@ export default function BacklogPage() {
                 <Select aria-label={`Move backlog item ${item.title}`} value="" onChange={(event) => groomingMutation.mutate({ id: item.id, payload: { status_name: event.target.value } })}>
                   <option value="">Move status</option>
                   {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                </Select>
+                <Select aria-label={`Move ${item.title} to sprint`} value="" onChange={(event) => { if (event.target.value) sprintAssignmentMutation.mutate({ sprintId: Number(event.target.value), workItemId: item.id }); }}>
+                  <option value="">Move to sprint</option>
+                  {plannedSprints.map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
                 </Select>
               </div>
             </EntityTableRow>

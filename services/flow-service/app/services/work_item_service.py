@@ -90,6 +90,7 @@ class WorkItemService:
         assignee_id: int | None = None,
         project_id: int | None = None,
         priority_id: int | None = None,
+        sprint_id: int | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[WorkItem]:
@@ -98,6 +99,7 @@ class WorkItemService:
             assignee_id=assignee_id,
             project_id=project_id,
             priority_id=priority_id,
+            sprint_id=sprint_id,
             limit=limit,
             offset=offset,
         )

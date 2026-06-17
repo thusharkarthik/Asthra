@@ -9,6 +9,8 @@ import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowReportsPage from "@/app/flow/reports/page";
 import FlowWorkflowSettingsPage from "@/app/flow/settings/workflows/page";
+import FlowSprintDetailPage from "@/app/flow/sprints/[id]/page";
+import FlowSprintsPage from "@/app/flow/sprints/page";
 import WorkItemsPage from "@/app/flow/work-items/page";
 import WorkItemDetailPage from "@/app/flow/work-items/[id]/page";
 import { QueryProvider } from "@/providers/query-provider";
@@ -69,6 +71,25 @@ function mockFlowFetch() {
     if (url.includes("/workflows")) {
       return new Response(JSON.stringify([workflowPayload]), { status: 200 });
     }
+    const sprintPayload = { id: 30, project_id: 3, name: "Sprint 1", goal: "Ship planning", status: "active", planned_work_count: 2, completed_work_count: 1, total_effort: 8, start_date: "2026-01-01T00:00:00Z", end_date: "2026-01-14T00:00:00Z" };
+    if (url.includes("/sprints/30/start") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...sprintPayload, status: "active" }), { status: 200 });
+    }
+    if (url.includes("/sprints/30/complete") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...sprintPayload, status: "completed" }), { status: 200 });
+    }
+    if (url.includes("/sprints/30/work-items") && init?.method === "POST") {
+      return new Response(JSON.stringify(sprintPayload), { status: 200 });
+    }
+    if (url.includes("/sprints/30")) {
+      return new Response(JSON.stringify(sprintPayload), { status: 200 });
+    }
+    if (url.includes("/sprints") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...sprintPayload, id: 31, name: "Sprint 2", status: "planned", planned_work_count: 0, completed_work_count: 0, total_effort: 0 }), { status: 201 });
+    }
+    if (url.includes("/sprints")) {
+      return new Response(JSON.stringify([sprintPayload, { ...sprintPayload, id: 31, name: "Sprint 2", status: "planned", planned_work_count: 0, completed_work_count: 0, total_effort: 0 }]), { status: 200 });
+    }
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
@@ -113,7 +134,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify([{ id: 1, work_item_id: 7, user_id: 1, content: "Looks good" }]), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "PATCH") {
-      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3, effort_size: "L", risk_level: "high" }), { status: 200 });
+      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3, sprint_id: 30, effort_size: "L", risk_level: "high" }), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "DELETE") {
       return new Response(null, { status: 204 });
@@ -127,6 +148,7 @@ function mockFlowFetch() {
         item_level: "work_item",
         status_id: 1,
         priority_id: 2,
+        sprint_id: 30,
         effort_size: "M",
         effort_score: 5,
         business_value: "high",
@@ -144,7 +166,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "work_item", status_id: 1, priority_id: 2 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "work_item", status_id: 1, priority_id: 2 }]), { status: 200 });
     }
     if (url.includes("/projects/3/hierarchy")) {
       return new Response(JSON.stringify({
@@ -583,6 +605,53 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByText("Business Value")).toBeInTheDocument());
     expect(screen.getByText("M / 5")).toBeInTheDocument();
     expect(screen.getAllByText("High").length).toBeGreaterThan(0);
+  });
+
+  it("assigns a backlog item to a sprint", async () => {
+    navigationMock.pathname = "/flow/backlog";
+    renderWithQuery(<BacklogPage />);
+
+    await waitFor(() => expect(screen.getByLabelText("Move Build Flow UI to sprint")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Move Build Flow UI to sprint"), { target: { value: "30" } });
+
+    await waitFor(() => {
+      const assignCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/work-items") && init?.method === "POST");
+      expect(assignCall).toBeTruthy();
+      expect(JSON.parse(String(assignCall?.[1]?.body))).toEqual({ work_item_id: 7 });
+    });
+  });
+
+  it("renders sprint list and creates a sprint", async () => {
+    navigationMock.pathname = "/flow/sprints";
+    renderWithQuery(<FlowSprintsPage />);
+
+    expect(screen.getByRole("heading", { name: "Sprints" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Sprint 1").length).toBeGreaterThan(0));
+    fireEvent.change(screen.getByLabelText("Sprint name"), { target: { value: "Sprint 2" } });
+    fireEvent.change(screen.getByLabelText("Sprint goal"), { target: { value: "Plan execution" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Sprint" }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints") && init?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body)).name).toBe("Sprint 2");
+    });
+  });
+
+  it("renders sprint detail metrics", async () => {
+    navigationMock.pathname = "/flow/sprints/30";
+    navigationMock.params = { id: "30" };
+    renderWithQuery(<FlowSprintDetailPage />);
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Sprint 1" })).toBeInTheDocument());
+    expect(screen.getByText("Ship planning")).toBeInTheDocument();
+    expect(screen.getByText("Progress")).toBeInTheDocument();
+    expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Complete Sprint" }));
+    await waitFor(() => {
+      const completeCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/complete") && init?.method === "POST");
+      expect(completeCall).toBeTruthy();
+    });
   });
 
   it("renders report metrics for effort and risk", async () => {

@@ -31,6 +31,7 @@ class WorkItemRepository:
         assignee_id: int | None = None,
         project_id: int | None = None,
         priority_id: int | None = None,
+        sprint_id: int | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[WorkItem]:
@@ -43,6 +44,8 @@ class WorkItemRepository:
             statement = statement.where(WorkItem.project_id == project_id)
         if priority_id is not None:
             statement = statement.where(WorkItem.priority_id == priority_id)
+        if sprint_id is not None:
+            statement = statement.where(WorkItem.sprint_id == sprint_id)
         statement = statement.order_by(WorkItem.id).offset(offset).limit(limit)
         return list(self.db.scalars(statement).all())
 

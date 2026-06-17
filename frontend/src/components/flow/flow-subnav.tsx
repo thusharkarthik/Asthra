@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Settings, UserRound } from "lucide-react";
+import { BarChart3, CalendarDays, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Settings, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { href: "/flow/hierarchy", label: "Hierarchy", icon: GitBranch },
   { href: "/flow/dependencies", label: "Dependencies", icon: Link2 },
   { href: "/flow/boards", label: "Boards", icon: Columns3 },
+  { href: "/flow/sprints", label: "Sprints", icon: CalendarDays },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },
   { href: "/flow/reports", label: "Reports", icon: BarChart3 },

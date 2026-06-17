@@ -8,6 +8,7 @@ export type WorkItem = {
   type_id?: number | null;
   status_id?: number | null;
   priority_id?: number | null;
+  sprint_id?: number | null;
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
@@ -31,6 +32,7 @@ export type WorkItemCreate = {
   type_id?: number | null;
   status_id?: number | null;
   priority_id?: number | null;
+  sprint_id?: number | null;
   assignee_id?: number | null;
   reporter_id?: number | null;
   due_date?: string | null;
@@ -220,6 +222,35 @@ export type WorkItemFilters = {
   status_id?: number | null;
   assignee_id?: number | null;
   priority_id?: number | null;
+  sprint_id?: number | null;
   limit?: number;
   offset?: number;
 };
+
+export type SprintStatus = "planned" | "active" | "completed" | "cancelled";
+
+export type Sprint = {
+  id: number;
+  project_id: number;
+  name: string;
+  goal?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status: SprintStatus;
+  planned_work_count: number;
+  completed_work_count: number;
+  total_effort: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type SprintCreate = {
+  project_id: number;
+  name: string;
+  goal?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: SprintStatus;
+};
+
+export type SprintUpdate = Partial<Omit<SprintCreate, "project_id">>;
