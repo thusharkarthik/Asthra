@@ -111,6 +111,66 @@ export type WorkItemAttachmentCreate = {
   uploaded_by_id?: number | null;
 };
 
+export type WorkflowCategory = "backlog" | "active" | "review" | "completed";
+
+export type WorkflowStatus = {
+  id: number;
+  workflow_id?: number | null;
+  name: string;
+  key: string;
+  category: WorkflowCategory;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type WorkflowTransition = {
+  id: number;
+  workflow_id: number;
+  from_status_id: number;
+  to_status_id: number;
+  from_status_name?: string | null;
+  to_status_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type Workflow = {
+  id: number;
+  project_id?: number | null;
+  workspace_id?: number | null;
+  name: string;
+  description?: string | null;
+  is_default: boolean;
+  statuses: WorkflowStatus[];
+  transitions: WorkflowTransition[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type WorkflowCreate = {
+  project_id?: number | null;
+  workspace_id?: number | null;
+  name: string;
+  description?: string | null;
+  is_default?: boolean;
+};
+
+export type WorkflowUpdate = Partial<WorkflowCreate>;
+
+export type WorkflowStatusCreate = {
+  name: string;
+  key?: string | null;
+  category: WorkflowCategory;
+  sort_order?: number;
+};
+
+export type WorkflowTransitionCreate = {
+  from_status_id: number;
+  to_status_id: number;
+};
+
 export type Board = {
   id: number;
   project_id?: number | null;

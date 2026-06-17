@@ -3,6 +3,13 @@ import type {
   Board,
   BoardColumn,
   ProjectHierarchy,
+  Workflow,
+  WorkflowCreate,
+  WorkflowStatus,
+  WorkflowStatusCreate,
+  WorkflowTransition,
+  WorkflowTransitionCreate,
+  WorkflowUpdate,
   WorkItem,
   WorkItemAttachment,
   WorkItemAttachmentCreate,
@@ -81,6 +88,36 @@ export const flowApi = {
   },
   attachmentDownloadPath(workItemId: string | number, attachmentId: string | number) {
     return `${FLOW_PREFIX}/work-items/${workItemId}/attachments/${attachmentId}/download`;
+  },
+  listWorkflows(accessToken: string, filters: { project_id?: number | null; workspace_id?: number | null } = {}) {
+    return apiRequest<Workflow[]>(`${FLOW_PREFIX}/workflows${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createWorkflow(accessToken: string, payload: WorkflowCreate) {
+    return apiRequest<Workflow>(`${FLOW_PREFIX}/workflows`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateWorkflow(accessToken: string, workflowId: string | number, payload: WorkflowUpdate) {
+    return apiRequest<Workflow>(`${FLOW_PREFIX}/workflows/${workflowId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteWorkflow(accessToken: string, workflowId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/workflows/${workflowId}`, { method: "DELETE", authToken: accessToken });
+  },
+  createWorkflowFromTemplate(accessToken: string, templateName: string, params: { project_id?: number | null; workspace_id?: number | null } = {}) {
+    return apiRequest<Workflow>(`${FLOW_PREFIX}/workflows/templates/${templateName}${toQuery(params)}`, { method: "POST", authToken: accessToken });
+  },
+  getProjectWorkflow(accessToken: string, projectId: string | number) {
+    return apiRequest<Workflow>(`${FLOW_PREFIX}/projects/${projectId}/workflow`, { method: "GET", authToken: accessToken });
+  },
+  assignWorkflowToProject(accessToken: string, workflowId: string | number, projectId: number) {
+    return apiRequest<Workflow>(`${FLOW_PREFIX}/workflows/${workflowId}/assign-project`, { method: "POST", authToken: accessToken, json: { project_id: projectId } });
+  },
+  createWorkflowStatus(accessToken: string, workflowId: string | number, payload: WorkflowStatusCreate) {
+    return apiRequest<WorkflowStatus>(`${FLOW_PREFIX}/workflows/${workflowId}/statuses`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateWorkflowStatus(accessToken: string, workflowId: string | number, statusId: string | number, payload: Partial<WorkflowStatusCreate> & { is_active?: boolean }) {
+    return apiRequest<WorkflowStatus>(`${FLOW_PREFIX}/workflows/${workflowId}/statuses/${statusId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  createWorkflowTransition(accessToken: string, workflowId: string | number, payload: WorkflowTransitionCreate) {
+    return apiRequest<WorkflowTransition>(`${FLOW_PREFIX}/workflows/${workflowId}/transitions`, { method: "POST", authToken: accessToken, json: payload });
   },
   listBoards(accessToken: string) {
     return apiRequest<Board[]>(`${FLOW_PREFIX}/boards`, { method: "GET", authToken: accessToken });

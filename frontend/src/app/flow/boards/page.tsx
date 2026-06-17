@@ -41,6 +41,12 @@ export default function BoardsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
 
   const moveMutation = useMutation({
     mutationFn: ({ id, statusName }: { id: number; statusName: string }) => flowApi.updateWorkItem(accessToken ?? "", id, { status_name: statusName }),
@@ -63,12 +69,12 @@ export default function BoardsPage() {
             </div>
           ) : (
             <div className="grid gap-4 xl:grid-cols-4">
-              {FLOW_STATUS_OPTIONS.map((column) => {
-                const columnItems = (workItemsQuery.data ?? []).filter((item) => String(item.status_id ?? "1") === column.value);
+              {(workflowQuery.data?.statuses.length ? workflowQuery.data.statuses : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }))).map((column) => {
+                const columnItems = (workItemsQuery.data ?? []).filter((item) => item.status_id === column.id);
                 return (
-                  <section key={column.value} className="min-h-96 rounded-lg border bg-card">
+                  <section key={column.id} className="min-h-96 rounded-lg border bg-card">
                     <div className="flex items-center justify-between border-b px-3 py-2">
-                      <span className="text-sm font-semibold">{column.label}</span>
+                      <span className="text-sm font-semibold">{column.name}</span>
                       <span className="rounded-md bg-muted px-2 py-0.5 text-xs">{columnItems.length}</span>
                     </div>
                     <div className="space-y-2 p-3">
@@ -92,15 +98,15 @@ export default function BoardsPage() {
                             Move to
                             <Select
                               aria-label={`Move ${item.title}`}
-                              value={FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === item.status_id)?.name ?? column.name}
+                              value={statusKeyFor(workflowQuery.data, item.status_id)}
                               onChange={(event) => moveMutation.mutate({ id: item.id, statusName: event.target.value })}
                             >
-                              {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                              {validBoardTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.id} value={statusOption.key}>{statusOption.name}</option>)}
                             </Select>
                           </label>
                         </div>
                       ))}
-                      {columnItems.length === 0 ? <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No items in {column.label}.</div> : null}
+                      {columnItems.length === 0 ? <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No items in {column.name}.</div> : null}
                     </div>
                   </section>
                 );
@@ -112,6 +118,26 @@ export default function BoardsPage() {
       <WorkItemCreateDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
     </>
   );
+}
+
+function validBoardTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
+  if (!workflow) {
+    return FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }));
+  }
+  const allowedIds = new Set(
+    workflow.transitions
+      .filter((transition) => transition.from_status_id === currentStatusId)
+      .map((transition) => transition.to_status_id)
+  );
+  const allowed = workflow.statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
+  return allowed.length ? allowed : workflow.statuses;
+}
+
+function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, statusId?: number | null) {
+  if (!workflow) {
+    return FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === statusId)?.name ?? "todo";
+  }
+  return workflow.statuses.find((statusOption) => statusOption.id === statusId)?.key ?? workflow.statuses[0]?.key ?? "todo";
 }
 
 function BoardCardIndicators({ accessToken, workItemId }: { accessToken: string; workItemId: number }) {

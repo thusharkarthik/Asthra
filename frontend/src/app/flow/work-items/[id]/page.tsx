@@ -81,6 +81,12 @@ export default function WorkItemDetailPage() {
   const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const item = itemQuery.data;
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", item?.project_id],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", item?.project_id ?? 0),
+    enabled: Boolean(accessToken && item?.project_id),
+    retry: 1
+  });
   const relatedWorkQuery = useQuery({
     queryKey: ["flow", "work-items", item?.project_id],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: item?.project_id, limit: 100 }),
@@ -93,7 +99,7 @@ export default function WorkItemDetailPage() {
     setDraft({
       title: item.title,
       description: item.description ?? "",
-      statusName: statusNameFromId(item.status_id),
+      statusName: statusKeyFor(workflowQuery.data, item.status_id),
       priorityName: priorityNameFromId(item.priority_id),
       assigneeId: item.assignee_id ? String(item.assignee_id) : "",
       dueDate: item.due_date ? item.due_date.slice(0, 10) : "",
@@ -107,7 +113,7 @@ export default function WorkItemDetailPage() {
       parentId: item.parent_id ? String(item.parent_id) : "",
       itemLevel: (item.item_level ?? "work_item") as FlowItemLevel
     });
-  }, [item]);
+  }, [item, workflowQuery.data]);
 
   const updateMutation = useMutation({
     mutationFn: () => flowApi.updateWorkItem(accessToken ?? "", id, {
@@ -259,7 +265,7 @@ export default function WorkItemDetailPage() {
                   <label className="grid gap-1 text-sm">
                     <span className="font-medium">Status</span>
                     <Select value={draft.statusName} onChange={(event) => setDraft((value) => ({ ...value, statusName: event.target.value }))}>
-                      {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                      {validDetailTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.key} value={statusOption.key}>{statusOption.name}</option>)}
                     </Select>
                   </label>
                   <label className="grid gap-1 text-sm">
@@ -487,4 +493,24 @@ function attachmentHref(workItemId: string, attachmentId: number, fileUrl?: stri
     return fileUrl;
   }
   return `${apiConfig.gatewayUrl}${flowApi.attachmentDownloadPath(workItemId, attachmentId)}`;
+}
+
+function validDetailTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
+  if (!workflow) {
+    return FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }));
+  }
+  const allowedIds = new Set(
+    workflow.transitions
+      .filter((transition) => transition.from_status_id === currentStatusId)
+      .map((transition) => transition.to_status_id)
+  );
+  const allowed = workflow.statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
+  return allowed.length ? allowed : workflow.statuses;
+}
+
+function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, statusId?: number | null) {
+  if (!workflow) {
+    return statusNameFromId(statusId);
+  }
+  return workflow.statuses.find((statusOption) => statusOption.id === statusId)?.key ?? workflow.statuses[0]?.key ?? "todo";
 }

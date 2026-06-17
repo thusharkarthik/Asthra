@@ -21,6 +21,7 @@ from app.schemas.work_item import (
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
+from app.services.workflow_service import WorkflowService
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ class WorkItemService:
 
     def update(self, work_item_id: int, work_item_update: WorkItemUpdate) -> WorkItem:
         work_item = self.get(work_item_id)
-        work_item_update = self._apply_update_lookup_names(work_item_update)
+        work_item_update = self._apply_update_lookup_names(work_item_update, work_item.project_id)
         effective_level = work_item_update.item_level if work_item_update.item_level is not None else work_item.item_level
         effective_parent_id = work_item_update.parent_id if "parent_id" in work_item_update.model_fields_set else work_item.parent_id
         self._validate_references(
@@ -129,6 +130,8 @@ class WorkItemService:
             project_id=work_item.project_id,
             work_item_id=work_item.id,
         )
+        if work_item_update.status_id is not None:
+            WorkflowService(self.work_item_repository.db).validate_transition(work_item.project_id, work_item.status_id, work_item_update.status_id)
         updated_work_item = self.work_item_repository.update(work_item, work_item_update)
         self.activity_service.log_activity(
             action="work_item.updated",
@@ -291,9 +294,9 @@ class WorkItemService:
         if work_item_create.type_id is None:
             update_data["type_id"] = self.work_item_repository.get_or_create_default_type().id
         if work_item_create.status_name:
-            update_data["status_id"] = self.work_item_repository.get_or_create_status_by_name(work_item_create.status_name).id
+            update_data["status_id"] = WorkflowService(self.work_item_repository.db).get_or_create_status_for_project(work_item_create.project_id, work_item_create.status_name).id
         elif work_item_create.status_id is None:
-            update_data["status_id"] = self.work_item_repository.get_or_create_default_status().id
+            update_data["status_id"] = WorkflowService(self.work_item_repository.db).get_or_create_status_for_project(work_item_create.project_id).id
         if work_item_create.priority_name:
             update_data["priority_id"] = self.work_item_repository.get_or_create_priority_by_name(work_item_create.priority_name).id
         elif work_item_create.priority_id is None:
@@ -304,10 +307,10 @@ class WorkItemService:
             update_data["reporter_id"] = 0
         return work_item_create.model_copy(update=update_data)
 
-    def _apply_update_lookup_names(self, work_item_update: WorkItemUpdate) -> WorkItemUpdate:
+    def _apply_update_lookup_names(self, work_item_update: WorkItemUpdate, project_id: int) -> WorkItemUpdate:
         update_data: dict[str, int] = {}
         if work_item_update.status_name:
-            update_data["status_id"] = self.work_item_repository.get_or_create_status_by_name(work_item_update.status_name).id
+            update_data["status_id"] = WorkflowService(self.work_item_repository.db).get_or_create_status_for_project(project_id, work_item_update.status_name).id
         if work_item_update.priority_name:
             update_data["priority_id"] = self.work_item_repository.get_or_create_priority_by_name(work_item_update.priority_name).id
         if not update_data:

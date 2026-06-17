@@ -7,6 +7,7 @@ from app.models.work_item_label import WorkItemLabel
 from app.models.work_item_priority import WorkItemPriority
 from app.models.work_item_relation import WorkItemRelation
 from app.models.work_item_status import WorkItemStatus
+from app.models.workflow import Workflow, WorkflowStatus, WorkflowTransition
 from app.models.work_item_type import WorkItemType
 
 __all__ = [
@@ -20,6 +21,9 @@ __all__ = [
     "WorkItemPriority",
     "WorkItemRelation",
     "WorkItemStatus",
+    "Workflow",
+    "WorkflowStatus",
+    "WorkflowTransition",
     "WorkItemType",
     "work_item_labels",
 ]

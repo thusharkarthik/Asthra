@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, isBlockedWorkItem, isCompletedWorkItem, isHighRiskWorkItem, isInProgressWorkItem, isOpenWorkItem, isOverdueWorkItem } from "@/components/flow/flow-utils";
+import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, isBlockedWorkItem, isHighRiskWorkItem, isOverdueWorkItem } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -20,8 +20,19 @@ export default function FlowReportsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const items = workItemsQuery.data ?? [];
-  const completionRate = items.length ? Math.round((items.filter(isCompletedWorkItem).length / items.length) * 100) : 0;
+  const workflowStatuses = workflowQuery.data?.statuses.length
+    ? workflowQuery.data.statuses
+    : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, category: status.name === "done" ? "completed" : status.name === "review" ? "review" : status.name === "in_progress" ? "active" : "backlog" }));
+  const completedStatusIds = new Set(workflowStatuses.filter((status) => status.category === "completed").map((status) => status.id));
+  const activeStatusIds = new Set(workflowStatuses.filter((status) => status.category === "active" || status.category === "review").map((status) => status.id));
+  const completionRate = items.length ? Math.round((items.filter((item) => completedStatusIds.has(item.status_id ?? 0)).length / items.length) * 100) : 0;
   const countByStatus = (statusId: number) => items.filter((item) => item.status_id === statusId).length;
   const countByPriority = (priorityId: number) => items.filter((item) => item.priority_id === priorityId).length;
   const countByEffort = (effortSize: string) => items.filter((item) => item.effort_size === effortSize).length;
@@ -33,8 +44,8 @@ export default function FlowReportsPage() {
       {!selectedProjectId ? <EmptyState title="Select a project to view Flow reports" /> : workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 md:grid-cols-4">
           <ModuleDashboardCard title="Total Items" value={items.length} />
-          <ModuleDashboardCard title="Open" value={items.filter(isOpenWorkItem).length} />
-          <ModuleDashboardCard title="In Progress" value={items.filter(isInProgressWorkItem).length} />
+          <ModuleDashboardCard title="Open" value={items.filter((item) => !completedStatusIds.has(item.status_id ?? 0)).length} />
+          <ModuleDashboardCard title="Active / Review" value={items.filter((item) => activeStatusIds.has(item.status_id ?? 0)).length} />
           <ModuleDashboardCard title="Blocked" value={items.filter(isBlockedWorkItem).length} />
           <ModuleDashboardCard title="High Risk" value={items.filter(isHighRiskWorkItem).length} />
           <ModuleDashboardCard title="Overdue" value={items.filter(isOverdueWorkItem).length} />
@@ -42,7 +53,7 @@ export default function FlowReportsPage() {
             <p className="text-sm text-muted-foreground">Advanced charts are planned for the Insights integration.</p>
           </ModuleDashboardCard>
           <ModuleDashboardCard title="By Status" value={items.length}>
-            <MetricList items={FLOW_STATUS_OPTIONS.map((status) => [status.label, countByStatus(Number(status.value))])} />
+            <MetricList items={workflowStatuses.map((status) => [status.name, countByStatus(status.id)])} />
           </ModuleDashboardCard>
           <ModuleDashboardCard title="By Priority" value={items.length}>
             <MetricList items={FLOW_PRIORITY_OPTIONS.map((priority) => [priority.label, countByPriority(Number(priority.value))])} />

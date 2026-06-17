@@ -8,6 +8,7 @@ import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowReportsPage from "@/app/flow/reports/page";
+import FlowWorkflowSettingsPage from "@/app/flow/settings/workflows/page";
 import WorkItemsPage from "@/app/flow/work-items/page";
 import WorkItemDetailPage from "@/app/flow/work-items/[id]/page";
 import { QueryProvider } from "@/providers/query-provider";
@@ -27,6 +28,47 @@ function renderWithQuery(ui: React.ReactNode) {
 function mockFlowFetch() {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    const workflowPayload = {
+      id: 20,
+      project_id: 3,
+      name: "Custom Workflow",
+      is_default: true,
+      statuses: [
+        { id: 1, workflow_id: 20, name: "Backlog", key: "backlog", category: "backlog", sort_order: 0, is_active: true },
+        { id: 2, workflow_id: 20, name: "Development", key: "development", category: "active", sort_order: 1, is_active: true },
+        { id: 3, workflow_id: 20, name: "QA", key: "qa", category: "review", sort_order: 2, is_active: true },
+        { id: 4, workflow_id: 20, name: "Done", key: "done", category: "completed", sort_order: 3, is_active: true }
+      ],
+      transitions: [
+        { id: 1, workflow_id: 20, from_status_id: 1, to_status_id: 2, from_status_name: "Backlog", to_status_name: "Development" },
+        { id: 2, workflow_id: 20, from_status_id: 2, to_status_id: 3, from_status_name: "Development", to_status_name: "QA" },
+        { id: 3, workflow_id: 20, from_status_id: 3, to_status_id: 4, from_status_name: "QA", to_status_name: "Done" }
+      ]
+    };
+    if (url.includes("/projects/3/workflow")) {
+      return new Response(JSON.stringify(workflowPayload), { status: 200 });
+    }
+    if (url.includes("/workflows/20/statuses") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 5, workflow_id: 20, name: "Blocked", key: "blocked", category: "active", sort_order: 4, is_active: true }), { status: 201 });
+    }
+    if (url.includes("/workflows/20/transitions") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 4, workflow_id: 20, from_status_id: 2, to_status_id: 5, from_status_name: "Development", to_status_name: "Blocked" }), { status: 201 });
+    }
+    if (url.includes("/workflows/templates/engineering") && init?.method === "POST") {
+      return new Response(JSON.stringify(workflowPayload), { status: 201 });
+    }
+    if (url.includes("/workflows/20") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ ...workflowPayload, name: "Renamed Workflow" }), { status: 200 });
+    }
+    if (url.includes("/workflows/20") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/workflows") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...workflowPayload, id: 21, name: "New Workflow" }), { status: 201 });
+    }
+    if (url.includes("/workflows")) {
+      return new Response(JSON.stringify([workflowPayload]), { status: 200 });
+    }
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
@@ -362,7 +404,7 @@ describe("Flow frontend screens", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByDisplayValue("Build Flow UI"), { target: { value: "Updated Flow UI" } });
     fireEvent.change(screen.getByDisplayValue("Wire work items"), { target: { value: "Updated details" } });
-    fireEvent.change(screen.getByDisplayValue("Todo"), { target: { value: "in_progress" } });
+    fireEvent.change(screen.getByDisplayValue("Backlog"), { target: { value: "development" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -370,7 +412,7 @@ describe("Flow frontend screens", () => {
       expect(patchCall).toBeTruthy();
       const body = JSON.parse(String(patchCall?.[1]?.body));
       expect(body.title).toBe("Updated Flow UI");
-      expect(body.status_name).toBe("in_progress");
+      expect(body.status_name).toBe("development");
     });
   });
 
@@ -433,7 +475,9 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<BoardsPage />);
 
     expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText("Todo").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("Backlog").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("Development").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("QA").length).toBeGreaterThan(0);
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
     expect(screen.getByText("Effort: M / 5")).toBeInTheDocument();
     expect(screen.getByText("High risk")).toBeInTheDocument();
@@ -444,12 +488,42 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<BoardsPage />);
 
     await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Move Build Flow UI"), { target: { value: "review" } });
+    fireEvent.change(screen.getByLabelText("Move Build Flow UI"), { target: { value: "development" } });
 
     await waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
       expect(patchCall).toBeTruthy();
-      expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ status_name: "review" });
+      expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ status_name: "development" });
+    });
+  });
+
+  it("renders workflow settings and status management", async () => {
+    navigationMock.pathname = "/flow/settings/workflows";
+    renderWithQuery(<FlowWorkflowSettingsPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Workflows" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Custom Workflow")).toBeInTheDocument());
+    expect(screen.getAllByText("Development").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Status name")).toBeInTheDocument();
+    expect(screen.getByLabelText("From status")).toBeInTheDocument();
+  });
+
+  it("updates and deletes a workflow from settings", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    navigationMock.pathname = "/flow/settings/workflows";
+    renderWithQuery(<FlowWorkflowSettingsPage />);
+
+    await waitFor(() => expect(screen.getByLabelText("Edit workflow name")).toHaveValue("Custom Workflow"));
+    fireEvent.change(screen.getByLabelText("Edit workflow name"), { target: { value: "Renamed Workflow" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Workflow" }));
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/workflows/20") && init?.method === "PATCH");
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/workflows/20") && init?.method === "DELETE");
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ name: "Renamed Workflow" });
+      expect(deleteCall).toBeTruthy();
     });
   });
 
