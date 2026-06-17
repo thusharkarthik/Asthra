@@ -10,6 +10,7 @@ from app.models.work_item_priority import WorkItemPriority
 from app.models.work_item_status import WorkItemStatus
 from app.models.work_item_type import WorkItemType
 from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.schemas.work_item import WorkItemParentUpdate, WorkItemRelationCreate
 from app.services.work_item_service import WorkItemService
 from tests.conftest import create_work_item
 
@@ -190,7 +191,7 @@ def test_create_work_item_with_advanced_fields(db, monkeypatch):
 
 def test_update_work_item_advanced_fields_and_parent(db, monkeypatch):
     monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
-    parent = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Parent work"))
+    parent = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Parent feature", item_level="feature"))
     child = WorkItemService(db).create(WorkItemCreate(project_id=42, title="Child work"))
 
     updated = WorkItemService(db).update(
@@ -229,3 +230,69 @@ def test_invalid_advanced_work_item_values_are_rejected():
         assert "business_value" in str(exc)
     else:
         raise AssertionError("Invalid business_value should fail validation.")
+
+
+def test_flow_hierarchy_create_tree_and_change_parent(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    service = WorkItemService(db)
+
+    initiative = service.create(WorkItemCreate(project_id=42, title="Launch initiative", item_level="initiative"))
+    feature = service.create(WorkItemCreate(project_id=42, title="Onboarding feature", item_level="feature", parent_id=initiative.id))
+    work_item = service.create(WorkItemCreate(project_id=42, title="Build signup", item_level="work_item", parent_id=feature.id))
+    subtask = service.create_subtask(work_item.id, WorkItemCreate(project_id=42, title="Write validation tests"))
+
+    hierarchy = service.get_project_hierarchy(42)
+    assert hierarchy.items[0].title == "Launch initiative"
+    assert hierarchy.items[0].children[0].title == "Onboarding feature"
+    assert hierarchy.items[0].children[0].children[0].title == "Build signup"
+    assert hierarchy.items[0].children[0].children[0].children[0].title == "Write validation tests"
+    assert subtask.item_level == "subtask"
+
+    moved = service.update_parent(work_item.id, WorkItemParentUpdate(parent_id=initiative.id))
+    assert moved.parent_id == initiative.id
+    children = service.list_children(initiative.id)
+    assert {child.id for child in children} == {feature.id, work_item.id}
+
+
+def test_hierarchy_validation_rejects_invalid_parenting(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    service = WorkItemService(db)
+    initiative = service.create(WorkItemCreate(project_id=42, title="Initiative", item_level="initiative"))
+
+    try:
+        service.create(WorkItemCreate(project_id=42, title="Bad subtask", item_level="subtask"))
+    except HTTPException as exc:
+        assert exc.status_code == 400
+    else:
+        raise AssertionError("Subtask without parent should fail.")
+
+    try:
+        service.create(WorkItemCreate(project_id=42, title="Bad initiative", item_level="initiative", parent_id=initiative.id))
+    except HTTPException as exc:
+        assert exc.status_code == 400
+    else:
+        raise AssertionError("Initiative with parent should fail.")
+
+
+def test_work_item_relations_add_reject_self_and_remove(db, monkeypatch):
+    monkeypatch.setattr("app.services.work_item_service.publish_event", lambda *args, **kwargs: None)
+    service = WorkItemService(db)
+    first = service.create(WorkItemCreate(project_id=42, title="Item A"))
+    second = service.create(WorkItemCreate(project_id=42, title="Item B"))
+
+    relation = service.create_relation(first.id, WorkItemRelationCreate(target_work_item_id=second.id, relation_type="blocks", description="A blocks B"))
+
+    relations = service.list_relations(first.id)
+    assert len(relations) == 1
+    assert relations[0].target_title == "Item B"
+    assert relations[0].relation_type == "blocks"
+
+    try:
+        service.create_relation(first.id, WorkItemRelationCreate(target_work_item_id=first.id, relation_type="blocks"))
+    except HTTPException as exc:
+        assert exc.status_code == 400
+    else:
+        raise AssertionError("Self relation should fail.")
+
+    service.delete_relation(first.id, relation.id)
+    assert service.list_relations(first.id) == []

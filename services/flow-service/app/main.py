@@ -30,6 +30,7 @@ def ensure_flow_sqlite_columns() -> None:
         return
     expected_columns = {
         "effort_score": "INTEGER",
+        "item_level": "VARCHAR(30) DEFAULT 'work_item' NOT NULL",
         "effort_size": "VARCHAR(10)",
         "business_value": "VARCHAR(20)",
         "risk_level": "VARCHAR(20)",

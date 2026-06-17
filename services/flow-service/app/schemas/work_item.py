@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 from app.schemas.base import TimestampedRead
 
 
+ALLOWED_ITEM_LEVELS = {"initiative", "feature", "work_item", "subtask"}
+ALLOWED_RELATION_TYPES = {"blocks", "blocked_by", "related_to", "duplicate_of"}
+
+
 class WorkItemTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = None
@@ -57,6 +61,7 @@ class WorkItemCreate(BaseModel):
     reporter_id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None)
+    item_level: str = "work_item"
     parent_id: int | None = Field(default=None)
     board_id: int | None = Field(default=None)
     board_column_id: int | None = Field(default=None)
@@ -95,6 +100,11 @@ class WorkItemCreate(BaseModel):
     def validate_complexity(cls, value: str | None) -> str | None:
         return validate_choice(value, {"low", "medium", "high"}, "complexity")
 
+    @field_validator("item_level")
+    @classmethod
+    def validate_item_level(cls, value: str) -> str:
+        return validate_required_choice(value, ALLOWED_ITEM_LEVELS, "item_level")
+
 
 class WorkItemUpdate(BaseModel):
     type_id: int | None = None
@@ -107,6 +117,7 @@ class WorkItemUpdate(BaseModel):
     board_column_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
+    item_level: str | None = None
     assignee_id: int | None = None
     reporter_id: int | None = None
     due_date: datetime | None = None
@@ -145,6 +156,13 @@ class WorkItemUpdate(BaseModel):
     def validate_complexity(cls, value: str | None) -> str | None:
         return validate_choice(value, {"low", "medium", "high"}, "complexity")
 
+    @field_validator("item_level")
+    @classmethod
+    def validate_item_level(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return validate_required_choice(value, ALLOWED_ITEM_LEVELS, "item_level")
+
 
 class WorkItemRead(TimestampedRead):
     project_id: int
@@ -156,6 +174,7 @@ class WorkItemRead(TimestampedRead):
     board_column_id: int | None = None
     title: str
     description: str | None = None
+    item_level: str
     assignee_id: int | None = None
     reporter_id: int | None = None
     due_date: datetime | None = None
@@ -168,6 +187,49 @@ class WorkItemRead(TimestampedRead):
     definition_of_done: str | None = None
     sort_order: int
     is_active: bool
+
+
+class WorkItemParentUpdate(BaseModel):
+    parent_id: int | None = None
+
+
+class WorkItemRelationCreate(BaseModel):
+    target_work_item_id: int
+    relation_type: str
+    description: str | None = None
+    created_by_id: int | None = None
+
+    @field_validator("relation_type")
+    @classmethod
+    def validate_relation_type(cls, value: str) -> str:
+        return validate_required_choice(value, ALLOWED_RELATION_TYPES, "relation_type")
+
+
+class WorkItemRelationRead(TimestampedRead):
+    source_work_item_id: int
+    target_work_item_id: int
+    relation_type: str
+    description: str | None = None
+    created_by_id: int | None = None
+    target_title: str | None = None
+    target_status_id: int | None = None
+    target_priority_id: int | None = None
+
+
+class WorkItemHierarchyNode(BaseModel):
+    id: int
+    project_id: int
+    parent_id: int | None = None
+    item_level: str
+    title: str
+    status_id: int | None = None
+    priority_id: int | None = None
+    children: list["WorkItemHierarchyNode"] = Field(default_factory=list)
+
+
+class ProjectHierarchyRead(BaseModel):
+    project_id: int
+    items: list[WorkItemHierarchyNode]
 
 
 class WorkItemAIBreakdownRead(BaseModel):
@@ -192,6 +254,13 @@ class WorkItemMemoryDocumentPayload(BaseModel):
 def validate_choice(value: str | None, allowed: set[str], field_name: str) -> str | None:
     if value is None:
         return value
+    normalized = value.strip().lower()
+    if normalized not in allowed:
+        raise ValueError(f"{field_name} must be one of {', '.join(sorted(allowed))}")
+    return normalized
+
+
+def validate_required_choice(value: str, allowed: set[str], field_name: str) -> str:
     normalized = value.strip().lower()
     if normalized not in allowed:
         raise ValueError(f"{field_name} must be one of {', '.join(sorted(allowed))}")

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from fastapi import HTTPException, status
@@ -5,7 +7,17 @@ from sqlalchemy.orm import Session
 
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
-from app.schemas.work_item import WorkItemAIBreakdownRead, WorkItemCreate, WorkItemMemoryDocumentPayload, WorkItemUpdate
+from app.schemas.work_item import (
+    ProjectHierarchyRead,
+    WorkItemAIBreakdownRead,
+    WorkItemCreate,
+    WorkItemHierarchyNode,
+    WorkItemMemoryDocumentPayload,
+    WorkItemParentUpdate,
+    WorkItemRelationCreate,
+    WorkItemRelationRead,
+    WorkItemUpdate,
+)
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
@@ -43,6 +55,11 @@ class WorkItemService:
             project_id=work_item_create.project_id,
             board_id=work_item_create.board_id,
             board_column_id=work_item_create.board_column_id,
+        )
+        self._validate_hierarchy(
+            item_level=work_item_create.item_level,
+            parent_id=work_item_create.parent_id,
+            project_id=work_item_create.project_id,
         )
         work_item = self.work_item_repository.create(work_item_create)
         self.activity_service.log_activity(
@@ -94,6 +111,8 @@ class WorkItemService:
     def update(self, work_item_id: int, work_item_update: WorkItemUpdate) -> WorkItem:
         work_item = self.get(work_item_id)
         work_item_update = self._apply_update_lookup_names(work_item_update)
+        effective_level = work_item_update.item_level if work_item_update.item_level is not None else work_item.item_level
+        effective_parent_id = work_item_update.parent_id if "parent_id" in work_item_update.model_fields_set else work_item.parent_id
         self._validate_references(
             type_id=work_item_update.type_id,
             status_id=work_item_update.status_id,
@@ -103,6 +122,12 @@ class WorkItemService:
             project_id=work_item.project_id,
             board_id=work_item_update.board_id,
             board_column_id=work_item_update.board_column_id,
+        )
+        self._validate_hierarchy(
+            item_level=effective_level,
+            parent_id=effective_parent_id,
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
         )
         updated_work_item = self.work_item_repository.update(work_item, work_item_update)
         self.activity_service.log_activity(
@@ -131,6 +156,93 @@ class WorkItemService:
     def delete(self, work_item_id: int) -> None:
         work_item = self.get(work_item_id)
         self.work_item_repository.delete(work_item)
+
+    def get_project_hierarchy(self, project_id: int) -> ProjectHierarchyRead:
+        items = self.work_item_repository.list_by_project(project_id)
+        nodes = {
+            item.id: WorkItemHierarchyNode(
+                id=item.id,
+                project_id=item.project_id,
+                parent_id=item.parent_id,
+                item_level=item.item_level,
+                title=item.title,
+                status_id=item.status_id,
+                priority_id=item.priority_id,
+                children=[],
+            )
+            for item in items
+        }
+        roots: list[WorkItemHierarchyNode] = []
+        for item in items:
+            node = nodes[item.id]
+            if item.parent_id and item.parent_id in nodes:
+                nodes[item.parent_id].children.append(node)
+            else:
+                roots.append(node)
+        level_order = {"initiative": 0, "feature": 1, "work_item": 2, "subtask": 3}
+        roots.sort(key=lambda node: (level_order.get(node.item_level, 9), node.id))
+        return ProjectHierarchyRead(project_id=project_id, items=roots)
+
+    def create_subtask(self, work_item_id: int, subtask_create: WorkItemCreate) -> WorkItem:
+        parent = self.get(work_item_id)
+        payload = subtask_create.model_copy(
+            update={
+                "project_id": parent.project_id,
+                "parent_id": parent.id,
+                "item_level": "subtask",
+            }
+        )
+        return self.create(payload)
+
+    def update_parent(self, work_item_id: int, parent_update: WorkItemParentUpdate) -> WorkItem:
+        work_item = self.get(work_item_id)
+        return self.update(work_item_id, WorkItemUpdate(parent_id=parent_update.parent_id, item_level=work_item.item_level))
+
+    def list_children(self, work_item_id: int) -> list[WorkItem]:
+        self.get(work_item_id)
+        return self.work_item_repository.list_children(work_item_id)
+
+    def create_relation(self, work_item_id: int, relation_create: WorkItemRelationCreate):
+        source = self.get(work_item_id)
+        target = self.get(relation_create.target_work_item_id)
+        if source.id == target.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Work item relation cannot target itself.")
+        if source.project_id != target.project_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Related work must belong to the same project.")
+        return self.work_item_repository.create_relation(work_item_id, relation_create)
+
+    def list_relations(self, work_item_id: int) -> list[WorkItemRelationRead]:
+        self.get(work_item_id)
+        results: list[WorkItemRelationRead] = []
+        for relation in self.work_item_repository.list_relations(work_item_id):
+            related = relation.target_work_item
+            if relation.target_work_item_id == work_item_id:
+                related = relation.source_work_item
+            results.append(
+                WorkItemRelationRead(
+                    id=relation.id,
+                    created_at=relation.created_at,
+                    updated_at=relation.updated_at,
+                    source_work_item_id=relation.source_work_item_id,
+                    target_work_item_id=relation.target_work_item_id,
+                    relation_type=relation.relation_type,
+                    description=relation.description,
+                    created_by_id=relation.created_by_id,
+                    target_title=related.title if related else None,
+                    target_status_id=related.status_id if related else None,
+                    target_priority_id=related.priority_id if related else None,
+                )
+            )
+        return results
+
+    def delete_relation(self, work_item_id: int, relation_id: int) -> None:
+        self.get(work_item_id)
+        relation = self.work_item_repository.get_relation(relation_id)
+        if relation is None or (
+            relation.source_work_item_id != work_item_id and relation.target_work_item_id != work_item_id
+        ):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Work item relation not found.")
+        self.work_item_repository.delete_relation(relation)
 
     def ai_breakdown(self, work_item_id: int, request_id: str | None = None) -> WorkItemAIBreakdownRead:
         work_item = self.get(work_item_id)
@@ -208,6 +320,36 @@ class WorkItemService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="project_id is required.",
             )
+
+    def _validate_hierarchy(
+        self,
+        *,
+        item_level: str,
+        parent_id: int | None,
+        project_id: int,
+        work_item_id: int | None = None,
+    ) -> None:
+        if item_level == "initiative" and parent_id is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Initiatives cannot have parent work.")
+        if item_level == "subtask" and parent_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subtasks must have parent work.")
+        if parent_id is None:
+            return
+        if work_item_id is not None and parent_id == work_item_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Work item cannot be its own parent.")
+        parent = self.work_item_repository.get_by_id(parent_id)
+        if parent is None or not parent.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent work not found.")
+        if parent.project_id != project_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent work must belong to the same project.")
+        allowed_parent_levels = {
+            "feature": {"initiative"},
+            "work_item": {"initiative", "feature"},
+            "subtask": {"work_item"},
+        }
+        if item_level in allowed_parent_levels and parent.item_level not in allowed_parent_levels[item_level]:
+            allowed = ", ".join(sorted(allowed_parent_levels[item_level]))
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{item_level} parent must be one of: {allowed}.")
 
     def _validate_references(
         self,

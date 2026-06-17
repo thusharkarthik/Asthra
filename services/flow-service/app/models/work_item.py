@@ -28,6 +28,7 @@ class WorkItem(TimestampMixin, Base):
     board_column_id: Mapped[int | None] = mapped_column(ForeignKey("board_columns.id"))
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    item_level: Mapped[str] = mapped_column(String(30), default="work_item", nullable=False)
     assignee_id: Mapped[int | None] = mapped_column(index=True)
     reporter_id: Mapped[int | None] = mapped_column(index=True, nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

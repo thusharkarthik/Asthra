@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.board import Board, BoardColumn
 from app.models.work_item import WorkItem
 from app.models.work_item_priority import WorkItemPriority
+from app.models.work_item_relation import WorkItemRelation
 from app.models.work_item_status import WorkItemStatus
 from app.models.work_item_type import WorkItemType
-from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
+from app.schemas.work_item import WorkItemCreate, WorkItemRelationCreate, WorkItemUpdate
 
 
 class WorkItemRepository:
@@ -45,6 +48,22 @@ class WorkItemRepository:
     def get_by_id(self, work_item_id: int) -> WorkItem | None:
         return self.db.get(WorkItem, work_item_id)
 
+    def list_by_project(self, project_id: int) -> list[WorkItem]:
+        statement = (
+            select(WorkItem)
+            .where(WorkItem.project_id == project_id, WorkItem.is_active.is_(True))
+            .order_by(WorkItem.item_level, WorkItem.id)
+        )
+        return list(self.db.scalars(statement).all())
+
+    def list_children(self, work_item_id: int) -> list[WorkItem]:
+        statement = (
+            select(WorkItem)
+            .where(WorkItem.parent_id == work_item_id, WorkItem.is_active.is_(True))
+            .order_by(WorkItem.id)
+        )
+        return list(self.db.scalars(statement).all())
+
     def update(self, work_item: WorkItem, work_item_update: WorkItemUpdate) -> WorkItem:
         update_data = work_item_update.model_dump(
             exclude_unset=True,
@@ -60,6 +79,37 @@ class WorkItemRepository:
     def delete(self, work_item: WorkItem) -> None:
         work_item.is_active = False
         self.db.add(work_item)
+        self.db.commit()
+
+    def create_relation(self, source_work_item_id: int, relation_create: WorkItemRelationCreate) -> WorkItemRelation:
+        relation = WorkItemRelation(
+            source_work_item_id=source_work_item_id,
+            target_work_item_id=relation_create.target_work_item_id,
+            relation_type=relation_create.relation_type,
+            description=relation_create.description,
+            created_by_id=relation_create.created_by_id,
+        )
+        self.db.add(relation)
+        self.db.commit()
+        self.db.refresh(relation)
+        return relation
+
+    def list_relations(self, work_item_id: int) -> list[WorkItemRelation]:
+        statement = (
+            select(WorkItemRelation)
+            .where(
+                (WorkItemRelation.source_work_item_id == work_item_id)
+                | (WorkItemRelation.target_work_item_id == work_item_id)
+            )
+            .order_by(WorkItemRelation.id)
+        )
+        return list(self.db.scalars(statement).all())
+
+    def get_relation(self, relation_id: int) -> WorkItemRelation | None:
+        return self.db.get(WorkItemRelation, relation_id)
+
+    def delete_relation(self, relation: WorkItemRelation) -> None:
+        self.db.delete(relation)
         self.db.commit()
 
     def type_exists(self, type_id: int) -> bool:

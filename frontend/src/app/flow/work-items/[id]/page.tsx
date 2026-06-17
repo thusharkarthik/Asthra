@@ -10,13 +10,17 @@ import {
   FLOW_BUSINESS_VALUE_OPTIONS,
   FLOW_COMPLEXITY_OPTIONS,
   FLOW_EFFORT_SIZE_OPTIONS,
+  FLOW_ITEM_LEVEL_OPTIONS,
   FLOW_PRIORITY_OPTIONS,
+  FLOW_RELATION_TYPE_OPTIONS,
   FLOW_RISK_OPTIONS,
   FLOW_STATUS_OPTIONS,
   assigneeLabel,
   effortLabel,
+  itemLevelLabel,
   planningLabel,
   priorityNameFromId,
+  relationTypeLabel,
   reporterLabel,
   statusNameFromId
 } from "@/components/flow/flow-utils";
@@ -34,6 +38,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { FlowItemLevel, WorkItemRelationType } from "@/types/flow";
 
 export default function WorkItemDetailPage() {
   const params = useParams<{ id: string }>();
@@ -60,12 +65,25 @@ export default function WorkItemDetailPage() {
     complexity: "",
     acceptanceCriteria: "",
     definitionOfDone: "",
-    parentId: ""
+    parentId: "",
+    itemLevel: "work_item" as FlowItemLevel
   });
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [relationTargetId, setRelationTargetId] = useState("");
+  const [relationType, setRelationType] = useState<WorkItemRelationType>("blocks");
+  const [relationDescription, setRelationDescription] = useState("");
 
   const itemQuery = useQuery({ queryKey: ["flow", "work-item", id], queryFn: () => flowApi.getWorkItem(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const commentsQuery = useQuery({ queryKey: ["flow", "comments", id], queryFn: () => flowApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const childrenQuery = useQuery({ queryKey: ["flow", "children", id], queryFn: () => flowApi.listChildren(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const relationsQuery = useQuery({ queryKey: ["flow", "relations", id], queryFn: () => flowApi.listRelations(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const item = itemQuery.data;
+  const relatedWorkQuery = useQuery({
+    queryKey: ["flow", "work-items", item?.project_id],
+    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: item?.project_id, limit: 100 }),
+    enabled: Boolean(accessToken && item?.project_id),
+    retry: 1
+  });
 
   useEffect(() => {
     if (!item) return;
@@ -83,7 +101,8 @@ export default function WorkItemDetailPage() {
       complexity: item.complexity ?? "",
       acceptanceCriteria: item.acceptance_criteria ?? "",
       definitionOfDone: item.definition_of_done ?? "",
-      parentId: item.parent_id ? String(item.parent_id) : ""
+      parentId: item.parent_id ? String(item.parent_id) : "",
+      itemLevel: (item.item_level ?? "work_item") as FlowItemLevel
     });
   }, [item]);
 
@@ -102,7 +121,8 @@ export default function WorkItemDetailPage() {
       complexity: draft.complexity || null,
       acceptance_criteria: draft.acceptanceCriteria.trim() || null,
       definition_of_done: draft.definitionOfDone.trim() || null,
-      parent_id: draft.parentId ? Number(draft.parentId) : null
+      parent_id: draft.parentId ? Number(draft.parentId) : null,
+      item_level: draft.itemLevel
     }),
     onSuccess: () => {
       setEditing(false);
@@ -130,6 +150,40 @@ export default function WorkItemDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow", "work-item", id] });
     },
     onError: (error) => addToast({ type: "error", title: "Comment failed", message: error instanceof Error ? error.message : "Unable to add comment." })
+  });
+  const subtaskMutation = useMutation({
+    mutationFn: () => flowApi.createSubtask(accessToken ?? "", id, {
+      project_id: item?.project_id ?? 0,
+      title: subtaskTitle.trim(),
+      item_level: "subtask"
+    }),
+    onSuccess: () => {
+      setSubtaskTitle("");
+      addToast({ type: "success", title: "Subtask added" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Subtask failed", message: error instanceof Error ? error.message : "Unable to add subtask." })
+  });
+  const relationMutation = useMutation({
+    mutationFn: () => flowApi.createRelation(accessToken ?? "", id, {
+      target_work_item_id: Number(relationTargetId),
+      relation_type: relationType,
+      description: relationDescription.trim() || null
+    }),
+    onSuccess: () => {
+      setRelationTargetId("");
+      setRelationDescription("");
+      addToast({ type: "success", title: "Related work added" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "relations", id] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Relation failed", message: error instanceof Error ? error.message : "Unable to add relation." })
+  });
+  const deleteRelationMutation = useMutation({
+    mutationFn: (relationId: number) => flowApi.deleteRelation(accessToken ?? "", id, relationId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Relation removed" });
+      queryClient.invalidateQueries({ queryKey: ["flow", "relations", id] });
+    }
   });
 
   if (itemQuery.isLoading) {
@@ -237,6 +291,12 @@ export default function WorkItemDetailPage() {
                       </Select>
                     </label>
                     <label className="grid gap-1 text-sm">
+                      <span className="font-medium">Work Level</span>
+                      <Select value={draft.itemLevel} onChange={(event) => setDraft((value) => ({ ...value, itemLevel: event.target.value as FlowItemLevel }))}>
+                        {FLOW_ITEM_LEVEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </Select>
+                    </label>
+                    <label className="grid gap-1 text-sm">
                       <span className="font-medium">Parent Work</span>
                       <Input inputMode="numeric" placeholder="Parent work item ID" value={draft.parentId} onChange={(event) => setDraft((value) => ({ ...value, parentId: event.target.value }))} />
                     </label>
@@ -303,11 +363,49 @@ export default function WorkItemDetailPage() {
           </div>
         </EntityMetadataPanel>}
         links={<>
-          <DetailPanel title="Relationships">
+          <DetailPanel title="Hierarchy">
             <div className="space-y-3 text-sm">
+              <div><div className="text-muted-foreground">Current Level</div><div className="font-medium">{itemLevelLabel(item.item_level)}</div></div>
               <div><div className="text-muted-foreground">Parent Work</div><div className="font-medium">{parentWork?.title ?? (item.parent_id ? `Work item #${item.parent_id}` : "No parent work")}</div></div>
-              <div className="rounded-md border border-dashed p-3 text-muted-foreground">Blocks / Blocked By dependency graph placeholder.</div>
-              <div className="rounded-md border border-dashed p-3 text-muted-foreground">Related Work placeholder.</div>
+              <div>
+                <div className="font-medium">Children / Subtasks</div>
+                <div className="mt-2 space-y-2">
+                  {(childrenQuery.data ?? []).length === 0 ? <p className="text-muted-foreground">No child work yet.</p> : (childrenQuery.data ?? []).map((child) => (
+                    <Link key={child.id} href={`/flow/work-items/${child.id}`} className="block rounded-md border p-2 text-primary hover:bg-muted">{child.title}</Link>
+                  ))}
+                </div>
+              </div>
+              {item.item_level === "work_item" ? (
+                <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); if (subtaskTitle.trim()) subtaskMutation.mutate(); }}>
+                  <Input aria-label="Subtask title" placeholder="Add subtask title" value={subtaskTitle} onChange={(event) => setSubtaskTitle(event.target.value)} />
+                  <Button size="sm" disabled={!subtaskTitle.trim() || subtaskMutation.isPending}>{subtaskMutation.isPending ? "Adding..." : "Add Subtask"}</Button>
+                </form>
+              ) : null}
+            </div>
+          </DetailPanel>
+          <DetailPanel title="Related Work">
+            <div className="space-y-3 text-sm">
+              <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); if (relationTargetId) relationMutation.mutate(); }}>
+                <Select aria-label="Related work target" value={relationTargetId} onChange={(event) => setRelationTargetId(event.target.value)}>
+                  <option value="">Select target work</option>
+                  {(relatedWorkQuery.data ?? []).filter((candidate) => candidate.id !== item.id).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                </Select>
+                <Select aria-label="Related work type" value={relationType} onChange={(event) => setRelationType(event.target.value as WorkItemRelationType)}>
+                  {FLOW_RELATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </Select>
+                <Input aria-label="Related work description" placeholder="Description optional" value={relationDescription} onChange={(event) => setRelationDescription(event.target.value)} />
+                <Button size="sm" disabled={!relationTargetId || relationMutation.isPending}>{relationMutation.isPending ? "Adding..." : "Add Relation"}</Button>
+              </form>
+              <div className="space-y-2">
+                {(relationsQuery.data ?? []).length === 0 ? <p className="text-muted-foreground">No related work yet.</p> : (relationsQuery.data ?? []).map((relation) => (
+                  <div key={relation.id} className="rounded-md border p-2">
+                    <Link href={`/flow/work-items/${relation.target_work_item_id}`} className="font-medium text-primary hover:underline">{relation.target_title ?? `Work item #${relation.target_work_item_id}`}</Link>
+                    <div className="mt-1 text-xs text-muted-foreground">{relationTypeLabel(relation.relation_type)}</div>
+                    {relation.description ? <p className="mt-1 text-muted-foreground">{relation.description}</p> : null}
+                    <Button className="mt-2" size="sm" variant="outline" onClick={() => deleteRelationMutation.mutate(relation.id)}>Remove</Button>
+                  </div>
+                ))}
+              </div>
             </div>
           </DetailPanel>
           <EntityLinksPanel labels={["Linked Docs", "Linked Tickets", "Linked Incidents", "Linked Discover Items"]} />

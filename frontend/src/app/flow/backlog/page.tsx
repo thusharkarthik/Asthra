@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, effortLabel, planningLabel } from "@/components/flow/flow-utils";
+import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, effortLabel, itemLevelLabel, planningLabel } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -42,10 +42,11 @@ export default function BacklogPage() {
       <PageHeader title="Backlog" description="Unstarted work ready for grooming and planning." actions={<FlowHeaderActions />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view the backlog" /> : workItemsQuery.isLoading ? <LoadingState /> : items.length === 0 ? <EmptyState title="No backlog items yet" /> : (
-        <EntityTable columns={["Title", "Priority", "Effort", "Business Value", "Risk", "Parent Work", "Grooming"]}>
+        <EntityTable columns={["Title", "Level", "Priority", "Effort", "Business Value", "Risk", "Parent Work", "Grooming"]}>
           {items.map((item) => (
-            <EntityTableRow key={item.id} columns={7}>
+            <EntityTableRow key={item.id} columns={8}>
               <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
+              <span>{itemLevelLabel(item.item_level)}</span>
               <PriorityBadge value={item.priority_id} />
               <span>{effortLabel(item.effort_size, item.effort_score)}</span>
               <span>{planningLabel(item.business_value)}</span>

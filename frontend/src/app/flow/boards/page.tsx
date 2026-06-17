@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_STATUS_OPTIONS, assigneeLabel, effortLabel, isHighRiskWorkItem } from "@/components/flow/flow-utils";
+import { FLOW_STATUS_OPTIONS, assigneeLabel, effortLabel, isHighRiskWorkItem, itemLevelLabel } from "@/components/flow/flow-utils";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -75,10 +75,12 @@ export default function BoardsPage() {
                         <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
                           <Link href={`/flow/work-items/${item.id}`} className="font-medium text-primary hover:underline">{item.title}</Link>
                           <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs">{itemLevelLabel(item.item_level)}</span>
                             <StatusBadge value={item.status_id} />
                             <PriorityBadge value={item.priority_id} />
                             <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Effort: {effortLabel(item.effort_size, item.effort_score)}</span>
                             {isHighRiskWorkItem(item) ? <span className="rounded-md border border-destructive/40 px-2 py-0.5 text-xs text-destructive">High risk</span> : null}
+                            {item.parent_id ? <span className="rounded-md border px-2 py-0.5 text-xs">Parent #{item.parent_id}</span> : null}
                           </div>
                           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                             <div>{assigneeLabel(item.assignee_id)}</div>

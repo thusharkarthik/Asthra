@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FlowPage from "@/app/flow/page";
 import BacklogPage from "@/app/flow/backlog/page";
 import BoardsPage from "@/app/flow/boards/page";
+import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
+import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowReportsPage from "@/app/flow/reports/page";
 import WorkItemsPage from "@/app/flow/work-items/page";
 import WorkItemDetailPage from "@/app/flow/work-items/[id]/page";
@@ -28,6 +30,18 @@ function mockFlowFetch() {
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
+    if (url.includes("/work-items/7/children")) {
+      return new Response(JSON.stringify([{ id: 10, project_id: 3, parent_id: 7, item_level: "subtask", title: "Subtask A", status_id: 1, priority_id: 2 }]), { status: 200 });
+    }
+    if (url.includes("/work-items/7/relations") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 3, source_work_item_id: 7, target_work_item_id: 8, relation_type: "blocks", target_title: "Target item" }), { status: 201 });
+    }
+    if (url.includes("/work-items/7/relations") && init?.method === "GET") {
+      return new Response(JSON.stringify([{ id: 3, source_work_item_id: 7, target_work_item_id: 8, relation_type: "blocks", target_title: "Target item", target_status_id: 1, target_priority_id: 2 }]), { status: 200 });
+    }
+    if (url.includes("/work-items/7/subtasks") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 11, project_id: 3, parent_id: 7, item_level: "subtask", title: "New subtask" }), { status: 201 });
+    }
     if (url.includes("/work-items/7/comments")) {
       return new Response(JSON.stringify([{ id: 1, work_item_id: 7, user_id: 1, content: "Looks good" }]), { status: 200 });
     }
@@ -43,6 +57,7 @@ function mockFlowFetch() {
         project_id: 3,
         title: "Build Flow UI",
         description: "Wire work items",
+        item_level: "work_item",
         status_id: 1,
         priority_id: 2,
         effort_size: "M",
@@ -62,7 +77,21 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", status_id: 1, priority_id: 2, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "work_item", status_id: 1, priority_id: 2 }]), { status: 200 });
+    }
+    if (url.includes("/projects/3/hierarchy")) {
+      return new Response(JSON.stringify({
+        project_id: 3,
+        items: [
+          { id: 1, project_id: 3, item_level: "initiative", title: "Platform Initiative", status_id: 1, priority_id: 2, children: [
+            { id: 2, project_id: 3, parent_id: 1, item_level: "feature", title: "Onboarding Feature", status_id: 1, priority_id: 2, children: [
+              { id: 7, project_id: 3, parent_id: 2, item_level: "work_item", title: "Build Flow UI", status_id: 1, priority_id: 2, children: [
+                { id: 10, project_id: 3, parent_id: 7, item_level: "subtask", title: "Subtask A", status_id: 1, priority_id: 2, children: [] }
+              ] }
+            ] }
+          ] }
+        ]
+      }), { status: 200 });
     }
     if (url.includes("/boards")) {
       return new Response(JSON.stringify([{ id: 1, name: "Main board" }]), { status: 200 });
@@ -168,7 +197,8 @@ describe("Flow frontend screens", () => {
       expect(body).toEqual({
         project_id: 3,
         title: "Create from frontend",
-        description: "Created through Flow UI"
+        description: "Created through Flow UI",
+        item_level: "work_item"
       });
       expect(body).not.toHaveProperty("type_id");
       expect(body).not.toHaveProperty("status_id");
@@ -291,6 +321,10 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
     expect(screen.getByText("Looks good")).toBeInTheDocument();
     expect(screen.getByText("Linked Docs")).toBeInTheDocument();
+    expect(screen.getAllByText("Hierarchy").length).toBeGreaterThan(0);
+    expect(screen.getByText("Related Work")).toBeInTheDocument();
+    expect(screen.getByText("Subtask A")).toBeInTheDocument();
+    expect(screen.getAllByText("Target item").length).toBeGreaterThan(0);
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getByText("Acceptance")).toBeInTheDocument();
     expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
@@ -421,5 +455,25 @@ describe("Flow frontend screens", () => {
     expect(screen.getByRole("heading", { name: "Flow Reports" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("High Risk")).toBeInTheDocument());
     expect(screen.getByText("By Effort")).toBeInTheDocument();
+  });
+
+  it("renders hierarchy page and add subtask action", async () => {
+    navigationMock.pathname = "/flow/hierarchy";
+    renderWithQuery(<FlowHierarchyPage />);
+
+    expect(screen.getByRole("heading", { name: "Hierarchy" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Platform Initiative")).toBeInTheDocument());
+    expect(screen.getByText("Onboarding Feature")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Subtask" })).toBeInTheDocument();
+  });
+
+  it("renders dependencies page and add relation controls", async () => {
+    navigationMock.pathname = "/flow/dependencies";
+    renderWithQuery(<FlowDependenciesPage />);
+
+    expect(screen.getByRole("heading", { name: "Dependencies" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Source work item")).toBeInTheDocument());
+    expect(screen.getByLabelText("Relation type")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Relation" })).toBeInTheDocument();
   });
 });

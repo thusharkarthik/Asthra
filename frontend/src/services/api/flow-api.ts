@@ -1,5 +1,16 @@
 import { apiRequest } from "@/services/api/client";
-import type { Board, BoardColumn, WorkItem, WorkItemComment, WorkItemCreate, WorkItemFilters, WorkItemOperationalUpdate } from "@/types/flow";
+import type {
+  Board,
+  BoardColumn,
+  ProjectHierarchy,
+  WorkItem,
+  WorkItemComment,
+  WorkItemCreate,
+  WorkItemFilters,
+  WorkItemOperationalUpdate,
+  WorkItemRelation,
+  WorkItemRelationCreate
+} from "@/types/flow";
 
 const FLOW_PREFIX = "/api/flow/api/v1";
 
@@ -29,6 +40,27 @@ export const flowApi = {
   },
   deleteWorkItem(accessToken: string, id: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/work-items/${id}`, { method: "DELETE", authToken: accessToken });
+  },
+  getProjectHierarchy(accessToken: string, projectId: string | number) {
+    return apiRequest<ProjectHierarchy>(`${FLOW_PREFIX}/projects/${projectId}/hierarchy`, { method: "GET", authToken: accessToken });
+  },
+  createSubtask(accessToken: string, workItemId: string | number, payload: WorkItemCreate) {
+    return apiRequest<WorkItem>(`${FLOW_PREFIX}/work-items/${workItemId}/subtasks`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateParent(accessToken: string, workItemId: string | number, parentId: number | null) {
+    return apiRequest<WorkItem>(`${FLOW_PREFIX}/work-items/${workItemId}/parent`, { method: "PATCH", authToken: accessToken, json: { parent_id: parentId } });
+  },
+  listChildren(accessToken: string, workItemId: string | number) {
+    return apiRequest<WorkItem[]>(`${FLOW_PREFIX}/work-items/${workItemId}/children`, { method: "GET", authToken: accessToken });
+  },
+  listRelations(accessToken: string, workItemId: string | number) {
+    return apiRequest<WorkItemRelation[]>(`${FLOW_PREFIX}/work-items/${workItemId}/relations`, { method: "GET", authToken: accessToken });
+  },
+  createRelation(accessToken: string, workItemId: string | number, payload: WorkItemRelationCreate) {
+    return apiRequest<WorkItemRelation>(`${FLOW_PREFIX}/work-items/${workItemId}/relations`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  deleteRelation(accessToken: string, workItemId: string | number, relationId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/relations/${relationId}`, { method: "DELETE", authToken: accessToken });
   },
   listBoards(accessToken: string) {
     return apiRequest<Board[]>(`${FLOW_PREFIX}/boards`, { method: "GET", authToken: accessToken });

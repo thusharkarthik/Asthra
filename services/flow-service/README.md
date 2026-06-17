@@ -180,8 +180,62 @@ Advanced work item fields:
 - `acceptance_criteria`: optional text
 - `definition_of_done`: optional text
 - `parent_id`: optional Parent Work reference
+- `item_level`: `initiative`, `feature`, `work_item`, or `subtask`
+
+Flow hierarchy rules:
+
+- Initiatives cannot have parents.
+- Features can belong to initiatives.
+- Work items can belong to initiatives or features.
+- Subtasks must belong to work items.
 
 For local SQLite development, Flow adds missing nullable advanced columns at startup. If a local database has unexpected schema drift, reset the Flow Docker volume after backing up any data you need.
+
+## Hierarchy And Dependency Endpoints
+
+Project hierarchy:
+
+```http
+GET /api/v1/projects/{project_id}/hierarchy
+```
+
+Create a subtask below a work item:
+
+```http
+POST /api/v1/work-items/{work_item_id}/subtasks
+```
+
+Move a work item to a new parent:
+
+```http
+PATCH /api/v1/work-items/{work_item_id}/parent
+```
+
+List children for a work item:
+
+```http
+GET /api/v1/work-items/{work_item_id}/children
+```
+
+Create a relation between work items:
+
+```http
+POST /api/v1/work-items/{work_item_id}/relations
+```
+
+Supported relation types:
+
+- `blocks`
+- `blocked_by`
+- `related_to`
+- `duplicate_of`
+
+List and remove relations:
+
+```http
+GET /api/v1/work-items/{work_item_id}/relations
+DELETE /api/v1/work-items/{work_item_id}/relations/{relation_id}
+```
 
 ### Comments
 
