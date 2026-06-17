@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { sortedByUpdatedAt } from "@/components/flow/flow-utils";
+import { isInProgressWorkItem, sortedByUpdatedAt } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -26,22 +26,26 @@ export default function MyWorkPage() {
   });
   const items = workItemsQuery.data ?? [];
   const dueSoon = items.filter((item) => item.due_date).slice(0, 5);
-  const recent = sortedByUpdatedAt(items).slice(0, 5);
+  const highPriority = items.filter((item) => item.priority_id === 3 || item.priority_id === 4).slice(0, 5);
+  const inProgress = items.filter(isInProgressWorkItem).slice(0, 5);
 
   return (
     <>
       <PageHeader title="My Work" description="Items assigned to you, upcoming work, and recently updated tasks." />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view your work" /> : workItemsQuery.isLoading ? <LoadingState /> : (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <ModuleDashboardCard title="Assigned Items" value={items.length}>
-            <WorkList items={items} empty="No assigned items." />
+            <WorkList items={sortedByUpdatedAt(items).slice(0, 5)} empty={currentUser?.id ? "No assigned items." : "Current user matching is pending."} />
           </ModuleDashboardCard>
           <ModuleDashboardCard title="Due Soon" value={dueSoon.length}>
             <WorkList items={dueSoon} empty="No due dates are set yet." />
           </ModuleDashboardCard>
-          <ModuleDashboardCard title="Recently Updated" value={recent.length}>
-            <WorkList items={recent} empty="No recent updates." />
+          <ModuleDashboardCard title="High Priority" value={highPriority.length}>
+            <WorkList items={highPriority} empty="No high priority items." />
+          </ModuleDashboardCard>
+          <ModuleDashboardCard title="In Progress" value={inProgress.length}>
+            <WorkList items={inProgress} empty="No in-progress items." />
           </ModuleDashboardCard>
         </div>
       )}

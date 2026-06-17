@@ -14,7 +14,7 @@ class WorkItemRepository:
         self.db = db
 
     def create(self, work_item_create: WorkItemCreate) -> WorkItem:
-        work_item = WorkItem(**work_item_create.model_dump())
+        work_item = WorkItem(**work_item_create.model_dump(exclude={"status_name", "priority_name"}))
         self.db.add(work_item)
         self.db.commit()
         self.db.refresh(work_item)

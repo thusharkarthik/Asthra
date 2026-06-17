@@ -178,9 +178,13 @@ class WorkItemService:
         update_data: dict[str, int] = {}
         if work_item_create.type_id is None:
             update_data["type_id"] = self.work_item_repository.get_or_create_default_type().id
-        if work_item_create.status_id is None:
+        if work_item_create.status_name:
+            update_data["status_id"] = self.work_item_repository.get_or_create_status_by_name(work_item_create.status_name).id
+        elif work_item_create.status_id is None:
             update_data["status_id"] = self.work_item_repository.get_or_create_default_status().id
-        if work_item_create.priority_id is None:
+        if work_item_create.priority_name:
+            update_data["priority_id"] = self.work_item_repository.get_or_create_priority_by_name(work_item_create.priority_name).id
+        elif work_item_create.priority_id is None:
             update_data["priority_id"] = self.work_item_repository.get_or_create_default_priority().id
         if work_item_create.reporter_id is None:
             # MVP fallback for unauthenticated UI creates and existing SQLite volumes

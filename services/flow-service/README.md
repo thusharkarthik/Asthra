@@ -121,7 +121,14 @@ Request:
 {
   "project_id": 1,
   "title": "Design task model",
-  "description": "Draft the first task model for Flow"
+  "description": "Draft the first task model for Flow",
+  "effort_size": "M",
+  "effort_score": 5,
+  "business_value": "high",
+  "risk_level": "medium",
+  "complexity": "medium",
+  "acceptance_criteria": "The model supports basic execution tracking.",
+  "definition_of_done": "Tests pass and docs are updated."
 }
 ```
 
@@ -162,6 +169,19 @@ The update endpoint accepts lookup IDs or stable lookup names for operational UI
 ```
 
 Supported status names include `todo`, `in_progress`, `review`, and `done`. Supported priority names include `low`, `medium`, `high`, and `critical`.
+
+Advanced work item fields:
+
+- `effort_score`: positive integer
+- `effort_size`: `XS`, `S`, `M`, `L`, `XL`
+- `business_value`: `low`, `medium`, `high`, `critical`
+- `risk_level`: `low`, `medium`, `high`
+- `complexity`: `low`, `medium`, `high`
+- `acceptance_criteria`: optional text
+- `definition_of_done`: optional text
+- `parent_id`: optional Parent Work reference
+
+For local SQLite development, Flow adds missing nullable advanced columns at startup. If a local database has unexpected schema drift, reset the Flow Docker volume after backing up any data you need.
 
 ### Comments
 

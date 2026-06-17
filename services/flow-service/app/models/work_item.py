@@ -31,6 +31,13 @@ class WorkItem(TimestampMixin, Base):
     assignee_id: Mapped[int | None] = mapped_column(index=True)
     reporter_id: Mapped[int | None] = mapped_column(index=True, nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    effort_score: Mapped[int | None] = mapped_column(Integer)
+    effort_size: Mapped[str | None] = mapped_column(String(10))
+    business_value: Mapped[str | None] = mapped_column(String(20))
+    risk_level: Mapped[str | None] = mapped_column(String(20))
+    complexity: Mapped[str | None] = mapped_column(String(20))
+    acceptance_criteria: Mapped[str | None] = mapped_column(Text)
+    definition_of_done: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_STATUS_OPTIONS } from "@/components/flow/flow-utils";
+import { FLOW_STATUS_OPTIONS, assigneeLabel, effortLabel, isHighRiskWorkItem } from "@/components/flow/flow-utils";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -77,6 +77,12 @@ export default function BoardsPage() {
                           <div className="mt-2 flex flex-wrap gap-2">
                             <StatusBadge value={item.status_id} />
                             <PriorityBadge value={item.priority_id} />
+                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Effort: {effortLabel(item.effort_size, item.effort_score)}</span>
+                            {isHighRiskWorkItem(item) ? <span className="rounded-md border border-destructive/40 px-2 py-0.5 text-xs text-destructive">High risk</span> : null}
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                            <div>{assigneeLabel(item.assignee_id)}</div>
+                            {item.due_date ? <div>Due {new Date(item.due_date).toLocaleDateString()}</div> : null}
                           </div>
                           <label className="mt-3 grid gap-1 text-xs text-muted-foreground">
                             Move to

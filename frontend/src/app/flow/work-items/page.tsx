@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS } from "@/components/flow/flow-utils";
+import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, FLOW_STATUS_OPTIONS, effortLabel, planningLabel } from "@/components/flow/flow-utils";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -37,6 +37,9 @@ export default function WorkItemsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [effortFilter, setEffortFilter] = useState("");
+  const [riskFilter, setRiskFilter] = useState("");
+  const [businessValueFilter, setBusinessValueFilter] = useState("");
 
   const hasOrganization = Boolean(selectedOrganizationId) || organizations.length > 0;
   const hasWorkspace = Boolean(selectedWorkspaceId) || workspaces.length > 0;
@@ -65,9 +68,12 @@ export default function WorkItemsPage() {
       const matchesStatus = !statusFilter || item.status_id === Number(statusFilter);
       const matchesPriority = !priorityFilter || item.priority_id === Number(priorityFilter);
       const matchesAssignee = !assigneeFilter || String(item.assignee_id ?? "") === assigneeFilter;
-      return matchesText && matchesStatus && matchesPriority && matchesAssignee;
+      const matchesEffort = !effortFilter || item.effort_size === effortFilter;
+      const matchesRisk = !riskFilter || item.risk_level === riskFilter;
+      const matchesBusinessValue = !businessValueFilter || item.business_value === businessValueFilter;
+      return matchesText && matchesStatus && matchesPriority && matchesAssignee && matchesEffort && matchesRisk && matchesBusinessValue;
     });
-  }, [assigneeFilter, priorityFilter, search, statusFilter, workItemsQuery.data]);
+  }, [assigneeFilter, businessValueFilter, effortFilter, priorityFilter, riskFilter, search, statusFilter, workItemsQuery.data]);
 
   return (
     <>
@@ -82,7 +88,7 @@ export default function WorkItemsPage() {
       ) : (
         <div className="space-y-4">
           <div className="rounded-lg border bg-card p-4">
-            <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_auto]">
+            <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_auto]">
               <label className="relative">
                 <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-9" aria-label="Search work items" placeholder="Search work items" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -96,6 +102,18 @@ export default function WorkItemsPage() {
                 {FLOW_PRIORITY_OPTIONS.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
               </Select>
               <Input aria-label="Assignee filter" placeholder="Assignee ID" value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} />
+              <Select aria-label="Effort size filter" value={effortFilter} onChange={(event) => setEffortFilter(event.target.value)}>
+                <option value="">All effort</option>
+                {FLOW_EFFORT_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </Select>
+              <Select aria-label="Risk filter" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
+                <option value="">All risk</option>
+                {FLOW_RISK_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </Select>
+              <Select aria-label="Business value filter" value={businessValueFilter} onChange={(event) => setBusinessValueFilter(event.target.value)}>
+                <option value="">All value</option>
+                {FLOW_BUSINESS_VALUE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </Select>
               <Button onClick={() => setCreateOpen(true)}>Create</Button>
             </div>
           </div>
@@ -107,9 +125,9 @@ export default function WorkItemsPage() {
           ) : filteredItems.length === 0 ? (
             <EmptyState title={(workItemsQuery.data ?? []).length === 0 ? "No work items yet. Create the first item for this project." : "No work items match these filters."} />
           ) : (
-            <EntityTable columns={["Title", "Status", "Priority", "Assignee", "Updated"]}>
+            <EntityTable columns={["Title", "Status", "Priority", "Effort", "Risk", "Assignee", "Due", "Updated"]}>
               {filteredItems.map((item) => (
-                <EntityTableRow key={item.id} columns={5}>
+                <EntityTableRow key={item.id} columns={8}>
                   <Link className="min-w-0 font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
                   <Select
                     aria-label={`Status for ${item.title}`}
@@ -119,7 +137,10 @@ export default function WorkItemsPage() {
                     {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
                   </Select>
                   <PriorityBadge value={item.priority_id} />
+                  <span>{effortLabel(item.effort_size, item.effort_score)}</span>
+                  <span>{planningLabel(item.risk_level)}</span>
                   <span>{item.assignee_id ? `User ${item.assignee_id}` : "Unassigned"}</span>
+                  <span className="text-muted-foreground">{item.due_date ? new Date(item.due_date).toLocaleDateString() : "-"}</span>
                   <span className="text-muted-foreground">{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : "-"}</span>
                 </EntityTableRow>
               ))}

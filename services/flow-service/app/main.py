@@ -21,7 +21,30 @@ from app.db.session import SessionLocal, engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_flow_sqlite_columns()
     yield
+
+
+def ensure_flow_sqlite_columns() -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    expected_columns = {
+        "effort_score": "INTEGER",
+        "effort_size": "VARCHAR(10)",
+        "business_value": "VARCHAR(20)",
+        "risk_level": "VARCHAR(20)",
+        "complexity": "VARCHAR(20)",
+        "acceptance_criteria": "TEXT",
+        "definition_of_done": "TEXT",
+    }
+    with engine.begin() as connection:
+        existing = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(work_items)")).fetchall()
+        }
+        for column_name, column_type in expected_columns.items():
+            if column_name not in existing:
+                connection.execute(text(f"ALTER TABLE work_items ADD COLUMN {column_name} {column_type}"))
 
 
 def create_app() -> FastAPI:
