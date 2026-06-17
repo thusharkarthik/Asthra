@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Columns3, Inbox, LayoutDashboard, ListTodo, UserRound } from "lucide-react";
+import { BarChart3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/flow", label: "Flow Dashboard", icon: LayoutDashboard },
   { href: "/flow/work-items", label: "Work Items", icon: ListTodo },
+  { href: "/flow/hierarchy", label: "Hierarchy", icon: GitBranch },
+  { href: "/flow/dependencies", label: "Dependencies", icon: Link2 },
   { href: "/flow/boards", label: "Boards", icon: Columns3 },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },

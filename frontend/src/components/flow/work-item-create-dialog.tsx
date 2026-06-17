@@ -6,6 +6,7 @@ import {
   FLOW_BUSINESS_VALUE_OPTIONS,
   FLOW_COMPLEXITY_OPTIONS,
   FLOW_EFFORT_SIZE_OPTIONS,
+  FLOW_ITEM_LEVEL_OPTIONS,
   FLOW_PRIORITY_OPTIONS,
   FLOW_RISK_OPTIONS,
   FLOW_STATUS_OPTIONS
@@ -18,6 +19,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { FlowItemLevel } from "@/types/flow";
 
 type WorkItemCreateDialogProps = {
   open: boolean;
@@ -31,6 +33,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [itemLevel, setItemLevel] = useState<FlowItemLevel>("work_item");
   const [statusName, setStatusName] = useState("");
   const [priorityName, setPriorityName] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -58,6 +61,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
       const payload = {
         project_id: selectedProjectId ?? 0,
         title: title.trim(),
+        item_level: itemLevel,
         ...(description.trim() ? { description: description.trim() } : {}),
         ...(statusName ? { status_name: statusName } : {}),
         ...(priorityName ? { priority_name: priorityName } : {}),
@@ -77,6 +81,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
     onSuccess: () => {
       setTitle("");
       setDescription("");
+      setItemLevel("work_item");
       setStatusName("");
       setPriorityName("");
       setAssigneeId("");
@@ -198,11 +203,19 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
         </section>
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Relationships</h3>
+          <FormField label="Work Level">
+            <Select aria-label="Work level" value={itemLevel} onChange={(event) => setItemLevel(event.target.value as FlowItemLevel)}>
+              {FLOW_ITEM_LEVEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </Select>
+          </FormField>
           <FormField label="Parent Work">
             <Select aria-label="Parent work" value={parentId} onChange={(event) => setParentId(event.target.value)}>
-              <option value="">No parent work</option>
-              {(parentOptions.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              <option value="">{itemLevel === "initiative" ? "Initiatives do not use parent work" : "No parent work"}</option>
+              {(parentOptions.data ?? [])
+                .filter((item) => isValidParentOption(item.item_level ?? "work_item", itemLevel))
+                .map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </Select>
+            <p className="mt-1 text-xs text-muted-foreground">Features can sit under initiatives. Work items can sit under features or initiatives. Subtasks must sit under work items.</p>
           </FormField>
         </section>
           </div>
@@ -210,4 +223,12 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
         <FormActions submitLabel="Create Work Item" loadingLabel="Creating..." isSubmitting={createMutation.isPending} disabled={!title.trim() || !selectedProjectId} onCancel={() => onOpenChange(false)} />
     </EntityCreateDialog>
   );
+}
+
+function isValidParentOption(parentLevel: string, childLevel: FlowItemLevel) {
+  if (childLevel === "initiative") return false;
+  if (childLevel === "feature") return parentLevel === "initiative";
+  if (childLevel === "work_item") return parentLevel === "initiative" || parentLevel === "feature";
+  if (childLevel === "subtask") return parentLevel === "work_item";
+  return false;
 }

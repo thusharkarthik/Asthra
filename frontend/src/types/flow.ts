@@ -2,6 +2,7 @@ export type WorkItem = {
   id: number;
   project_id: number;
   parent_id?: number | null;
+  item_level?: FlowItemLevel;
   title: string;
   description?: string | null;
   type_id?: number | null;
@@ -24,6 +25,7 @@ export type WorkItem = {
 export type WorkItemCreate = {
   project_id: number;
   parent_id?: number | null;
+  item_level?: FlowItemLevel;
   title: string;
   description?: string | null;
   type_id?: number | null;
@@ -47,6 +49,45 @@ export type WorkItemUpdate = Partial<Omit<WorkItemCreate, "project_id" | "report
 export type WorkItemOperationalUpdate = WorkItemUpdate & {
   status_name?: string | null;
   priority_name?: string | null;
+};
+
+export type FlowItemLevel = "initiative" | "feature" | "work_item" | "subtask";
+export type WorkItemRelationType = "blocks" | "blocked_by" | "related_to" | "duplicate_of";
+
+export type WorkItemHierarchyNode = {
+  id: number;
+  project_id: number;
+  parent_id?: number | null;
+  item_level: FlowItemLevel;
+  title: string;
+  status_id?: number | null;
+  priority_id?: number | null;
+  children: WorkItemHierarchyNode[];
+};
+
+export type ProjectHierarchy = {
+  project_id: number;
+  items: WorkItemHierarchyNode[];
+};
+
+export type WorkItemRelation = {
+  id: number;
+  source_work_item_id: number;
+  target_work_item_id: number;
+  relation_type: WorkItemRelationType;
+  description?: string | null;
+  created_by_id?: number | null;
+  target_title?: string | null;
+  target_status_id?: number | null;
+  target_priority_id?: number | null;
+  created_at?: string;
+};
+
+export type WorkItemRelationCreate = {
+  target_work_item_id: number;
+  relation_type: WorkItemRelationType;
+  description?: string | null;
+  created_by_id?: number | null;
 };
 
 export type Board = {

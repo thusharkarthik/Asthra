@@ -7,5 +7,6 @@ from app.models.work_item_attachment import WorkItemAttachment  # noqa: E402,F40
 from app.models.work_item_comment import WorkItemComment  # noqa: E402,F401
 from app.models.work_item_label import WorkItemLabel  # noqa: E402,F401
 from app.models.work_item_priority import WorkItemPriority  # noqa: E402,F401
+from app.models.work_item_relation import WorkItemRelation  # noqa: E402,F401
 from app.models.work_item_status import WorkItemStatus  # noqa: E402,F401
 from app.models.work_item_type import WorkItemType  # noqa: E402,F401
