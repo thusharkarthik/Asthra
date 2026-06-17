@@ -15,6 +15,8 @@ export type WorkItem = {
   due_date?: string | null;
   effort_score?: number | null;
   effort_size?: string | null;
+  original_estimate_minutes?: number | null;
+  remaining_estimate_minutes?: number | null;
   business_value?: string | null;
   risk_level?: string | null;
   complexity?: string | null;
@@ -40,6 +42,8 @@ export type WorkItemCreate = {
   due_date?: string | null;
   effort_score?: number | null;
   effort_size?: string | null;
+  original_estimate_minutes?: number | null;
+  remaining_estimate_minutes?: number | null;
   business_value?: string | null;
   risk_level?: string | null;
   complexity?: string | null;
@@ -219,6 +223,23 @@ export type WorkItemComment = {
   created_at?: string;
 };
 
+export type WorkLog = {
+  id: number;
+  work_item_id: number;
+  user_id?: number | null;
+  description?: string | null;
+  time_spent_minutes: number;
+  logged_at: string;
+  created_at: string;
+};
+
+export type WorkLogCreate = {
+  user_id?: number | null;
+  description?: string | null;
+  time_spent_minutes: number;
+  logged_at?: string | null;
+};
+
 export type WorkItemFilters = {
   project_id?: number | null;
   status_id?: number | null;
@@ -287,3 +308,24 @@ export type ReleaseCreate = {
 };
 
 export type ReleaseUpdate = Partial<Omit<ReleaseCreate, "project_id">>;
+
+export type TeamCapacity = {
+  id: number;
+  project_id: number;
+  user_id?: number | null;
+  team_id?: number | null;
+  sprint_id?: number | null;
+  capacity_minutes: number;
+  notes?: string | null;
+};
+
+export type TeamCapacityCreate = {
+  project_id: number;
+  user_id?: number | null;
+  team_id?: number | null;
+  sprint_id?: number | null;
+  capacity_minutes: number;
+  notes?: string | null;
+};
+
+export type TeamCapacityUpdate = Partial<Omit<TeamCapacityCreate, "project_id">>;

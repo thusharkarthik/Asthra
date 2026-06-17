@@ -32,7 +32,22 @@ export default function FlowSprintDetailPage() {
     retry: 1
   });
   const items = workItemsQuery.data ?? [];
+  const capacityQuery = useQuery({
+    queryKey: ["flow", "capacity", "sprint", sprintId],
+    queryFn: () => flowApi.listCapacity(accessToken ?? "", { sprint_id: Number(sprintId), limit: 100 }),
+    enabled: Boolean(accessToken && sprintId),
+    retry: 1
+  });
+  const workLogsQuery = useQuery({
+    queryKey: ["flow", "sprint-work-logs", sprintId, items.map((item) => item.id).join(",")],
+    queryFn: async () => (await Promise.all(items.map((item) => flowApi.listWorkLogs(accessToken ?? "", item.id)))).flat(),
+    enabled: Boolean(accessToken) && items.length > 0,
+    retry: 1
+  });
   const completion = sprint?.planned_work_count ? Math.round((sprint.completed_work_count / sprint.planned_work_count) * 100) : 0;
+  const estimateMinutes = items.reduce((sum, item) => sum + (item.original_estimate_minutes ?? 0), 0);
+  const loggedMinutes = (workLogsQuery.data ?? []).reduce((sum, log) => sum + log.time_spent_minutes, 0);
+  const capacityMinutes = (capacityQuery.data ?? []).reduce((sum, entry) => sum + entry.capacity_minutes, 0);
 
   const startMutation = useMutation({
     mutationFn: () => flowApi.startSprint(accessToken ?? "", sprintId),
@@ -75,6 +90,9 @@ export default function FlowSprintDetailPage() {
         <ModuleDashboardCard title="Completed" value={sprint.completed_work_count} />
         <ModuleDashboardCard title="Remaining" value={Math.max(sprint.planned_work_count - sprint.completed_work_count, 0)} />
         <ModuleDashboardCard title="Total Effort" value={sprint.total_effort} />
+        <ModuleDashboardCard title="Capacity" value={formatMinutes(capacityMinutes)} />
+        <ModuleDashboardCard title="Estimate" value={formatMinutes(estimateMinutes)} />
+        <ModuleDashboardCard title="Logged Time" value={formatMinutes(loggedMinutes)} />
         {sprint.status === "active" ? <ModuleDashboardCard title="Blocked Work" value={items.filter(isBlockedWorkItem).length} /> : null}
         {sprint.status === "active" ? <ModuleDashboardCard title="High Risk Work" value={items.filter(isHighRiskWorkItem).length} /> : null}
       </div>
@@ -88,13 +106,14 @@ export default function FlowSprintDetailPage() {
       </DetailPanel>
       <DetailPanel title="Work Items">
         {items.length === 0 ? <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No work assigned to this sprint yet.</p> : (
-          <EntityTable columns={["Title", "Status", "Priority", "Effort"]}>
+          <EntityTable columns={["Title", "Status", "Priority", "Effort", "Estimate"]}>
             {items.map((item) => (
-              <EntityTableRow key={item.id} columns={4}>
+              <EntityTableRow key={item.id} columns={5}>
                 <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
                 <StatusBadge value={item.status_id} />
                 <PriorityBadge value={item.priority_id} />
                 <span>{item.effort_score ?? 0}</span>
+                <span>{formatMinutes(item.original_estimate_minutes ?? 0)}</span>
               </EntityTableRow>
             ))}
           </EntityTable>
@@ -102,4 +121,11 @@ export default function FlowSprintDetailPage() {
       </DetailPanel>
     </>
   );
+}
+
+function formatMinutes(value: number) {
+  if (!value) return "0h";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }

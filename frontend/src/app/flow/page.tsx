@@ -57,6 +57,13 @@ export default function FlowPage() {
 
   const items = workItemsQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
+  const workLogsQuery = useQuery({
+    queryKey: ["flow", "dashboard-work-logs", items.map((item) => item.id).join(",")],
+    queryFn: async () => (await Promise.all(items.map((item) => flowApi.listWorkLogs(accessToken ?? "", item.id)))).flat(),
+    enabled: Boolean(accessToken) && items.length > 0,
+    retry: 1
+  });
+  const workLogs = workLogsQuery.data ?? [];
   const recentItems = sortedByUpdatedAt(items).slice(0, 6);
   const assignedToMe = items.filter((item) => item.assignee_id === currentUser?.id).slice(0, 5);
   const openCount = items.filter(isOpenWorkItem).length;
@@ -66,6 +73,9 @@ export default function FlowPage() {
   const upcomingReleases = releases.filter((release) => release.status === "planned").slice(0, 3);
   const activeReleases = releases.filter((release) => release.status === "active");
   const releaseProgress = releases.length ? Math.round(releases.reduce((sum, release) => sum + release.completion_percentage, 0) / releases.length) : 0;
+  const plannedMinutes = items.reduce((sum, item) => sum + (item.original_estimate_minutes ?? 0), 0);
+  const remainingMinutes = items.reduce((sum, item) => sum + (item.remaining_estimate_minutes ?? 0), 0);
+  const loggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
 
   const stats = [
     { title: "Open Work Items", value: openCount, icon: Clock3, tone: "text-blue-600" },
@@ -107,6 +117,15 @@ export default function FlowPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
+            <ModuleDashboardCard title="Planned Effort" value={formatMinutes(plannedMinutes)}>
+              <p className="text-sm text-muted-foreground">Original estimates across project work.</p>
+            </ModuleDashboardCard>
+            <ModuleDashboardCard title="Logged Time" value={formatMinutes(loggedMinutes)}>
+              <p className="text-sm text-muted-foreground">Time logged from work item history.</p>
+            </ModuleDashboardCard>
+            <ModuleDashboardCard title="Remaining Estimate" value={formatMinutes(remainingMinutes)}>
+              <p className="text-sm text-muted-foreground">Remaining project estimate.</p>
+            </ModuleDashboardCard>
             <ModuleDashboardCard title="Upcoming Releases" value={upcomingReleases.length}>
               <div className="space-y-1 text-sm text-muted-foreground">
                 {upcomingReleases.map((release) => (
@@ -188,4 +207,11 @@ export default function FlowPage() {
       <WorkItemCreateDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
     </>
   );
+}
+
+function formatMinutes(value: number) {
+  if (!value) return "0h";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }

@@ -36,6 +36,8 @@ class WorkItem(TimestampMixin, Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     effort_score: Mapped[int | None] = mapped_column(Integer)
     effort_size: Mapped[str | None] = mapped_column(String(10))
+    original_estimate_minutes: Mapped[int | None] = mapped_column(Integer)
+    remaining_estimate_minutes: Mapped[int | None] = mapped_column(Integer)
     business_value: Mapped[str | None] = mapped_column(String(20))
     risk_level: Mapped[str | None] = mapped_column(String(20))
     complexity: Mapped[str | None] = mapped_column(String(20))
@@ -60,6 +62,11 @@ class WorkItem(TimestampMixin, Base):
     )
     attachments = relationship(
         "WorkItemAttachment",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
+    work_logs = relationship(
+        "WorkLog",
         back_populates="work_item",
         cascade="all, delete-orphan",
     )

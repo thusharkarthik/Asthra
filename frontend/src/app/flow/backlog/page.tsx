@@ -57,13 +57,14 @@ export default function BacklogPage() {
       <PageHeader title="Backlog" description="Unstarted work ready for grooming and planning." actions={<FlowHeaderActions />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view the backlog" /> : workItemsQuery.isLoading ? <LoadingState /> : items.length === 0 ? <EmptyState title="No backlog items yet" /> : (
-        <EntityTable columns={["Title", "Level", "Priority", "Effort", "Business Value", "Risk", "Parent Work", "Planning"]}>
+        <EntityTable columns={["Title", "Level", "Priority", "Effort", "Estimate", "Business Value", "Risk", "Parent Work", "Planning"]}>
           {items.map((item) => (
-            <EntityTableRow key={item.id} columns={8}>
+            <EntityTableRow key={item.id} columns={9}>
               <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
               <span>{itemLevelLabel(item.item_level)}</span>
               <PriorityBadge value={item.priority_id} />
               <span>{effortLabel(item.effort_size, item.effort_score)}</span>
+              <span>{formatMinutes(item.original_estimate_minutes ?? 0)}</span>
               <span>{planningLabel(item.business_value)}</span>
               <span>{planningLabel(item.risk_level)}</span>
               <span>{item.parent_id ? `Work item #${item.parent_id}` : "No parent"}</span>
@@ -91,4 +92,11 @@ export default function BacklogPage() {
       )}
     </>
   );
+}
+
+function formatMinutes(value: number) {
+  if (!value) return "0h";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }

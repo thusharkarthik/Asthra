@@ -79,6 +79,8 @@ class WorkItemCreate(BaseModel):
     due_date: datetime | None = Field(default=None)
     effort_score: int | None = Field(default=None, gt=0)
     effort_size: str | None = None
+    original_estimate_minutes: int | None = Field(default=None, ge=0)
+    remaining_estimate_minutes: int | None = Field(default=None, ge=0)
     business_value: str | None = None
     risk_level: str | None = None
     complexity: str | None = None
@@ -135,6 +137,8 @@ class WorkItemUpdate(BaseModel):
     due_date: datetime | None = None
     effort_score: int | None = Field(default=None, gt=0)
     effort_size: str | None = None
+    original_estimate_minutes: int | None = Field(default=None, ge=0)
+    remaining_estimate_minutes: int | None = Field(default=None, ge=0)
     business_value: str | None = None
     risk_level: str | None = None
     complexity: str | None = None
@@ -194,6 +198,8 @@ class WorkItemRead(TimestampedRead):
     due_date: datetime | None = None
     effort_score: int | None = None
     effort_size: str | None = None
+    original_estimate_minutes: int | None = None
+    remaining_estimate_minutes: int | None = None
     business_value: str | None = None
     risk_level: str | None = None
     complexity: str | None = None
