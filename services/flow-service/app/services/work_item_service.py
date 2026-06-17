@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.work_item import (
+    LinkedEntityCreate,
+    LinkedEntityRead,
     ProjectHierarchyRead,
     WorkItemAIBreakdownRead,
     WorkItemCreate,
@@ -246,6 +248,53 @@ class WorkItemService:
         ):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Work item relation not found.")
         self.work_item_repository.delete_relation(relation)
+
+    def create_link(self, work_item_id: int, link_create: LinkedEntityCreate):
+        work_item = self.get(work_item_id)
+        link = self.work_item_repository.create_link(work_item_id, link_create)
+        self.activity_service.log_activity(
+            action="link_added",
+            entity_type="linked_entity",
+            entity_id=str(link.id),
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            description=f"Linked {link.entity_type} '{link.entity_title}' to work item '{work_item.title}'.",
+            metadata={
+                "entity_type": link.entity_type,
+                "entity_id": link.entity_id,
+                "entity_title": link.entity_title,
+                "entity_url": link.entity_url,
+            },
+        )
+        return link
+
+    def list_links(self, work_item_id: int) -> list[LinkedEntityRead]:
+        self.get(work_item_id)
+        return [LinkedEntityRead.model_validate(link) for link in self.work_item_repository.list_links(work_item_id)]
+
+    def delete_link(self, work_item_id: int, link_id: int) -> None:
+        work_item = self.get(work_item_id)
+        link = self.work_item_repository.get_link(link_id)
+        if link is None or link.work_item_id != work_item_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked entity not found.")
+        metadata = {
+            "entity_type": link.entity_type,
+            "entity_id": link.entity_id,
+            "entity_title": link.entity_title,
+            "entity_url": link.entity_url,
+        }
+        entity_title = link.entity_title
+        entity_type = link.entity_type
+        self.work_item_repository.delete_link(link)
+        self.activity_service.log_activity(
+            action="link_removed",
+            entity_type="linked_entity",
+            entity_id=str(link_id),
+            project_id=work_item.project_id,
+            work_item_id=work_item.id,
+            description=f"Removed {entity_type} '{entity_title}' from work item '{work_item.title}'.",
+            metadata=metadata,
+        )
 
     def ai_breakdown(self, work_item_id: int, request_id: str | None = None) -> WorkItemAIBreakdownRead:
         work_item = self.get(work_item_id)

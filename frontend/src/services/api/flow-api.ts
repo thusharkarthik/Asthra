@@ -2,6 +2,8 @@ import { apiRequest } from "@/services/api/client";
 import type {
   Board,
   BoardColumn,
+  LinkedEntity,
+  LinkedEntityCreate,
   ProjectHierarchy,
   Workflow,
   WorkflowCreate,
@@ -70,6 +72,15 @@ export const flowApi = {
   },
   deleteRelation(accessToken: string, workItemId: string | number, relationId: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/relations/${relationId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listLinks(accessToken: string, workItemId: string | number) {
+    return apiRequest<LinkedEntity[]>(`${FLOW_PREFIX}/work-items/${workItemId}/links`, { method: "GET", authToken: accessToken });
+  },
+  createLink(accessToken: string, workItemId: string | number, payload: LinkedEntityCreate) {
+    return apiRequest<LinkedEntity>(`${FLOW_PREFIX}/work-items/${workItemId}/links`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  deleteLink(accessToken: string, workItemId: string | number, linkId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/links/${linkId}`, { method: "DELETE", authToken: accessToken });
   },
   listAttachments(accessToken: string, workItemId: string | number) {
     return apiRequest<WorkItemAttachment[]>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "GET", authToken: accessToken });

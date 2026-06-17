@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.work_item import WorkItem
 from app.schemas.work_item import (
+    LinkedEntityCreate,
+    LinkedEntityRead,
     ProjectHierarchyRead,
     WorkItemAIBreakdownRead,
     WorkItemCreate,
@@ -168,4 +170,34 @@ def delete_work_item_relation(
     _: None = Depends(auth_placeholder),
 ) -> Response:
     WorkItemService(db).delete_relation(work_item_id, relation_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{work_item_id}/links", response_model=LinkedEntityRead, status_code=status.HTTP_201_CREATED)
+def create_work_item_link(
+    work_item_id: int,
+    link_create: LinkedEntityCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> LinkedEntityRead:
+    return LinkedEntityRead.model_validate(WorkItemService(db).create_link(work_item_id, link_create))
+
+
+@router.get("/{work_item_id}/links", response_model=list[LinkedEntityRead])
+def list_work_item_links(
+    work_item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> list[LinkedEntityRead]:
+    return WorkItemService(db).list_links(work_item_id)
+
+
+@router.delete("/{work_item_id}/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_work_item_link(
+    work_item_id: int,
+    link_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> Response:
+    WorkItemService(db).delete_link(work_item_id, link_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

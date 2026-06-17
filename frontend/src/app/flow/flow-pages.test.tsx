@@ -90,6 +90,22 @@ function mockFlowFetch() {
     if (url.includes("/work-items/7/relations") && init?.method === "GET") {
       return new Response(JSON.stringify([{ id: 3, source_work_item_id: 7, target_work_item_id: 8, relation_type: "blocks", target_title: "Target item", target_status_id: 1, target_priority_id: 2 }]), { status: 200 });
     }
+    if (url.includes("/work-items/7/links") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 5, work_item_id: 7, entity_type: "desk_ticket", entity_id: "42", entity_title: "Support ticket" }), { status: 201 });
+    }
+    if (url.includes("/work-items/7/links/5") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/work-items/7/links") && init?.method === "GET") {
+      return new Response(JSON.stringify([
+        { id: 5, work_item_id: 7, entity_type: "doc_page", entity_id: "page-1", entity_title: "Architecture Notes" },
+        { id: 2, work_item_id: 7, entity_type: "discover_idea", entity_id: "idea-2", entity_title: "Onboarding Idea" },
+        { id: 3, work_item_id: 7, entity_type: "pulse_incident", entity_id: "inc-3", entity_title: "Login outage" }
+      ]), { status: 200 });
+    }
+    if (url.includes("/work-items/8/links")) {
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
     if (url.includes("/work-items/7/subtasks") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 11, project_id: 3, parent_id: 7, item_level: "subtask", title: "New subtask" }), { status: 201 });
     }
@@ -383,16 +399,40 @@ describe("Flow frontend screens", () => {
 
     await waitFor(() => expect(screen.getByText("Wire work items")).toBeInTheDocument());
     expect(screen.getByText("Looks good")).toBeInTheDocument();
-    expect(screen.getByText("Linked Docs")).toBeInTheDocument();
     expect(screen.getAllByText("Hierarchy").length).toBeGreaterThan(0);
-    expect(screen.getByText("Related Work")).toBeInTheDocument();
+    expect(screen.getAllByText("Related Work").length).toBeGreaterThan(0);
     expect(screen.getByText("Attachments")).toBeInTheDocument();
     expect(screen.getByText("design.pdf")).toBeInTheDocument();
     expect(screen.getByText("Subtask A")).toBeInTheDocument();
     expect(screen.getAllByText("Target item").length).toBeGreaterThan(0);
+    expect(screen.getByText("Linked Resources")).toBeInTheDocument();
+    expect(screen.getAllByText("Architecture Notes").length).toBeGreaterThan(0);
+    expect(screen.getByText("Onboarding Idea")).toBeInTheDocument();
+    expect(screen.getAllByText("Login outage").length).toBeGreaterThan(0);
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getByText("Acceptance")).toBeInTheDocument();
     expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
+  });
+
+  it("adds and removes linked resources from work item detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Linked Resources")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Link type"), { target: { value: "desk_ticket" } });
+    fireEvent.change(screen.getByLabelText("Linked entity ID"), { target: { value: "42" } });
+    fireEvent.change(screen.getByLabelText("Linked entity title"), { target: { value: "Support ticket" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Link" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove Link" })[0]);
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7/links") && init?.method === "POST");
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7/links/5") && init?.method === "DELETE");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ entity_type: "desk_ticket", entity_id: "42", entity_title: "Support ticket" });
+      expect(deleteCall).toBeTruthy();
+    });
   });
 
   it("edits a work item from detail", async () => {
