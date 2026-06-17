@@ -363,3 +363,16 @@ export type CustomFieldValueUpsert = {
   custom_field_id: number;
   value?: string | number | boolean | null;
 };
+
+export type FlowNotification = {
+  id: number;
+  workspace_id?: number | null;
+  project_id?: number | null;
+  user_id?: number | null;
+  work_item_id?: number | null;
+  notification_type: "work_item_assigned" | "comment_added" | "status_changed" | "priority_changed" | "due_date_updated" | string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};

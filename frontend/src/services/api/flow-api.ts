@@ -7,6 +7,7 @@ import type {
   CustomFieldDefinitionUpdate,
   CustomFieldValue,
   CustomFieldValueUpsert,
+  FlowNotification,
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
@@ -41,7 +42,7 @@ import type {
 
 const FLOW_PREFIX = "/api/flow/api/v1";
 
-function toQuery(params: Record<string, string | number | null | undefined>) {
+function toQuery(params: Record<string, string | number | boolean | null | undefined>) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== "") {
@@ -251,5 +252,17 @@ export const flowApi = {
   },
   saveCustomFieldValue(accessToken: string, workItemId: string | number, payload: CustomFieldValueUpsert) {
     return apiRequest<CustomFieldValue>(`${FLOW_PREFIX}/work-items/${workItemId}/custom-fields`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  listNotifications(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; user_id?: number | null; unread_only?: boolean; limit?: number; offset?: number } = {}) {
+    return apiRequest<FlowNotification[]>(`${FLOW_PREFIX}/notifications${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  markNotificationRead(accessToken: string, notificationId: string | number) {
+    return apiRequest<FlowNotification>(`${FLOW_PREFIX}/notifications/${notificationId}/read`, { method: "PATCH", authToken: accessToken });
+  },
+  markAllNotificationsRead(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; user_id?: number | null } = {}) {
+    return apiRequest<FlowNotification[]>(`${FLOW_PREFIX}/notifications/read-all${toQuery(filters)}`, { method: "PATCH", authToken: accessToken });
+  },
+  deleteNotification(accessToken: string, notificationId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/notifications/${notificationId}`, { method: "DELETE", authToken: accessToken });
   }
 };

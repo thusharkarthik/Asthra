@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Clock3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { BarChart3, Bell, CalendarDays, Clock3, Columns3, GitBranch, Inbox, LayoutDashboard, Link2, ListTodo, Map, Rocket, Settings, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { flowApi } from "@/services/api/flow-api";
+import { useAuthStore } from "@/stores/auth-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const items = [
   { href: "/flow", label: "Flow Dashboard", icon: LayoutDashboard },
@@ -15,6 +19,7 @@ const items = [
   { href: "/flow/releases", label: "Releases", icon: Rocket },
   { href: "/flow/roadmap", label: "Roadmap", icon: Map },
   { href: "/flow/capacity", label: "Capacity", icon: Clock3 },
+  { href: "/flow/notifications", label: "Notifications", icon: Bell, showUnread: true },
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },
   { href: "/flow/reports", label: "Reports", icon: BarChart3 },
@@ -24,6 +29,15 @@ const items = [
 
 export function FlowSubnav() {
   const pathname = usePathname();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
+  const unreadQuery = useQuery({
+    queryKey: ["flow", "notifications", "unread-count", selectedProjectId],
+    queryFn: () => flowApi.listNotifications(accessToken ?? "", { project_id: selectedProjectId, unread_only: true, limit: 100 }),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
+  const unreadCount = unreadQuery.data?.length ?? 0;
 
   return (
     <nav className="mb-5 flex gap-2 overflow-x-auto border-b pb-2" aria-label="Flow sections">
@@ -41,6 +55,9 @@ export function FlowSubnav() {
           >
             <Icon className="h-4 w-4" />
             {item.label}
+            {"showUnread" in item && item.showUnread && unreadCount > 0 ? (
+              <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">{unreadCount}</span>
+            ) : null}
           </Link>
         );
       })}

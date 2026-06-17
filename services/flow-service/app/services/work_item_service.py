@@ -23,6 +23,7 @@ from app.schemas.work_item import (
 from app.services.ai_client import AIClient
 from app.services.activity_service import ActivityService
 from app.services.event_publisher import publish_event
+from app.services.notification_service import NotificationService
 from app.services.workflow_service import WorkflowService
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class WorkItemService:
     def __init__(self, db: Session) -> None:
         self.work_item_repository = WorkItemRepository(db)
         self.activity_service = ActivityService(db)
+        self.notification_service = NotificationService(db)
 
     def create(self, work_item_create: WorkItemCreate) -> WorkItem:
         logger.info(
@@ -117,6 +119,10 @@ class WorkItemService:
 
     def update(self, work_item_id: int, work_item_update: WorkItemUpdate) -> WorkItem:
         work_item = self.get(work_item_id)
+        previous_status_id = work_item.status_id
+        previous_priority_id = work_item.priority_id
+        previous_assignee_id = work_item.assignee_id
+        previous_due_date = work_item.due_date
         work_item_update = self._apply_update_lookup_names(work_item_update, work_item.project_id)
         effective_level = work_item_update.item_level if work_item_update.item_level is not None else work_item.item_level
         effective_parent_id = work_item_update.parent_id if "parent_id" in work_item_update.model_fields_set else work_item.parent_id
@@ -159,6 +165,14 @@ class WorkItemService:
             actor_user_id=updated_work_item.reporter_id,
             entity_type="work_item",
             entity_id=str(updated_work_item.id),
+        )
+        self._create_update_notifications(
+            previous_status_id=previous_status_id,
+            previous_priority_id=previous_priority_id,
+            previous_assignee_id=previous_assignee_id,
+            previous_due_date=previous_due_date,
+            updated_work_item=updated_work_item,
+            updated_fields=set(work_item_update.model_dump(exclude_unset=True)),
         )
         return updated_work_item
 
@@ -369,6 +383,49 @@ class WorkItemService:
         if not update_data:
             return work_item_update
         return work_item_update.model_copy(update=update_data)
+
+    def _create_update_notifications(
+        self,
+        *,
+        previous_status_id: int | None,
+        previous_priority_id: int | None,
+        previous_assignee_id: int | None,
+        previous_due_date: object,
+        updated_work_item: WorkItem,
+        updated_fields: set[str],
+    ) -> None:
+        if "assignee_id" in updated_fields and previous_assignee_id != updated_work_item.assignee_id:
+            self.notification_service.create_for_work_item(
+                work_item=updated_work_item,
+                notification_type="work_item_assigned",
+                title="Work item assigned",
+                message=f"'{updated_work_item.title}' was assigned.",
+                user_id=updated_work_item.assignee_id,
+            )
+        if {"status_id", "status_name"} & updated_fields and previous_status_id != updated_work_item.status_id:
+            self.notification_service.create_for_work_item(
+                work_item=updated_work_item,
+                notification_type="status_changed",
+                title="Status changed",
+                message=f"Status changed for '{updated_work_item.title}'.",
+                user_id=updated_work_item.assignee_id,
+            )
+        if {"priority_id", "priority_name"} & updated_fields and previous_priority_id != updated_work_item.priority_id:
+            self.notification_service.create_for_work_item(
+                work_item=updated_work_item,
+                notification_type="priority_changed",
+                title="Priority changed",
+                message=f"Priority changed for '{updated_work_item.title}'.",
+                user_id=updated_work_item.assignee_id,
+            )
+        if "due_date" in updated_fields and previous_due_date != updated_work_item.due_date:
+            self.notification_service.create_for_work_item(
+                work_item=updated_work_item,
+                notification_type="due_date_updated",
+                title="Due date updated",
+                message=f"Due date updated for '{updated_work_item.title}'.",
+                user_id=updated_work_item.assignee_id,
+            )
 
     def _validate_required_ids(self, project_id: int) -> None:
         if project_id is None:

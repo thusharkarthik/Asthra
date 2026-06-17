@@ -5,12 +5,14 @@ from app.models.work_item_comment import WorkItemComment
 from app.repositories.comment_repository import CommentRepository
 from app.schemas.comment import WorkItemCommentCreate
 from app.services.activity_service import ActivityService
+from app.services.notification_service import NotificationService
 
 
 class CommentService:
     def __init__(self, db: Session) -> None:
         self.comment_repository = CommentRepository(db)
         self.activity_service = ActivityService(db)
+        self.notification_service = NotificationService(db)
 
     def create(self, work_item_id: int, comment_create: WorkItemCommentCreate) -> WorkItemComment:
         work_item = self._ensure_work_item(work_item_id)
@@ -28,6 +30,13 @@ class CommentService:
             project_id=work_item.project_id,
             work_item_id=work_item.id,
             description=f"Comment added to work item '{work_item.title}'.",
+        )
+        self.notification_service.create_for_work_item(
+            work_item=work_item,
+            notification_type="comment_added",
+            title="Comment added",
+            message=f"New comment on '{work_item.title}'.",
+            user_id=work_item.assignee_id,
         )
         return comment
 

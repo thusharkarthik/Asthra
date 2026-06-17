@@ -8,6 +8,7 @@ import FlowCapacityPage from "@/app/flow/capacity/page";
 import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
+import FlowNotificationsPage from "@/app/flow/notifications/page";
 import FlowReportsPage from "@/app/flow/reports/page";
 import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
 import FlowReleasesPage from "@/app/flow/releases/page";
@@ -91,6 +92,23 @@ function mockFlowFetch() {
     }
     if (url.includes("/custom-field-definitions")) {
       return new Response(JSON.stringify(customFieldPayload), { status: 200 });
+    }
+    const notificationPayload = [
+      { id: 90, project_id: 3, user_id: 2, work_item_id: 7, notification_type: "status_changed", title: "Status changed", message: "Status changed for Build Flow UI.", is_read: false, created_at: "2026-01-01T00:00:00Z" },
+      { id: 91, project_id: 3, user_id: 2, work_item_id: 7, notification_type: "comment_added", title: "Comment added", message: "New comment on Build Flow UI.", is_read: true, created_at: "2026-01-02T00:00:00Z" }
+    ];
+    if (url.includes("/notifications/read-all") && init?.method === "PATCH") {
+      return new Response(JSON.stringify(notificationPayload.map((item) => ({ ...item, is_read: true }))), { status: 200 });
+    }
+    if (url.includes("/notifications/90/read") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ ...notificationPayload[0], is_read: true }), { status: 200 });
+    }
+    if (url.includes("/notifications/90") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/notifications")) {
+      const unreadOnly = url.includes("unread_only=true");
+      return new Response(JSON.stringify(unreadOnly ? notificationPayload.filter((item) => !item.is_read) : notificationPayload), { status: 200 });
     }
     const sprintPayload = { id: 30, project_id: 3, name: "Sprint 1", goal: "Ship planning", status: "active", planned_work_count: 2, completed_work_count: 1, total_effort: 8, start_date: "2026-01-01T00:00:00Z", end_date: "2026-01-14T00:00:00Z" };
     if (url.includes("/sprints/30/start") && init?.method === "POST") {
@@ -711,6 +729,29 @@ describe("Flow frontend screens", () => {
       const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/custom-field-definitions") && init?.method === "POST");
       expect(createCall).toBeTruthy();
       expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ project_id: 3, name: "Region", field_type: "text" });
+    });
+  });
+
+  it("renders Flow notifications and handles read/delete actions", async () => {
+    navigationMock.pathname = "/flow/notifications";
+    renderWithQuery(<FlowNotificationsPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Notifications" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Status changed")).toBeInTheDocument());
+    expect(screen.getByText("Notifications")).toBeInTheDocument();
+    expect(screen.getAllByText("Unread").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+    fireEvent.click(screen.getByRole("button", { name: /Mark all read/i }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Delete/i })[0]);
+
+    await waitFor(() => {
+      const readCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/notifications/90/read") && init?.method === "PATCH");
+      const readAllCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/notifications/read-all") && init?.method === "PATCH");
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/notifications/90") && init?.method === "DELETE");
+      expect(readCall).toBeTruthy();
+      expect(readAllCall).toBeTruthy();
+      expect(deleteCall).toBeTruthy();
     });
   });
 
