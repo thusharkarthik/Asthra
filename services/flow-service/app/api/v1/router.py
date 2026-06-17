@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.v1 import audit_events, attachments, boards, capacity, comments, custom_fields, labels, notifications, releases, sprints, work_items, work_logs, workflows
+from app.api.v1 import audit_events, attachments, automation_rules, boards, capacity, comments, custom_fields, labels, notifications, releases, sprints, work_items, work_logs, workflows
 
 
 api_router = APIRouter()
 api_router.include_router(audit_events.router, tags=["audit-events"])
+api_router.include_router(automation_rules.router, prefix="/automation-rules", tags=["automation-rules"])
 api_router.include_router(work_items.router, prefix="/work-items", tags=["work-items"])
 api_router.include_router(work_items.project_router, prefix="/projects", tags=["project-hierarchy"])
 api_router.include_router(workflows.project_router, prefix="/projects", tags=["project-workflows"])

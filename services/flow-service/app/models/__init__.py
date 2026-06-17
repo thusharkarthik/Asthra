@@ -1,4 +1,5 @@
 from app.models.audit_event import AuditEvent
+from app.models.automation_rule import FlowAutomationRule
 from app.models.board import Board, BoardColumn
 from app.models.custom_field import CustomFieldDefinition, CustomFieldValue
 from app.models.flow_activity import FlowActivity
@@ -22,6 +23,7 @@ __all__ = [
     "Board",
     "BoardColumn",
     "AuditEvent",
+    "FlowAutomationRule",
     "CustomFieldDefinition",
     "CustomFieldValue",
     "FlowActivity",

@@ -10,6 +10,7 @@ import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowNotificationsPage from "@/app/flow/notifications/page";
 import FlowActivityPage from "@/app/flow/activity/page";
+import FlowAutomationPage from "@/app/flow/automation/page";
 import FlowReportsPage from "@/app/flow/reports/page";
 import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
 import FlowReleasesPage from "@/app/flow/releases/page";
@@ -118,6 +119,24 @@ function mockFlowFetch() {
     ];
     if (url.includes("/audit-events")) {
       return new Response(JSON.stringify(auditPayload), { status: 200 });
+    }
+    const automationPayload = [
+      { id: 130, workspace_id: 2, project_id: 3, name: "Notify on status", description: "Tell owner when status changes", trigger_type: "status_changed", condition_config: { type: "assignee_exists" }, action_config: { type: "create_notification", title: "Status moved" }, is_active: true, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }
+    ];
+    if (url.includes("/automation-rules/130/test") && init?.method === "POST") {
+      return new Response(JSON.stringify({ rule_id: 130, matched: true, executed: true, message: "Rule test executed." }), { status: 200 });
+    }
+    if (url.includes("/automation-rules/130") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ ...automationPayload[0], is_active: false }), { status: 200 });
+    }
+    if (url.includes("/automation-rules/130") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/automation-rules") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...automationPayload[0], id: 131, name: "Created automation" }), { status: 201 });
+    }
+    if (url.includes("/automation-rules")) {
+      return new Response(JSON.stringify(automationPayload), { status: 200 });
     }
     const sprintPayload = { id: 30, project_id: 3, name: "Sprint 1", goal: "Ship planning", status: "active", planned_work_count: 2, completed_work_count: 1, total_effort: 8, start_date: "2026-01-01T00:00:00Z", end_date: "2026-01-14T00:00:00Z" };
     if (url.includes("/sprints/30/start") && init?.method === "POST") {
@@ -786,6 +805,34 @@ describe("Flow frontend screens", () => {
     await waitFor(() => {
       const auditCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).includes("/api/flow/api/v1/audit-events") && String(url).includes("action=priority.changed"));
       expect(auditCall).toBeTruthy();
+    });
+  });
+
+  it("renders Flow automation and handles create, toggle, and test actions", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    navigationMock.pathname = "/flow/automation";
+    renderWithQuery(<FlowAutomationPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Automation" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Notify on status")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    fireEvent.change(screen.getByLabelText("Rule name"), { target: { value: "Created automation" } });
+    fireEvent.change(screen.getByLabelText("Rule description"), { target: { value: "Create a notification" } });
+    fireEvent.change(screen.getByLabelText("Rule trigger"), { target: { value: "status_changed" } });
+    fireEvent.change(screen.getByLabelText("Rule condition"), { target: { value: "assignee_exists" } });
+    fireEvent.change(screen.getByLabelText("Rule action"), { target: { value: "create_notification" } });
+    fireEvent.change(screen.getByLabelText("Action value"), { target: { value: "Status moved" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Rule" }));
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/automation-rules/130") && init?.method === "PATCH");
+      const testCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/automation-rules/130/test") && init?.method === "POST");
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).endsWith("/api/flow/api/v1/automation-rules") && init?.method === "POST");
+      expect(patchCall).toBeTruthy();
+      expect(testCall).toBeTruthy();
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ project_id: 3, name: "Created automation", trigger_type: "status_changed" });
     });
   });
 

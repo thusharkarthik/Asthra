@@ -17,7 +17,13 @@ class CommentService:
         self.audit_service = AuditService(db)
         self.notification_service = NotificationService(db)
 
-    def create(self, work_item_id: int, comment_create: WorkItemCommentCreate) -> WorkItemComment:
+    def create(
+        self,
+        work_item_id: int,
+        comment_create: WorkItemCommentCreate,
+        *,
+        run_automation: bool = True,
+    ) -> WorkItemComment:
         work_item = self._ensure_work_item(work_item_id)
         if not comment_create.body or not comment_create.body.strip():
             raise HTTPException(
@@ -52,6 +58,14 @@ class CommentService:
                 new_value=comment.body,
             )
         )
+        if run_automation:
+            from app.services.automation_rule_service import AutomationRuleService
+
+            AutomationRuleService(self.comment_repository.db).execute_for_event(
+                "comment_added",
+                work_item,
+                event_payload={"comment_id": comment.id, "author_user_id": comment.author_user_id},
+            )
         return comment
 
     def list_for_work_item(self, work_item_id: int) -> list[WorkItemComment]:
