@@ -18,7 +18,8 @@ const items = [
   { href: "/flow/my-work", label: "My Work", icon: UserRound },
   { href: "/flow/backlog", label: "Backlog", icon: Inbox },
   { href: "/flow/reports", label: "Reports", icon: BarChart3 },
-  { href: "/flow/settings/workflows", label: "Workflows", icon: Settings }
+  { href: "/flow/settings/workflows", label: "Workflows", icon: Settings },
+  { href: "/flow/settings/custom-fields", label: "Custom Fields", icon: Settings }
 ];
 
 export function FlowSubnav() {

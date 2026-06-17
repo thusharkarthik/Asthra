@@ -2,6 +2,11 @@ import { apiRequest } from "@/services/api/client";
 import type {
   Board,
   BoardColumn,
+  CustomFieldDefinition,
+  CustomFieldDefinitionCreate,
+  CustomFieldDefinitionUpdate,
+  CustomFieldValue,
+  CustomFieldValueUpsert,
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
@@ -228,5 +233,23 @@ export const flowApi = {
   },
   deleteCapacity(accessToken: string, capacityId: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/capacity/${capacityId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listCustomFieldDefinitions(accessToken: string, filters: { project_id?: number | null } = {}) {
+    return apiRequest<CustomFieldDefinition[]>(`${FLOW_PREFIX}/custom-field-definitions${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createCustomFieldDefinition(accessToken: string, payload: CustomFieldDefinitionCreate) {
+    return apiRequest<CustomFieldDefinition>(`${FLOW_PREFIX}/custom-field-definitions`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateCustomFieldDefinition(accessToken: string, definitionId: string | number, payload: CustomFieldDefinitionUpdate) {
+    return apiRequest<CustomFieldDefinition>(`${FLOW_PREFIX}/custom-field-definitions/${definitionId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteCustomFieldDefinition(accessToken: string, definitionId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/custom-field-definitions/${definitionId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listCustomFieldValues(accessToken: string, workItemId: string | number) {
+    return apiRequest<CustomFieldValue[]>(`${FLOW_PREFIX}/work-items/${workItemId}/custom-fields`, { method: "GET", authToken: accessToken });
+  },
+  saveCustomFieldValue(accessToken: string, workItemId: string | number, payload: CustomFieldValueUpsert) {
+    return apiRequest<CustomFieldValue>(`${FLOW_PREFIX}/work-items/${workItemId}/custom-fields`, { method: "POST", authToken: accessToken, json: payload });
   }
 };

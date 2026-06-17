@@ -241,6 +241,27 @@ DELETE /api/v1/capacity/{capacity_id}
 
 Capacity is project-scoped and can optionally reference a sprint, user ID, or team ID. Detailed member and team lookup remains a future Core integration.
 
+## Custom Fields
+
+Project-scoped custom field definitions are available for work items:
+
+```http
+POST /api/v1/custom-field-definitions
+GET /api/v1/custom-field-definitions
+GET /api/v1/custom-field-definitions/{definition_id}
+PATCH /api/v1/custom-field-definitions/{definition_id}
+DELETE /api/v1/custom-field-definitions/{definition_id}
+```
+
+Work item custom field values:
+
+```http
+POST /api/v1/work-items/{work_item_id}/custom-fields
+GET /api/v1/work-items/{work_item_id}/custom-fields
+```
+
+Supported field types are `text`, `number`, `select`, `date`, and `checkbox`. Select values are validated against configured options, and required fields are enforced when saving values.
+
 Create a relation between work items:
 
 ```http

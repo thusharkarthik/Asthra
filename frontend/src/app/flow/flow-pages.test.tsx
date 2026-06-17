@@ -12,6 +12,7 @@ import FlowReportsPage from "@/app/flow/reports/page";
 import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
 import FlowReleasesPage from "@/app/flow/releases/page";
 import FlowRoadmapPage from "@/app/flow/roadmap/page";
+import FlowCustomFieldsSettingsPage from "@/app/flow/settings/custom-fields/page";
 import FlowWorkflowSettingsPage from "@/app/flow/settings/workflows/page";
 import FlowSprintDetailPage from "@/app/flow/sprints/[id]/page";
 import FlowSprintsPage from "@/app/flow/sprints/page";
@@ -75,6 +76,22 @@ function mockFlowFetch() {
     if (url.includes("/workflows")) {
       return new Response(JSON.stringify([workflowPayload]), { status: 200 });
     }
+    const customFieldPayload = [
+      { id: 60, project_id: 3, name: "Customer Tier", field_type: "select", required: true, options: ["Free", "Pro"], created_at: "2026-01-01T00:00:00Z" },
+      { id: 61, project_id: 3, name: "Needs Security Review", field_type: "checkbox", required: false, options: null, created_at: "2026-01-01T00:00:00Z" }
+    ];
+    if (url.includes("/custom-field-definitions/60") && init?.method === "PATCH") {
+      return new Response(JSON.stringify({ ...customFieldPayload[0], name: "Account Tier" }), { status: 200 });
+    }
+    if (url.includes("/custom-field-definitions/60") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/custom-field-definitions") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 62, project_id: 3, name: "Region", field_type: "text", required: false, options: null, created_at: "2026-01-01T00:00:00Z" }), { status: 201 });
+    }
+    if (url.includes("/custom-field-definitions")) {
+      return new Response(JSON.stringify(customFieldPayload), { status: 200 });
+    }
     const sprintPayload = { id: 30, project_id: 3, name: "Sprint 1", goal: "Ship planning", status: "active", planned_work_count: 2, completed_work_count: 1, total_effort: 8, start_date: "2026-01-01T00:00:00Z", end_date: "2026-01-14T00:00:00Z" };
     if (url.includes("/sprints/30/start") && init?.method === "POST") {
       return new Response(JSON.stringify({ ...sprintPayload, status: "active" }), { status: 200 });
@@ -128,6 +145,12 @@ function mockFlowFetch() {
     }
     if (url.includes("/work-items/7/work-logs") && init?.method === "GET") {
       return new Response(JSON.stringify([{ id: 12, work_item_id: 7, user_id: 1, description: "Implementation", time_spent_minutes: 45, logged_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z" }]), { status: 200 });
+    }
+    if (url.includes("/work-items/7/custom-fields") && init?.method === "POST") {
+      return new Response(JSON.stringify({ id: 70, work_item_id: 7, custom_field_id: 60, value: "Pro" }), { status: 201 });
+    }
+    if (url.includes("/work-items/7/custom-fields") && init?.method === "GET") {
+      return new Response(JSON.stringify([{ id: 70, work_item_id: 7, custom_field_id: 60, value: "Pro" }]), { status: 200 });
     }
     if (url.includes("/work-items/7/children")) {
       return new Response(JSON.stringify([{ id: 10, project_id: 3, parent_id: 7, item_level: "subtask", title: "Subtask A", status_id: 1, priority_id: 2 }]), { status: 200 });
@@ -482,8 +505,26 @@ describe("Flow frontend screens", () => {
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getByText("Acceptance")).toBeInTheDocument();
     expect(screen.getByText("Time Tracking")).toBeInTheDocument();
+    expect(screen.getAllByText("Custom Fields").length).toBeGreaterThan(0);
+    expect(screen.getByText("Customer Tier *")).toBeInTheDocument();
     expect(screen.getAllByText(/45m/).length).toBeGreaterThan(0);
     expect(screen.getByText("User can create and move work.")).toBeInTheDocument();
+  });
+
+  it("saves custom field values from work item detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Customer Tier *")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Customer Tier *"), { target: { value: "Free" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Custom Fields" }));
+
+    await waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7/custom-fields") && init?.method === "POST");
+      expect(postCall).toBeTruthy();
+      expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ custom_field_id: 60, value: "Free" });
+    });
   });
 
   it("adds work log from work item detail", async () => {
@@ -652,6 +693,45 @@ describe("Flow frontend screens", () => {
       const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/workflows/20") && init?.method === "DELETE");
       expect(patchCall).toBeTruthy();
       expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ name: "Renamed Workflow" });
+      expect(deleteCall).toBeTruthy();
+    });
+  });
+
+  it("renders custom field settings and creates a field", async () => {
+    navigationMock.pathname = "/flow/settings/custom-fields";
+    renderWithQuery(<FlowCustomFieldsSettingsPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Custom Fields" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Customer Tier")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Custom field name"), { target: { value: "Region" } });
+    fireEvent.change(screen.getByLabelText("Custom field type"), { target: { value: "text" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Field" }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/custom-field-definitions") && init?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ project_id: 3, name: "Region", field_type: "text" });
+    });
+  });
+
+  it("updates and deletes a custom field", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    navigationMock.pathname = "/flow/settings/custom-fields";
+    renderWithQuery(<FlowCustomFieldsSettingsPage />);
+
+    await waitFor(() => expect(screen.getByText("Customer Tier")).toBeInTheDocument());
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    fireEvent.change(screen.getByLabelText("Edit Customer Tier name"), { target: { value: "Account Tier" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/custom-field-definitions/60") && init?.method === "PATCH");
+      expect(patchCall).toBeTruthy();
+    });
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Delete" }).length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+
+    await waitFor(() => {
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/custom-field-definitions/60") && init?.method === "DELETE");
       expect(deleteCall).toBeTruthy();
     });
   });

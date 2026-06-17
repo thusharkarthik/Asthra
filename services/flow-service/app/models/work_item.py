@@ -75,6 +75,11 @@ class WorkItem(TimestampMixin, Base):
         back_populates="work_item",
         cascade="all, delete-orphan",
     )
+    custom_field_values = relationship(
+        "CustomFieldValue",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
     labels = relationship(
         "WorkItemLabel",
         secondary=work_item_labels,
