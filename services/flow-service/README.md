@@ -560,6 +560,27 @@ Flow writes simple internal activity events to `flow_activities` for:
 
 These events are local to Flow and are not a cross-service audit log yet.
 
+## Flow Notifications
+
+Flow stores project-scoped notifications in `flow_notifications` for operational updates that need user attention:
+
+- work item assigned
+- comment added
+- status changed
+- priority changed
+- due date updated
+
+Notification API:
+
+```http
+GET /api/v1/notifications
+PATCH /api/v1/notifications/{notification_id}/read
+PATCH /api/v1/notifications/read-all
+DELETE /api/v1/notifications/{notification_id}
+```
+
+`GET /api/v1/notifications` supports `workspace_id`, `project_id`, `user_id`, `unread_only`, `limit`, and `offset`. `workspace_id` is nullable until Flow receives workspace context from Core/API Gateway.
+
 ## Response And Error Format
 
 Health and readiness endpoints use a standard response envelope:

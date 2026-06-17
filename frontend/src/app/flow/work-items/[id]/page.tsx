@@ -190,6 +190,7 @@ export default function WorkItemDetailPage() {
       setEditing(false);
       addToast({ type: "success", title: "Work item updated" });
       queryClient.invalidateQueries({ queryKey: ["flow"] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "notifications"] });
     },
     onError: (error) => addToast({ type: "error", title: "Update failed", message: error instanceof Error ? error.message : "Unable to update work item." })
   });
@@ -210,6 +211,7 @@ export default function WorkItemDetailPage() {
       addToast({ type: "success", title: "Comment added" });
       queryClient.invalidateQueries({ queryKey: ["flow", "comments", id] });
       queryClient.invalidateQueries({ queryKey: ["flow", "work-item", id] });
+      queryClient.invalidateQueries({ queryKey: ["flow", "notifications"] });
     },
     onError: (error) => addToast({ type: "error", title: "Comment failed", message: error instanceof Error ? error.message : "Unable to add comment." })
   });

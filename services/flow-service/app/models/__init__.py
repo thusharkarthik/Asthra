@@ -1,6 +1,7 @@
 from app.models.board import Board, BoardColumn
 from app.models.custom_field import CustomFieldDefinition, CustomFieldValue
 from app.models.flow_activity import FlowActivity
+from app.models.flow_notification import FlowNotification
 from app.models.linked_entity import LinkedEntity
 from app.models.release import Release
 from app.models.sprint import Sprint
@@ -22,6 +23,7 @@ __all__ = [
     "CustomFieldDefinition",
     "CustomFieldValue",
     "FlowActivity",
+    "FlowNotification",
     "LinkedEntity",
     "Release",
     "Sprint",
