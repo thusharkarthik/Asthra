@@ -5,6 +5,9 @@ import type {
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
+  Sprint,
+  SprintCreate,
+  SprintUpdate,
   Workflow,
   WorkflowCreate,
   WorkflowStatus,
@@ -81,6 +84,30 @@ export const flowApi = {
   },
   deleteLink(accessToken: string, workItemId: string | number, linkId: string | number) {
     return apiRequest<void>(`${FLOW_PREFIX}/work-items/${workItemId}/links/${linkId}`, { method: "DELETE", authToken: accessToken });
+  },
+  listSprints(accessToken: string, filters: { project_id?: number | null; status?: string | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<Sprint[]>(`${FLOW_PREFIX}/sprints${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createSprint(accessToken: string, payload: SprintCreate) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  getSprint(accessToken: string, sprintId: string | number) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}`, { method: "GET", authToken: accessToken });
+  },
+  updateSprint(accessToken: string, sprintId: string | number, payload: SprintUpdate) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteSprint(accessToken: string, sprintId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/sprints/${sprintId}`, { method: "DELETE", authToken: accessToken });
+  },
+  startSprint(accessToken: string, sprintId: string | number) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}/start`, { method: "POST", authToken: accessToken });
+  },
+  completeSprint(accessToken: string, sprintId: string | number) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}/complete`, { method: "POST", authToken: accessToken });
+  },
+  assignWorkItemToSprint(accessToken: string, sprintId: string | number, workItemId: string | number) {
+    return apiRequest<Sprint>(`${FLOW_PREFIX}/sprints/${sprintId}/work-items`, { method: "POST", authToken: accessToken, json: { work_item_id: Number(workItemId) } });
   },
   listAttachments(accessToken: string, workItemId: string | number) {
     return apiRequest<WorkItemAttachment[]>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "GET", authToken: accessToken });

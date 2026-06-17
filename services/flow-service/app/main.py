@@ -37,6 +37,7 @@ def ensure_flow_sqlite_columns() -> None:
         "complexity": "VARCHAR(20)",
         "acceptance_criteria": "TEXT",
         "definition_of_done": "TEXT",
+        "sprint_id": "INTEGER",
     }
     with engine.begin() as connection:
         existing = {

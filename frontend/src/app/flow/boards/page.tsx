@@ -22,6 +22,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function BoardsPage() {
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [sprintScope, setSprintScope] = useState("all");
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
@@ -47,6 +48,20 @@ export default function BoardsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const sprintsQuery = useQuery({
+    queryKey: ["flow", "sprints", selectedProjectId],
+    queryFn: () => flowApi.listSprints(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const sprints = sprintsQuery.data ?? [];
+  const activeSprint = sprints.find((sprint) => sprint.status === "active");
+  const visibleItems = (workItemsQuery.data ?? []).filter((item) => {
+    if (sprintScope === "backlog") return !item.sprint_id;
+    if (sprintScope === "active") return activeSprint ? item.sprint_id === activeSprint.id : false;
+    if (sprintScope.startsWith("sprint:")) return item.sprint_id === Number(sprintScope.replace("sprint:", ""));
+    return true;
+  });
 
   const moveMutation = useMutation({
     mutationFn: ({ id, statusName }: { id: number; statusName: string }) => flowApi.updateWorkItem(accessToken ?? "", id, { status_name: statusName }),
@@ -63,6 +78,14 @@ export default function BoardsPage() {
       <FlowSubnav />
       {!hasOrganization || !hasWorkspace || !hasProject ? <FlowSetupState hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} hasProject={hasProject} /> : (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Select aria-label="Board sprint filter" value={sprintScope} onChange={(event) => setSprintScope(event.target.value)}>
+              <option value="all">All project work</option>
+              <option value="backlog">Backlog</option>
+              <option value="active">Current sprint</option>
+              {sprints.filter((sprint) => sprint.status === "planned").map((sprint) => <option key={sprint.id} value={`sprint:${sprint.id}`}>{sprint.name}</option>)}
+            </Select>
+          </div>
           {workItemsQuery.isLoading ? <LoadingState /> : workItemsQuery.error ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
               Unable to load board items. <Button size="sm" variant="outline" onClick={() => workItemsQuery.refetch()}>Retry</Button>
@@ -70,7 +93,7 @@ export default function BoardsPage() {
           ) : (
             <div className="grid gap-4 xl:grid-cols-4">
               {(workflowQuery.data?.statuses.length ? workflowQuery.data.statuses : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }))).map((column) => {
-                const columnItems = (workItemsQuery.data ?? []).filter((item) => item.status_id === column.id);
+                const columnItems = visibleItems.filter((item) => item.status_id === column.id);
                 return (
                   <section key={column.id} className="min-h-96 rounded-lg border bg-card">
                     <div className="flex items-center justify-between border-b px-3 py-2">
