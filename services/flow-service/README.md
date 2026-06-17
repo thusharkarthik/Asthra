@@ -238,6 +238,57 @@ GET /api/v1/work-items/{work_item_id}/relations
 DELETE /api/v1/work-items/{work_item_id}/relations/{relation_id}
 ```
 
+## Workflow Endpoints
+
+Flow supports configurable project workflows. Work items still store `status_id`, but those statuses can now belong to a project workflow.
+
+Project default workflow:
+
+```http
+GET /api/v1/projects/{project_id}/workflow
+```
+
+This creates the default Engineering workflow for the project if none exists.
+
+Workflow CRUD:
+
+```http
+POST /api/v1/workflows
+GET /api/v1/workflows
+GET /api/v1/workflows/{workflow_id}
+PATCH /api/v1/workflows/{workflow_id}
+DELETE /api/v1/workflows/{workflow_id}
+```
+
+Templates:
+
+```http
+GET /api/v1/workflows/templates
+POST /api/v1/workflows/templates/{template_name}
+```
+
+Built-in templates:
+
+- `engineering`
+- `product`
+- `support`
+
+Statuses and transitions:
+
+```http
+POST /api/v1/workflows/{workflow_id}/statuses
+PATCH /api/v1/workflows/{workflow_id}/statuses/{status_id}
+POST /api/v1/workflows/{workflow_id}/transitions
+```
+
+Project assignment:
+
+```http
+POST /api/v1/workflows/{workflow_id}/assign-project
+```
+
+Configured transitions are enforced when moving work items between statuses. Existing local SQLite databases get lightweight startup columns for workflow-aware statuses. If an old local volume has a unique status-name constraint that blocks multiple workflows, reset the Flow Docker volume after backing up data you need.
+
 ### Comments
 
 ```http

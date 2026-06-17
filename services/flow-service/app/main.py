@@ -52,6 +52,14 @@ def ensure_flow_sqlite_columns() -> None:
         }
         if "uploaded_at" not in existing_attachments:
             connection.execute(text("ALTER TABLE work_item_attachments ADD COLUMN uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL"))
+        existing_statuses = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(work_item_statuses)")).fetchall()
+        }
+        if "workflow_id" not in existing_statuses:
+            connection.execute(text("ALTER TABLE work_item_statuses ADD COLUMN workflow_id INTEGER"))
+        if "key" not in existing_statuses:
+            connection.execute(text("ALTER TABLE work_item_statuses ADD COLUMN key VARCHAR(100) DEFAULT '' NOT NULL"))
 
 
 def create_app() -> FastAPI:

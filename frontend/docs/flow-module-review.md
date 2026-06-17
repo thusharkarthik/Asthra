@@ -42,6 +42,9 @@ Flow now presents a project-scoped work management experience:
 - Work item detail pages now support attachment upload, open/download, and delete.
 - Board and backlog views show level and parent indicators where available.
 - Board cards now show attachment, comment, and dependency indicators.
+- Flow Workflows settings page now supports configurable workflows, statuses, transitions, templates, and project assignment.
+- Boards now render workflow statuses dynamically instead of hardcoded Todo/In Progress/Review/Done columns.
+- Work item detail status movement now respects configured workflow transitions.
 - Board view grouped into Todo, In Progress, Review, and Done columns.
 - My Work, Backlog, and Reports pages added as lightweight product surfaces.
 
@@ -56,3 +59,4 @@ Flow now presents a project-scoped work management experience:
 - Assignee selection still needs workspace member lookup so names and email addresses can replace raw user IDs everywhere.
 - Sprints, dependency graph visualization, custom fields, workflow customization, and AI estimation remain future Flow gaps.
 - File previews, access-controlled downloads, and Media Service-backed storage remain future attachment gaps.
+- Workflow drag-and-drop editing, transition deletion, and richer status governance remain future workflow gaps.
