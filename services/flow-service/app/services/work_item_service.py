@@ -91,6 +91,7 @@ class WorkItemService:
         project_id: int | None = None,
         priority_id: int | None = None,
         sprint_id: int | None = None,
+        release_id: int | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[WorkItem]:
@@ -100,6 +101,7 @@ class WorkItemService:
             project_id=project_id,
             priority_id=priority_id,
             sprint_id=sprint_id,
+            release_id=release_id,
             limit=limit,
             offset=offset,
         )

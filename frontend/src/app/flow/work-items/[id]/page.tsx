@@ -106,6 +106,12 @@ export default function WorkItemDetailPage() {
     enabled: Boolean(accessToken && item?.project_id),
     retry: 1
   });
+  const releasesQuery = useQuery({
+    queryKey: ["flow", "releases", item?.project_id],
+    queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: item?.project_id, limit: 100 }),
+    enabled: Boolean(accessToken && item?.project_id),
+    retry: 1
+  });
 
   useEffect(() => {
     if (!item) return;
@@ -249,6 +255,19 @@ export default function WorkItemDetailPage() {
     },
     onError: (error) => addToast({ type: "error", title: "Link remove failed", message: error instanceof Error ? error.message : "Unable to remove link." })
   });
+  const releaseAssignmentMutation = useMutation<unknown, Error, number | null>({
+    mutationFn: (releaseId: number | null) => {
+      if (releaseId === null) {
+        return flowApi.updateWorkItem(accessToken ?? "", id, { release_id: null });
+      }
+      return flowApi.assignWorkItemToRelease(accessToken ?? "", releaseId, id);
+    },
+    onSuccess: () => {
+      addToast({ type: "success", title: "Release assignment updated" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Release assignment failed", message: error instanceof Error ? error.message : "Unable to update release assignment." })
+  });
 
   if (itemQuery.isLoading) {
     return (
@@ -272,6 +291,8 @@ export default function WorkItemDetailPage() {
   const siblingWorkItems = queryClient.getQueryData<Array<{ id: number; title: string }>>(["flow", "work-items", item.project_id]) ?? [];
   const parentWork = siblingWorkItems.find((candidate) => candidate.id === item.parent_id);
   const linksByType = groupLinksByType(linksQuery.data ?? []);
+  const releases = releasesQuery.data ?? [];
+  const currentRelease = releases.find((release) => release.id === item.release_id);
 
   return (
     <div className="space-y-4">
@@ -413,6 +434,28 @@ export default function WorkItemDetailPage() {
               <div><div className="text-muted-foreground">Business Value</div><div className="font-medium">{planningLabel(item.business_value)}</div></div>
               <div><div className="text-muted-foreground">Risk</div><div className="font-medium">{planningLabel(item.risk_level)}</div></div>
               <div><div className="text-muted-foreground">Complexity</div><div className="font-medium">{planningLabel(item.complexity)}</div></div>
+            </div>
+          </DetailPanel>
+          <DetailPanel title="Release">
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-muted-foreground">Current Release</div>
+                <div className="font-medium">{currentRelease ? `${currentRelease.name} (${currentRelease.version})` : item.release_id ? `Release #${item.release_id}` : "No release assigned"}</div>
+                {currentRelease ? <div className="text-xs text-muted-foreground">{currentRelease.status} · {currentRelease.completion_percentage}% complete</div> : null}
+              </div>
+              <label className="grid gap-1">
+                <span className="font-medium">Assign Release</span>
+                <Select
+                  aria-label="Assign release"
+                  value={item.release_id ? String(item.release_id) : ""}
+                  disabled={releaseAssignmentMutation.isPending}
+                  onChange={(event) => releaseAssignmentMutation.mutate(event.target.value ? Number(event.target.value) : null)}
+                >
+                  <option value="">No release</option>
+                  {releases.map((release) => <option key={release.id} value={release.id}>{release.name} · {release.version}</option>)}
+                </Select>
+              </label>
+              {releases.length === 0 ? <p className="text-xs text-muted-foreground">Create releases from Flow Releases before assigning work.</p> : null}
             </div>
           </DetailPanel>
           <DetailPanel title="Acceptance">

@@ -8,6 +8,9 @@ import FlowDependenciesPage from "@/app/flow/dependencies/page";
 import MyWorkPage from "@/app/flow/my-work/page";
 import FlowHierarchyPage from "@/app/flow/hierarchy/page";
 import FlowReportsPage from "@/app/flow/reports/page";
+import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
+import FlowReleasesPage from "@/app/flow/releases/page";
+import FlowRoadmapPage from "@/app/flow/roadmap/page";
 import FlowWorkflowSettingsPage from "@/app/flow/settings/workflows/page";
 import FlowSprintDetailPage from "@/app/flow/sprints/[id]/page";
 import FlowSprintsPage from "@/app/flow/sprints/page";
@@ -90,6 +93,29 @@ function mockFlowFetch() {
     if (url.includes("/sprints")) {
       return new Response(JSON.stringify([sprintPayload, { ...sprintPayload, id: 31, name: "Sprint 2", status: "planned", planned_work_count: 0, completed_work_count: 0, total_effort: 0 }]), { status: 200 });
     }
+    const releasePayload = { id: 40, project_id: 3, name: "Release 1", version: "v1.0.0", description: "First release", target_date: "2026-02-01T00:00:00Z", actual_release_date: null, status: "active", work_item_count: 2, completed_work_count: 1, completion_percentage: 50 };
+    const plannedReleasePayload = { ...releasePayload, id: 41, name: "Release 2", version: "v1.1.0", status: "planned", work_item_count: 0, completed_work_count: 0, completion_percentage: 0 };
+    if (url.includes("/releases/40/activate") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...releasePayload, status: "active" }), { status: 200 });
+    }
+    if (url.includes("/releases/40/release") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...releasePayload, status: "released", actual_release_date: "2026-02-02T00:00:00Z", completion_percentage: 100 }), { status: 200 });
+    }
+    if (url.includes("/releases/41/work-items") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...plannedReleasePayload, work_item_count: 1 }), { status: 200 });
+    }
+    if (url.includes("/releases/40/work-items") && init?.method === "POST") {
+      return new Response(JSON.stringify(releasePayload), { status: 200 });
+    }
+    if (url.includes("/releases/40")) {
+      return new Response(JSON.stringify(releasePayload), { status: 200 });
+    }
+    if (url.includes("/releases") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...plannedReleasePayload, id: 42, name: "Release 3", version: "v2.0.0" }), { status: 201 });
+    }
+    if (url.includes("/releases")) {
+      return new Response(JSON.stringify([releasePayload, plannedReleasePayload]), { status: 200 });
+    }
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
@@ -134,7 +160,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify([{ id: 1, work_item_id: 7, user_id: 1, content: "Looks good" }]), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "PATCH") {
-      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3, sprint_id: 30, effort_size: "L", risk_level: "high" }), { status: 200 });
+      return new Response(JSON.stringify({ id: 7, project_id: 3, title: "Updated Flow UI", description: "Updated details", status_id: 2, priority_id: 3, sprint_id: 30, release_id: 41, effort_size: "L", risk_level: "high" }), { status: 200 });
     }
     if (url.includes("/work-items/7") && init?.method === "DELETE") {
       return new Response(null, { status: 204 });
@@ -149,6 +175,7 @@ function mockFlowFetch() {
         status_id: 1,
         priority_id: 2,
         sprint_id: 30,
+        release_id: 40,
         effort_size: "M",
         effort_score: 5,
         business_value: "high",
@@ -166,7 +193,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "work_item", status_id: 1, priority_id: 2 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2 }]), { status: 200 });
     }
     if (url.includes("/projects/3/hierarchy")) {
       return new Response(JSON.stringify({
@@ -651,6 +678,64 @@ describe("Flow frontend screens", () => {
     await waitFor(() => {
       const completeCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/complete") && init?.method === "POST");
       expect(completeCall).toBeTruthy();
+    });
+  });
+
+  it("renders release list and creates a release", async () => {
+    navigationMock.pathname = "/flow/releases";
+    renderWithQuery(<FlowReleasesPage />);
+
+    expect(screen.getByRole("heading", { name: "Releases" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Release 1").length).toBeGreaterThan(0));
+    fireEvent.change(screen.getByLabelText("Release name"), { target: { value: "Release 3" } });
+    fireEvent.change(screen.getByLabelText("Release version"), { target: { value: "v2.0.0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Release" }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/releases") && init?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ name: "Release 3", version: "v2.0.0", project_id: 3 });
+    });
+  });
+
+  it("renders release detail metrics and marks release complete", async () => {
+    navigationMock.pathname = "/flow/releases/40";
+    navigationMock.params = { id: "40" };
+    renderWithQuery(<FlowReleaseDetailPage />);
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Release 1" })).toBeInTheDocument());
+    expect(screen.getByText(/First release/)).toBeInTheDocument();
+    expect(screen.getAllByText("Assigned Work").length).toBeGreaterThan(0);
+    expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mark Released" }));
+    await waitFor(() => {
+      const releaseCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/releases/40/release") && init?.method === "POST");
+      expect(releaseCall).toBeTruthy();
+    });
+  });
+
+  it("renders roadmap timeline", async () => {
+    navigationMock.pathname = "/flow/roadmap";
+    renderWithQuery(<FlowRoadmapPage />);
+
+    expect(screen.getByRole("heading", { name: "Roadmap" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Release Timeline")).toBeInTheDocument());
+    expect(screen.getByText("Release 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Target item").length).toBeGreaterThan(0);
+  });
+
+  it("assigns a work item to a release from detail", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByLabelText("Assign release")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Assign release"), { target: { value: "41" } });
+
+    await waitFor(() => {
+      const assignCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/releases/41/work-items") && init?.method === "POST");
+      expect(assignCall).toBeTruthy();
+      expect(JSON.parse(String(assignCall?.[1]?.body))).toEqual({ work_item_id: 7 });
     });
   });
 

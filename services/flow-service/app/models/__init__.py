@@ -1,6 +1,7 @@
 from app.models.board import Board, BoardColumn
 from app.models.flow_activity import FlowActivity
 from app.models.linked_entity import LinkedEntity
+from app.models.release import Release
 from app.models.sprint import Sprint
 from app.models.work_item import WorkItem, work_item_labels
 from app.models.work_item_attachment import WorkItemAttachment
@@ -17,6 +18,7 @@ __all__ = [
     "BoardColumn",
     "FlowActivity",
     "LinkedEntity",
+    "Release",
     "Sprint",
     "WorkItem",
     "WorkItemAttachment",
