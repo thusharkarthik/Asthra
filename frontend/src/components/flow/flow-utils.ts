@@ -1,4 +1,4 @@
-import type { WorkItem } from "@/types/flow";
+import type { Workflow, WorkflowStatus, WorkItem } from "@/types/flow";
 
 export const FLOW_STATUS_OPTIONS = [
   { value: "1", label: "Todo", name: "todo" },
@@ -83,11 +83,64 @@ export function statusNameFromId(statusId?: number | null) {
   return FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === statusId)?.name ?? "todo";
 }
 
+export function workflowStatusOptions(workflow?: Workflow | null): Array<Pick<WorkflowStatus, "id" | "name" | "key" | "category" | "sort_order">> {
+  if (workflow?.statuses?.length) {
+    return [...workflow.statuses]
+      .filter((status) => status.is_active !== false)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((status) => ({
+        id: status.id,
+        name: status.name,
+        key: status.key,
+        category: status.category,
+        sort_order: status.sort_order ?? 0
+      }));
+  }
+  return FLOW_STATUS_OPTIONS.map((status, index) => ({
+    id: Number(status.value),
+    name: status.label,
+    key: status.name,
+    category: status.name === "done" ? "completed" : status.name === "review" ? "review" : status.name === "todo" ? "backlog" : "active",
+    sort_order: index
+  }));
+}
+
+export function workflowStatusKeyFor(workflow: Workflow | null | undefined, statusId?: number | null) {
+  return workflowStatusOptions(workflow).find((status) => status.id === statusId)?.key ?? workflowStatusOptions(workflow)[0]?.key ?? "todo";
+}
+
+export function workflowStatusLabelFor(workflow: Workflow | null | undefined, statusId?: number | null) {
+  return workflowStatusOptions(workflow).find((status) => status.id === statusId)?.name ?? statusLabel(statusId);
+}
+
+export function workflowStatusByKey(workflow: Workflow | null | undefined, key?: string | null) {
+  return workflowStatusOptions(workflow).find((status) => status.key === key);
+}
+
+export function validWorkflowTargets(workflow: Workflow | null | undefined, currentStatusId?: number | null) {
+  const statuses = workflowStatusOptions(workflow);
+  if (!workflow?.transitions?.length) {
+    return statuses;
+  }
+  const allowedIds = new Set(
+    workflow.transitions
+      .filter((transition) => transition.from_status_id === currentStatusId)
+      .map((transition) => transition.to_status_id)
+  );
+  const allowed = statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
+  return allowed.length ? allowed : statuses;
+}
+
+export function nextWorkflowTargets(workflow: Workflow | null | undefined, currentStatusId?: number | null) {
+  return validWorkflowTargets(workflow, currentStatusId).filter((statusOption) => statusOption.id !== currentStatusId);
+}
+
 export function priorityNameFromId(priorityId?: number | null) {
   return FLOW_PRIORITY_OPTIONS.find((priority) => Number(priority.value) === priorityId)?.name ?? "medium";
 }
 
-export function assigneeLabel(assigneeId?: number | null) {
+export function assigneeLabel(assigneeId?: number | null, displayName?: string | null) {
+  if (displayName) return displayName;
   return assigneeId ? `User ${assigneeId}` : "Unassigned";
 }
 
@@ -124,20 +177,23 @@ export function isOverdueWorkItem(item: WorkItem) {
   return new Date(item.due_date).getTime() < Date.now();
 }
 
-export function isOpenWorkItem(item: WorkItem) {
-  return item.status_id !== 4;
+export function isOpenWorkItem(item: WorkItem, workflow?: Workflow | null | number) {
+  const status = workflowStatusOptions(typeof workflow === "number" ? null : workflow).find((option) => option.id === item.status_id);
+  return status?.category !== "completed";
 }
 
-export function isInProgressWorkItem(item: WorkItem) {
-  return item.status_id === 2 || item.status_id === 3;
+export function isInProgressWorkItem(item: WorkItem, workflow?: Workflow | null | number) {
+  const status = workflowStatusOptions(typeof workflow === "number" ? null : workflow).find((option) => option.id === item.status_id);
+  return status?.category === "active" || status?.category === "review";
 }
 
 export function isBlockedWorkItem(item: WorkItem) {
   return item.priority_id === 4 || item.status_id === 5;
 }
 
-export function isCompletedWorkItem(item: WorkItem) {
-  return item.status_id === 4;
+export function isCompletedWorkItem(item: WorkItem, workflow?: Workflow | null | number) {
+  const status = workflowStatusOptions(typeof workflow === "number" ? null : workflow).find((option) => option.id === item.status_id);
+  return status?.category === "completed";
 }
 
 export function sortedByUpdatedAt(items: WorkItem[]) {

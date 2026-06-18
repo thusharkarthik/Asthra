@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { isBlockedWorkItem, isHighRiskWorkItem } from "@/components/flow/flow-utils";
@@ -13,6 +14,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -20,11 +22,23 @@ import { useToastStore } from "@/stores/toast-store";
 export default function FlowSprintDetailPage() {
   const params = useParams<{ id: string }>();
   const sprintId = params.id;
+  const router = useRouter();
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
+  const [isEditing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ name: "", goal: "", startDate: "", endDate: "" });
   const sprintQuery = useQuery({ queryKey: ["flow", "sprint", sprintId], queryFn: () => flowApi.getSprint(accessToken ?? "", sprintId), enabled: Boolean(accessToken && sprintId), retry: 1 });
   const sprint = sprintQuery.data;
+  useEffect(() => {
+    if (!sprint) return;
+    setDraft({
+      name: sprint.name,
+      goal: sprint.goal ?? "",
+      startDate: sprint.start_date ? sprint.start_date.slice(0, 10) : "",
+      endDate: sprint.end_date ? sprint.end_date.slice(0, 10) : ""
+    });
+  }, [sprint]);
   const workItemsQuery = useQuery({
     queryKey: ["flow", "sprint-work-items", sprintId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { sprint_id: Number(sprintId), limit: 100 }),
@@ -63,6 +77,34 @@ export default function FlowSprintDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["flow"] });
     }
   });
+  const updateMutation = useMutation({
+    mutationFn: () => flowApi.updateSprint(accessToken ?? "", sprintId, {
+      name: draft.name.trim(),
+      goal: draft.goal.trim() || null,
+      start_date: draft.startDate ? new Date(draft.startDate).toISOString() : null,
+      end_date: draft.endDate ? new Date(draft.endDate).toISOString() : null
+    }),
+    onSuccess: () => {
+      setEditing(false);
+      addToast({ type: "success", title: "Sprint updated" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint update failed", message: error instanceof Error ? error.message : "Unable to update sprint." })
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => flowApi.deleteSprint(accessToken ?? "", sprintId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Sprint deleted" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+      router.push("/flow/sprints");
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint delete failed", message: error instanceof Error ? error.message : "Unable to delete sprint." })
+  });
+
+  const handleEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (draft.name.trim()) updateMutation.mutate();
+  };
 
   if (sprintQuery.isLoading || !sprint) {
     return (
@@ -79,12 +121,41 @@ export default function FlowSprintDetailPage() {
         title={sprint.name}
         description={sprint.goal || "Sprint execution plan."}
         actions={<div className="flex gap-2">
+          <Button variant="outline" onClick={() => setEditing((value) => !value)}>{isEditing ? "Cancel Edit" : "Edit Sprint"}</Button>
           {sprint.status !== "active" && sprint.status !== "completed" ? <Button variant="outline" onClick={() => startMutation.mutate()}>Start Sprint</Button> : null}
           {sprint.status === "active" ? <Button variant="outline" onClick={() => completeMutation.mutate()}>Complete Sprint</Button> : null}
+          <Button variant="outline" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm("Delete this sprint? Work items will remain in Flow.")) deleteMutation.mutate(); }}>{deleteMutation.isPending ? "Deleting..." : "Delete Sprint"}</Button>
           <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/sprints">Back to Sprints</Link>
         </div>}
       />
       <FlowSubnav />
+      <DetailPanel title="Sprint Workflow">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span className="rounded-md border px-2 py-1">Backlog</span>
+          <span>→</span>
+          <span className="rounded-md border px-2 py-1">Assign Work Item to Sprint</span>
+          <span>→</span>
+          <span className="rounded-md border px-2 py-1">Start Sprint</span>
+          <span>→</span>
+          <span className="rounded-md border px-2 py-1">Execute Work</span>
+          <span>→</span>
+          <span className="rounded-md border px-2 py-1">Complete Sprint</span>
+        </div>
+      </DetailPanel>
+      {isEditing ? (
+        <DetailPanel title="Edit Sprint">
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleEdit}>
+            <Input aria-label="Edit sprint name" value={draft.name} onChange={(event) => setDraft((value) => ({ ...value, name: event.target.value }))} required />
+            <Input aria-label="Edit sprint goal" value={draft.goal} onChange={(event) => setDraft((value) => ({ ...value, goal: event.target.value }))} />
+            <Input aria-label="Edit sprint start date" type="date" value={draft.startDate} onChange={(event) => setDraft((value) => ({ ...value, startDate: event.target.value }))} />
+            <Input aria-label="Edit sprint end date" type="date" value={draft.endDate} onChange={(event) => setDraft((value) => ({ ...value, endDate: event.target.value }))} />
+            <div className="flex gap-2 md:col-span-2">
+              <Button disabled={!draft.name.trim() || updateMutation.isPending}>{updateMutation.isPending ? "Saving..." : "Save Sprint"}</Button>
+              <Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </form>
+        </DetailPanel>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-4">
         <ModuleDashboardCard title="Progress" value={`${completion}%`} />
         <ModuleDashboardCard title="Completed" value={sprint.completed_work_count} />
@@ -96,7 +167,7 @@ export default function FlowSprintDetailPage() {
         {sprint.status === "active" ? <ModuleDashboardCard title="Blocked Work" value={items.filter(isBlockedWorkItem).length} /> : null}
         {sprint.status === "active" ? <ModuleDashboardCard title="High Risk Work" value={items.filter(isHighRiskWorkItem).length} /> : null}
       </div>
-      <DetailPanel title="Sprint Details">
+      <DetailPanel title="Overview">
         <div className="grid gap-3 text-sm md:grid-cols-4">
           <div><div className="text-muted-foreground">Status</div><div className="font-medium">{sprint.status}</div></div>
           <div><div className="text-muted-foreground">Start</div><div className="font-medium">{sprint.start_date ? new Date(sprint.start_date).toLocaleDateString() : "Not set"}</div></div>
@@ -118,6 +189,9 @@ export default function FlowSprintDetailPage() {
             ))}
           </EntityTable>
         )}
+      </DetailPanel>
+      <DetailPanel title="Activity">
+        <p className="text-sm text-muted-foreground">Sprint status changes and work assignment events appear in Flow Activity as audit coverage expands.</p>
       </DetailPanel>
     </>
   );

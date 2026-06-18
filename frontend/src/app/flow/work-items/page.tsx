@@ -7,7 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, FLOW_STATUS_OPTIONS, effortLabel, planningLabel } from "@/components/flow/flow-utils";
+import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, effortLabel, planningLabel, workflowStatusKeyFor, workflowStatusOptions } from "@/components/flow/flow-utils";
+import { FlowMemberDisplay, FlowMemberPicker } from "@/components/flow/member-picker";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -51,6 +52,13 @@ export default function WorkItemsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const statusOptions = workflowStatusOptions(workflowQuery.data);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, statusName }: { id: number; statusName: string }) => flowApi.updateWorkItem(accessToken ?? "", id, { status_name: statusName }),
@@ -95,13 +103,13 @@ export default function WorkItemsPage() {
               </label>
               <Select aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                 <option value="">All statuses</option>
-                {FLOW_STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                {statusOptions.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
               </Select>
               <Select aria-label="Priority filter" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
                 <option value="">All priorities</option>
                 {FLOW_PRIORITY_OPTIONS.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
               </Select>
-              <Input aria-label="Assignee filter" placeholder="Assignee ID" value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} />
+              <FlowMemberPicker label="Assignee filter" value={assigneeFilter} onChange={setAssigneeFilter} />
               <Select aria-label="Effort size filter" value={effortFilter} onChange={(event) => setEffortFilter(event.target.value)}>
                 <option value="">All effort</option>
                 {FLOW_EFFORT_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -131,15 +139,15 @@ export default function WorkItemsPage() {
                   <Link className="min-w-0 font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
                   <Select
                     aria-label={`Status for ${item.title}`}
-                    value={FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === item.status_id)?.name ?? "todo"}
+                    value={workflowStatusKeyFor(workflowQuery.data, item.status_id)}
                     onChange={(event) => statusMutation.mutate({ id: item.id, statusName: event.target.value })}
                   >
-                    {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+                    {statusOptions.map((status) => <option key={status.key} value={status.key}>{status.name}</option>)}
                   </Select>
                   <PriorityBadge value={item.priority_id} />
                   <span>{effortLabel(item.effort_size, item.effort_score)}</span>
                   <span>{planningLabel(item.risk_level)}</span>
-                  <span>{item.assignee_id ? `User ${item.assignee_id}` : "Unassigned"}</span>
+                  <span><FlowMemberDisplay userId={item.assignee_id} /></span>
                   <span className="text-muted-foreground">{item.due_date ? new Date(item.due_date).toLocaleDateString() : "-"}</span>
                   <span className="text-muted-foreground">{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : "-"}</span>
                 </EntityTableRow>

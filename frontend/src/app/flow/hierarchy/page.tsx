@@ -18,7 +18,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { WorkItemHierarchyNode } from "@/types/flow";
+import type { FlowItemLevel, WorkItemHierarchyNode } from "@/types/flow";
 
 export default function FlowHierarchyPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -26,6 +26,7 @@ export default function FlowHierarchyPage() {
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [createPreset, setCreatePreset] = useState<{ level: FlowItemLevel; label: string } | null>(null);
   const [subtaskParent, setSubtaskParent] = useState<WorkItemHierarchyNode | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
 
@@ -60,9 +61,9 @@ export default function FlowHierarchyPage() {
       ) : (
         <div className="rounded-lg border bg-card p-4">
           <div className="mb-3 flex flex-wrap gap-2">
-            <Button onClick={() => setCreateOpen(true)}>Create Initiative</Button>
-            <Button variant="outline" onClick={() => setCreateOpen(true)}>Create Feature</Button>
-            <Button variant="outline" onClick={() => setCreateOpen(true)}>Create Work Item</Button>
+            <Button onClick={() => { setCreatePreset({ level: "initiative", label: "Create Initiative: top-level outcome, no parent." }); setCreateOpen(true); }}>Create Initiative</Button>
+            <Button variant="outline" onClick={() => { setCreatePreset({ level: "feature", label: "Create Feature: select an initiative parent in Relationships." }); setCreateOpen(true); }}>Create Feature</Button>
+            <Button variant="outline" onClick={() => { setCreatePreset({ level: "work_item", label: "Create Work Item: execution work under a feature or initiative." }); setCreateOpen(true); }}>Create Work Item</Button>
           </div>
           <div className="space-y-2">
             {(hierarchyQuery.data?.items ?? []).map((node) => (
@@ -84,7 +85,16 @@ export default function FlowHierarchyPage() {
           </form>
         </div>
       ) : null}
-      <WorkItemCreateDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
+      <WorkItemCreateDialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) setCreatePreset(null);
+        }}
+        initialItemLevel={createPreset?.level ?? "work_item"}
+        lockItemLevel={Boolean(createPreset)}
+        contextLabel={createPreset?.label}
+      />
     </>
   );
 }

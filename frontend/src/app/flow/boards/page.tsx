@@ -7,7 +7,8 @@ import { Link2, MessageSquare, Paperclip } from "lucide-react";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_STATUS_OPTIONS, assigneeLabel, effortLabel, isHighRiskWorkItem, itemLevelLabel } from "@/components/flow/flow-utils";
+import { effortLabel, isHighRiskWorkItem, itemLevelLabel, nextWorkflowTargets, validWorkflowTargets, workflowStatusKeyFor, workflowStatusOptions } from "@/components/flow/flow-utils";
+import { FlowMemberDisplay } from "@/components/flow/member-picker";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -92,7 +93,7 @@ export default function BoardsPage() {
             </div>
           ) : (
             <div className="grid gap-4 xl:grid-cols-4">
-              {(workflowQuery.data?.statuses.length ? workflowQuery.data.statuses : FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }))).map((column) => {
+              {workflowStatusOptions(workflowQuery.data).map((column) => {
                 const columnItems = visibleItems.filter((item) => item.status_id === column.id);
                 return (
                   <section key={column.id} className="min-h-96 rounded-lg border bg-card">
@@ -104,7 +105,7 @@ export default function BoardsPage() {
                       {columnItems.map((item) => (
                         <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
                           {(() => {
-                            const nextTargets = nextBoardTargets(workflowQuery.data, item.status_id);
+                            const nextTargets = nextWorkflowTargets(workflowQuery.data, item.status_id);
                             return nextTargets[0] ? (
                               <div className="mb-2 flex justify-end">
                                 <Button size="sm" variant="outline" onClick={() => moveMutation.mutate({ id: item.id, statusName: nextTargets[0].key })}>
@@ -124,17 +125,17 @@ export default function BoardsPage() {
                           </div>
                           <BoardCardIndicators accessToken={accessToken ?? ""} workItemId={item.id} />
                           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            <div>{assigneeLabel(item.assignee_id)}</div>
+                            <div><FlowMemberDisplay userId={item.assignee_id} /></div>
                             {item.due_date ? <div>Due {new Date(item.due_date).toLocaleDateString()}</div> : null}
                           </div>
                           <label className="mt-3 grid gap-1 text-xs text-muted-foreground">
                             Move to
                             <Select
                               aria-label={`Move ${item.title}`}
-                              value={statusKeyFor(workflowQuery.data, item.status_id)}
+                              value={workflowStatusKeyFor(workflowQuery.data, item.status_id)}
                               onChange={(event) => moveMutation.mutate({ id: item.id, statusName: event.target.value })}
                             >
-                              {validBoardTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.id} value={statusOption.key}>{statusOption.name}</option>)}
+                              {validWorkflowTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.id} value={statusOption.key}>{statusOption.name}</option>)}
                             </Select>
                           </label>
                         </div>
@@ -151,30 +152,6 @@ export default function BoardsPage() {
       <WorkItemCreateDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
     </>
   );
-}
-
-function validBoardTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
-  if (!workflow) {
-    return FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }));
-  }
-  const allowedIds = new Set(
-    workflow.transitions
-      .filter((transition) => transition.from_status_id === currentStatusId)
-      .map((transition) => transition.to_status_id)
-  );
-  const allowed = workflow.statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
-  return allowed.length ? allowed : workflow.statuses;
-}
-
-function nextBoardTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
-  return validBoardTargets(workflow, currentStatusId).filter((statusOption) => statusOption.id !== currentStatusId);
-}
-
-function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, statusId?: number | null) {
-  if (!workflow) {
-    return FLOW_STATUS_OPTIONS.find((status) => Number(status.value) === statusId)?.name ?? "todo";
-  }
-  return workflow.statuses.find((statusOption) => statusOption.id === statusId)?.key ?? workflow.statuses[0]?.key ?? "todo";
 }
 
 function BoardCardIndicators({ accessToken, workItemId }: { accessToken: string; workItemId: number }) {

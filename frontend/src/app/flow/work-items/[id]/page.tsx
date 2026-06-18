@@ -15,16 +15,15 @@ import {
   FLOW_PRIORITY_OPTIONS,
   FLOW_RELATION_TYPE_OPTIONS,
   FLOW_RISK_OPTIONS,
-  FLOW_STATUS_OPTIONS,
-  assigneeLabel,
   effortLabel,
   itemLevelLabel,
   planningLabel,
   priorityNameFromId,
-  relationTypeLabel,
   reporterLabel,
-  statusNameFromId
+  validWorkflowTargets,
+  workflowStatusKeyFor
 } from "@/components/flow/flow-utils";
+import { FlowMemberDisplay, FlowMemberPicker } from "@/components/flow/member-picker";
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { CommentList } from "@/components/modules/comment-list";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -140,7 +139,7 @@ export default function WorkItemDetailPage() {
     setDraft({
       title: item.title,
       description: item.description ?? "",
-      statusName: statusKeyFor(workflowQuery.data, item.status_id),
+      statusName: workflowStatusKeyFor(workflowQuery.data, item.status_id),
       priorityName: priorityNameFromId(item.priority_id),
       assigneeId: item.assignee_id ? String(item.assignee_id) : "",
       dueDate: item.due_date ? item.due_date.slice(0, 10) : "",
@@ -383,6 +382,7 @@ export default function WorkItemDetailPage() {
   const workLogs = workLogsQuery.data ?? [];
   const totalLoggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
   const auditGroups = groupAuditEventsByDay(auditQuery.data ?? []);
+  const compactAuditGroups = groupAuditEventsByDay((auditQuery.data ?? []).slice(0, 5));
 
   return (
     <div className="space-y-4">
@@ -412,7 +412,7 @@ export default function WorkItemDetailPage() {
                   <label className="grid gap-1 text-sm">
                     <span className="font-medium">Status</span>
                     <Select value={draft.statusName} onChange={(event) => setDraft((value) => ({ ...value, statusName: event.target.value }))}>
-                      {validDetailTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.key} value={statusOption.key}>{statusOption.name}</option>)}
+                      {validWorkflowTargets(workflowQuery.data, item.status_id).map((statusOption) => <option key={statusOption.key} value={statusOption.key}>{statusOption.name}</option>)}
                     </Select>
                   </label>
                   <label className="grid gap-1 text-sm">
@@ -423,8 +423,8 @@ export default function WorkItemDetailPage() {
                   </label>
                   <label className="grid gap-1 text-sm">
                     <span className="font-medium">Assignee</span>
-                    <Input inputMode="numeric" placeholder="User ID optional" value={draft.assigneeId} onChange={(event) => setDraft((value) => ({ ...value, assigneeId: event.target.value }))} />
-                    <span className="text-xs text-muted-foreground">Member picker pending. Leave blank for Unassigned.</span>
+                    <FlowMemberPicker value={draft.assigneeId} onChange={(nextValue) => setDraft((value) => ({ ...value, assigneeId: nextValue }))} />
+                    <span className="text-xs text-muted-foreground">Members are resolved from project context, workspace members, then organization members.</span>
                   </label>
                   <label className="grid gap-1 text-sm">
                     <span className="font-medium">Due date</span>
@@ -508,7 +508,7 @@ export default function WorkItemDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={item.status_id} />
                   <PriorityBadge value={item.priority_id} />
-                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Assignee: {assigneeLabel(item.assignee_id)}</span>
+                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Assignee: <FlowMemberDisplay userId={item.assignee_id} /></span>
                   <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Reporter: {reporterLabel(item.reporter_id)}</span>
                 </div>
                 <Button variant="outline" size="sm">AI breakdown placeholder</Button>
@@ -608,6 +608,13 @@ export default function WorkItemDetailPage() {
               {releases.length === 0 ? <p className="text-xs text-muted-foreground">Create releases from Flow Releases before assigning work.</p> : null}
             </div>
           </DetailPanel>
+          <DetailPanel title="Sprint Membership">
+            <div className="space-y-2 text-sm">
+              <div><div className="text-muted-foreground">Current Sprint</div><div className="font-medium">{item.sprint_id ? `Sprint #${item.sprint_id}` : "Backlog / not assigned to sprint"}</div></div>
+              <p className="text-xs text-muted-foreground">Flow sprint path: Backlog → assign work item to sprint → start sprint → execute work → complete sprint.</p>
+              <Link className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/flow/backlog">Assign from Backlog</Link>
+            </div>
+          </DetailPanel>
           <DetailPanel title="Acceptance">
             <div className="space-y-3 text-sm">
               <div><div className="font-medium">Acceptance Criteria</div><p className="mt-1 whitespace-pre-wrap text-muted-foreground">{item.acceptance_criteria || "No acceptance criteria yet."}</p></div>
@@ -618,7 +625,7 @@ export default function WorkItemDetailPage() {
         metadata={<EntityMetadataPanel>
           <div className="grid gap-3 text-sm">
             <div><div className="text-muted-foreground">Project</div><div className="font-medium">{project?.name ?? "Selected project"}</div><div className="text-xs text-muted-foreground">ID {item.project_id}</div></div>
-            <div><div className="text-muted-foreground">Assignee</div><div className="font-medium">{assigneeLabel(item.assignee_id)}</div></div>
+            <div><div className="text-muted-foreground">Assignee</div><div className="font-medium"><FlowMemberDisplay userId={item.assignee_id} /></div></div>
             <div><div className="text-muted-foreground">Reporter</div><div className="font-medium">{reporterLabel(item.reporter_id)}</div></div>
             <div><div className="text-muted-foreground">Due date</div><div className="font-medium">{item.due_date ? new Date(item.due_date).toLocaleDateString() : "No due date"}</div></div>
           </div>
@@ -661,7 +668,7 @@ export default function WorkItemDetailPage() {
                 {(relationsQuery.data ?? []).length === 0 ? <p className="text-muted-foreground">No related work yet.</p> : (relationsQuery.data ?? []).map((relation) => (
                   <div key={relation.id} className="rounded-md border p-2">
                     <Link href={`/flow/work-items/${relation.target_work_item_id}`} className="font-medium text-primary hover:underline">{relation.target_title ?? `Work item #${relation.target_work_item_id}`}</Link>
-                    <div className="mt-1 text-xs text-muted-foreground">{relationTypeLabel(relation.relation_type)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{dependencySentence(item.title, relation.target_title ?? `FLOW-${relation.target_work_item_id}`, relation.relation_type)}</div>
                     {relation.description ? <p className="mt-1 text-muted-foreground">{relation.description}</p> : null}
                     <Button className="mt-2" size="sm" variant="outline" onClick={() => deleteRelationMutation.mutate(relation.id)}>Remove</Button>
                   </div>
@@ -725,7 +732,14 @@ export default function WorkItemDetailPage() {
         {!auditQuery.isLoading && !auditQuery.isError && auditGroups.length === 0 ? (
           <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No audit events yet.</p>
         ) : (
-          <AuditEventGroups grouped={auditGroups} />
+          <div className="space-y-3">
+            <AuditEventGroups grouped={compactAuditGroups} />
+            {(auditQuery.data ?? []).length > 5 ? (
+              <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/activity">
+                View Full Activity
+              </Link>
+            ) : null}
+          </div>
         )}
       </DetailPanel>
       <DetailPanel title="Attachments">
@@ -779,26 +793,6 @@ function attachmentHref(workItemId: string, attachmentId: number, fileUrl?: stri
   return `${apiConfig.gatewayUrl}${flowApi.attachmentDownloadPath(workItemId, attachmentId)}`;
 }
 
-function validDetailTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
-  if (!workflow) {
-    return FLOW_STATUS_OPTIONS.map((status) => ({ id: Number(status.value), name: status.label, key: status.name }));
-  }
-  const allowedIds = new Set(
-    workflow.transitions
-      .filter((transition) => transition.from_status_id === currentStatusId)
-      .map((transition) => transition.to_status_id)
-  );
-  const allowed = workflow.statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
-  return allowed.length ? allowed : workflow.statuses;
-}
-
-function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, statusId?: number | null) {
-  if (!workflow) {
-    return statusNameFromId(statusId);
-  }
-  return workflow.statuses.find((statusOption) => statusOption.id === statusId)?.key ?? workflow.statuses[0]?.key ?? "todo";
-}
-
 function groupLinksByType(links: LinkedEntity[]) {
   return links.reduce<Record<LinkedEntityType, LinkedEntity[]>>((groups, link) => {
     groups[link.entity_type] = [...(groups[link.entity_type] ?? []), link];
@@ -808,6 +802,13 @@ function groupLinksByType(links: LinkedEntity[]) {
 
 function linkTypeLabel(type: LinkedEntityType) {
   return LINK_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+}
+
+function dependencySentence(sourceTitle: string, targetTitle: string, relationType: WorkItemRelationType) {
+  if (relationType === "blocks") return `${sourceTitle} blocks ${targetTitle}`;
+  if (relationType === "blocked_by") return `${sourceTitle} is waiting on ${targetTitle}`;
+  if (relationType === "duplicate_of") return `${sourceTitle} duplicates ${targetTitle}`;
+  return `${sourceTitle} is related to ${targetTitle}`;
 }
 
 function CustomFieldInput({ definition, value, onChange }: { definition: CustomFieldDefinition; value: string; onChange: (value: string) => void }) {

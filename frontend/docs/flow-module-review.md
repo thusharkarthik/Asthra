@@ -53,6 +53,15 @@ Flow now presents a project-scoped work management experience:
 - Board view grouped into Todo, In Progress, Review, and Done columns.
 - My Work, Backlog, and Reports pages added as lightweight product surfaces.
 
+## Flow Usability Improvements
+
+- Status consistency: Create, filters, detail edit, board movement, and workflow-aware views now use the project workflow as the status source of truth.
+- Assignee lookup: Create, edit, and filters now use a member picker that prefers available workspace and organization members while storing user IDs internally.
+- Hierarchy UX: Create Initiative, Create Feature, and Create Work Item actions now preselect the intended hierarchy level and explain parent expectations.
+- Dependency UX: Dependency rows now describe direction in plain language, for example “Build Flow UI blocks Target item” and “Build Flow UI is waiting on Target item.”
+- Audit compaction: Work item detail shows the latest five audit events and links to Flow Activity for the full grouped history.
+- Sprint workflow: Sprint detail now separates lifecycle guidance, overview, work items, metrics, edit controls, delete action, and activity placeholders.
+
 ## Remaining Gaps
 
 - Backend status and priority metadata should eventually replace numeric fallback labels.
@@ -61,7 +70,7 @@ Flow now presents a project-scoped work management experience:
 - Backlog grooming, due dates, and sprint planning are not implemented yet.
 - Reports are lightweight and should eventually integrate with Insights.
 - Cross-module links are placeholders until platform references are persisted.
-- Assignee selection still needs workspace member lookup so names and email addresses can replace raw user IDs everywhere.
+- Assignee selection uses available member lists, but detailed profile lookup is still pending when Core only returns user IDs.
 - Sprints, dependency graph visualization, custom fields, workflow customization, and AI estimation remain future Flow gaps.
 - File previews, access-controlled downloads, and Media Service-backed storage remain future attachment gaps.
 - Workflow drag-and-drop editing, transition deletion, and richer status governance remain future workflow gaps.

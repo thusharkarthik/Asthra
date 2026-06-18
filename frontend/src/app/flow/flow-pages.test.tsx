@@ -320,7 +320,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, original_estimate_minutes: 240, remaining_estimate_minutes: 120, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2, original_estimate_minutes: 120, remaining_estimate_minutes: 90 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, assignee_id: 1, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, original_estimate_minutes: 240, remaining_estimate_minutes: 120, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2, original_estimate_minutes: 120, remaining_estimate_minutes: 90 }]), { status: 200 });
     }
     if (url.includes("/capacity/99") && init?.method === "DELETE") {
       return new Response(null, { status: 204 });
@@ -380,7 +380,7 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Flow" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Open Work Items")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Build Flow UI").length).toBeGreaterThan(0));
   });
 
   it("renders guided empty state when no project is selected", () => {
@@ -487,7 +487,7 @@ describe("Flow frontend screens", () => {
     expect(screen.getByLabelText("Complexity")).toBeInTheDocument();
     expect(screen.getByLabelText("Acceptance criteria")).toBeInTheDocument();
     expect(screen.getByLabelText("Completion checklist")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("option", { name: "Development" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByRole("option", { name: "Development" }).length).toBeGreaterThan(0));
   });
 
   it("applies bug template content in create dialog", () => {
@@ -561,6 +561,19 @@ describe("Flow frontend screens", () => {
         definition_of_done: "Tests pass."
       });
     });
+  });
+
+  it("filters work items by workflow status and assignee member", async () => {
+    navigationMock.pathname = "/flow/work-items";
+    renderWithQuery(<WorkItemsPage />);
+
+    await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Status filter"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Assignee filter"), { target: { value: "1" } });
+
+    expect(screen.getByLabelText("Status filter")).toHaveValue("1");
+    expect(screen.getByLabelText("Assignee filter")).toHaveValue("1");
+    expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
   });
 
   it("blocks work item creation when no project is selected", async () => {
@@ -664,6 +677,16 @@ describe("Flow frontend screens", () => {
     expect(screen.getAllByText("In Progress").length).toBeGreaterThan(0);
   });
 
+  it("compacts work item audit trail and links to full activity", async () => {
+    navigationMock.pathname = "/flow/work-items/7";
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<WorkItemDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Audit Trail")).toBeInTheDocument());
+    expect(screen.getByText("Leo status changed")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View Full Activity" })).not.toBeInTheDocument();
+  });
+
   it("saves custom field values from work item detail", async () => {
     navigationMock.pathname = "/flow/work-items/7";
     navigationMock.params = { id: "7" };
@@ -728,6 +751,7 @@ describe("Flow frontend screens", () => {
     fireEvent.change(screen.getByDisplayValue("Build Flow UI"), { target: { value: "Updated Flow UI" } });
     fireEvent.change(screen.getByDisplayValue("Wire work items"), { target: { value: "Updated details" } });
     fireEvent.change(screen.getByDisplayValue("Backlog"), { target: { value: "development" } });
+    fireEvent.change(screen.getByLabelText("Assignee"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -736,6 +760,7 @@ describe("Flow frontend screens", () => {
       const body = JSON.parse(String(patchCall?.[1]?.body));
       expect(body.title).toBe("Updated Flow UI");
       expect(body.status_name).toBe("development");
+      expect(body.assignee_id).toBe(1);
     });
   });
 
@@ -1032,11 +1057,17 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Sprint 1" })).toBeInTheDocument());
     expect(screen.getByText("Ship planning")).toBeInTheDocument();
     expect(screen.getByText("Progress")).toBeInTheDocument();
+    expect(screen.getByText("Sprint Workflow")).toBeInTheDocument();
     expect(screen.getAllByText("Capacity").length).toBeGreaterThan(0);
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Sprint" }));
+    fireEvent.change(screen.getByLabelText("Edit sprint name"), { target: { value: "Sprint 1 Updated" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Sprint" }));
     fireEvent.click(screen.getByRole("button", { name: "Complete Sprint" }));
     await waitFor(() => {
+      const editCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30") && init?.method === "PATCH");
       const completeCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/complete") && init?.method === "POST");
+      expect(editCall).toBeTruthy();
       expect(completeCall).toBeTruthy();
     });
   });
@@ -1138,6 +1169,17 @@ describe("Flow frontend screens", () => {
     expect(screen.getByRole("button", { name: "Add Subtask" })).toBeInTheDocument();
   });
 
+  it("preselects hierarchy create actions", async () => {
+    navigationMock.pathname = "/flow/hierarchy";
+    renderWithQuery(<FlowHierarchyPage />);
+
+    await waitFor(() => expect(screen.getByText("Platform Initiative")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Create Initiative" }));
+
+    expect(screen.getAllByText("Create Initiative: top-level outcome, no parent.").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Work level")).toHaveValue("initiative");
+  });
+
   it("renders dependencies page and add relation controls", async () => {
     navigationMock.pathname = "/flow/dependencies";
     renderWithQuery(<FlowDependenciesPage />);
@@ -1146,5 +1188,17 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByLabelText("Source work item")).toBeInTheDocument());
     expect(screen.getByLabelText("Relation type")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Relation" })).toBeInTheDocument();
+  });
+
+  it("shows clearer dependency direction labels", async () => {
+    navigationMock.pathname = "/flow/dependencies";
+    renderWithQuery(<FlowDependenciesPage />);
+
+    await waitFor(() => expect(screen.getByLabelText("Source work item")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Source work item"), { target: { value: "7" } });
+
+    await waitFor(() => expect(screen.getByText("This work blocks")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Target item").length).toBeGreaterThan(0));
+    expect(screen.getByText("Build Flow UI blocks Target item")).toBeInTheDocument();
   });
 });
