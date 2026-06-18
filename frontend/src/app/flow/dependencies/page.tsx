@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_RELATION_TYPE_OPTIONS, relationTypeLabel } from "@/components/flow/flow-utils";
+import { FLOW_RELATION_TYPE_OPTIONS } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -99,12 +99,12 @@ export default function FlowDependenciesPage() {
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 {grouped.map((group) => (
                   <div key={group.value} className="rounded-md border p-3">
-                    <h3 className="text-sm font-semibold">{group.label}</h3>
+                    <h3 className="text-sm font-semibold">{dependencyGroupTitle(group.value)}</h3>
                     <div className="mt-2 space-y-2">
                       {group.items.length === 0 ? <p className="text-sm text-muted-foreground">No {group.label.toLowerCase()} relations.</p> : group.items.map((relation) => (
                         <div key={relation.id} className="rounded-md border bg-background p-3 text-sm">
                           <Link href={`/flow/work-items/${relation.target_work_item_id}`} className="font-medium text-primary hover:underline">{relation.target_title ?? `Work item #${relation.target_work_item_id}`}</Link>
-                          <div className="mt-2 flex flex-wrap gap-2"><StatusBadge value={relation.target_status_id} /><PriorityBadge value={relation.target_priority_id} /><span>{relationTypeLabel(relation.relation_type)}</span></div>
+                          <div className="mt-2 flex flex-wrap gap-2"><StatusBadge value={relation.target_status_id} /><PriorityBadge value={relation.target_priority_id} /><span>{dependencySentence(source.title, relation.target_title ?? `FLOW-${relation.target_work_item_id}`, relation.relation_type)}</span></div>
                           {relation.description ? <p className="mt-2 text-muted-foreground">{relation.description}</p> : null}
                           <Button className="mt-2" size="sm" variant="outline" onClick={() => removeMutation.mutate(relation.id)}>Remove</Button>
                         </div>
@@ -119,4 +119,18 @@ export default function FlowDependenciesPage() {
       )}
     </>
   );
+}
+
+function dependencyGroupTitle(type: WorkItemRelationType) {
+  if (type === "blocks") return "This work blocks";
+  if (type === "blocked_by") return "This work is waiting on";
+  if (type === "duplicate_of") return "Duplicates";
+  return "Related work";
+}
+
+function dependencySentence(sourceTitle: string, targetTitle: string, relationType: WorkItemRelationType) {
+  if (relationType === "blocks") return `${sourceTitle} blocks ${targetTitle}`;
+  if (relationType === "blocked_by") return `${sourceTitle} waiting on ${targetTitle}`;
+  if (relationType === "duplicate_of") return `${sourceTitle} duplicates ${targetTitle}`;
+  return `${sourceTitle} related to ${targetTitle}`;
 }

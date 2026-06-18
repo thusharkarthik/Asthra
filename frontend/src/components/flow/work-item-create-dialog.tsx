@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FLOW_BUSINESS_VALUE_OPTIONS,
@@ -12,6 +12,7 @@ import {
   FLOW_STATUS_OPTIONS,
   FLOW_WORK_ITEM_TEMPLATES
 } from "@/components/flow/flow-utils";
+import { FlowMemberPicker } from "@/components/flow/member-picker";
 import { EntityCreateDialog, FormActions, FormField } from "@/components/modules/entity-form";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -25,9 +26,13 @@ import type { FlowItemLevel } from "@/types/flow";
 type WorkItemCreateDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialItemLevel?: FlowItemLevel;
+  lockItemLevel?: boolean;
+  initialParentId?: number | null;
+  contextLabel?: string;
 };
 
-export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialogProps) {
+export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "work_item", lockItemLevel = false, initialParentId = null, contextLabel }: WorkItemCreateDialogProps) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
@@ -35,7 +40,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
   const [title, setTitle] = useState("");
   const [template, setTemplate] = useState("blank");
   const [description, setDescription] = useState("");
-  const [itemLevel, setItemLevel] = useState<FlowItemLevel>("work_item");
+  const [itemLevel, setItemLevel] = useState<FlowItemLevel>(initialItemLevel);
   const [statusName, setStatusName] = useState("");
   const [priorityName, setPriorityName] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -47,9 +52,18 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
   const [complexity, setComplexity] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [definitionOfDone, setDefinitionOfDone] = useState("");
-  const [parentId, setParentId] = useState("");
+  const [parentId, setParentId] = useState(initialParentId ? String(initialParentId) : "");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setItemLevel(initialItemLevel);
+    setParentId(initialParentId ? String(initialParentId) : "");
+    if (initialItemLevel !== "work_item" || initialParentId) {
+      setShowAdvanced(true);
+    }
+  }, [initialItemLevel, initialParentId, open]);
 
   const parentOptions = useQuery({
     queryKey: ["flow", "create-parent-work", selectedProjectId],
@@ -93,7 +107,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
       setTitle("");
       setTemplate("blank");
       setDescription("");
-      setItemLevel("work_item");
+      setItemLevel(initialItemLevel);
       setStatusName("");
       setPriorityName("");
       setAssigneeId("");
@@ -105,7 +119,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
       setComplexity("");
       setAcceptanceCriteria("");
       setDefinitionOfDone("");
-      setParentId("");
+      setParentId(initialParentId ? String(initialParentId) : "");
       setShowAdvanced(false);
       setFormError(null);
       onOpenChange(false);
@@ -135,6 +149,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
     <EntityCreateDialog title="Create work item" open={open} onOpenChange={onOpenChange} onSubmit={handleCreate} error={formError}>
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Basics</h3>
+        {contextLabel ? <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">{contextLabel}</p> : null}
         <FormField label="Title" required error={!title.trim() ? "Required" : null}>
           <Input aria-label="Work item title" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
         </FormField>
@@ -179,8 +194,8 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
           </FormField>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label="Assignee ID optional" helpText="Member lookup is pending for Flow.">
-            <Input aria-label="Assignee id" inputMode="numeric" placeholder="Assignee ID, optional" value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} />
+          <FormField label="Assignee" helpText="Search order: project members, workspace members, then organization members. Detailed profiles appear when Core returns them.">
+            <FlowMemberPicker label="Assignee" value={assigneeId} onChange={setAssigneeId} />
           </FormField>
           <FormField label="Due Date">
             <Input aria-label="Due date" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
@@ -231,9 +246,10 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Relationships</h3>
           <FormField label="Work Level">
-            <Select aria-label="Work level" value={itemLevel} onChange={(event) => setItemLevel(event.target.value as FlowItemLevel)}>
+            <Select aria-label="Work level" value={itemLevel} disabled={lockItemLevel} onChange={(event) => setItemLevel(event.target.value as FlowItemLevel)}>
               {FLOW_ITEM_LEVEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </Select>
+            {lockItemLevel ? <p className="mt-1 text-xs text-muted-foreground">This action preselects the hierarchy level intentionally.</p> : null}
           </FormField>
           <FormField label="Parent Work">
             <Select aria-label="Parent work" value={parentId} onChange={(event) => setParentId(event.target.value)}>
