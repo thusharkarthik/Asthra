@@ -38,17 +38,25 @@ curl http://localhost:8000/ready
 
 API routes are mounted under `/api/v1`.
 
-Seed default Flow lookup data after the database tables exist:
+Seed demo-ready Flow data after the database tables exist:
 
 ```bash
-python scripts/seed_flow_defaults.py
+python3 scripts/seed_flow_defaults.py
 ```
 
-The seed script is idempotent and creates or updates:
+The seed script is idempotent and creates or updates a realistic local Flow project. By default it targets workspace `2` and project `3`; override those IDs when testing another project:
 
-- types: `task`, `bug`, `story`, `epic`
-- statuses: `todo`, `in_progress`, `review`, `done`
-- priorities: `low`, `medium`, `high`, `critical`
+```bash
+FLOW_DEMO_WORKSPACE_ID=2 FLOW_DEMO_PROJECT_ID=3 python3 scripts/seed_flow_defaults.py
+```
+
+It seeds:
+
+- workflow: `Flow Demo Workflow` with Todo, In Progress, Review, and Done.
+- metadata: types, priorities, labels, custom fields.
+- hierarchy: initiative, feature, work items, and subtask.
+- execution data: comments, dependencies, sprint, release, capacity, saved view.
+- traceability data: attachment metadata, linked resources, and audit examples.
 
 ## Docker
 

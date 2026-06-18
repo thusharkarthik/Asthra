@@ -7,8 +7,8 @@ import { Link2, MessageSquare, Paperclip } from "lucide-react";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { effortLabel, isHighRiskWorkItem, itemLevelLabel, nextWorkflowTargets, validWorkflowTargets, workflowStatusKeyFor, workflowStatusOptions } from "@/components/flow/flow-utils";
-import { FlowMemberDisplay } from "@/components/flow/member-picker";
+import { FLOW_PRIORITY_OPTIONS, effortLabel, isHighRiskWorkItem, itemLevelLabel, nextWorkflowTargets, validWorkflowTargets, workflowStatusKeyFor, workflowStatusLabelFor, workflowStatusOptions } from "@/components/flow/flow-utils";
+import { FlowMemberDisplay, FlowMemberPicker } from "@/components/flow/member-picker";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -24,6 +24,9 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 export default function BoardsPage() {
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [sprintScope, setSprintScope] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [releaseScope, setReleaseScope] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
@@ -55,12 +58,23 @@ export default function BoardsPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const releasesQuery = useQuery({
+    queryKey: ["flow", "releases", selectedProjectId],
+    queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const sprints = sprintsQuery.data ?? [];
+  const releases = releasesQuery.data ?? [];
   const activeSprint = sprints.find((sprint) => sprint.status === "active");
   const visibleItems = (workItemsQuery.data ?? []).filter((item) => {
-    if (sprintScope === "backlog") return !item.sprint_id;
-    if (sprintScope === "active") return activeSprint ? item.sprint_id === activeSprint.id : false;
-    if (sprintScope.startsWith("sprint:")) return item.sprint_id === Number(sprintScope.replace("sprint:", ""));
+    if (sprintScope === "backlog" && item.sprint_id) return false;
+    if (sprintScope === "active" && (!activeSprint || item.sprint_id !== activeSprint.id)) return false;
+    if (sprintScope.startsWith("sprint:") && item.sprint_id !== Number(sprintScope.replace("sprint:", ""))) return false;
+    if (releaseScope === "none" && item.release_id) return false;
+    if (releaseScope.startsWith("release:") && item.release_id !== Number(releaseScope.replace("release:", ""))) return false;
+    if (priorityFilter && item.priority_id !== Number(priorityFilter)) return false;
+    if (assigneeFilter && String(item.assignee_id ?? "") !== assigneeFilter) return false;
     return true;
   });
 
@@ -79,13 +93,23 @@ export default function BoardsPage() {
       <FlowSubnav />
       {!hasOrganization || !hasWorkspace || !hasProject ? <FlowSetupState hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} hasProject={hasProject} /> : (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-4">
             <Select aria-label="Board sprint filter" value={sprintScope} onChange={(event) => setSprintScope(event.target.value)}>
               <option value="all">All project work</option>
               <option value="backlog">Backlog</option>
               <option value="active">Current sprint</option>
               {sprints.filter((sprint) => sprint.status === "planned").map((sprint) => <option key={sprint.id} value={`sprint:${sprint.id}`}>{sprint.name}</option>)}
             </Select>
+            <Select aria-label="Board release filter" value={releaseScope} onChange={(event) => setReleaseScope(event.target.value)}>
+              <option value="all">All releases</option>
+              <option value="none">No release</option>
+              {releases.map((release) => <option key={release.id} value={`release:${release.id}`}>{release.name}</option>)}
+            </Select>
+            <Select aria-label="Board priority filter" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+              <option value="">All priorities</option>
+              {FLOW_PRIORITY_OPTIONS.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
+            </Select>
+            <FlowMemberPicker label="Board assignee filter" value={assigneeFilter} onChange={setAssigneeFilter} />
           </div>
           {workItemsQuery.isLoading ? <LoadingState /> : workItemsQuery.error ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
@@ -104,20 +128,17 @@ export default function BoardsPage() {
                     <div className="space-y-2 p-3">
                       {columnItems.map((item) => (
                         <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
-                          {(() => {
-                            const nextTargets = nextWorkflowTargets(workflowQuery.data, item.status_id);
-                            return nextTargets[0] ? (
-                              <div className="mb-2 flex justify-end">
-                                <Button size="sm" variant="outline" onClick={() => moveMutation.mutate({ id: item.id, statusName: nextTargets[0].key })}>
-                                  Move to {nextTargets[0].name}
-                                </Button>
-                              </div>
-                            ) : null;
-                          })()}
+                          <div className="mb-2 flex flex-wrap justify-end gap-2">
+                            {nextWorkflowTargets(workflowQuery.data, item.status_id).map((target) => (
+                              <Button key={target.id} size="sm" variant="outline" onClick={() => moveMutation.mutate({ id: item.id, statusName: target.key })}>
+                                Move to {target.name}
+                              </Button>
+                            ))}
+                          </div>
                           <Link href={`/flow/work-items/${item.id}`} className="font-medium text-primary hover:underline">{item.title}</Link>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <span className="rounded-md bg-muted px-2 py-0.5 text-xs">{itemLevelLabel(item.item_level)}</span>
-                            <StatusBadge value={item.status_id} />
+                            <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                             <PriorityBadge value={item.priority_id} />
                             <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Effort: {effortLabel(item.effort_size, item.effort_score)}</span>
                             {isHighRiskWorkItem(item) ? <span className="rounded-md border border-destructive/40 px-2 py-0.5 text-xs text-destructive">High risk</span> : null}

@@ -485,8 +485,10 @@ describe("Flow frontend screens", () => {
     expect(screen.getByLabelText("Business value")).toBeInTheDocument();
     expect(screen.getByLabelText("Risk level")).toBeInTheDocument();
     expect(screen.getByLabelText("Complexity")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByLabelText("Acceptance criteria")).toBeInTheDocument();
     expect(screen.getByLabelText("Completion checklist")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ownership" }));
     await waitFor(() => expect(screen.getAllByRole("option", { name: "Development" }).length).toBeGreaterThan(0));
   });
 
@@ -499,6 +501,7 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByDisplayValue(/Problem Summary:/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByDisplayValue(/Issue is reproduced/)).toBeInTheDocument();
   });
 
@@ -534,13 +537,14 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<WorkItemsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
     fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Advanced item" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
     fireEvent.change(screen.getByLabelText("Effort size"), { target: { value: "L" } });
     fireEvent.change(screen.getByLabelText("Effort score"), { target: { value: "8" } });
     fireEvent.change(screen.getByLabelText("Business value"), { target: { value: "high" } });
     fireEvent.change(screen.getByLabelText("Risk level"), { target: { value: "high" } });
     fireEvent.change(screen.getByLabelText("Complexity"), { target: { value: "medium" } });
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     fireEvent.change(screen.getByLabelText("Acceptance criteria"), { target: { value: "Accepted when users can finish the flow." } });
     fireEvent.change(screen.getByLabelText("Completion checklist"), { target: { value: "Tests pass." } });
     fireEvent.click(screen.getAllByRole("button", { name: "Create Work Item" }).at(-1)!);
@@ -1177,6 +1181,7 @@ describe("Flow frontend screens", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Initiative" }));
 
     expect(screen.getAllByText("Create Initiative: top-level outcome, no parent.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByLabelText("Work level")).toHaveValue("initiative");
   });
 

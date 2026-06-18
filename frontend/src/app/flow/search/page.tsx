@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
+import { workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyModuleState, ErrorState, PageLoading } from "@/components/layout/ui-states";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -51,6 +52,12 @@ export default function FlowSearchPage() {
   const savedViewsQuery = useQuery({
     queryKey: ["flow", "saved-views", selectedProjectId],
     queryFn: () => flowApi.listSavedViews(accessToken ?? "", { workspace_id: selectedWorkspaceId, project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
     enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
@@ -165,7 +172,7 @@ export default function FlowSearchPage() {
             {!searchQuery.isLoading && !searchQuery.isError && results.length === 0 ? (
               <EmptyModuleState title="No work items found" description="Adjust filters or clear the search to broaden results." />
             ) : null}
-            {results.length ? <SearchResultsTable items={results} /> : null}
+            {results.length ? <SearchResultsTable items={results} workflow={workflowQuery.data} /> : null}
           </DetailPanel>
         </div>
         <DetailPanel title="Saved Views">
@@ -196,7 +203,7 @@ export default function FlowSearchPage() {
   );
 }
 
-function SearchResultsTable({ items }: { items: WorkItemSearchResponse["items"] }) {
+function SearchResultsTable({ items, workflow }: { items: WorkItemSearchResponse["items"]; workflow?: Parameters<typeof workflowStatusLabelFor>[0] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[920px] text-left text-sm">
@@ -217,7 +224,7 @@ function SearchResultsTable({ items }: { items: WorkItemSearchResponse["items"] 
           {items.map((item) => (
             <tr key={item.id} className="border-b">
               <td className="py-3"><Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link></td>
-              <td><StatusBadge value={item.status_id} /></td>
+              <td><StatusBadge value={workflowStatusLabelFor(workflow, item.status_id)} /></td>
               <td><PriorityBadge value={item.priority_id} /></td>
               <td>{item.assignee_id ?? "Unassigned"}</td>
               <td>{item.effort_size ?? "-"}</td>

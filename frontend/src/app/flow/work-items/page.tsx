@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, effortLabel, planningLabel, workflowStatusKeyFor, workflowStatusOptions } from "@/components/flow/flow-utils";
+import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, effortLabel, planningLabel, workflowStatusKeyFor, workflowStatusLabelFor, workflowStatusOptions } from "@/components/flow/flow-utils";
 import { FlowMemberDisplay, FlowMemberPicker } from "@/components/flow/member-picker";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -15,6 +15,7 @@ import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { EntityTable, EntityTableRow } from "@/components/modules/entity-table";
 import { PriorityBadge } from "@/components/modules/priority-badge";
+import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -137,13 +138,16 @@ export default function WorkItemsPage() {
               {filteredItems.map((item) => (
                 <EntityTableRow key={item.id} columns={8}>
                   <Link className="min-w-0 font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
-                  <Select
-                    aria-label={`Status for ${item.title}`}
-                    value={workflowStatusKeyFor(workflowQuery.data, item.status_id)}
-                    onChange={(event) => statusMutation.mutate({ id: item.id, statusName: event.target.value })}
-                  >
-                    {statusOptions.map((status) => <option key={status.key} value={status.key}>{status.name}</option>)}
-                  </Select>
+                  <div className="space-y-1">
+                    <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
+                    <Select
+                      aria-label={`Status for ${item.title}`}
+                      value={workflowStatusKeyFor(workflowQuery.data, item.status_id)}
+                      onChange={(event) => statusMutation.mutate({ id: item.id, statusName: event.target.value })}
+                    >
+                      {statusOptions.map((status) => <option key={status.key} value={status.key}>{status.name}</option>)}
+                    </Select>
+                  </div>
                   <PriorityBadge value={item.priority_id} />
                   <span>{effortLabel(item.effort_size, item.effort_score)}</span>
                   <span>{planningLabel(item.risk_level)}</span>

@@ -13,7 +13,8 @@ import {
   isCompletedWorkItem,
   isInProgressWorkItem,
   isOpenWorkItem,
-  sortedByUpdatedAt
+  sortedByUpdatedAt,
+  workflowStatusLabelFor
 } from "@/components/flow/flow-utils";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -51,6 +52,12 @@ export default function FlowPage() {
   const releasesQuery = useQuery({
     queryKey: ["flow", "releases", selectedProjectId],
     queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
@@ -171,7 +178,7 @@ export default function FlowPage() {
                           <div className="truncate text-sm font-medium">{item.title}</div>
                           <div className="mt-1 text-xs text-muted-foreground">Updated {formatWorkItemDate(item.updated_at ?? item.created_at)}</div>
                         </div>
-                        <StatusBadge value={item.status_id} />
+                        <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                       </div>
                     </Link>
                   ))}
@@ -189,7 +196,7 @@ export default function FlowPage() {
                       <Link key={item.id} href={`/flow/work-items/${item.id}`} className="block rounded-md border p-3 hover:bg-muted">
                         <div className="text-sm font-medium">{item.title}</div>
                         <div className="mt-2 flex gap-2">
-                          <StatusBadge value={item.status_id} />
+                          <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                           <PriorityBadge value={item.priority_id} />
                         </div>
                       </Link>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { isBlockedWorkItem, isHighRiskWorkItem } from "@/components/flow/flow-utils";
+import { isBlockedWorkItem, isHighRiskWorkItem, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -29,6 +29,12 @@ export default function FlowReleaseDetailPage() {
     queryKey: ["flow", "release-work-items", releaseId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { release_id: Number(releaseId), limit: 100 }),
     enabled: Boolean(accessToken && releaseId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", release?.project_id],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", release?.project_id ?? 0),
+    enabled: Boolean(accessToken && release?.project_id),
     retry: 1
   });
   const items = workItemsQuery.data ?? [];
@@ -91,7 +97,7 @@ export default function FlowReleaseDetailPage() {
             {items.map((item) => (
               <EntityTableRow key={item.id} columns={4}>
                 <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
-                <StatusBadge value={item.status_id} />
+                <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                 <PriorityBadge value={item.priority_id} />
                 <span>{item.risk_level ?? "not set"}</span>
               </EntityTableRow>

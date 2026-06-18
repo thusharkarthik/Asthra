@@ -1,0 +1,50 @@
+import { expect, test } from "@playwright/test";
+
+// Enable by installing @playwright/test and renaming this file to flow-demo.spec.ts.
+// The flow below assumes the platform is running at BASE_URL and demo data has
+// been seeded with services/flow-service/scripts/seed_flow_defaults.py.
+
+const baseUrl = process.env.BASE_URL ?? "http://localhost:3000";
+
+test.describe("Flow demo CRUD path", () => {
+  test("creates, edits, moves, comments, plans, and saves a view", async ({ page }) => {
+    await page.goto(`${baseUrl}/login`);
+    await page.getByLabel("Email").fill(process.env.E2E_EMAIL ?? "admin@admin.com");
+    await page.getByLabel("Password").fill(process.env.E2E_PASSWORD ?? "admin123");
+    await page.getByRole("button", { name: /login/i }).click();
+
+    await page.goto(`${baseUrl}/flow/work-items`);
+    await page.getByRole("button", { name: "Create Work Item" }).click();
+    await page.getByLabel("Work item title").fill("E2E demo work item");
+    await page.getByLabel("Work item description").fill("Created by the Flow demo E2E path.");
+    await page.getByRole("button", { name: "Create Work Item" }).last().click();
+    await expect(page.getByText("Work item created")).toBeVisible();
+
+    await page.getByText("E2E demo work item").click();
+    await page.getByRole("button", { name: "Edit" }).click();
+    await page.getByDisplayValue("E2E demo work item").fill("E2E updated work item");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Work item updated")).toBeVisible();
+
+    await page.goto(`${baseUrl}/flow/boards`);
+    await page.getByRole("button", { name: /Move to/i }).first().click();
+    await expect(page.getByText("Work item moved")).toBeVisible();
+
+    await page.goto(`${baseUrl}/flow/work-items`);
+    await page.getByText("E2E updated work item").click();
+    await page.getByPlaceholder("Add a comment").fill("E2E comment");
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(page.getByText("Comment added")).toBeVisible();
+
+    await page.goto(`${baseUrl}/flow/sprints`);
+    await page.getByLabel("Sprint name").fill("E2E Sprint");
+    await page.getByRole("button", { name: "Create Sprint" }).click();
+    await expect(page.getByText("Sprint created")).toBeVisible();
+
+    await page.goto(`${baseUrl}/flow/search`);
+    await page.getByLabel("Search text").fill("E2E");
+    await page.getByLabel("Saved view name").fill("E2E Demo View");
+    await page.getByRole("button", { name: "Save Current Filter" }).click();
+    await expect(page.getByText("Saved view created")).toBeVisible();
+  });
+});

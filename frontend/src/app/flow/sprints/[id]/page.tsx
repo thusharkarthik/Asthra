@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { isBlockedWorkItem, isHighRiskWorkItem } from "@/components/flow/flow-utils";
+import { isBlockedWorkItem, isHighRiskWorkItem, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -43,6 +43,12 @@ export default function FlowSprintDetailPage() {
     queryKey: ["flow", "sprint-work-items", sprintId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { sprint_id: Number(sprintId), limit: 100 }),
     enabled: Boolean(accessToken && sprintId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", sprint?.project_id],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", sprint?.project_id ?? 0),
+    enabled: Boolean(accessToken && sprint?.project_id),
     retry: 1
   });
   const items = workItemsQuery.data ?? [];
@@ -181,7 +187,7 @@ export default function FlowSprintDetailPage() {
             {items.map((item) => (
               <EntityTableRow key={item.id} columns={5}>
                 <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
-                <StatusBadge value={item.status_id} />
+                <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                 <PriorityBadge value={item.priority_id} />
                 <span>{item.effort_score ?? 0}</span>
                 <span>{formatMinutes(item.original_estimate_minutes ?? 0)}</span>

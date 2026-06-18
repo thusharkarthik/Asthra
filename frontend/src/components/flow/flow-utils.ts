@@ -139,6 +139,10 @@ export function priorityNameFromId(priorityId?: number | null) {
   return FLOW_PRIORITY_OPTIONS.find((priority) => Number(priority.value) === priorityId)?.name ?? "medium";
 }
 
+export function priorityLabelFor(priorityId?: number | null) {
+  return FLOW_PRIORITY_OPTIONS.find((priority) => Number(priority.value) === priorityId)?.label ?? (priorityId ? `Priority ${priorityId}` : "Not set");
+}
+
 export function assigneeLabel(assigneeId?: number | null, displayName?: string | null) {
   if (displayName) return displayName;
   return assigneeId ? `User ${assigneeId}` : "Unassigned";

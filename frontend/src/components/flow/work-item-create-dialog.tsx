@@ -21,7 +21,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { FlowItemLevel } from "@/types/flow";
+import type { CustomFieldDefinition, FlowItemLevel } from "@/types/flow";
 
 type WorkItemCreateDialogProps = {
   open: boolean;
@@ -54,6 +54,8 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
   const [definitionOfDone, setDefinitionOfDone] = useState("");
   const [parentId, setParentId] = useState(initialParentId ? String(initialParentId) : "");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeSection, setActiveSection] = useState<"basics" | "planning" | "ownership" | "advanced" | "custom">("basics");
+  const [customFieldDraft, setCustomFieldDraft] = useState<Record<number, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +79,13 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
     enabled: open && Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const customFieldDefinitionsQuery = useQuery({
+    queryKey: ["flow", "custom-fields", selectedProjectId],
+    queryFn: () => flowApi.listCustomFieldDefinitions(accessToken ?? "", { project_id: selectedProjectId }),
+    enabled: open && Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const customFieldDefinitions = customFieldDefinitionsQuery.data ?? [];
   const statusOptions = workflowQuery.data?.statuses?.length
     ? workflowQuery.data.statuses.map((status) => ({ value: status.key, label: status.name }))
     : FLOW_STATUS_OPTIONS.map((status) => ({ value: status.name, label: status.label }));
@@ -103,7 +112,23 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
       };
       return flowApi.createWorkItem(accessToken ?? "", payload);
     },
-    onSuccess: () => {
+    onSuccess: async (createdWorkItem) => {
+      try {
+        for (const definition of customFieldDefinitions) {
+          const value = customFieldDraft[definition.id] ?? "";
+          if (value === "" && !definition.required) continue;
+          await flowApi.saveCustomFieldValue(accessToken ?? "", createdWorkItem.id, {
+            custom_field_id: definition.id,
+            value: normalizeCustomFieldValue(definition, value)
+          });
+        }
+      } catch (error) {
+        addToast({
+          type: "error",
+          title: "Custom fields were not saved",
+          message: error instanceof Error ? error.message : "The work item was created, but custom fields need to be saved from the detail page."
+        });
+      }
       setTitle("");
       setTemplate("blank");
       setDescription("");
@@ -121,6 +146,8 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
       setDefinitionOfDone("");
       setParentId(initialParentId ? String(initialParentId) : "");
       setShowAdvanced(false);
+      setActiveSection("basics");
+      setCustomFieldDraft({});
       setFormError(null);
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["flow"] });
@@ -141,12 +168,46 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
       addToast({ type: "error", title: "Missing required fields", message });
       return;
     }
+    const missingCustomField = customFieldDefinitions.find((definition) => definition.required && !(customFieldDraft[definition.id] ?? "").trim());
+    if (missingCustomField) {
+      const message = `${missingCustomField.name} is required.`;
+      setActiveSection("custom");
+      setShowAdvanced(true);
+      setFormError(message);
+      addToast({ type: "error", title: "Missing custom field", message });
+      return;
+    }
     setFormError(null);
     createMutation.mutate();
   };
+  const visibleSections: Array<{ id: typeof activeSection; label: string }> = [
+    { id: "basics", label: "Basics" },
+    { id: "planning", label: "Planning" },
+    { id: "ownership", label: "Ownership" },
+    { id: "advanced", label: "Advanced" },
+    { id: "custom", label: "Custom Fields" }
+  ];
 
   return (
     <EntityCreateDialog title="Create work item" open={open} onOpenChange={onOpenChange} onSubmit={handleCreate} error={formError}>
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-card px-4 pb-3">
+        <div className="flex gap-2 overflow-x-auto">
+          {visibleSections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${activeSection === section.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+              onClick={() => {
+                setActiveSection(section.id);
+                if (section.id !== "basics") setShowAdvanced(true);
+              }}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {activeSection === "basics" ? (
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Basics</h3>
         {contextLabel ? <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">{contextLabel}</p> : null}
@@ -172,13 +233,17 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
           <textarea className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm" aria-label="Work item description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
         </FormField>
         </section>
-        <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setShowAdvanced((value) => !value)}>
+      ) : null}
+        <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => {
+          setShowAdvanced((value) => !value);
+          if (!showAdvanced) setActiveSection("planning");
+          if (showAdvanced) setActiveSection("basics");
+        }}>
           {showAdvanced ? "Hide advanced fields" : "Show advanced fields"}
         </button>
-        {showAdvanced ? (
-          <div className="space-y-5">
+        {showAdvanced && activeSection === "ownership" ? (
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold">Execution</h3>
+          <h3 className="text-sm font-semibold">Ownership</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Status">
             <Select aria-label="Work item status" value={statusName} onChange={(event) => setStatusName(event.target.value)}>
@@ -202,6 +267,8 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
           </FormField>
         </div>
         </section>
+        ) : null}
+        {showAdvanced && activeSection === "planning" ? (
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Planning</h3>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -234,6 +301,9 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
             </FormField>
           </div>
         </section>
+        ) : null}
+        {showAdvanced && activeSection === "advanced" ? (
+          <div className="space-y-5">
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Acceptance</h3>
           <FormField label="Acceptance Criteria">
@@ -263,6 +333,27 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
         </section>
           </div>
         ) : null}
+        {showAdvanced && activeSection === "custom" ? (
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">Custom Fields</h3>
+            {customFieldDefinitionsQuery.isLoading ? <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Loading custom fields...</p> : null}
+            {!customFieldDefinitionsQuery.isLoading && customFieldDefinitions.length === 0 ? (
+              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No project custom fields yet. Configure them from Flow Settings after setup.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {customFieldDefinitions.map((definition) => (
+                  <FormField key={definition.id} label={definition.name} required={definition.required}>
+                    <CustomFieldInput
+                      definition={definition}
+                      value={customFieldDraft[definition.id] ?? ""}
+                      onChange={(value) => setCustomFieldDraft((current) => ({ ...current, [definition.id]: value }))}
+                    />
+                  </FormField>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
         <FormActions submitLabel="Create Work Item" loadingLabel="Creating..." isSubmitting={createMutation.isPending} disabled={!title.trim() || !selectedProjectId} onCancel={() => onOpenChange(false)} />
     </EntityCreateDialog>
   );
@@ -274,4 +365,37 @@ function isValidParentOption(parentLevel: string, childLevel: FlowItemLevel) {
   if (childLevel === "work_item") return parentLevel === "initiative" || parentLevel === "feature";
   if (childLevel === "subtask") return parentLevel === "work_item";
   return false;
+}
+
+function CustomFieldInput({ definition, value, onChange }: { definition: CustomFieldDefinition; value: string; onChange: (value: string) => void }) {
+  if (definition.field_type === "select") {
+    return (
+      <Select value={value} required={definition.required} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select</option>
+        {(definition.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
+      </Select>
+    );
+  }
+  if (definition.field_type === "checkbox") {
+    return (
+      <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+        <input type="checkbox" checked={value === "true"} onChange={(event) => onChange(event.target.checked ? "true" : "false")} />
+        <span>{value === "true" ? "Checked" : "Unchecked"}</span>
+      </label>
+    );
+  }
+  return (
+    <Input
+      type={definition.field_type === "number" ? "number" : definition.field_type === "date" ? "date" : "text"}
+      value={value}
+      required={definition.required}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
+
+function normalizeCustomFieldValue(definition: CustomFieldDefinition, value: string) {
+  if (definition.field_type === "checkbox") return value === "true";
+  if (definition.field_type === "number" && value !== "") return Number(value);
+  return value || null;
 }

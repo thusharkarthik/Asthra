@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { itemLevelLabel } from "@/components/flow/flow-utils";
+import { itemLevelLabel, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { WorkItemCreateDialog } from "@/components/flow/work-item-create-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -18,7 +18,7 @@ import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import type { FlowItemLevel, WorkItemHierarchyNode } from "@/types/flow";
+import type { FlowItemLevel, Workflow, WorkItemHierarchyNode } from "@/types/flow";
 
 export default function FlowHierarchyPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -33,6 +33,12 @@ export default function FlowHierarchyPage() {
   const hierarchyQuery = useQuery({
     queryKey: ["flow", "hierarchy", selectedProjectId],
     queryFn: () => flowApi.getProjectHierarchy(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
     enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
@@ -67,7 +73,7 @@ export default function FlowHierarchyPage() {
           </div>
           <div className="space-y-2">
             {(hierarchyQuery.data?.items ?? []).map((node) => (
-              <HierarchyNode key={node.id} node={node} depth={0} onAddSubtask={setSubtaskParent} />
+              <HierarchyNode key={node.id} node={node} workflow={workflowQuery.data} depth={0} onAddSubtask={setSubtaskParent} />
             ))}
           </div>
         </div>
@@ -99,19 +105,19 @@ export default function FlowHierarchyPage() {
   );
 }
 
-function HierarchyNode({ node, depth, onAddSubtask }: { node: WorkItemHierarchyNode; depth: number; onAddSubtask: (node: WorkItemHierarchyNode) => void }) {
+function HierarchyNode({ node, workflow, depth, onAddSubtask }: { node: WorkItemHierarchyNode; workflow?: Workflow; depth: number; onAddSubtask: (node: WorkItemHierarchyNode) => void }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 rounded-md border bg-background p-3" style={{ marginLeft: `${depth * 20}px` }}>
         <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">{itemLevelLabel(node.item_level)}</span>
         <Link href={`/flow/work-items/${node.id}`} className="font-medium text-primary hover:underline">{node.title}</Link>
-        <StatusBadge value={node.status_id} />
+        <StatusBadge value={workflowStatusLabelFor(workflow, node.status_id)} />
         <PriorityBadge value={node.priority_id} />
         {node.item_level === "work_item" ? <Button size="sm" variant="outline" onClick={() => onAddSubtask(node)}>Add Subtask</Button> : null}
       </div>
       {node.children.length > 0 ? (
         <div className="mt-2 space-y-2">
-          {node.children.map((child) => <HierarchyNode key={child.id} node={child} depth={depth + 1} onAddSubtask={onAddSubtask} />)}
+          {node.children.map((child) => <HierarchyNode key={child.id} node={child} workflow={workflow} depth={depth + 1} onAddSubtask={onAddSubtask} />)}
         </div>
       ) : null}
     </div>

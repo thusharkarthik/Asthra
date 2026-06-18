@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
-import { isInProgressWorkItem, sortedByUpdatedAt } from "@/components/flow/flow-utils";
+import { isInProgressWorkItem, sortedByUpdatedAt, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -24,6 +24,12 @@ export default function MyWorkPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
   const items = workItemsQuery.data ?? [];
   const dueSoon = items.filter((item) => item.due_date).slice(0, 5);
   const highPriority = items.filter((item) => item.priority_id === 3 || item.priority_id === 4).slice(0, 5);
@@ -36,16 +42,16 @@ export default function MyWorkPage() {
       {!selectedProjectId ? <EmptyState title="Select a project to view your work" /> : workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 lg:grid-cols-4">
           <ModuleDashboardCard title="Assigned Items" value={items.length}>
-            <WorkList items={sortedByUpdatedAt(items).slice(0, 5)} empty={currentUser?.id ? "No assigned items." : "Current user matching is pending."} />
+            <WorkList items={sortedByUpdatedAt(items).slice(0, 5)} workflow={workflowQuery.data} empty={currentUser?.id ? "No assigned items." : "Current user matching is pending."} />
           </ModuleDashboardCard>
           <ModuleDashboardCard title="Due Soon" value={dueSoon.length}>
-            <WorkList items={dueSoon} empty="No due dates are set yet." />
+            <WorkList items={dueSoon} workflow={workflowQuery.data} empty="No due dates are set yet." />
           </ModuleDashboardCard>
           <ModuleDashboardCard title="High Priority" value={highPriority.length}>
-            <WorkList items={highPriority} empty="No high priority items." />
+            <WorkList items={highPriority} workflow={workflowQuery.data} empty="No high priority items." />
           </ModuleDashboardCard>
           <ModuleDashboardCard title="In Progress" value={inProgress.length}>
-            <WorkList items={inProgress} empty="No in-progress items." />
+            <WorkList items={inProgress} workflow={workflowQuery.data} empty="No in-progress items." />
           </ModuleDashboardCard>
         </div>
       )}
@@ -53,14 +59,14 @@ export default function MyWorkPage() {
   );
 }
 
-function WorkList({ items, empty }: { items: Array<{ id: number; title: string; status_id?: number | null; priority_id?: number | null }>; empty: string }) {
+function WorkList({ items, workflow, empty }: { items: Array<{ id: number; title: string; status_id?: number | null; priority_id?: number | null }>; workflow?: Parameters<typeof workflowStatusLabelFor>[0]; empty: string }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
     <div className="space-y-2">
       {items.map((item) => (
         <Link key={item.id} href={`/flow/work-items/${item.id}`} className="block rounded-md border p-3 hover:bg-muted">
           <div className="text-sm font-medium">{item.title}</div>
-          <div className="mt-2 flex gap-2"><StatusBadge value={item.status_id} /><PriorityBadge value={item.priority_id} /></div>
+          <div className="mt-2 flex gap-2"><StatusBadge value={workflowStatusLabelFor(workflow, item.status_id)} /><PriorityBadge value={item.priority_id} /></div>
         </Link>
       ))}
     </div>
