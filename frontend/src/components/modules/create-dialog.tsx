@@ -8,18 +8,22 @@ export function CreateDialog({
   title,
   open,
   onOpenChange,
-  children
+  children,
+  size = "default"
 }: {
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  size?: "default" | "wide";
 }) {
   if (!open) return null;
 
+  const widthClass = size === "wide" ? "max-w-[1000px]" : "max-w-lg";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border bg-card shadow-lg">
+      <div className={`flex max-h-[85vh] w-full ${widthClass} flex-col overflow-hidden rounded-lg border bg-card shadow-lg`}>
         <div className="shrink-0 flex items-center justify-between border-b p-4">
           <h2 className="text-sm font-semibold">{title}</h2>
           <Button aria-label="Close dialog" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>

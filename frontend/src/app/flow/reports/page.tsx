@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, isBlockedWorkItem, isHighRiskWorkItem, isOverdueWorkItem } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -80,7 +81,7 @@ export default function FlowReportsPage() {
 
   return (
     <>
-      <PageHeader title="Flow Reports" description="Lightweight project health indicators for work planning." />
+      <PageHeader title="Flow Reports" description="Lightweight project health indicators for work planning." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Reports" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view Flow reports" /> : workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 md:grid-cols-4">

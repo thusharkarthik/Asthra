@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -77,7 +78,7 @@ export default function FlowReleasesPage() {
 
   return (
     <>
-      <PageHeader title="Releases" description="Plan delivery milestones, assign work, and track progress toward target dates." />
+      <PageHeader title="Releases" description="Plan delivery milestones, assign work, and track progress toward target dates." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Releases" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to manage releases" /> : releasesQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

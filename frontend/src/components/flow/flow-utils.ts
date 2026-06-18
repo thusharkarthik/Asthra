@@ -118,17 +118,7 @@ export function workflowStatusByKey(workflow: Workflow | null | undefined, key?:
 }
 
 export function validWorkflowTargets(workflow: Workflow | null | undefined, currentStatusId?: number | null) {
-  const statuses = workflowStatusOptions(workflow);
-  if (!workflow?.transitions?.length) {
-    return statuses;
-  }
-  const allowedIds = new Set(
-    workflow.transitions
-      .filter((transition) => transition.from_status_id === currentStatusId)
-      .map((transition) => transition.to_status_id)
-  );
-  const allowed = statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
-  return allowed.length ? allowed : statuses;
+  return workflowStatusOptions(workflow);
 }
 
 export function nextWorkflowTargets(workflow: Workflow | null | undefined, currentStatusId?: number | null) {

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, Trash2 } from "lucide-react";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyModuleState, ErrorState, PageLoading } from "@/components/layout/ui-states";
@@ -99,7 +100,7 @@ export default function FlowAutomationPage() {
   if (!selectedProjectId) {
     return (
       <>
-        <PageHeader title="Flow Automation" description="Create simple Flow rules for project work." />
+        <PageHeader title="Flow Automation" description="Create simple Flow rules for project work." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Automation" }]} />} />
         <FlowSubnav />
         <EmptyModuleState title="Select a project" description="Automation rules are scoped to the selected project." />
       </>
@@ -108,7 +109,7 @@ export default function FlowAutomationPage() {
 
   return (
     <>
-      <PageHeader title="Flow Automation" description="Run simple project rules when work items, comments, status, priority, or assignee fields change." />
+      <PageHeader title="Flow Automation" description="Run simple project rules when work items, comments, status, priority, or assignee fields change." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Automation" }]} />} />
       <FlowSubnav />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <DetailPanel title="Automation Rules">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { FLOW_RELATION_TYPE_OPTIONS } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -71,7 +72,7 @@ export default function FlowDependenciesPage() {
 
   return (
     <>
-      <PageHeader title="Dependencies" description="Track blocks, blocked by, related work, and duplicate relationships." />
+      <PageHeader title="Dependencies" description="Track blocks, blocked by, related work, and duplicate relationships." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Dependencies" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view dependencies" /> : workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="space-y-4">
@@ -122,10 +123,10 @@ export default function FlowDependenciesPage() {
 }
 
 function dependencyGroupTitle(type: WorkItemRelationType) {
-  if (type === "blocks") return "This work blocks";
-  if (type === "blocked_by") return "This work is waiting on";
-  if (type === "duplicate_of") return "Duplicates";
-  return "Related work";
+  if (type === "blocks") return "Blocks";
+  if (type === "blocked_by") return "Blocked By";
+  if (type === "duplicate_of") return "Duplicate Of";
+  return "Related";
 }
 
 function dependencySentence(sourceTitle: string, targetTitle: string, relationType: WorkItemRelationType) {

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { PageHeader } from "@/components/layout/page-header";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -92,7 +93,7 @@ export default function FlowCustomFieldsSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Flow Custom Fields" description="Define project-specific fields that appear on work items." />
+      <PageHeader title="Flow Custom Fields" description="Define project-specific fields that appear on work items." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Settings", href: "/flow/settings/workflows" }, { label: "Custom Fields" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? (
         <DetailPanel title="Select a project"><p className="text-sm text-muted-foreground">Choose a project before configuring custom fields.</p></DetailPanel>

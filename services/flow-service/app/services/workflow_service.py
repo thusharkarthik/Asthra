@@ -147,11 +147,9 @@ class WorkflowService:
         if from_status_id == to_status_id:
             return
         workflow = self.get_model(self.ensure_project_workflow(project_id).id)
-        workflow_status_ids = {workflow_status.id for workflow_status in workflow.statuses}
-        if from_status_id not in workflow_status_ids or to_status_id not in workflow_status_ids:
-            return
-        if not self.workflow_repository.transition_exists(workflow.id, from_status_id, to_status_id):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status transition is not allowed by the project workflow.")
+        workflow_status_ids = {workflow_status.id for workflow_status in workflow.statuses if workflow_status.is_active}
+        if to_status_id not in workflow_status_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Target status is not part of the project workflow.")
 
     def get_model(self, workflow_id: int) -> Workflow:
         workflow = self.workflow_repository.get(workflow_id)

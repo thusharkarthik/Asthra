@@ -320,7 +320,7 @@ function mockFlowFetch() {
       return new Response(JSON.stringify({ id: 8, project_id: 3, title: "New item", status_id: 1, priority_id: 2 }), { status: 200 });
     }
     if (url.includes("/work-items")) {
-      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, assignee_id: 1, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, original_estimate_minutes: 240, remaining_estimate_minutes: 120, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2, original_estimate_minutes: 120, remaining_estimate_minutes: 90 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, project_id: 3, title: "Build Flow UI", item_level: "work_item", status_id: 1, priority_id: 2, assignee_id: 1, sprint_id: 30, release_id: 40, effort_size: "M", effort_score: 5, original_estimate_minutes: 240, remaining_estimate_minutes: 120, business_value: "high", risk_level: "high", complexity: "medium" }, { id: 8, project_id: 3, title: "Target item", item_level: "feature", status_id: 1, priority_id: 2, original_estimate_minutes: 120, remaining_estimate_minutes: 90, effort_size: "M", effort_score: 5, business_value: "high", risk_level: "high", complexity: "medium" }]), { status: 200 });
     }
     if (url.includes("/capacity/99") && init?.method === "DELETE") {
       return new Response(null, { status: 204 });
@@ -469,8 +469,13 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Work item title")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show advanced fields" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Basics" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Planning" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ownership" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Advanced" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Custom Fields" })).toBeInTheDocument();
     expect(container.querySelector(".max-h-\\[85vh\\]")).toBeInTheDocument();
+    expect(container.querySelector(".max-w-\\[1000px\\]")).toBeInTheDocument();
     expect(container.querySelector(".overflow-y-auto")).toBeInTheDocument();
   });
 
@@ -479,7 +484,7 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<WorkItemsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+    fireEvent.click(screen.getByRole("button", { name: "Planning" }));
 
     expect(screen.getByLabelText("Effort size")).toBeInTheDocument();
     expect(screen.getByLabelText("Business value")).toBeInTheDocument();
@@ -497,10 +502,11 @@ describe("Flow frontend screens", () => {
     renderWithQuery(<WorkItemsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     fireEvent.change(screen.getByLabelText("Work item template"), { target: { value: "bug" } });
 
+    fireEvent.click(screen.getByRole("button", { name: "Basics" }));
     expect(screen.getByDisplayValue(/Problem Summary:/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByDisplayValue(/Issue is reproduced/)).toBeInTheDocument();
   });
@@ -538,7 +544,7 @@ describe("Flow frontend screens", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
     fireEvent.change(screen.getByLabelText("Work item title"), { target: { value: "Advanced item" } });
-    fireEvent.click(screen.getByRole("button", { name: "Show advanced fields" }));
+    fireEvent.click(screen.getByRole("button", { name: "Planning" }));
     fireEvent.change(screen.getByLabelText("Effort size"), { target: { value: "L" } });
     fireEvent.change(screen.getByLabelText("Effort score"), { target: { value: "8" } });
     fireEvent.change(screen.getByLabelText("Business value"), { target: { value: "high" } });
@@ -576,7 +582,7 @@ describe("Flow frontend screens", () => {
     fireEvent.change(screen.getByLabelText("Assignee filter"), { target: { value: "1" } });
 
     expect(screen.getByLabelText("Status filter")).toHaveValue("1");
-    expect(screen.getByLabelText("Assignee filter")).toHaveValue("1");
+    expect(screen.getByLabelText("Assignee filter")).toHaveValue("Test User · user@example.com · Member");
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
   });
 
@@ -916,7 +922,7 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Flow Notifications" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Status changed")).toBeInTheDocument());
-    expect(screen.getByText("Notifications")).toBeInTheDocument();
+    expect(screen.getAllByText("Notifications").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Unread").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
@@ -1026,13 +1032,13 @@ describe("Flow frontend screens", () => {
     navigationMock.pathname = "/flow/backlog";
     renderWithQuery(<BacklogPage />);
 
-    await waitFor(() => expect(screen.getByLabelText("Move Build Flow UI to sprint")).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Move Build Flow UI to sprint"), { target: { value: "30" } });
+    await waitFor(() => expect(screen.getByLabelText("Move Target item to sprint")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Move Target item to sprint"), { target: { value: "30" } });
 
     await waitFor(() => {
       const assignCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/sprints/30/work-items") && init?.method === "POST");
       expect(assignCall).toBeTruthy();
-      expect(JSON.parse(String(assignCall?.[1]?.body))).toEqual({ work_item_id: 7 });
+      expect(JSON.parse(String(assignCall?.[1]?.body))).toEqual({ work_item_id: 8 });
     });
   });
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AuditEventGroups, groupAuditEventsByDay } from "@/components/flow/audit-event-list";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyModuleState, ErrorState, PageLoading } from "@/components/layout/ui-states";
@@ -52,7 +53,7 @@ export default function FlowActivityPage() {
   if (!selectedProjectId) {
     return (
       <>
-        <PageHeader title="Flow Activity" description="Review project audit history." />
+        <PageHeader title="Flow Activity" description="Review project audit history." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Activity" }]} />} />
         <FlowSubnav />
         <EmptyModuleState title="Select a project" description="Project activity is scoped to the selected project." />
       </>
@@ -61,7 +62,7 @@ export default function FlowActivityPage() {
 
   return (
     <>
-      <PageHeader title="Flow Activity" description="Latest audit events for work items, comments, attachments, relations, and links." />
+      <PageHeader title="Flow Activity" description="Latest audit events for work items, comments, attachments, relations, and links." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Activity" }]} />} />
       <FlowSubnav />
       <DetailPanel title="Filters">
         <div className="grid gap-2 md:grid-cols-[1fr_220px_160px_auto]">
