@@ -48,8 +48,13 @@ Flow now presents a project-scoped work management experience:
 - Work item detail status movement now respects configured workflow transitions.
 - Create Work Item loads status choices from the selected project workflow and falls back to safe defaults only when needed.
 - Create Work Item now uses an 85vh modal with internal scrolling and sticky actions so advanced fields remain usable.
+- Create Work Item now groups inputs into Basics, Planning, Ownership, Advanced, and Custom Fields sections.
 - Flow sub-navigation wraps instead of creating a horizontal scrollbar.
-- Board cards include a direct move action in addition to the status dropdown.
+- Board cards include quick move actions in addition to the status dropdown.
+- Board view now includes assignee, sprint, release, and priority filters plus column counts.
+- Flow demo seed data now creates a realistic workflow, hierarchy, sprint, release, links, comments, attachments metadata, custom fields, saved view, and audit examples.
+- Flow screens now prefer workflow status names instead of raw status IDs where project workflow data is available.
+- Status and priority audit events now store readable old/new values where the backend can resolve metadata.
 - Board view grouped into Todo, In Progress, Review, and Done columns.
 - My Work, Backlog, and Reports pages added as lightweight product surfaces.
 
@@ -61,10 +66,12 @@ Flow now presents a project-scoped work management experience:
 - Dependency UX: Dependency rows now describe direction in plain language, for example “Build Flow UI blocks Target item” and “Build Flow UI is waiting on Target item.”
 - Audit compaction: Work item detail shows the latest five audit events and links to Flow Activity for the full grouped history.
 - Sprint workflow: Sprint detail now separates lifecycle guidance, overview, work items, metrics, edit controls, delete action, and activity placeholders.
+- Demo readiness: `services/flow-service/scripts/seed_flow_defaults.py` provides realistic local data for CRUD testing.
+- Board usability: Board filters cover assignee, sprint, release, and priority; quick move buttons use configured workflow transitions.
 
 ## Remaining Gaps
 
-- Backend status and priority metadata should eventually replace numeric fallback labels.
+- Priority and type metadata should eventually come from backend lookup APIs instead of frontend constants.
 - Organization, workspace, and project creation should be available directly from guided setup actions.
 - Board drag-and-drop is not implemented yet; status dropdown movement is the current MVP interaction.
 - Backlog grooming, due dates, and sprint planning are not implemented yet.
@@ -74,3 +81,4 @@ Flow now presents a project-scoped work management experience:
 - Sprints, dependency graph visualization, custom fields, workflow customization, and AI estimation remain future Flow gaps.
 - File previews, access-controlled downloads, and Media Service-backed storage remain future attachment gaps.
 - Workflow drag-and-drop editing, transition deletion, and richer status governance remain future workflow gaps.
+- Playwright is documented as an E2E foundation, but the frontend package does not install `@playwright/test` yet.

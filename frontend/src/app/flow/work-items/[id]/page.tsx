@@ -21,7 +21,8 @@ import {
   priorityNameFromId,
   reporterLabel,
   validWorkflowTargets,
-  workflowStatusKeyFor
+  workflowStatusKeyFor,
+  workflowStatusLabelFor
 } from "@/components/flow/flow-utils";
 import { FlowMemberDisplay, FlowMemberPicker } from "@/components/flow/member-picker";
 import { CommentComposer } from "@/components/modules/comment-composer";
@@ -506,7 +507,7 @@ export default function WorkItemDetailPage() {
               <div className="space-y-3">
                 <p className="whitespace-pre-wrap text-sm">{item.description || "No description."}</p>
                 <div className="flex flex-wrap gap-2">
-                  <StatusBadge value={item.status_id} />
+                  <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                   <PriorityBadge value={item.priority_id} />
                   <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Assignee: <FlowMemberDisplay userId={item.assignee_id} /></span>
                   <span className="rounded-md bg-muted px-2 py-0.5 text-xs">Reporter: {reporterLabel(item.reporter_id)}</span>

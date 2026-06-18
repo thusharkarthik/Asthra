@@ -6,6 +6,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.work_item import WorkItem
+from app.models.work_item_priority import WorkItemPriority
+from app.models.work_item_status import WorkItemStatus
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.audit_event import AuditEventCreate
 from app.schemas.search import WorkItemSearchParams, WorkItemSearchResponse
@@ -564,9 +566,23 @@ class WorkItemService:
         if "description" in updated_fields and previous_description != updated_work_item.description:
             self._record_work_item_audit(updated_work_item, "work_item.updated", actor_id, previous_description, updated_work_item.description, {"field": "description"})
         if {"status_id", "status_name"} & updated_fields and previous_status_id != updated_work_item.status_id:
-            self._record_work_item_audit(updated_work_item, "status.changed", actor_id, previous_status_id, updated_work_item.status_id, {"field": "status_id"})
+            self._record_work_item_audit(
+                updated_work_item,
+                "status.changed",
+                actor_id,
+                self._status_audit_label(previous_status_id),
+                self._status_audit_label(updated_work_item.status_id),
+                {"field": "status_id", "old_status_id": previous_status_id, "new_status_id": updated_work_item.status_id},
+            )
         if {"priority_id", "priority_name"} & updated_fields and previous_priority_id != updated_work_item.priority_id:
-            self._record_work_item_audit(updated_work_item, "priority.changed", actor_id, previous_priority_id, updated_work_item.priority_id, {"field": "priority_id"})
+            self._record_work_item_audit(
+                updated_work_item,
+                "priority.changed",
+                actor_id,
+                self._priority_audit_label(previous_priority_id),
+                self._priority_audit_label(updated_work_item.priority_id),
+                {"field": "priority_id", "old_priority_id": previous_priority_id, "new_priority_id": updated_work_item.priority_id},
+            )
         if "assignee_id" in updated_fields and previous_assignee_id != updated_work_item.assignee_id:
             self._record_work_item_audit(updated_work_item, "assignee.changed", actor_id, previous_assignee_id, updated_work_item.assignee_id, {"field": "assignee_id"})
         if "due_date" in updated_fields and previous_due_date != updated_work_item.due_date:
@@ -629,6 +645,18 @@ class WorkItemService:
         if value is None:
             return None
         return str(value)
+
+    def _status_audit_label(self, status_id: int | None) -> str | None:
+        if status_id is None:
+            return None
+        workflow_status = self.work_item_repository.db.get(WorkItemStatus, status_id)
+        return workflow_status.name if workflow_status is not None else f"Status #{status_id}"
+
+    def _priority_audit_label(self, priority_id: int | None) -> str | None:
+        if priority_id is None:
+            return None
+        priority = self.work_item_repository.db.get(WorkItemPriority, priority_id)
+        return priority.name.title() if priority is not None else f"Priority #{priority_id}"
 
     def _validate_required_ids(self, project_id: int) -> None:
         if project_id is None:

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
+import { workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -12,6 +13,7 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { Workflow } from "@/types/flow";
 
 export default function FlowRoadmapPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -25,6 +27,12 @@ export default function FlowRoadmapPage() {
   const workItemsQuery = useQuery({
     queryKey: ["flow", "roadmap", "work-items", selectedProjectId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
     enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
@@ -71,7 +79,7 @@ export default function FlowRoadmapPage() {
                         {assigned.slice(0, 4).map((item) => (
                           <Link key={item.id} href={`/flow/work-items/${item.id}`} className="rounded-md border p-2 text-sm hover:bg-muted">
                             <div className="font-medium">{item.title}</div>
-                            <div className="mt-1 flex items-center gap-2"><StatusBadge value={item.status_id} /></div>
+                            <div className="mt-1 flex items-center gap-2"><StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} /></div>
                           </Link>
                         ))}
                         {assigned.length === 0 ? <p className="text-sm text-muted-foreground">No work assigned to this release.</p> : null}
@@ -84,10 +92,10 @@ export default function FlowRoadmapPage() {
           </DetailPanel>
           <div className="grid gap-4 lg:grid-cols-2">
             <DetailPanel title="Initiatives">
-              <RoadmapItemList items={initiatives} empty="Initiatives will appear here when work items are marked as initiative level." />
+              <RoadmapItemList items={initiatives} workflow={workflowQuery.data} empty="Initiatives will appear here when work items are marked as initiative level." />
             </DetailPanel>
             <DetailPanel title="Features">
-              <RoadmapItemList items={features} empty="Features will appear here when work items are marked as feature level." />
+              <RoadmapItemList items={features} workflow={workflowQuery.data} empty="Features will appear here when work items are marked as feature level." />
             </DetailPanel>
           </div>
         </div>
@@ -96,7 +104,7 @@ export default function FlowRoadmapPage() {
   );
 }
 
-function RoadmapItemList({ items, empty }: { items: Array<{ id: number; title: string; status_id?: number | null }>; empty: string }) {
+function RoadmapItemList({ items, workflow, empty }: { items: Array<{ id: number; title: string; status_id?: number | null }>; workflow?: Workflow; empty: string }) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">{empty}</p>;
   }
@@ -105,7 +113,7 @@ function RoadmapItemList({ items, empty }: { items: Array<{ id: number; title: s
       {items.slice(0, 6).map((item) => (
         <Link key={item.id} href={`/flow/work-items/${item.id}`} className="block rounded-md border p-2 text-sm hover:bg-muted">
           <div className="font-medium">{item.title}</div>
-          <div className="mt-1"><StatusBadge value={item.status_id} /></div>
+          <div className="mt-1"><StatusBadge value={workflowStatusLabelFor(workflow, item.status_id)} /></div>
         </Link>
       ))}
     </div>
