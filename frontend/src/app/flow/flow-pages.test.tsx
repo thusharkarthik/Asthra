@@ -12,6 +12,7 @@ import FlowNotificationsPage from "@/app/flow/notifications/page";
 import FlowActivityPage from "@/app/flow/activity/page";
 import FlowAutomationPage from "@/app/flow/automation/page";
 import FlowReportsPage from "@/app/flow/reports/page";
+import FlowSearchPage from "@/app/flow/search/page";
 import FlowReleaseDetailPage from "@/app/flow/releases/[id]/page";
 import FlowReleasesPage from "@/app/flow/releases/page";
 import FlowRoadmapPage from "@/app/flow/roadmap/page";
@@ -27,7 +28,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const navigationMock = (
   globalThis as typeof globalThis & {
-    __asthraNavigationMock: { pathname: string; params: Record<string, string>; push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
+    __asthraNavigationMock: { pathname: string; params: Record<string, string>; searchParams: string; push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
   }
 ).__asthraNavigationMock;
 
@@ -180,6 +181,51 @@ function mockFlowFetch() {
     if (url.includes("/releases")) {
       return new Response(JSON.stringify([releasePayload, plannedReleasePayload]), { status: 200 });
     }
+    const searchPayload = {
+      items: [
+        {
+          id: 7,
+          project_id: 3,
+          title: "Build Flow UI",
+          status_id: 1,
+          priority_id: 2,
+          assignee_id: 1,
+          effort_size: "M",
+          risk_level: "high",
+          sprint_id: 30,
+          release_id: 40,
+          updated_at: "2026-01-02T00:00:00Z"
+        }
+      ],
+      total: 1,
+      page: 1,
+      page_size: 25
+    };
+    if (url.includes("/work-items/search")) {
+      return new Response(JSON.stringify(searchPayload), { status: 200 });
+    }
+    const savedViewsPayload = [
+      {
+        id: 140,
+        workspace_id: 2,
+        project_id: 3,
+        name: "High Risk Items",
+        description: "Risky work",
+        filters: { risk_level: "high" },
+        is_default: false,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z"
+      }
+    ];
+    if (url.includes("/saved-views/140") && init?.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    if (url.includes("/saved-views") && init?.method === "POST") {
+      return new Response(JSON.stringify({ ...savedViewsPayload[0], id: 141, name: "My Active Work" }), { status: 201 });
+    }
+    if (url.includes("/saved-views")) {
+      return new Response(JSON.stringify(savedViewsPayload), { status: 200 });
+    }
     if (url.includes("/work-items/7/comments") && init?.method === "POST") {
       return new Response(JSON.stringify({ id: 2, work_item_id: 7, user_id: 1, content: "New comment" }), { status: 201 });
     }
@@ -310,6 +356,7 @@ describe("Flow frontend screens", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     navigationMock.params = {};
+    navigationMock.searchParams = "";
     navigationMock.pathname = "/flow";
     useAuthStore.setState({
       accessToken: "token",
@@ -359,6 +406,59 @@ describe("Flow frontend screens", () => {
     expect(screen.getByRole("heading", { name: "Work Items" })).toBeInTheDocument();
     expect(screen.getByLabelText("Search work items")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
+  });
+
+  it("renders Flow search filters and executes search", async () => {
+    navigationMock.pathname = "/flow/search";
+    renderWithQuery(<FlowSearchPage />);
+
+    expect(screen.getByRole("heading", { name: "Flow Search" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Search text")).toBeInTheDocument();
+    expect(screen.getByLabelText("Status filter")).toBeInTheDocument();
+    expect(screen.getByLabelText("Priority filter")).toBeInTheDocument();
+    expect(screen.getByText("Saved Views")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const initialSearchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) => {
+        const requestUrl = String(url);
+        return requestUrl.includes("/api/flow/api/v1/work-items/search") && requestUrl.includes("project_id=3");
+      });
+      expect(initialSearchCall).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Search text"), { target: { value: "Flow" } });
+    fireEvent.change(screen.getByLabelText("Risk filter"), { target: { value: "high" } });
+    expect(screen.getByLabelText("Search text")).toHaveValue("Flow");
+    expect(screen.getByLabelText("Risk filter")).toHaveValue("high");
+
+    await waitFor(() => {
+      const searchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url]) => {
+        const requestUrl = String(url);
+        return requestUrl.includes("/api/flow/api/v1/work-items/search") && requestUrl.includes("text=Flow");
+      });
+      expect(searchCall).toBeTruthy();
+    });
+  }, 15000);
+
+  it("saves, loads, and deletes Flow saved views", async () => {
+    navigationMock.pathname = "/flow/search";
+    renderWithQuery(<FlowSearchPage />);
+
+    await waitFor(() => expect(screen.getByText("High Risk Items")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("High Risk Items"));
+    expect(screen.getByLabelText("Risk filter")).toHaveValue("high");
+
+    fireEvent.change(screen.getByLabelText("Saved view name"), { target: { value: "My Active Work" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Current Filter" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete saved view High Risk Items" }));
+
+    await waitFor(() => {
+      const createCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/saved-views") && init?.method === "POST");
+      const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/saved-views/140") && init?.method === "DELETE");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ project_id: 3, name: "My Active Work", filters: { risk_level: "high" } });
+      expect(deleteCall).toBeTruthy();
+    });
   });
 
   it("renders work item create dialog", () => {

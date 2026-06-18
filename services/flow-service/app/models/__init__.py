@@ -6,6 +6,7 @@ from app.models.flow_activity import FlowActivity
 from app.models.flow_notification import FlowNotification
 from app.models.linked_entity import LinkedEntity
 from app.models.release import Release
+from app.models.saved_view import SavedView
 from app.models.sprint import Sprint
 from app.models.team_capacity import TeamCapacity
 from app.models.work_item import WorkItem, work_item_labels
@@ -30,6 +31,7 @@ __all__ = [
     "FlowNotification",
     "LinkedEntity",
     "Release",
+    "SavedView",
     "Sprint",
     "TeamCapacity",
     "WorkItem",

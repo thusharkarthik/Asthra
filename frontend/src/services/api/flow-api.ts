@@ -19,6 +19,9 @@ import type {
   Release,
   ReleaseCreate,
   ReleaseUpdate,
+  SavedView,
+  SavedViewCreate,
+  SavedViewUpdate,
   Sprint,
   SprintCreate,
   SprintUpdate,
@@ -41,6 +44,8 @@ import type {
   WorkItemOperationalUpdate,
   WorkItemRelation,
   WorkItemRelationCreate,
+  WorkItemSearchFilters,
+  WorkItemSearchResponse,
   WorkLog,
   WorkLogCreate
 } from "@/types/flow";
@@ -61,6 +66,9 @@ function toQuery(params: Record<string, string | number | boolean | null | undef
 export const flowApi = {
   listWorkItems(accessToken: string, filters: WorkItemFilters = {}) {
     return apiRequest<WorkItem[]>(`${FLOW_PREFIX}/work-items${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  searchWorkItems(accessToken: string, filters: WorkItemSearchFilters = {}) {
+    return apiRequest<WorkItemSearchResponse>(`${FLOW_PREFIX}/work-items/search${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
   createWorkItem(accessToken: string, payload: WorkItemCreate) {
     return apiRequest<WorkItem>(`${FLOW_PREFIX}/work-items`, { method: "POST", authToken: accessToken, json: payload });
@@ -290,5 +298,17 @@ export const flowApi = {
   },
   testAutomationRule(accessToken: string, ruleId: string | number, workItemId?: number | null) {
     return apiRequest<FlowAutomationRuleTestResult>(`${FLOW_PREFIX}/automation-rules/${ruleId}/test`, { method: "POST", authToken: accessToken, json: workItemId ? { work_item_id: workItemId } : {} });
+  },
+  listSavedViews(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; limit?: number; offset?: number } = {}) {
+    return apiRequest<SavedView[]>(`${FLOW_PREFIX}/saved-views${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createSavedView(accessToken: string, payload: SavedViewCreate) {
+    return apiRequest<SavedView>(`${FLOW_PREFIX}/saved-views`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  updateSavedView(accessToken: string, savedViewId: string | number, payload: SavedViewUpdate) {
+    return apiRequest<SavedView>(`${FLOW_PREFIX}/saved-views/${savedViewId}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteSavedView(accessToken: string, savedViewId: string | number) {
+    return apiRequest<void>(`${FLOW_PREFIX}/saved-views/${savedViewId}`, { method: "DELETE", authToken: accessToken });
   }
 };

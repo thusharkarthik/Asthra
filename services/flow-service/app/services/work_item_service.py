@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.work_item import WorkItem
 from app.repositories.work_item_repository import WorkItemRepository
 from app.schemas.audit_event import AuditEventCreate
+from app.schemas.search import WorkItemSearchParams, WorkItemSearchResponse
 from app.schemas.work_item import (
     LinkedEntityCreate,
     LinkedEntityRead,
@@ -127,6 +128,15 @@ class WorkItemService:
             release_id=release_id,
             limit=limit,
             offset=offset,
+        )
+
+    def search(self, params: WorkItemSearchParams) -> WorkItemSearchResponse:
+        items, total = self.work_item_repository.search(params)
+        return WorkItemSearchResponse(
+            items=items,
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
         )
 
     def get(self, work_item_id: int) -> WorkItem:

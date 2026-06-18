@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.board import Board, BoardColumn
 from app.models.linked_entity import LinkedEntity
 from app.models.work_item import WorkItem
+from app.models.work_item_comment import WorkItemComment
 from app.models.work_item_priority import WorkItemPriority
 from app.models.work_item_relation import WorkItemRelation
 from app.models.work_item_status import WorkItemStatus
 from app.models.work_item_type import WorkItemType
 from app.schemas.work_item import LinkedEntityCreate, WorkItemCreate, WorkItemRelationCreate, WorkItemUpdate
+from app.schemas.search import WorkItemSearchParams
 
 
 class WorkItemRepository:
@@ -51,6 +53,70 @@ class WorkItemRepository:
             statement = statement.where(WorkItem.release_id == release_id)
         statement = statement.order_by(WorkItem.id).offset(offset).limit(limit)
         return list(self.db.scalars(statement).all())
+
+    def search(self, params: WorkItemSearchParams) -> tuple[list[WorkItem], int]:
+        statement = select(WorkItem).where(WorkItem.is_active.is_(True))
+        if params.text:
+            pattern = f"%{params.text}%"
+            comment_ids = select(WorkItemComment.work_item_id).where(
+                WorkItemComment.is_active.is_(True),
+                WorkItemComment.body.ilike(pattern),
+            )
+            statement = statement.where(
+                or_(
+                    WorkItem.title.ilike(pattern),
+                    WorkItem.description.ilike(pattern),
+                    WorkItem.id.in_(comment_ids),
+                )
+            )
+        if params.title:
+            statement = statement.where(WorkItem.title.ilike(f"%{params.title}%"))
+        if params.description:
+            statement = statement.where(WorkItem.description.ilike(f"%{params.description}%"))
+        if params.status:
+            statement = self._filter_status(statement, params.status)
+        if params.priority:
+            statement = self._filter_priority(statement, params.priority)
+        exact_filters = {
+            "assignee_id": params.assignee_id,
+            "reporter_id": params.reporter_id,
+            "effort_size": params.effort_size,
+            "business_value": params.business_value,
+            "risk_level": params.risk_level,
+            "complexity": params.complexity,
+            "sprint_id": params.sprint_id,
+            "release_id": params.release_id,
+            "parent_id": params.parent_id,
+            "item_level": params.item_level,
+            "project_id": params.project_id,
+        }
+        for field, value in exact_filters.items():
+            if value is not None:
+                statement = statement.where(getattr(WorkItem, field) == value)
+        if params.created_after is not None:
+            statement = statement.where(WorkItem.created_at >= params.created_after)
+        if params.created_before is not None:
+            statement = statement.where(WorkItem.created_at <= params.created_before)
+        if params.updated_after is not None:
+            statement = statement.where(WorkItem.updated_at >= params.updated_after)
+        if params.updated_before is not None:
+            statement = statement.where(WorkItem.updated_at <= params.updated_before)
+        if params.due_after is not None:
+            statement = statement.where(WorkItem.due_date >= params.due_after)
+        if params.due_before is not None:
+            statement = statement.where(WorkItem.due_date <= params.due_before)
+
+        total = self.db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        sort_column = {
+            "created_at": WorkItem.created_at,
+            "updated_at": WorkItem.updated_at,
+            "priority": WorkItem.priority_id,
+            "due_date": WorkItem.due_date,
+        }[params.sort_by]
+        if params.sort_direction == "desc":
+            sort_column = sort_column.desc()
+        statement = statement.order_by(sort_column, WorkItem.id).offset((params.page - 1) * params.page_size).limit(params.page_size)
+        return list(self.db.scalars(statement).all()), total
 
     def get_by_id(self, work_item_id: int) -> WorkItem | None:
         return self.db.get(WorkItem, work_item_id)
@@ -205,6 +271,22 @@ class WorkItemRepository:
             self.db.add(priority)
             self.db.flush()
         return priority
+
+    def _filter_status(self, statement, value: str):
+        if value.isdigit():
+            return statement.where(WorkItem.status_id == int(value))
+        status = self.db.scalar(select(WorkItemStatus).where(WorkItemStatus.name == value))
+        if status is None:
+            return statement.where(WorkItem.status_id == -1)
+        return statement.where(WorkItem.status_id == status.id)
+
+    def _filter_priority(self, statement, value: str):
+        if value.isdigit():
+            return statement.where(WorkItem.priority_id == int(value))
+        priority = self.db.scalar(select(WorkItemPriority).where(WorkItemPriority.name == value))
+        if priority is None:
+            return statement.where(WorkItem.priority_id == -1)
+        return statement.where(WorkItem.priority_id == priority.id)
 
     def get_board(self, board_id: int) -> Board | None:
         return self.db.get(Board, board_id)
