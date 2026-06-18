@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBackLink, FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { isBlockedWorkItem, isHighRiskWorkItem, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -69,12 +70,14 @@ export default function FlowReleaseDetailPage() {
       <PageHeader
         title={release.name}
         description={`${release.version} · ${release.description || "Release delivery plan."}`}
+        breadcrumbs={<FlowBreadcrumbs items={[{ label: "Releases", href: "/flow/releases" }, { label: release.version || release.name }]} />}
         actions={<div className="flex gap-2">
           {release.status !== "active" && release.status !== "released" ? <Button variant="outline" onClick={() => activateMutation.mutate()}>Activate Release</Button> : null}
           {release.status === "active" ? <Button variant="outline" onClick={() => releaseMutation.mutate()}>Mark Released</Button> : null}
           <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/releases">Back to Releases</Link>
         </div>}
       />
+      <FlowBackLink href="/flow/releases" label="Back to Releases" />
       <FlowSubnav />
       <div className="grid gap-4 md:grid-cols-4">
         <ModuleDashboardCard title="Progress" value={`${release.completion_percentage}%`} />

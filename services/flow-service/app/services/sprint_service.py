@@ -40,6 +40,9 @@ class SprintService:
         sprint = self.get_model(sprint_id)
         if sprint.status != "active":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active sprints can be completed.")
+        for work_item in self.sprint_repository.list_work_items(sprint.id):
+            if not self.is_completed(work_item):
+                self.work_item_repository.update(work_item, WorkItemUpdate(sprint_id=None))
         return self.to_read(self.sprint_repository.update(sprint, SprintUpdate(status="completed")))
 
     def assign_work_item(self, sprint_id: int, work_item_id: int) -> SprintRead:

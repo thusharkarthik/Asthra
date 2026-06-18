@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBackLink, FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { isBlockedWorkItem, isHighRiskWorkItem, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -15,6 +16,7 @@ import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
@@ -43,6 +45,12 @@ export default function FlowSprintDetailPage() {
     queryKey: ["flow", "sprint-work-items", sprintId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { sprint_id: Number(sprintId), limit: 100 }),
     enabled: Boolean(accessToken && sprintId),
+    retry: 1
+  });
+  const backlogQuery = useQuery({
+    queryKey: ["flow", "sprint-backlog-items", sprint?.project_id],
+    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: sprint?.project_id, limit: 100 }),
+    enabled: Boolean(accessToken && sprint?.project_id),
     retry: 1
   });
   const workflowQuery = useQuery({
@@ -106,6 +114,22 @@ export default function FlowSprintDetailPage() {
     },
     onError: (error) => addToast({ type: "error", title: "Sprint delete failed", message: error instanceof Error ? error.message : "Unable to delete sprint." })
   });
+  const assignMutation = useMutation({
+    mutationFn: (workItemId: number) => flowApi.assignWorkItemToSprint(accessToken ?? "", sprintId, workItemId),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Work item moved into sprint" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint assignment failed", message: error instanceof Error ? error.message : "Unable to move work into sprint." })
+  });
+  const removeFromSprintMutation = useMutation({
+    mutationFn: (workItemId: number) => flowApi.updateWorkItem(accessToken ?? "", workItemId, { sprint_id: null }),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Work item returned to backlog" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint update failed", message: error instanceof Error ? error.message : "Unable to return item to backlog." })
+  });
 
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -126,6 +150,7 @@ export default function FlowSprintDetailPage() {
       <PageHeader
         title={sprint.name}
         description={sprint.goal || "Sprint execution plan."}
+        breadcrumbs={<FlowBreadcrumbs items={[{ label: "Sprints", href: "/flow/sprints" }, { label: sprint.name }]} />}
         actions={<div className="flex gap-2">
           <Button variant="outline" onClick={() => setEditing((value) => !value)}>{isEditing ? "Cancel Edit" : "Edit Sprint"}</Button>
           {sprint.status !== "active" && sprint.status !== "completed" ? <Button variant="outline" onClick={() => startMutation.mutate()}>Start Sprint</Button> : null}
@@ -134,6 +159,7 @@ export default function FlowSprintDetailPage() {
           <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/sprints">Back to Sprints</Link>
         </div>}
       />
+      <FlowBackLink href="/flow/sprints" label="Back to Sprints" />
       <FlowSubnav />
       <DetailPanel title="Sprint Workflow">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -182,15 +208,23 @@ export default function FlowSprintDetailPage() {
         </div>
       </DetailPanel>
       <DetailPanel title="Work Items">
+        <div className="mb-3 grid gap-2 rounded-md border bg-muted/30 p-3 md:grid-cols-[1fr_auto]">
+          <Select aria-label="Move work item into sprint" value="" onChange={(event) => { if (event.target.value) assignMutation.mutate(Number(event.target.value)); }}>
+            <option value="">Move backlog item into sprint</option>
+            {(backlogQuery.data ?? []).filter((candidate) => !candidate.sprint_id).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+          </Select>
+          <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/backlog">Open Backlog</Link>
+        </div>
         {items.length === 0 ? <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No work assigned to this sprint yet.</p> : (
-          <EntityTable columns={["Title", "Status", "Priority", "Effort", "Estimate"]}>
+          <EntityTable columns={["Title", "Status", "Priority", "Effort", "Estimate", "Actions"]}>
             {items.map((item) => (
-              <EntityTableRow key={item.id} columns={5}>
+              <EntityTableRow key={item.id} columns={6}>
                 <Link className="font-medium text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</Link>
                 <StatusBadge value={workflowStatusLabelFor(workflowQuery.data, item.status_id)} />
                 <PriorityBadge value={item.priority_id} />
                 <span>{item.effort_score ?? 0}</span>
                 <span>{formatMinutes(item.original_estimate_minutes ?? 0)}</span>
+                <Button size="sm" variant="outline" disabled={removeFromSprintMutation.isPending} onClick={() => removeFromSprintMutation.mutate(item.id)}>Move to Backlog</Button>
               </EntityTableRow>
             ))}
           </EntityTable>

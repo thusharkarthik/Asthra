@@ -66,7 +66,8 @@ export function EntityCreateDialog({
   onOpenChange,
   onSubmit,
   children,
-  error
+  error,
+  size = "default"
 }: {
   title: string;
   open: boolean;
@@ -74,10 +75,11 @@ export function EntityCreateDialog({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   children: ReactNode;
   error?: string | null;
+  size?: "default" | "wide";
 }) {
   return (
-    <CreateDialog title={title} open={open} onOpenChange={onOpenChange}>
-      <form className="space-y-3" onSubmit={onSubmit}>
+    <CreateDialog title={title} open={open} onOpenChange={onOpenChange} size={size}>
+      <form className="space-y-4" onSubmit={onSubmit}>
         {children}
         {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{error}</p> : null}
       </form>

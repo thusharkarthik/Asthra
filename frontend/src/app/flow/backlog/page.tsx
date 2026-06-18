@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_STATUS_OPTIONS, effortLabel, itemLevelLabel, planningLabel } from "@/components/flow/flow-utils";
@@ -23,7 +24,7 @@ export default function BacklogPage() {
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const workItemsQuery = useQuery({
     queryKey: ["flow", "backlog", selectedProjectId],
-    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, status_id: 1, limit: 100 }),
+    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
@@ -33,7 +34,7 @@ export default function BacklogPage() {
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
-  const items = workItemsQuery.data ?? [];
+  const items = (workItemsQuery.data ?? []).filter((item) => !item.sprint_id);
   const plannedSprints = (sprintsQuery.data ?? []).filter((sprint) => sprint.status !== "completed" && sprint.status !== "cancelled");
   const groomingMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Parameters<typeof flowApi.updateWorkItem>[2] }) => flowApi.updateWorkItem(accessToken ?? "", id, payload),
@@ -54,7 +55,7 @@ export default function BacklogPage() {
 
   return (
     <>
-      <PageHeader title="Backlog" description="Unstarted work ready for grooming and planning." actions={<FlowHeaderActions />} />
+      <PageHeader title="Backlog" description="Unstarted work ready for grooming and planning." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Backlog" }]} />} actions={<FlowHeaderActions />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view the backlog" /> : workItemsQuery.isLoading ? <LoadingState /> : items.length === 0 ? <EmptyState title="No backlog items yet" /> : (
         <EntityTable columns={["Title", "Level", "Priority", "Effort", "Estimate", "Business Value", "Risk", "Parent Work", "Planning"]}>

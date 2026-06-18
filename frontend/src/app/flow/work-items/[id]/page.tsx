@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { AuditEventGroups, groupAuditEventsByDay } from "@/components/flow/audit-event-list";
+import { FlowBackLink, FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import {
   FLOW_BUSINESS_VALUE_OPTIONS,
@@ -117,6 +118,12 @@ export default function WorkItemDetailPage() {
   const releasesQuery = useQuery({
     queryKey: ["flow", "releases", item?.project_id],
     queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: item?.project_id, limit: 100 }),
+    enabled: Boolean(accessToken && item?.project_id),
+    retry: 1
+  });
+  const sprintsQuery = useQuery({
+    queryKey: ["flow", "sprints", item?.project_id],
+    queryFn: () => flowApi.listSprints(accessToken ?? "", { project_id: item?.project_id, limit: 100 }),
     enabled: Boolean(accessToken && item?.project_id),
     retry: 1
   });
@@ -335,6 +342,14 @@ export default function WorkItemDetailPage() {
     },
     onError: (error) => addToast({ type: "error", title: "Release assignment failed", message: error instanceof Error ? error.message : "Unable to update release assignment." })
   });
+  const sprintAssignmentMutation = useMutation({
+    mutationFn: (sprintId: number | null) => flowApi.updateWorkItem(accessToken ?? "", id, { sprint_id: sprintId }),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Sprint assignment updated" });
+      queryClient.invalidateQueries({ queryKey: ["flow"] });
+    },
+    onError: (error) => addToast({ type: "error", title: "Sprint assignment failed", message: error instanceof Error ? error.message : "Unable to update sprint assignment." })
+  });
   const customFieldMutation = useMutation({
     mutationFn: async () => {
       const definitions = customFieldDefinitionsQuery.data ?? [];
@@ -383,7 +398,9 @@ export default function WorkItemDetailPage() {
   const workLogs = workLogsQuery.data ?? [];
   const totalLoggedMinutes = workLogs.reduce((sum, log) => sum + log.time_spent_minutes, 0);
   const auditGroups = groupAuditEventsByDay(auditQuery.data ?? []);
-  const compactAuditGroups = groupAuditEventsByDay((auditQuery.data ?? []).slice(0, 5));
+  const compactAuditGroups = groupAuditEventsByDay((auditQuery.data ?? []).slice(0, 10));
+  const sprints = sprintsQuery.data ?? [];
+  const currentSprint = sprints.find((sprint) => sprint.id === item.sprint_id);
 
   return (
     <div className="space-y-4">
@@ -392,6 +409,7 @@ export default function WorkItemDetailPage() {
         header={<EntityDetailHeader
           title={item.title}
           description={`Work item #${item.id}`}
+          breadcrumbs={<FlowBreadcrumbs items={[{ label: "Work Items", href: "/flow/work-items" }, { label: item.title }]} />}
           actions={<>
             <Button variant="outline" onClick={() => setEditing((value) => !value)}>{isEditing ? "Cancel" : "Edit"}</Button>
             <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/work-items">Back to Work Items</Link>
@@ -483,7 +501,12 @@ export default function WorkItemDetailPage() {
                     </label>
                     <label className="grid gap-1 text-sm">
                       <span className="font-medium">Parent Work</span>
-                      <Input inputMode="numeric" placeholder="Parent work item ID" value={draft.parentId} onChange={(event) => setDraft((value) => ({ ...value, parentId: event.target.value }))} />
+                      <Select value={draft.parentId} onChange={(event) => setDraft((value) => ({ ...value, parentId: event.target.value }))}>
+                        <option value="">No parent work</option>
+                        {(relatedWorkQuery.data ?? [])
+                          .filter((candidate) => candidate.id !== item.id && isValidParentOption(candidate.item_level ?? "work_item", draft.itemLevel))
+                          .map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                      </Select>
                     </label>
                   </div>
                 </div>
@@ -611,7 +634,20 @@ export default function WorkItemDetailPage() {
           </DetailPanel>
           <DetailPanel title="Sprint Membership">
             <div className="space-y-2 text-sm">
-              <div><div className="text-muted-foreground">Current Sprint</div><div className="font-medium">{item.sprint_id ? `Sprint #${item.sprint_id}` : "Backlog / not assigned to sprint"}</div></div>
+              <FlowBackLink href="/flow/work-items" label="Back to Work Items" />
+              <div><div className="text-muted-foreground">Current Sprint</div><div className="font-medium">{currentSprint?.name ?? (item.sprint_id ? `Sprint #${item.sprint_id}` : "Backlog / not assigned to sprint")}</div></div>
+              <label className="grid gap-1">
+                <span className="font-medium">Sprint</span>
+                <Select
+                  aria-label="Assign sprint"
+                  value={item.sprint_id ? String(item.sprint_id) : ""}
+                  disabled={sprintAssignmentMutation.isPending}
+                  onChange={(event) => sprintAssignmentMutation.mutate(event.target.value ? Number(event.target.value) : null)}
+                >
+                  <option value="">Backlog</option>
+                  {sprints.filter((sprint) => sprint.status !== "completed" && sprint.status !== "cancelled").map((sprint) => <option key={sprint.id} value={sprint.id}>{sprint.name}</option>)}
+                </Select>
+              </label>
               <p className="text-xs text-muted-foreground">Flow sprint path: Backlog → assign work item to sprint → start sprint → execute work → complete sprint.</p>
               <Link className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/flow/backlog">Assign from Backlog</Link>
             </div>
@@ -727,22 +763,6 @@ export default function WorkItemDetailPage() {
           <CommentComposer onSubmit={(content) => commentMutation.mutate(content)} isSubmitting={commentMutation.isPending} />
         </div>
       </DetailPanel>
-      <DetailPanel title="Audit Trail">
-        {auditQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading audit trail...</p> : null}
-        {auditQuery.isError ? <p className="text-sm text-destructive">Unable to load audit trail.</p> : null}
-        {!auditQuery.isLoading && !auditQuery.isError && auditGroups.length === 0 ? (
-          <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No audit events yet.</p>
-        ) : (
-          <div className="space-y-3">
-            <AuditEventGroups grouped={compactAuditGroups} />
-            {(auditQuery.data ?? []).length > 5 ? (
-              <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/activity">
-                View Full Activity
-              </Link>
-            ) : null}
-          </div>
-        )}
-      </DetailPanel>
       <DetailPanel title="Attachments">
         <div className="space-y-4">
           <form className="grid gap-2 rounded-md border p-3" onSubmit={(event) => { event.preventDefault(); uploadAttachmentMutation.mutate(); }}>
@@ -768,6 +788,22 @@ export default function WorkItemDetailPage() {
             ))}
           </div>
         </div>
+      </DetailPanel>
+      <DetailPanel title="Audit Trail">
+        {auditQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading audit trail...</p> : null}
+        {auditQuery.isError ? <p className="text-sm text-destructive">Unable to load audit trail.</p> : null}
+        {!auditQuery.isLoading && !auditQuery.isError && auditGroups.length === 0 ? (
+          <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No audit events yet.</p>
+        ) : (
+          <div className="space-y-3">
+            <AuditEventGroups grouped={compactAuditGroups} />
+            {(auditQuery.data ?? []).length > 10 ? (
+              <Link className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted" href="/flow/activity">
+                View Full Activity
+              </Link>
+            ) : null}
+          </div>
+        )}
       </DetailPanel>
     </div>
   );
@@ -810,6 +846,14 @@ function dependencySentence(sourceTitle: string, targetTitle: string, relationTy
   if (relationType === "blocked_by") return `${sourceTitle} is waiting on ${targetTitle}`;
   if (relationType === "duplicate_of") return `${sourceTitle} duplicates ${targetTitle}`;
   return `${sourceTitle} is related to ${targetTitle}`;
+}
+
+function isValidParentOption(parentLevel: string, childLevel: FlowItemLevel) {
+  if (childLevel === "initiative") return false;
+  if (childLevel === "feature") return parentLevel === "initiative";
+  if (childLevel === "work_item") return parentLevel === "initiative" || parentLevel === "feature";
+  if (childLevel === "subtask") return parentLevel === "work_item";
+  return false;
 }
 
 function CustomFieldInput({ definition, value, onChange }: { definition: CustomFieldDefinition; value: string; onChange: (value: string) => void }) {

@@ -45,10 +45,10 @@ Flow now presents a project-scoped work management experience:
 - Flow Workflows settings page now supports configurable workflows, statuses, transitions, templates, and project assignment.
 - Boards now render workflow statuses dynamically instead of hardcoded Todo/In Progress/Review/Done columns.
 - Project workflows now self-heal missing default statuses: Todo, In Progress, Review, and Done.
-- Work item detail status movement now respects configured workflow transitions.
+- Work item detail status movement now loads every project workflow status and allows forward or backward movement until transition restrictions are reintroduced.
 - Create Work Item loads status choices from the selected project workflow and falls back to safe defaults only when needed.
 - Create Work Item now uses an 85vh modal with internal scrolling and sticky actions so advanced fields remain usable.
-- Create Work Item now groups inputs into Basics, Planning, Ownership, Advanced, and Custom Fields sections.
+- Create Work Item now uses a wide tabbed modal with Basics, Planning, Ownership, Advanced, and Custom Fields tabs.
 - Flow sub-navigation wraps instead of creating a horizontal scrollbar.
 - Board cards include quick move actions in addition to the status dropdown.
 - Board view now includes assignee, sprint, release, and priority filters plus column counts.
@@ -60,11 +60,14 @@ Flow now presents a project-scoped work management experience:
 
 ## Flow Usability Improvements
 
-- Status consistency: Create, filters, detail edit, board movement, and workflow-aware views now use the project workflow as the status source of truth.
-- Assignee lookup: Create, edit, and filters now use a member picker that prefers available workspace and organization members while storing user IDs internally.
+- Breadcrumbs and back navigation: Flow pages now show navigable Flow breadcrumbs under the page title, and detail pages expose a direct return path to their parent list.
+- Status consistency: Create, filters, detail edit, board movement, and workflow-aware views now use the project workflow as the status source of truth. All statuses are available for movement, including backward moves.
+- Assignee lookup: Create and edit now use a searchable member picker that prefers available workspace and organization members while storing user IDs internally.
+- Backlog behavior: New work items stay in backlog by default because `sprint_id` is empty. Backlog views now filter on unassigned sprint membership instead of a hardcoded status.
+- Sprint completion behavior: Incomplete work returns to backlog when a sprint is completed.
 - Hierarchy UX: Create Initiative, Create Feature, and Create Work Item actions now preselect the intended hierarchy level and explain parent expectations.
 - Dependency UX: Dependency rows now describe direction in plain language, for example “Build Flow UI blocks Target item” and “Build Flow UI is waiting on Target item.”
-- Audit compaction: Work item detail shows the latest five audit events and links to Flow Activity for the full grouped history.
+- Audit compaction: Work item detail shows the latest ten audit events and links to Flow Activity for the full grouped history.
 - Sprint workflow: Sprint detail now separates lifecycle guidance, overview, work items, metrics, edit controls, delete action, and activity placeholders.
 - Demo readiness: `services/flow-service/scripts/seed_flow_defaults.py` provides realistic local data for CRUD testing.
 - Board usability: Board filters cover assignee, sprint, release, and priority; quick move buttons use configured workflow transitions.
@@ -74,11 +77,11 @@ Flow now presents a project-scoped work management experience:
 - Priority and type metadata should eventually come from backend lookup APIs instead of frontend constants.
 - Organization, workspace, and project creation should be available directly from guided setup actions.
 - Board drag-and-drop is not implemented yet; status dropdown movement is the current MVP interaction.
-- Backlog grooming, due dates, and sprint planning are not implemented yet.
+- Backlog grooming is lightweight; richer ranking, due date planning, and batch assignment controls remain future work.
 - Reports are lightweight and should eventually integrate with Insights.
-- Cross-module links are placeholders until platform references are persisted.
+- Linked resource creation still needs richer cross-service lookup for Docs, Discover, Desk, Pulse, and Dev entities.
 - Assignee selection uses available member lists, but detailed profile lookup is still pending when Core only returns user IDs.
-- Sprints, dependency graph visualization, custom fields, workflow customization, and AI estimation remain future Flow gaps.
+- Dependency graph visualization and AI estimation remain future Flow gaps.
 - File previews, access-controlled downloads, and Media Service-backed storage remain future attachment gaps.
 - Workflow drag-and-drop editing, transition deletion, and richer status governance remain future workflow gaps.
 - Playwright is documented as an E2E foundation, but the frontend package does not install `@playwright/test` yet.

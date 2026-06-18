@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { PageHeader } from "@/components/layout/page-header";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -132,7 +133,7 @@ export default function FlowWorkflowSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Flow Workflows" description="Configure project statuses and allowed transitions." />
+      <PageHeader title="Flow Workflows" description="Configure project statuses and allowed transitions." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Settings" }, { label: "Workflows" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? (
         <DetailPanel title="Select a project"><p className="text-sm text-muted-foreground">Choose a project before configuring Flow workflows.</p></DetailPanel>

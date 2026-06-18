@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -75,7 +76,7 @@ export default function FlowSprintsPage() {
 
   return (
     <>
-      <PageHeader title="Sprints" description="Plan, start, and complete project execution cycles." />
+      <PageHeader title="Sprints" description="Plan, start, and complete project execution cycles." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Sprints" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to manage sprints" /> : sprintsQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

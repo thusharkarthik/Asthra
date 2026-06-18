@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, PlayCircle } from "lucide-react";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import {
@@ -96,6 +97,7 @@ export default function FlowPage() {
       <PageHeader
         title="Flow"
         description={selectedProject ? `Plan, track, and unblock work for ${selectedProject.name}.` : "Plan, track, and unblock work across projects."}
+        breadcrumbs={<FlowBreadcrumbs items={[]} />}
         actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />}
       />
       <FlowSubnav />

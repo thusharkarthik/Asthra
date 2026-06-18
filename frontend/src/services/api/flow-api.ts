@@ -41,6 +41,7 @@ import type {
   WorkItemComment,
   WorkItemCreate,
   WorkItemFilters,
+  WorkItemLabel,
   WorkItemOperationalUpdate,
   WorkItemRelation,
   WorkItemRelationCreate,
@@ -165,6 +166,12 @@ export const flowApi = {
   },
   createAttachment(accessToken: string, workItemId: string | number, payload: WorkItemAttachmentCreate) {
     return apiRequest<WorkItemAttachment>(`${FLOW_PREFIX}/work-items/${workItemId}/attachments`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  listLabels(accessToken: string, filters: { project_id?: number | null } = {}) {
+    return apiRequest<WorkItemLabel[]>(`${FLOW_PREFIX}/labels${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  addLabelToWorkItem(accessToken: string, workItemId: string | number, labelId: string | number) {
+    return apiRequest<WorkItemLabel>(`${FLOW_PREFIX}/work-items/${workItemId}/labels`, { method: "POST", authToken: accessToken, json: { label_id: Number(labelId) } });
   },
   uploadAttachment(accessToken: string, workItemId: string | number, file: File, uploadedById?: number | null) {
     const formData = new FormData();

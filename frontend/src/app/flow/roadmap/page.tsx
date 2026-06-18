@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -49,7 +50,7 @@ export default function FlowRoadmapPage() {
 
   return (
     <>
-      <PageHeader title="Roadmap" description="A lightweight timeline for initiatives, features, and releases." />
+      <PageHeader title="Roadmap" description="A lightweight timeline for initiatives, features, and releases." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Roadmap" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view the roadmap" /> : releasesQuery.isLoading || workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="space-y-4">

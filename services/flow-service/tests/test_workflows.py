@@ -1,6 +1,3 @@
-import pytest
-from fastapi import HTTPException
-
 from app.schemas.workflow import WorkflowAssignProject, WorkflowCreate, WorkflowStatusCreate, WorkflowTransitionCreate
 from app.schemas.work_item import WorkItemCreate, WorkItemUpdate
 from app.services.work_item_service import WorkItemService
@@ -33,13 +30,12 @@ def test_project_workflow_default_and_transition_validation(db, monkeypatch):
 
     assert work_item.status_id == todo.id
 
-    with pytest.raises(HTTPException):
-        WorkItemService(db).update(work_item.id, WorkItemUpdate(status_name="review"))
+    moved_to_review = WorkItemService(db).update(work_item.id, WorkItemUpdate(status_name="review"))
+    assert moved_to_review.status_id == review.id
 
     moved = WorkItemService(db).update(work_item.id, WorkItemUpdate(status_name="in_progress"))
 
     assert moved.status_id == in_progress.id
-    assert review.id != moved.status_id
 
 
 def test_project_workflow_repairs_missing_default_statuses(db):

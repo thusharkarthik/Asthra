@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link2, MessageSquare, Paperclip } from "lucide-react";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { FLOW_PRIORITY_OPTIONS, effortLabel, isHighRiskWorkItem, itemLevelLabel, nextWorkflowTargets, validWorkflowTargets, workflowStatusKeyFor, workflowStatusLabelFor, workflowStatusOptions } from "@/components/flow/flow-utils";
@@ -89,7 +90,7 @@ export default function BoardsPage() {
 
   return (
     <>
-      <PageHeader title="Boards" description="Kanban-style planning for selected project work." actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />} />
+      <PageHeader title="Boards" description="Kanban-style planning for selected project work." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Boards" }]} />} actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />} />
       <FlowSubnav />
       {!hasOrganization || !hasWorkspace || !hasProject ? <FlowSetupState hasOrganization={hasOrganization} hasWorkspace={hasWorkspace} hasProject={hasProject} /> : (
         <div className="space-y-4">

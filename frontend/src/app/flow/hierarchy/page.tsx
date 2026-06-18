@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { itemLevelLabel, workflowStatusLabelFor } from "@/components/flow/flow-utils";
@@ -60,7 +61,7 @@ export default function FlowHierarchyPage() {
 
   return (
     <>
-      <PageHeader title="Hierarchy" description="Plan initiatives, features, work items, and subtasks." actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />} />
+      <PageHeader title="Hierarchy" description="Plan initiatives, features, work items, and subtasks." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Hierarchy" }]} />} actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view hierarchy" /> : hierarchyQuery.isLoading ? <LoadingState /> : (hierarchyQuery.data?.items ?? []).length === 0 ? (
         <EmptyState title="No hierarchy yet. Create an initiative or work item to begin." />
@@ -69,7 +70,8 @@ export default function FlowHierarchyPage() {
           <div className="mb-3 flex flex-wrap gap-2">
             <Button onClick={() => { setCreatePreset({ level: "initiative", label: "Create Initiative: top-level outcome, no parent." }); setCreateOpen(true); }}>Create Initiative</Button>
             <Button variant="outline" onClick={() => { setCreatePreset({ level: "feature", label: "Create Feature: select an initiative parent in Relationships." }); setCreateOpen(true); }}>Create Feature</Button>
-            <Button variant="outline" onClick={() => { setCreatePreset({ level: "work_item", label: "Create Work Item: execution work under a feature or initiative." }); setCreateOpen(true); }}>Create Work Item</Button>
+            <Button variant="outline" onClick={() => { setCreatePreset({ level: "work_item", label: "Create Story: execution work under a feature or initiative." }); setCreateOpen(true); }}>Create Story</Button>
+            <Button variant="outline" onClick={() => { setCreatePreset({ level: "work_item", label: "Create Task: execution task under a feature or initiative." }); setCreateOpen(true); }}>Create Task</Button>
           </div>
           <div className="space-y-2">
             {(hierarchyQuery.data?.items ?? []).map((node) => (

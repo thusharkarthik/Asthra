@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -85,16 +85,60 @@ export function FlowMemberPicker({
   includeUnassigned?: boolean;
 }) {
   const members = useFlowMemberOptions();
+  const listId = useId();
+  const selectedMember = members.find((member) => String(member.id) === value);
+  const [displayValue, setDisplayValue] = useState("");
+
+  useEffect(() => {
+    setDisplayValue(selectedMember ? memberDisplayText(selectedMember) : "");
+  }, [selectedMember]);
+
   return (
-    <Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-      {includeUnassigned ? <option value="">Unassigned</option> : null}
-      {members.map((member) => (
-        <option key={member.id} value={member.id}>
-          {member.name}{member.email ? ` · ${member.email}` : ""}{member.role ? ` · ${member.role}` : ""}
-        </option>
-      ))}
-    </Select>
+    <div className="space-y-1">
+      <Input
+        aria-label={label}
+        list={listId}
+        placeholder={includeUnassigned ? "Unassigned" : "Search members"}
+        value={displayValue}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setDisplayValue(nextValue);
+          if (!nextValue.trim() && includeUnassigned) {
+            onChange("");
+            return;
+          }
+          const matched = members.find((member) => memberDisplayText(member) === nextValue || String(member.id) === nextValue);
+          if (matched) onChange(String(matched.id));
+        }}
+        onBlur={() => {
+          if (!displayValue.trim() && includeUnassigned) {
+            onChange("");
+            return;
+          }
+          if (selectedMember) setDisplayValue(memberDisplayText(selectedMember));
+        }}
+      />
+      <datalist id={listId}>
+        {members.map((member) => (
+          <option key={member.id} value={memberDisplayText(member)} />
+        ))}
+      </datalist>
+      {selectedMember ? (
+        <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-background font-semibold text-foreground">{selectedMember.name.slice(0, 1).toUpperCase()}</span>
+          <span className="min-w-0">
+            <span className="font-medium text-foreground">{selectedMember.name}</span>
+            {selectedMember.email ? <span> · {selectedMember.email}</span> : null}
+            {selectedMember.role ? <span> · {selectedMember.role}</span> : null}
+          </span>
+        </div>
+      ) : null}
+    </div>
   );
+}
+
+function memberDisplayText(member: FlowMemberOption) {
+  return `${member.name}${member.email ? ` · ${member.email}` : ""}${member.role ? ` · ${member.role}` : ""}`;
 }
 
 export function FlowMemberDisplay({ userId }: { userId?: number | null }) {

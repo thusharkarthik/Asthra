@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { PageHeader } from "@/components/layout/page-header";
@@ -109,7 +110,7 @@ export default function FlowSearchPage() {
   if (!selectedProjectId) {
     return (
       <>
-        <PageHeader title="Flow Search" description="Find and reuse project work item views." />
+        <PageHeader title="Flow Search" description="Find and reuse project work item views." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Search" }]} />} />
         <FlowSubnav />
         <EmptyModuleState title="Select a project" description="Advanced search is scoped to the selected project." />
       </>
@@ -120,7 +121,7 @@ export default function FlowSearchPage() {
 
   return (
     <>
-      <PageHeader title="Flow Search" description="Search work items by text, status, owner, planning fields, dates, sprint, and release." />
+      <PageHeader title="Flow Search" description="Search work items by text, status, owner, planning fields, dates, sprint, and release." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Search" }]} />} />
       <FlowSubnav />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">

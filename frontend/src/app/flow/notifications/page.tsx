@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Trash2 } from "lucide-react";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { PageHeader } from "@/components/layout/page-header";
 import { DetailPanel } from "@/components/modules/detail-panel";
@@ -57,7 +58,7 @@ export default function FlowNotificationsPage() {
   if (!selectedProjectId) {
     return (
       <>
-        <PageHeader title="Flow Notifications" description="Track work item updates that need attention." />
+        <PageHeader title="Flow Notifications" description="Track work item updates that need attention." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Notifications" }]} />} />
         <FlowSubnav />
         <EmptyModuleState title="Select a project" description="Flow notifications are scoped to the selected project." />
       </>
@@ -69,6 +70,7 @@ export default function FlowNotificationsPage() {
       <PageHeader
         title="Flow Notifications"
         description="Assignment, comment, status, priority, and due date updates for Flow work."
+        breadcrumbs={<FlowBreadcrumbs items={[{ label: "Notifications" }]} />}
         actions={<Button variant="outline" disabled={unreadCount === 0 || markAllReadMutation.isPending} onClick={() => markAllReadMutation.mutate()}><CheckCheck className="mr-2 h-4 w-4" />Mark all read</Button>}
       />
       <FlowSubnav />

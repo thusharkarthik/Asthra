@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -89,7 +90,7 @@ export default function FlowCapacityPage() {
 
   return (
     <>
-      <PageHeader title="Capacity" description="Compare project capacity against planned and remaining work." />
+      <PageHeader title="Capacity" description="Compare project capacity against planned and remaining work." breadcrumbs={<FlowBreadcrumbs items={[{ label: "Capacity" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to plan capacity" /> : capacityQuery.isLoading || workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="space-y-4">

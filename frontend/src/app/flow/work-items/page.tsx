@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlowHeaderActions } from "@/components/flow/flow-header-actions";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSetupState } from "@/components/flow/flow-setup-state";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { FLOW_BUSINESS_VALUE_OPTIONS, FLOW_EFFORT_SIZE_OPTIONS, FLOW_PRIORITY_OPTIONS, FLOW_RISK_OPTIONS, effortLabel, planningLabel, workflowStatusKeyFor, workflowStatusLabelFor, workflowStatusOptions } from "@/components/flow/flow-utils";
@@ -89,6 +90,7 @@ export default function WorkItemsPage() {
       <PageHeader
         title="Work Items"
         description="Search, filter, and create project work items."
+        breadcrumbs={<FlowBreadcrumbs items={[{ label: "Work Items" }]} />}
         actions={<FlowHeaderActions onCreate={() => setCreateOpen(true)} />}
       />
       <FlowSubnav />

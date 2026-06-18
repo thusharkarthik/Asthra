@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { FlowBreadcrumbs } from "@/components/flow/flow-breadcrumbs";
 import { FlowSubnav } from "@/components/flow/flow-subnav";
 import { isInProgressWorkItem, sortedByUpdatedAt, workflowStatusLabelFor } from "@/components/flow/flow-utils";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -37,7 +38,7 @@ export default function MyWorkPage() {
 
   return (
     <>
-      <PageHeader title="My Work" description="Items assigned to you, upcoming work, and recently updated tasks." />
+      <PageHeader title="My Work" description="Items assigned to you, upcoming work, and recently updated tasks." breadcrumbs={<FlowBreadcrumbs items={[{ label: "My Work" }]} />} />
       <FlowSubnav />
       {!selectedProjectId ? <EmptyState title="Select a project to view your work" /> : workItemsQuery.isLoading ? <LoadingState /> : (
         <div className="grid gap-4 lg:grid-cols-4">
