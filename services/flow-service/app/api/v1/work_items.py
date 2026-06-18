@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.work_item import WorkItem
+from app.schemas.search import WorkItemSearchParams, WorkItemSearchResponse
 from app.schemas.work_item import (
     LinkedEntityCreate,
     LinkedEntityRead,
@@ -58,6 +59,69 @@ def list_work_items(
         release_id=release_id,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/search", response_model=WorkItemSearchResponse)
+def search_work_items(
+    text: str | None = None,
+    title: str | None = None,
+    description: str | None = None,
+    status: str | None = None,
+    priority: str | None = None,
+    assignee_id: int | None = None,
+    reporter_id: int | None = None,
+    effort_size: str | None = None,
+    business_value: str | None = None,
+    risk_level: str | None = None,
+    complexity: str | None = None,
+    sprint_id: int | None = None,
+    release_id: int | None = None,
+    parent_id: int | None = None,
+    item_level: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    updated_after: str | None = None,
+    updated_before: str | None = None,
+    due_before: str | None = None,
+    due_after: str | None = None,
+    project_id: int | None = None,
+    sort_by: str = "updated_at",
+    sort_direction: str = "desc",
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> WorkItemSearchResponse:
+    return WorkItemService(db).search(
+        WorkItemSearchParams(
+            text=text,
+            title=title,
+            description=description,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
+            reporter_id=reporter_id,
+            effort_size=effort_size,
+            business_value=business_value,
+            risk_level=risk_level,
+            complexity=complexity,
+            sprint_id=sprint_id,
+            release_id=release_id,
+            parent_id=parent_id,
+            item_level=item_level,
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before,
+            due_before=due_before,
+            due_after=due_after,
+            project_id=project_id,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 

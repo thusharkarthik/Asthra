@@ -117,6 +117,14 @@ export default function FlowPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
+            <ModuleDashboardCard title="Quick Search">
+              <div className="grid gap-2 text-sm">
+                <Link className="rounded-md border px-3 py-2 hover:bg-muted" href="/flow/search?view=my-active">My Active Work</Link>
+                <Link className="rounded-md border px-3 py-2 hover:bg-muted" href="/flow/search?view=high-priority">High Priority</Link>
+                <Link className="rounded-md border px-3 py-2 hover:bg-muted" href="/flow/search?view=overdue">Overdue</Link>
+                <Link className="rounded-md border px-3 py-2 hover:bg-muted" href="/flow/search?view=current-sprint">Current Sprint</Link>
+              </div>
+            </ModuleDashboardCard>
             <ModuleDashboardCard title="Planned Effort" value={formatMinutes(plannedMinutes)}>
               <p className="text-sm text-muted-foreground">Original estimates across project work.</p>
             </ModuleDashboardCard>

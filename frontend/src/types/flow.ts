@@ -251,6 +251,65 @@ export type WorkItemFilters = {
   offset?: number;
 };
 
+export type WorkItemSearchFilters = {
+  project_id?: number | null;
+  text?: string | null;
+  title?: string | null;
+  description?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  assignee_id?: number | null;
+  reporter_id?: number | null;
+  effort_size?: string | null;
+  business_value?: string | null;
+  risk_level?: string | null;
+  complexity?: string | null;
+  sprint_id?: number | null;
+  release_id?: number | null;
+  parent_id?: number | null;
+  item_level?: FlowItemLevel | null;
+  created_after?: string | null;
+  created_before?: string | null;
+  updated_after?: string | null;
+  updated_before?: string | null;
+  due_before?: string | null;
+  due_after?: string | null;
+  sort_by?: "created_at" | "updated_at" | "priority" | "due_date";
+  sort_direction?: "asc" | "desc";
+  page?: number;
+  page_size?: number;
+};
+
+export type WorkItemSearchResponse = {
+  items: WorkItem[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type SavedView = {
+  id: number;
+  workspace_id?: number | null;
+  project_id: number;
+  name: string;
+  description?: string | null;
+  filters: WorkItemSearchFilters;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SavedViewCreate = {
+  workspace_id?: number | null;
+  project_id: number;
+  name: string;
+  description?: string | null;
+  filters: WorkItemSearchFilters;
+  is_default?: boolean;
+};
+
+export type SavedViewUpdate = Partial<SavedViewCreate>;
+
 export type SprintStatus = "planned" | "active" | "completed" | "cancelled";
 
 export type Sprint = {
