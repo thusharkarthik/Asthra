@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/stores/notification-store";
 
-export function NotificationCenter({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NotificationCenter({ open, onClose, placement = "top" }: { open: boolean; onClose: () => void; placement?: "top" | "bottom" }) {
   const notifications = useNotificationStore((state) => state.notifications);
   const markRead = useNotificationStore((state) => state.markRead);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
@@ -13,7 +14,11 @@ export function NotificationCenter({ open, onClose }: { open: boolean; onClose: 
   if (!open) return null;
 
   return (
-    <div className="absolute right-0 top-11 z-40 w-80 rounded-md border bg-card p-3 shadow-lg" role="dialog" aria-label="Notification center">
+    <div
+      className={cn("absolute right-0 z-40 w-80 rounded-md border bg-card p-3 shadow-lg", placement === "bottom" ? "bottom-11" : "top-11")}
+      role="dialog"
+      aria-label="Notification center"
+    >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold"><Bell className="h-4 w-4" />Notifications</div>
         <Button size="icon" variant="ghost" aria-label="Close notifications" onClick={onClose}><X className="h-4 w-4" /></Button>

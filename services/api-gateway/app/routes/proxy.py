@@ -6,7 +6,7 @@ from app.services.registry import build_service_registry
 router = APIRouter(tags=["proxy"])
 
 
-PROXY_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+PROXY_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 
 
 def _make_proxy_endpoint(base_url: str):

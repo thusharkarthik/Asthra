@@ -3,6 +3,7 @@ import {
   Bot,
   Briefcase,
   Cable,
+  ClipboardCheck,
   Database,
   FileText,
   Gauge,
@@ -28,6 +29,7 @@ export const navSections: NavSection[] = [
       { label: "Search", action: "search", icon: Search },
       { label: "Assistant", action: "assistant", icon: Sparkles },
       { label: "Favorites", href: "/favorites", icon: Star },
+      { label: "CRUD Checklist", href: "/platform/crud-checklist", icon: ClipboardCheck },
       { label: "Platform Health", href: "/platform/health", icon: ShieldCheck }
     ]
   },

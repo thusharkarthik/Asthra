@@ -1,12 +1,61 @@
-import React from "react";
+import React, { type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPage from "@/app/settings/page";
+import AccountSettingsPage from "@/app/settings/account/page";
+import ApiKeysSettingsPage from "@/app/settings/api-keys/page";
+import AdministrationSettingsPage from "@/app/settings/administration/page";
+import OrganizationsSettingsPage from "@/app/settings/organizations/page";
+import PermissionsSettingsPage from "@/app/settings/permissions/page";
 import PreferencesSettingsPage from "@/app/settings/preferences/page";
-import ProfileSettingsPage from "@/app/settings/profile/page";
+import RolesSettingsPage from "@/app/settings/roles/page";
+import TeamsSettingsPage from "@/app/settings/teams/page";
 import WorkspaceSettingsPage from "@/app/settings/workspace/page";
+import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, TeamDetailView, WorkspaceDetailView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+vi.mock("@/services/api/settings-api", () => ({
+  settingsApi: {
+    listOrganizations: vi.fn(async () => [{ id: 1, name: "Asthra", description: "Platform org", is_active: true }]),
+    listWorkspaces: vi.fn(async () => [{ id: 2, organization_id: 1, name: "Platform", description: "Default workspace", is_active: true }]),
+    listProjects: vi.fn(async () => [
+      { id: 3, workspace_id: 2, name: "Frontend", status: "active", owner_id: 1, is_active: true },
+      { id: 7, workspace_id: 2, name: "Unowned Project", status: "active", owner_id: null, is_active: true }
+    ]),
+    listApiKeys: vi.fn(async () => []),
+    listRoles: vi.fn(async () => [{ id: 4, name: "Admin", scope: "organization", organization_id: 1, is_active: true }]),
+    listPermissions: vi.fn(async () => [{ id: 5, code: "workspace.manage", name: "Manage workspace", is_active: true }]),
+    listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
+    listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
+    listInvitations: vi.fn(async () => [{ id: 12, email: "invite@example.com", organization_id: 1, workspace_id: 2, status: "pending", invited_by_id: 1, expires_at: "2026-01-08T00:00:00Z" }]),
+    listTeams: vi.fn(async () => [{ id: 6, workspace_id: 2, name: "Engineering", description: "Build team", created_by_id: 1, is_active: true }]),
+    getTeam: vi.fn(async () => ({ id: 6, workspace_id: 2, name: "Engineering", description: "Build team", created_by_id: 1, is_active: true })),
+    listTeamMembers: vi.fn(async () => [{ id: 13, team_id: 6, user_id: 1, role_id: 4, member_role: "lead" }]),
+    getUser: vi.fn(async () => ({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true })),
+    listUserRoles: vi.fn(async () => [{ id: 14, user_id: 1, role_id: 4 }]),
+    listRolePermissions: vi.fn(async () => [{ id: 15, role_id: 4, permission_id: 5 }]),
+    createOrganization: vi.fn(),
+    createWorkspace: vi.fn(),
+    createProject: vi.fn(),
+    createInvitation: vi.fn(),
+    createTeam: vi.fn(),
+    deleteTeam: vi.fn(),
+    createRole: vi.fn(),
+    deleteRole: vi.fn(),
+    createPermission: vi.fn(),
+    deletePermission: vi.fn(),
+    assignUserRole: vi.fn(),
+    addTeamMember: vi.fn(),
+    updateProject: vi.fn()
+  }
+}));
+
+function renderWithQuery(children: ReactNode) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
+}
 
 describe("Settings frontend screens", () => {
   beforeEach(() => {
@@ -19,34 +68,132 @@ describe("Settings frontend screens", () => {
     useWorkspaceStore.setState({
       organizations: [{ id: 1, name: "Asthra" }],
       workspaces: [{ id: 2, organization_id: 1, name: "Platform" }],
-      projects: [{ id: 3, workspace_id: 2, name: "Frontend" }],
+      projects: [
+        { id: 3, workspace_id: 2, name: "Frontend" },
+        { id: 7, workspace_id: 2, name: "Unowned Project", owner_id: null }
+      ],
       selectedOrganizationId: 1,
       selectedWorkspaceId: 2,
       selectedProjectId: 3
     });
   });
 
-  it("renders settings page", () => {
-    render(<SettingsPage />);
+  it("renders operational settings page", async () => {
+    renderWithQuery(<SettingsPage />);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Platform preferences and account context for the Asthra shell.")).toBeInTheDocument();
+    expect(await screen.findByText("Operational setup flow")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toBeInTheDocument();
+    expect(screen.getByText("Back to Home")).toBeInTheDocument();
+    expect(screen.getByText("Administration hierarchy")).toBeInTheDocument();
+    expect(screen.getByText("Owners must come from workspace members.")).toBeInTheDocument();
   });
 
-  it("renders profile settings", () => {
-    render(<ProfileSettingsPage />);
-    expect(screen.getByRole("heading", { name: "Profile Settings" })).toBeInTheDocument();
+  it("renders account settings", () => {
+    renderWithQuery(<AccountSettingsPage />);
+    expect(screen.getByRole("heading", { name: "Account" })).toBeInTheDocument();
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
   });
 
-  it("renders workspace settings", () => {
-    render(<WorkspaceSettingsPage />);
-    expect(screen.getByRole("heading", { name: "Workspace Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Platform")).toBeInTheDocument();
+  it("renders workspace context settings", async () => {
+    renderWithQuery(<WorkspaceSettingsPage />);
+    expect(screen.getByRole("heading", { name: "Workspace Context" })).toBeInTheDocument();
+    expect(await screen.findByText("Platform")).toBeInTheDocument();
   });
 
-  it("renders preferences settings", () => {
-    render(<PreferencesSettingsPage />);
+  it("renders organizations settings", async () => {
+    renderWithQuery(<OrganizationsSettingsPage />);
+    expect(screen.getByRole("heading", { name: "Organizations" })).toBeInTheDocument();
+    expect(await screen.findByText("Asthra")).toBeInTheDocument();
+  });
+
+  it("renders API key settings", async () => {
+    renderWithQuery(<ApiKeysSettingsPage />);
+    expect(screen.getByRole("heading", { name: "API Keys" })).toBeInTheDocument();
+    expect(await screen.findByText("No API keys yet")).toBeInTheDocument();
+  });
+
+  it("renders preferences placeholder", () => {
+    renderWithQuery(<PreferencesSettingsPage />);
     expect(screen.getByRole("heading", { name: "Preferences" })).toBeInTheDocument();
-    expect(screen.getByText("Notification channel preferences are placeholders until backend preference storage is added.")).toBeInTheDocument();
+    expect(screen.getByText("Theme, notification, shell, and workspace preference controls.")).toBeInTheDocument();
+  });
+
+  it("renders administration dashboard", async () => {
+    renderWithQuery(<AdministrationSettingsPage />);
+    expect(screen.getByRole("heading", { name: "Administration" })).toBeInTheDocument();
+    expect((await screen.findAllByText("Organizations")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Back to Settings")).toBeInTheDocument();
+  });
+
+  it("renders organization tabs", async () => {
+    renderWithQuery(<OrganizationDetailView organizationId={1} />);
+    expect(await screen.findByText("Organization")).toBeInTheDocument();
+    expect(screen.getAllByText("Platform org").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Members")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Permissions").length).toBeGreaterThan(0);
+    expect(screen.getByText("Back to Organizations")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Organizations.*Asthra/);
+  });
+
+  it("renders workspace tabs", async () => {
+    renderWithQuery(<WorkspaceDetailView workspaceId={2} />);
+    expect(await screen.findByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Organization: Asthra")).toBeInTheDocument();
+    expect((await screen.findAllByText("Teams")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Projects").length).toBeGreaterThan(0);
+    expect(screen.getByText("Back to Workspaces")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Workspaces.*Platform/);
+  });
+
+  it("renders members without raw-only columns", async () => {
+    renderWithQuery(<MembersView workspaceId={2} />);
+    expect(await screen.findByText("Test User")).toBeInTheDocument();
+    expect(screen.getByText("Change Role")).toBeInTheDocument();
+    expect(screen.getAllByText("Workspace").length).toBeGreaterThan(0);
+    expect(screen.getByText("Organization: Asthra")).toBeInTheDocument();
+    expect(screen.getByText("Back to Workspace")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Workspaces.*Platform.*Members/);
+  });
+
+  it("renders organization member context", async () => {
+    renderWithQuery(<MembersView organizationId={1} />);
+    expect(await screen.findByText("Test User")).toBeInTheDocument();
+    expect(screen.getByText("Organization")).toBeInTheDocument();
+    expect(screen.getByText("Back to Organization")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Organizations.*Asthra.*Members/);
+  });
+
+  it("renders member detail", async () => {
+    renderWithQuery(<MemberDetailView userId={1} />);
+    expect(await screen.findByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Activity Placeholder")).toBeInTheDocument();
+  });
+
+  it("renders teams and team detail", async () => {
+    renderWithQuery(<TeamsSettingsPage />);
+    expect(await screen.findByText("Engineering")).toBeInTheDocument();
+    renderWithQuery(<TeamDetailView teamId={6} />);
+    expect(await screen.findByText("Assign Member")).toBeInTheDocument();
+  });
+
+  it("renders project ownership", async () => {
+    renderWithQuery(<ProjectDetailView projectId={3} />);
+    expect(await screen.findByText("Owner Email")).toBeInTheDocument();
+    expect(screen.getByText("Change Owner")).toBeInTheDocument();
+  });
+
+  it("renders project ownership help when no owner is assigned", async () => {
+    renderWithQuery(<ProjectDetailView projectId={7} />);
+    expect(await screen.findByText("No owner assigned yet.")).toBeInTheDocument();
+    expect(screen.getAllByText("Owners should be selected from workspace members.").length).toBeGreaterThan(0);
+    expect(screen.getByText("Back to Projects")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Projects.*Unowned Project/);
+  });
+
+  it("renders roles and permissions", async () => {
+    renderWithQuery(<RolesSettingsPage />);
+    expect(await screen.findByText("Admin")).toBeInTheDocument();
+    renderWithQuery(<PermissionsSettingsPage />);
+    expect(await screen.findByText("Permission matrix")).toBeInTheDocument();
   });
 });

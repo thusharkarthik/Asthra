@@ -14,7 +14,11 @@ class CommentRepository:
         return self.db.get(WorkItem, work_item_id)
 
     def create(self, work_item_id: int, comment_create: WorkItemCommentCreate) -> WorkItemComment:
-        comment = WorkItemComment(work_item_id=work_item_id, **comment_create.model_dump())
+        comment = WorkItemComment(
+            work_item_id=work_item_id,
+            author_user_id=comment_create.author_user_id if comment_create.author_user_id is not None else 0,
+            body=comment_create.body or "",
+        )
         self.db.add(comment)
         self.db.commit()
         self.db.refresh(comment)
@@ -30,3 +34,18 @@ class CommentRepository:
             .order_by(WorkItemComment.id)
         )
         return list(self.db.scalars(statement).all())
+
+    def get_by_id(self, comment_id: int) -> WorkItemComment | None:
+        return self.db.get(WorkItemComment, comment_id)
+
+    def update(self, comment: WorkItemComment, body: str) -> WorkItemComment:
+        comment.body = body
+        self.db.add(comment)
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def delete(self, comment: WorkItemComment) -> None:
+        comment.is_active = False
+        self.db.add(comment)
+        self.db.commit()

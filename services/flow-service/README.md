@@ -38,17 +38,25 @@ curl http://localhost:8000/ready
 
 API routes are mounted under `/api/v1`.
 
-Seed default Flow lookup data after the database tables exist:
+Seed demo-ready Flow data after the database tables exist:
 
 ```bash
-python scripts/seed_flow_defaults.py
+python3 scripts/seed_flow_defaults.py
 ```
 
-The seed script is idempotent and creates or updates:
+The seed script is idempotent and creates or updates a realistic local Flow project. By default it targets workspace `2` and project `3`; override those IDs when testing another project:
 
-- types: `task`, `bug`, `story`, `epic`
-- statuses: `todo`, `in_progress`, `review`, `done`
-- priorities: `low`, `medium`, `high`, `critical`
+```bash
+FLOW_DEMO_WORKSPACE_ID=2 FLOW_DEMO_PROJECT_ID=3 python3 scripts/seed_flow_defaults.py
+```
+
+It seeds:
+
+- workflow: `Flow Demo Workflow` with Todo, In Progress, Review, and Done.
+- metadata: types, priorities, labels, custom fields.
+- hierarchy: initiative, feature, work items, and subtask.
+- execution data: comments, dependencies, sprint, release, capacity, saved view.
+- traceability data: attachment metadata, linked resources, and audit examples.
 
 ## Docker
 
@@ -75,6 +83,7 @@ ENVIRONMENT=development
 API_V1_PREFIX=/api/v1
 ASTHRA_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 DATABASE_URL=sqlite:///./asthra_flow.db
+FLOW_ATTACHMENT_STORAGE_DIR=./data/flow_attachments
 ```
 
 ## Current Structure
@@ -122,16 +131,17 @@ Request:
   "project_id": 1,
   "title": "Design task model",
   "description": "Draft the first task model for Flow",
-  "type_id": 1,
-  "status_id": 1,
-  "priority_id": 1,
-  "assignee_id": 2,
-  "reporter_id": 1,
-  "due_date": null
+  "effort_size": "M",
+  "effort_score": 5,
+  "business_value": "high",
+  "risk_level": "medium",
+  "complexity": "medium",
+  "acceptance_criteria": "The model supports basic execution tracking.",
+  "definition_of_done": "Tests pass and docs are updated."
 }
 ```
 
-`project_id`, `title`, `type_id`, `status_id`, and `reporter_id` are required. `type_id`, `status_id`, and `priority_id` are validated against Flow lookup tables.
+Only `project_id` and `title` are required. If `type_id`, `status_id`, or `priority_id` are omitted, Flow creates or reuses the MVP defaults `task`, `todo`, and `medium`. If `reporter_id` is omitted, Flow uses a temporary MVP reporter fallback until Core auth context is wired into this service.
 
 ### List Work Items
 
@@ -147,6 +157,206 @@ Optional query parameters:
 - `priority_id`
 - `limit`
 - `offset`
+
+### Update Work Item
+
+```http
+PATCH /api/v1/work-items/{work_item_id}
+```
+
+The update endpoint accepts lookup IDs or stable lookup names for operational UI flows:
+
+```json
+{
+  "title": "Updated title",
+  "description": "Updated description",
+  "status_name": "in_progress",
+  "priority_name": "high",
+  "assignee_id": null,
+  "due_date": null
+}
+```
+
+Supported status names include `todo`, `in_progress`, `review`, and `done`. Supported priority names include `low`, `medium`, `high`, and `critical`.
+
+Advanced work item fields:
+
+- `effort_score`: positive integer
+- `effort_size`: `XS`, `S`, `M`, `L`, `XL`
+- `original_estimate_minutes`: optional integer estimate
+- `remaining_estimate_minutes`: optional integer estimate
+- `business_value`: `low`, `medium`, `high`, `critical`
+- `risk_level`: `low`, `medium`, `high`
+- `complexity`: `low`, `medium`, `high`
+- `acceptance_criteria`: optional text
+- `definition_of_done`: optional text
+- `parent_id`: optional Parent Work reference
+- `item_level`: `initiative`, `feature`, `work_item`, or `subtask`
+
+Flow hierarchy rules:
+
+- Initiatives cannot have parents.
+- Features can belong to initiatives.
+- Work items can belong to initiatives or features.
+- Subtasks must belong to work items.
+
+For local SQLite development, Flow adds missing nullable advanced columns at startup. If a local database has unexpected schema drift, reset the Flow Docker volume after backing up any data you need.
+
+## Hierarchy And Dependency Endpoints
+
+Project hierarchy:
+
+```http
+GET /api/v1/projects/{project_id}/hierarchy
+```
+
+Create a subtask below a work item:
+
+```http
+POST /api/v1/work-items/{work_item_id}/subtasks
+```
+
+Move a work item to a new parent:
+
+```http
+PATCH /api/v1/work-items/{work_item_id}/parent
+```
+
+List children for a work item:
+
+```http
+GET /api/v1/work-items/{work_item_id}/children
+```
+
+## Capacity And Time Tracking
+
+Work item time logs:
+
+```http
+POST /api/v1/work-items/{work_item_id}/work-logs
+GET /api/v1/work-items/{work_item_id}/work-logs
+DELETE /api/v1/work-items/{work_item_id}/work-logs/{work_log_id}
+```
+
+Capacity entries:
+
+```http
+POST /api/v1/capacity
+GET /api/v1/capacity
+PATCH /api/v1/capacity/{capacity_id}
+DELETE /api/v1/capacity/{capacity_id}
+```
+
+Capacity is project-scoped and can optionally reference a sprint, user ID, or team ID. Detailed member and team lookup remains a future Core integration.
+
+## Custom Fields
+
+Project-scoped custom field definitions are available for work items:
+
+```http
+POST /api/v1/custom-field-definitions
+GET /api/v1/custom-field-definitions
+GET /api/v1/custom-field-definitions/{definition_id}
+PATCH /api/v1/custom-field-definitions/{definition_id}
+DELETE /api/v1/custom-field-definitions/{definition_id}
+```
+
+Work item custom field values:
+
+```http
+POST /api/v1/work-items/{work_item_id}/custom-fields
+GET /api/v1/work-items/{work_item_id}/custom-fields
+```
+
+Supported field types are `text`, `number`, `select`, `date`, and `checkbox`. Select values are validated against configured options, and required fields are enforced when saving values.
+
+Create a relation between work items:
+
+```http
+POST /api/v1/work-items/{work_item_id}/relations
+```
+
+Supported relation types:
+
+- `blocks`
+- `blocked_by`
+- `related_to`
+- `duplicate_of`
+
+List and remove relations:
+
+```http
+GET /api/v1/work-items/{work_item_id}/relations
+DELETE /api/v1/work-items/{work_item_id}/relations/{relation_id}
+```
+
+## Workflow Endpoints
+
+Flow supports configurable project workflows. Work items still store `status_id`, but those statuses can now belong to a project workflow.
+
+Project default workflow:
+
+```http
+GET /api/v1/projects/{project_id}/workflow
+```
+
+This creates the default Engineering workflow for the project if none exists.
+
+Workflow CRUD:
+
+```http
+POST /api/v1/workflows
+GET /api/v1/workflows
+GET /api/v1/workflows/{workflow_id}
+PATCH /api/v1/workflows/{workflow_id}
+DELETE /api/v1/workflows/{workflow_id}
+```
+
+Templates:
+
+```http
+GET /api/v1/workflows/templates
+POST /api/v1/workflows/templates/{template_name}
+```
+
+Built-in templates:
+
+- `engineering`
+- `product`
+- `support`
+
+Statuses and transitions:
+
+```http
+POST /api/v1/workflows/{workflow_id}/statuses
+PATCH /api/v1/workflows/{workflow_id}/statuses/{status_id}
+POST /api/v1/workflows/{workflow_id}/transitions
+```
+
+Project assignment:
+
+```http
+POST /api/v1/workflows/{workflow_id}/assign-project
+```
+
+Configured transitions are enforced when moving work items between statuses. Existing local SQLite databases get lightweight startup columns for workflow-aware statuses. If an old local volume has a unique status-name constraint that blocks multiple workflows, reset the Flow Docker volume after backing up data you need.
+
+### Comments
+
+```http
+POST /api/v1/work-items/{work_item_id}/comments
+```
+
+Flow accepts backend-native and UI-friendly comment payloads:
+
+```json
+{
+  "content": "This needs a follow-up",
+  "user_id": 1
+}
+```
+
+If no author is supplied, Flow uses a temporary MVP system fallback until Core auth propagation is wired in.
 
 ### Get Work Item
 
@@ -298,7 +508,9 @@ The label must belong to the same project as the work item.
 
 ## Attachment Endpoints
 
-Attachments store metadata only. Flow does not upload files, store file bytes, or integrate with external storage yet.
+Attachments store metadata and support local development uploads. Uploaded files are stored under `FLOW_ATTACHMENT_STORAGE_DIR`.
+
+Supported MVP file categories include images, PDFs, text files, documents, spreadsheets, and generic files. Production-grade asset storage and previews should move to Media Service later.
 
 ### Add Attachment Metadata
 
@@ -318,10 +530,22 @@ Request:
 }
 ```
 
+Multipart upload is also supported with a `file` field:
+
+```bash
+curl -F "file=@spec.pdf" http://localhost:8001/api/v1/work-items/1/attachments
+```
+
 ### List Work Item Attachments
 
 ```http
 GET /api/v1/work-items/{work_item_id}/attachments
+```
+
+### Download Attachment
+
+```http
+GET /api/v1/work-items/{work_item_id}/attachments/{attachment_id}/download
 ```
 
 ### Delete Attachment Metadata
@@ -343,6 +567,84 @@ Flow writes simple internal activity events to `flow_activities` for:
 - attachment added
 
 These events are local to Flow and are not a cross-service audit log yet.
+
+## Flow Audit Trail
+
+Flow stores queryable audit events in `audit_events` for traceability. Audit events capture the entity, action, actor, timestamp, and optional before/after values.
+
+Tracked actions include:
+
+- work item created, updated, and archived
+- status, priority, assignee, and due date changes
+- comments added, edited, and deleted
+- attachments uploaded and deleted
+- relations added and removed
+- links linked and unlinked
+
+Audit API:
+
+```http
+GET /api/v1/audit-events
+GET /api/v1/work-items/{work_item_id}/audit-events
+```
+
+`GET /api/v1/audit-events` supports `project_id`, `work_item_id`, `actor_id`, `action`, `created_from`, `created_to`, `search`, `limit`, and `offset`.
+
+Workspace ID is nullable until Flow receives consistent workspace context from Core/API Gateway.
+
+## Flow Automation Rules
+
+Flow stores project-scoped MVP automation rules in `flow_automation_rules`.
+
+Supported triggers:
+
+- `work_item_created`
+- `status_changed`
+- `priority_changed`
+- `assignee_changed`
+- `comment_added`
+
+Supported actions:
+
+- create notification
+- add comment
+- update priority
+- update status
+- assign user when `assignee_id` is provided
+
+Automation API:
+
+```http
+POST /api/v1/automation-rules
+GET /api/v1/automation-rules
+GET /api/v1/automation-rules/{rule_id}
+PATCH /api/v1/automation-rules/{rule_id}
+DELETE /api/v1/automation-rules/{rule_id}
+POST /api/v1/automation-rules/{rule_id}/test
+```
+
+Rules execute synchronously inside Flow event paths and fail safely. Successful rule executions write `automation_rule.executed` audit events. Background workers, retries, and cross-service automation actions are intentionally out of scope for this MVP.
+
+## Flow Notifications
+
+Flow stores project-scoped notifications in `flow_notifications` for operational updates that need user attention:
+
+- work item assigned
+- comment added
+- status changed
+- priority changed
+- due date updated
+
+Notification API:
+
+```http
+GET /api/v1/notifications
+PATCH /api/v1/notifications/{notification_id}/read
+PATCH /api/v1/notifications/read-all
+DELETE /api/v1/notifications/{notification_id}
+```
+
+`GET /api/v1/notifications` supports `workspace_id`, `project_id`, `user_id`, `unread_only`, `limit`, and `offset`. `workspace_id` is nullable until Flow receives workspace context from Core/API Gateway.
 
 ## Response And Error Format
 
@@ -376,6 +678,7 @@ The tests use a disposable SQLite database at `tests/test_asthra_flow.db`. They 
 - add comment
 - add label
 - add attachment metadata
+- audit events for work item updates, comments, attachments, relations, and links
 
 ## Optional Event Publishing
 

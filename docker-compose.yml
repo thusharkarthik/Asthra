@@ -39,6 +39,7 @@ services:
     build:
       context: ./services/flow-service
     container_name: asthra-flow-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/flow-service/.env.example
     environment:
@@ -46,6 +47,8 @@ services:
     ports:
       - "8001:8000"
     volumes:
+      - ./services/flow-service/app:/app/app
+      - ./services/flow-service/scripts:/app/scripts
       - flow_service_data:/app/data
 
   docs-service:
@@ -220,18 +223,25 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: dev
     container_name: asthra-frontend
     env_file:
       - ./frontend/.env.example
     environment:
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
     depends_on:
       - api-gateway
 
 volumes:
-  frontend:
+  frontend_node_modules:
+  frontend_next_cache:
   core_service_data:
   flow_service_data:
   docs_service_data:

@@ -1,31 +1,36 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function CreateDialog({
   title,
   open,
   onOpenChange,
-  children
+  children,
+  size = "default"
 }: {
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  size?: "default" | "wide";
 }) {
   if (!open) return null;
 
+  const widthClass = size === "wide" ? "max-w-[1000px]" : "max-w-lg";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-lg border bg-card shadow-lg">
-        <div className="flex items-center justify-between border-b p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`flex max-h-[85vh] w-full ${widthClass} flex-col overflow-hidden rounded-lg border bg-card shadow-lg`}>
+        <div className="shrink-0 flex items-center justify-between border-b p-4">
           <h2 className="text-sm font-semibold">{title}</h2>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Close
+          <Button aria-label="Close dialog" variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   );

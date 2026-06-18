@@ -35,6 +35,7 @@ src/
 - `/`
 - `/favorites`
 - `/login`
+- `/platform/crud-checklist`
 - `/platform/health`
 - `/register`
 - `/flow`
@@ -48,43 +49,80 @@ src/
 - `/discover`
 - `/discover/ideas`
 - `/discover/ideas/[id]`
+- `/discover/feature-requests`
+- `/discover/feedback`
 - `/discover/roadmap`
+- `/discover/validation`
+- `/discover/prioritization`
 - `/desk`
 - `/desk/tickets`
 - `/desk/tickets/[id]`
 - `/desk/queues`
+- `/desk/slas`
+- `/desk/approvals`
+- `/desk/incidents`
+- `/desk/change-requests`
 - `/pulse`
 - `/pulse/alerts`
 - `/pulse/incidents`
 - `/pulse/incidents/[id]`
 - `/pulse/status-pages`
+- `/pulse/on-call`
+- `/pulse/escalations`
+- `/pulse/postmortems`
 - `/dev`
 - `/dev/repositories`
+- `/dev/pull-requests`
+- `/dev/environments`
 - `/dev/deployments`
 - `/dev/releases`
 - `/dev/services`
 - `/dev/services/[id]`
+- `/dev/dependencies`
 - `/collab`
 - `/collab/threads`
 - `/collab/threads/[id]`
+- `/collab/mentions`
 - `/collab/announcements`
 - `/collab/team-updates`
+- `/collab/activity`
 - `/automation`
 - `/automation/workflows`
 - `/automation/workflows/[id]`
 - `/automation/executions`
 - `/automation/schedules`
+- `/automation/templates`
+- `/automation/audit-logs`
 - `/connect`
 - `/connect/integrations`
+- `/connect/connectors`
 - `/connect/webhooks`
 - `/connect/sync-jobs`
 - `/connect/api-connections`
+- `/connect/event-subscriptions`
 - `/guard`
 - `/guard/policies`
 - `/guard/audit-events`
 - `/guard/risks`
 - `/guard/compliance`
 - `/guard/access-reviews`
+- `/guard/retention`
+- `/guard/exceptions`
+- `/insights`
+- `/insights/dashboards`
+- `/insights/widgets`
+- `/insights/reports`
+- `/insights/metrics`
+- `/insights/usage`
+- `/insights/events`
+- `/media`
+- `/media/assets`
+- `/media/assets/[id]`
+- `/media/collections`
+- `/media/processing-jobs`
+- `/media/transcripts`
+- `/media/annotations`
+- `/media/tags`
 - `/insights`
 - `/insights/dashboards`
 - `/insights/reports`
@@ -102,13 +140,13 @@ src/
 
 `/login` and `/register` are public. All platform shell routes are protected and redirect unauthenticated users to `/login`.
 
-Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and keeps placeholder module cards for later frontend phases.
+Flow, Docs, Discover, Desk, Pulse, Dev, Collab, Automation, Connect, Guard, Insights, and Media now have first-pass module screens. The Home route shows real core-service counts where available and setup guidance when organization, workspace, or project context is missing.
 
 ## Navigation Structure
 
 Sidebar navigation is grouped into platform areas:
 
-- Platform: Home, Search, Assistant, Favorites, Platform Health
+- Platform: Home, Search, Assistant, Favorites, CRUD Checklist, Platform Health
 - Work: Flow, Discover, Docs, Collab
 - Operations: Desk, Pulse, Automation
 - Engineering: Dev, Connect
@@ -173,7 +211,20 @@ For a beta demo:
 5. Use grouped sidebar navigation or `Ctrl+K` / `Cmd+K` command palette to move between modules.
 6. Open global search and the assistant panel.
 7. Visit module dashboards across Work, Operations, Engineering, Intelligence, and Admin.
-8. Review Settings, Profile, Workspace, and Preferences.
+8. Open `/platform/crud-checklist` to track CRUD readiness during manual testing.
+9. Review Settings, Profile, Workspace, and Preferences.
+
+## Product Usability Pass
+
+The current usability pass adds:
+
+- Shared setup guidance for organization, workspace, and project prerequisites.
+- Shared form primitives for required labels, cancel actions, loading states, and errors.
+- Toast feedback for adopted create and validation flows.
+- Shared detail layout primitives for metadata, activity, linked entities, and danger-zone placeholders.
+- Internal CRUD checklist at `/platform/crud-checklist`.
+
+See `frontend/docs/product-usability-pass.md` and `frontend/docs/ui-testing-guide.md`.
 
 ## Tests
 
@@ -310,7 +361,9 @@ Current Discover gateway paths:
 - `POST /api/discover/api/v1/ideas/{id}/ai-analysis`
 - `GET /api/discover/api/v1/ideas/{id}/mvp-plan`
 - `GET /api/discover/api/v1/feature-requests`
+- `POST /api/discover/api/v1/feature-requests`
 - `GET /api/discover/api/v1/feedback`
+- `POST /api/discover/api/v1/feedback`
 - `GET /api/discover/api/v1/roadmap-items`
 - `POST /api/discover/api/v1/roadmap-items`
 
@@ -323,10 +376,14 @@ Current Desk gateway paths:
 - `GET /api/desk/api/v1/tickets/{id}/comments`
 - `POST /api/desk/api/v1/tickets/{id}/comments`
 - `GET /api/desk/api/v1/tickets/{id}/approvals`
+- `PATCH /api/desk/api/v1/approvals/{id}`
 - `GET /api/desk/api/v1/queues`
+- `POST /api/desk/api/v1/queues`
 - `GET /api/desk/api/v1/slas`
+- `POST /api/desk/api/v1/slas`
 - `GET /api/desk/api/v1/incidents`
 - `GET /api/desk/api/v1/change-requests`
+- `POST /api/desk/api/v1/change-requests`
 
 Current Pulse gateway paths:
 
@@ -544,23 +601,31 @@ Docs UI uses the selected workspace where needed. Rich editing, nested page tree
 
 Implemented first-pass Discover screens:
 
-- `/discover`: dashboard with idea, feature request, and roadmap counts plus recent ideas and roadmap preview.
-- `/discover/ideas`: workspace-scoped ideas table and create dialog.
-- `/discover/ideas/[id]`: idea detail with impact placeholder, MVP plan section, roadmap fit, and optional AI idea analysis action.
-- `/discover/roadmap`: simple roadmap board grouped by planned, in-progress, and shipped status.
+- `/discover`: product discovery dashboard with idea, feature request, validated idea, roadmap, and high-impact idea cards.
+- `/discover/ideas`: workspace-scoped ideas table with search, status filter, project filter, and create dialog.
+- `/discover/ideas/[id]`: idea detail with overview, problem statement, target users, validation notes, impact placeholder, MVP plan, roadmap links, linked work placeholders, and optional AI idea analysis.
+- `/discover/feature-requests`: feature request intake with search, status filter, and create dialog.
+- `/discover/feedback`: feedback capture surface with source, author, sentiment, and create dialog.
+- `/discover/roadmap`: Now/Next/Later roadmap board with create dialog.
+- `/discover/validation`: focused view for ideas that need validation.
+- `/discover/prioritization`: lightweight prioritization view for impact signals.
 
-Discover UI uses the selected workspace and selected project where available. Impact scoring controls, validation note editing, and roadmap drag-and-drop are deferred.
+Discover UI uses the selected organization, workspace, and selected project where available. Impact scoring controls, validation note editing, roadmap drag-and-drop, and persisted cross-module links are deferred.
 
 ## Desk UI
 
 Implemented first-pass Desk screens:
 
-- `/desk`: dashboard with ticket, queue, and SLA counts plus recent tickets.
-- `/desk/tickets`: workspace-scoped ticket table and create dialog.
-- `/desk/tickets/[id]`: ticket detail with SLA placeholder, approvals, comments, and optional AI classification action.
-- `/desk/queues`: queue list with SLA summary.
+- `/desk`: service operations dashboard with open tickets, high-priority tickets, SLA risk, approvals, incidents, change requests, queue summary, SLA overview, and AI support suggestions.
+- `/desk/tickets`: workspace-scoped ticket table with search, status, priority, queue, assignee filters, SLA signal, and create dialog.
+- `/desk/tickets/[id]`: ticket detail with overview, requester, queue, SLA, approvals, comments, escalations placeholder, linked incident, and optional AI classification.
+- `/desk/queues`: queue list with ticket count and owner/team placeholder plus create dialog.
+- `/desk/slas`: SLA target list with response/resolution times plus create dialog.
+- `/desk/approvals`: workspace approval queue aggregated from tickets with approve/reject placeholders.
+- `/desk/incidents`: Desk-linked incident list.
+- `/desk/change-requests`: operational change request list with create dialog.
 
-Desk UI uses the selected workspace and selected project where available. Queue creation, SLA editing, approvals workflows, and change request detail screens are deferred.
+Desk UI uses selected organization, workspace, and project context where available. SLA editing, full approvals workflows, change request detail screens, escalation timelines, and persisted queue ownership are deferred.
 
 ## Pulse UI
 
@@ -571,6 +636,9 @@ Implemented first-pass Pulse screens:
 - `/pulse/incidents`: workspace-scoped incident table and create dialog.
 - `/pulse/incidents/[id]`: incident detail with timeline, postmortem, and optional AI summary action.
 - `/pulse/status-pages`: status page overview.
+- `/pulse/on-call`: on-call schedule coverage.
+- `/pulse/escalations`: escalation policy list.
+- `/pulse/postmortems`: incident postmortem follow-up surface.
 
 Pulse UI uses the selected workspace. Timeline event creation, status page component editing, on-call schedule editing, and realtime incident collaboration are deferred.
 
@@ -580,10 +648,13 @@ Implemented first-pass Dev screens:
 
 - `/dev`: dashboard with repository, deployment, release, and service catalog summaries.
 - `/dev/repositories`: repository list with provider, branch, and project context.
+- `/dev/pull-requests`: pull request review surface.
+- `/dev/environments`: environment list.
 - `/dev/deployments`: deployment list with environment, service, version, and status.
 - `/dev/releases`: release list with status badges and optional AI release summary action.
 - `/dev/services`: service catalog list with lifecycle status.
 - `/dev/services/[id]`: service detail with owners and dependency sections.
+- `/dev/dependencies`: dependency risk placeholder surface.
 
 Dev UI uses the selected workspace. Repository creation, deployment mutation, service ownership editing, and dependency graph visuals are deferred.
 
@@ -594,8 +665,10 @@ Implemented first-pass Collab screens:
 - `/collab`: dashboard with thread, announcement, team update, and activity stream summaries.
 - `/collab/threads`: thread list and create thread dialog.
 - `/collab/threads/[id]`: thread detail with messages and message composer.
+- `/collab/mentions`: mentions requiring attention.
 - `/collab/announcements`: announcement list.
 - `/collab/team-updates`: team update list.
+- `/collab/activity`: activity stream view.
 
 Collab UI uses the selected workspace and selected project where available. Realtime transport, reactions UI, mention creation, and rich-thread editing are deferred.
 
@@ -608,6 +681,8 @@ Implemented first-pass Automation screens:
 - `/automation/workflows/[id]`: workflow detail with triggers, conditions, actions, and execution history.
 - `/automation/executions`: execution history timeline/list.
 - `/automation/schedules`: scheduled job list.
+- `/automation/templates`: workflow template placeholders.
+- `/automation/audit-logs`: automation audit log list.
 
 Automation UI is read-only in this phase. Workflow creation, trigger/action editing, and real execution controls are deferred.
 
@@ -617,9 +692,11 @@ Implemented first-pass Connect screens:
 
 - `/connect`: dashboard with integrations, webhooks, sync jobs, and event subscription summaries.
 - `/connect/integrations`: integration list and connector count.
+- `/connect/connectors`: connector list.
 - `/connect/webhooks`: webhook endpoint list plus recent delivery status.
 - `/connect/sync-jobs`: sync job list with execution logs.
 - `/connect/api-connections`: API connection list with connection status.
+- `/connect/event-subscriptions`: event subscription list.
 
 Connect UI is read-only in this phase. Real external connector setup, webhook retry controls, and credential management are deferred.
 
@@ -633,6 +710,8 @@ Implemented first-pass Guard screens:
 - `/guard/risks`: risk finding list with severity badges.
 - `/guard/compliance`: compliance check list.
 - `/guard/access-reviews`: access review list.
+- `/guard/retention`: data retention policy list.
+- `/guard/exceptions`: security exception list.
 
 Guard UI is read-only in this phase. Policy authoring, review workflows, exception approvals, and compliance evidence uploads are deferred.
 
@@ -642,9 +721,11 @@ Implemented first-pass Insights screens:
 
 - `/insights`: dashboard with dashboard, metric, report, and insight event summaries.
 - `/insights/dashboards`: dashboard card list and widget placeholder grid.
+- `/insights/widgets`: widget planning surface.
 - `/insights/reports`: reports table with status badges.
 - `/insights/metrics`: metric snapshot cards and metric definition table.
 - `/insights/usage`: usage metrics table.
+- `/insights/events`: insight event feed.
 
 Insights UI uses the selected workspace. Advanced charts, cross-service aggregation, scheduled report runs, and custom dashboard builders are deferred.
 
@@ -657,6 +738,9 @@ Implemented first-pass Media screens:
 - `/media/assets/[id]`: asset detail with transcripts, annotations, tags, and processing jobs.
 - `/media/collections`: media collection list.
 - `/media/processing-jobs`: processing job list with status badges.
+- `/media/transcripts`: transcript readiness surface.
+- `/media/annotations`: annotation placeholder surface.
+- `/media/tags`: media tag list.
 
 Media UI uses metadata only. File upload/storage, OCR, transcription, image understanding, and multimodal embeddings are deferred.
 
@@ -666,10 +750,20 @@ Implemented settings foundation:
 
 - `/settings`: settings overview
 - `/settings/profile`: signed-in user display
+- `/settings/account`: account identity display
 - `/settings/workspace`: selected organization/workspace/project context
 - `/settings/preferences`: theme toggle plus notification and compact-mode placeholders
+- `/settings/organizations`: organization creation and listing
+- `/settings/workspaces`: workspace creation and listing
+- `/settings/projects`: project creation and listing
+- `/settings/api-keys`: API key creation and listing
+- `/settings/administration`: operational admin dashboard
+- `/settings/members`: member review, invitation, and role assignment
+- `/settings/teams`: team creation and assignment workflows
+- `/settings/roles`: role management
+- `/settings/permissions`: permission management and matrix display
 
-Settings persistence beyond auth/workspace local storage is deferred.
+Settings now provides the internal alpha setup flow: create an organization, create a workspace under it, create a project under that workspace, then use the updated shell selectors to test module CRUD flows such as Flow work items. Advanced security, audit, integrations, and AI preference settings remain placeholders.
 
 ## State Stores
 
@@ -687,7 +781,7 @@ Settings persistence beyond auth/workspace local storage is deferred.
 - Flow create forms use simple numeric defaults for type/status/priority until lookup UI is added.
 - Docs uses a basic text input/textarea flow; no rich editor is implemented yet.
 - Kanban boards are read-only and do not support drag-and-drop yet.
-- Discover impact scoring and roadmap updates are read-only placeholders beyond basic idea creation.
+- Discover impact scoring and validation note editing are placeholders beyond idea, request, feedback, and roadmap creation.
 - Desk queue/SLA management is currently summary-focused; ticket comments are supported.
 - Pulse status pages and postmortems are display-focused; incident creation is supported.
 - Dev screens are read-mostly; release AI summary is optional and service ownership/dependency editing is deferred.
@@ -698,6 +792,7 @@ Settings persistence beyond auth/workspace local storage is deferred.
 - Insights uses tables and metric cards only; advanced charts and analytics composition are deferred.
 - Media uses metadata-only screens; upload, OCR, transcription, and multimodal processing are not implemented in the frontend yet.
 - Settings preference storage is mostly placeholder-only beyond the existing auth and workspace stores.
+- Settings organization/workspace/project creation is operational through core-service, while role assignment and member invitation flows are still limited.
 - Memory has a navigation placeholder but no dedicated frontend route yet.
 
 ## Next Frontend Work
@@ -708,6 +803,7 @@ Planned frontend passes:
 - Better lookup selectors for workspace/project/entity references.
 - Rich editors, drag-and-drop boards, realtime collaboration, and advanced analytics charts.
 - Full AI assistant integration into module-specific workflows.
+- See `frontend/docs/product-experience-status.md` for the product experience status matrix.
 
 ## Frontend Docs
 
@@ -718,6 +814,9 @@ Planned frontend passes:
 - `docs/frontend-beta-status.md`
 - `docs/component-map.md`
 - `docs/platform-beta-guide.md`
+- `docs/settings-operational-review.md`
+- `docs/admin-setup-workflow.md`
+- `docs/settings-operational-pass-2.md`
 
 ## Future Module Integration
 

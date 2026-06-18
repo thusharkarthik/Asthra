@@ -5,6 +5,7 @@ import { vi } from "vitest";
 const navigationMock = vi.hoisted(() => ({
   pathname: "/",
   params: {} as Record<string, string>,
+  searchParams: "",
   push: vi.fn(),
   replace: vi.fn()
 }));
@@ -15,6 +16,7 @@ const navigationMock = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => navigationMock.pathname,
   useParams: () => navigationMock.params,
+  useSearchParams: () => new URLSearchParams(navigationMock.searchParams),
   useRouter: () => ({
     push: navigationMock.push,
     replace: navigationMock.replace

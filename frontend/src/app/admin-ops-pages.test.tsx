@@ -2,17 +2,26 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AutomationPage from "@/app/automation/page";
+import AutomationAuditLogsPage from "@/app/automation/audit-logs/page";
+import AutomationTemplatesPage from "@/app/automation/templates/page";
 import WorkflowDetailPage from "@/app/automation/workflows/[id]/page";
 import WorkflowsPage from "@/app/automation/workflows/page";
 import ConnectPage from "@/app/connect/page";
+import ConnectorsPage from "@/app/connect/connectors/page";
+import EventSubscriptionsPage from "@/app/connect/event-subscriptions/page";
 import IntegrationsPage from "@/app/connect/integrations/page";
 import WebhooksPage from "@/app/connect/webhooks/page";
+import SecurityExceptionsPage from "@/app/guard/exceptions/page";
 import GuardPage from "@/app/guard/page";
 import AuditEventsPage from "@/app/guard/audit-events/page";
 import PoliciesPage from "@/app/guard/policies/page";
+import RetentionPage from "@/app/guard/retention/page";
+import MediaAnnotationsPage from "@/app/media/annotations/page";
 import MediaPage from "@/app/media/page";
 import MediaAssetDetailPage from "@/app/media/assets/[id]/page";
 import MediaAssetsPage from "@/app/media/assets/page";
+import MediaTagsPage from "@/app/media/tags/page";
+import MediaTranscriptsPage from "@/app/media/transcripts/page";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -61,6 +70,9 @@ function mockAdminOpsFetch() {
     if (url.includes("/api/automation/api/v1/schedules")) {
       return new Response(JSON.stringify(envelope([{ id: 9, workflow_id: 7, cron_expression: "0 9 * * *", is_active: true }])), { status: 200 });
     }
+    if (url.includes("/api/automation/api/v1/audit-logs")) {
+      return new Response(JSON.stringify(envelope([{ id: 91, workflow_id: 7, execution_id: 8, action: "workflow.executed", status: "success" }])), { status: 200 });
+    }
 
     if (url.includes("/api/connect/api/v1/integrations")) {
       return new Response(JSON.stringify(envelope([{ id: 10, workspace_id: 2, name: "GitHub integration", provider: "github", status: "active" }])), { status: 200 });
@@ -101,6 +113,9 @@ function mockAdminOpsFetch() {
     }
     if (url.includes("/api/guard/api/v1/security-exceptions")) {
       return new Response(JSON.stringify(envelope([{ id: 25, workspace_id: 2, title: "Temporary access exception", status: "open" }])), { status: 200 });
+    }
+    if (url.includes("/api/guard/api/v1/data-retention-policies")) {
+      return new Response(JSON.stringify(envelope([{ id: 26, workspace_id: 2, name: "Document retention", data_type: "docs", retention_days: 365, status: "active" }])), { status: 200 });
     }
 
     if (url.includes("/api/media/api/v1/media-assets/30/transcripts")) {
@@ -165,6 +180,15 @@ describe("Automation, Connect, Guard, and Media frontend screens", () => {
     expect(screen.getByText("Execution History")).toBeInTheDocument();
   });
 
+  it("renders automation templates and audit logs", async () => {
+    renderWithQuery(<AutomationTemplatesPage />);
+    expect(screen.getByRole("heading", { name: "Automation Templates" })).toBeInTheDocument();
+    expect(screen.getByText("Ticket routing")).toBeInTheDocument();
+
+    renderWithQuery(<AutomationAuditLogsPage />);
+    await waitFor(() => expect(screen.getByText("workflow.executed")).toBeInTheDocument());
+  });
+
   it("renders Connect dashboard", async () => {
     renderWithQuery(<ConnectPage />);
     expect(screen.getByRole("heading", { name: "Connect" })).toBeInTheDocument();
@@ -181,6 +205,15 @@ describe("Automation, Connect, Guard, and Media frontend screens", () => {
     renderWithQuery(<WebhooksPage />);
     expect(screen.getByRole("heading", { name: "Webhooks" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Ops webhook")).toBeInTheDocument());
+  });
+
+  it("renders connectors and event subscriptions pages", async () => {
+    renderWithQuery(<ConnectorsPage />);
+    expect(screen.getByRole("heading", { name: "Connectors" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("GitHub repos")).toBeInTheDocument());
+
+    renderWithQuery(<EventSubscriptionsPage />);
+    await waitFor(() => expect(screen.getByText("desk.ticket.created")).toBeInTheDocument());
   });
 
   it("renders Guard dashboard", async () => {
@@ -201,6 +234,15 @@ describe("Automation, Connect, Guard, and Media frontend screens", () => {
     await waitFor(() => expect(screen.getByText("policy.updated")).toBeInTheDocument());
   });
 
+  it("renders retention and security exception pages", async () => {
+    renderWithQuery(<RetentionPage />);
+    expect(screen.getByRole("heading", { name: "Retention" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Document retention")).toBeInTheDocument());
+
+    renderWithQuery(<SecurityExceptionsPage />);
+    await waitFor(() => expect(screen.getByText("Temporary access exception")).toBeInTheDocument());
+  });
+
   it("renders Media dashboard", async () => {
     renderWithQuery(<MediaPage />);
     expect(screen.getByRole("heading", { name: "Media" })).toBeInTheDocument();
@@ -218,5 +260,17 @@ describe("Automation, Connect, Guard, and Media frontend screens", () => {
     renderWithQuery(<MediaAssetDetailPage />);
     await waitFor(() => expect(screen.getByText("System overview")).toBeInTheDocument());
     expect(screen.getByText("architecture")).toBeInTheDocument();
+  });
+
+  it("renders media transcript, annotation, and tags pages", async () => {
+    renderWithQuery(<MediaTranscriptsPage />);
+    expect(screen.getByRole("heading", { name: "Transcripts" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Architecture diagram")).toBeInTheDocument());
+
+    renderWithQuery(<MediaAnnotationsPage />);
+    expect(screen.getByText("Annotations are asset-scoped")).toBeInTheDocument();
+
+    renderWithQuery(<MediaTagsPage />);
+    await waitFor(() => expect(screen.getByText("architecture")).toBeInTheDocument());
   });
 });

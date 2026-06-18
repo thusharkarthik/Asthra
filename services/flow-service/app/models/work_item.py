@@ -24,13 +24,25 @@ class WorkItem(TimestampMixin, Base):
     type_id: Mapped[int] = mapped_column(ForeignKey("work_item_types.id"), nullable=False)
     status_id: Mapped[int] = mapped_column(ForeignKey("work_item_statuses.id"), nullable=False)
     priority_id: Mapped[int | None] = mapped_column(ForeignKey("work_item_priorities.id"))
+    sprint_id: Mapped[int | None] = mapped_column(ForeignKey("sprints.id"), index=True)
+    release_id: Mapped[int | None] = mapped_column(ForeignKey("releases.id"), index=True)
     board_id: Mapped[int | None] = mapped_column(ForeignKey("boards.id"))
     board_column_id: Mapped[int | None] = mapped_column(ForeignKey("board_columns.id"))
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    item_level: Mapped[str] = mapped_column(String(30), default="work_item", nullable=False)
     assignee_id: Mapped[int | None] = mapped_column(index=True)
-    reporter_id: Mapped[int] = mapped_column(index=True, nullable=False)
+    reporter_id: Mapped[int | None] = mapped_column(index=True, nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    effort_score: Mapped[int | None] = mapped_column(Integer)
+    effort_size: Mapped[str | None] = mapped_column(String(10))
+    original_estimate_minutes: Mapped[int | None] = mapped_column(Integer)
+    remaining_estimate_minutes: Mapped[int | None] = mapped_column(Integer)
+    business_value: Mapped[str | None] = mapped_column(String(20))
+    risk_level: Mapped[str | None] = mapped_column(String(20))
+    complexity: Mapped[str | None] = mapped_column(String(20))
+    acceptance_criteria: Mapped[str | None] = mapped_column(Text)
+    definition_of_done: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -39,6 +51,8 @@ class WorkItem(TimestampMixin, Base):
     type = relationship("WorkItemType", back_populates="work_items")
     status = relationship("WorkItemStatus", back_populates="work_items")
     priority = relationship("WorkItemPriority", back_populates="work_items")
+    sprint = relationship("Sprint", back_populates="work_items")
+    release = relationship("Release", back_populates="work_items")
     board = relationship("Board", back_populates="work_items")
     board_column = relationship("BoardColumn", back_populates="work_items")
     comments = relationship(
@@ -48,6 +62,21 @@ class WorkItem(TimestampMixin, Base):
     )
     attachments = relationship(
         "WorkItemAttachment",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
+    work_logs = relationship(
+        "WorkLog",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
+    linked_entities = relationship(
+        "LinkedEntity",
+        back_populates="work_item",
+        cascade="all, delete-orphan",
+    )
+    custom_field_values = relationship(
+        "CustomFieldValue",
         back_populates="work_item",
         cascade="all, delete-orphan",
     )
