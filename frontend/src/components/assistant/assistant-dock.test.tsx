@@ -5,6 +5,7 @@ import { AssistantDock } from "@/components/assistant/assistant-dock";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAssistantStore } from "@/stores/assistant-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 function renderAssistant() {
@@ -29,13 +30,23 @@ describe("AssistantDock", () => {
       selectedWorkspaceId: 2,
       workspaces: [{ id: 2, organization_id: 1, name: "Platform" }]
     });
+    useUIStore.setState({ isAssistantOpen: true, isSearchOpen: false, isCommandPaletteOpen: false });
   });
 
-  it("renders the assistant panel", () => {
+  it("renders the assistant drawer", () => {
     renderAssistant();
 
     expect(screen.getByLabelText(/ai assistant/i)).toBeInTheDocument();
     expect(screen.getByText("Asthra Assistant")).toBeInTheDocument();
+  });
+
+  it("renders the floating assistant bubble when closed", () => {
+    useUIStore.setState({ isAssistantOpen: false });
+
+    renderAssistant();
+
+    expect(screen.getByLabelText("Open assistant")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/ai assistant/i)).not.toBeInTheDocument();
   });
 
   it("shows no workspace selected state", () => {

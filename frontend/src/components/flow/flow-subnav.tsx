@@ -43,7 +43,7 @@ export function FlowSubnav() {
   const unreadCount = unreadQuery.data?.length ?? 0;
 
   return (
-    <nav className="mb-5 flex gap-2 overflow-x-auto border-b pb-2" aria-label="Flow sections">
+    <nav className="mb-5 flex flex-wrap gap-2 border-b pb-2" aria-label="Flow sections">
       {items.map((item) => {
         const Icon = item.icon;
         const active = item.href === "/flow" ? pathname === item.href : pathname.startsWith(item.href);

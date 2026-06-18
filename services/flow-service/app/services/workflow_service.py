@@ -22,10 +22,10 @@ WORKFLOW_TEMPLATES = {
         "name": "Engineering Workflow",
         "description": "Default engineering delivery workflow.",
         "statuses": [
-            ("todo", "todo", "backlog"),
-            ("in_progress", "in_progress", "active"),
-            ("review", "review", "review"),
-            ("done", "done", "completed"),
+            ("Todo", "todo", "backlog"),
+            ("In Progress", "in_progress", "active"),
+            ("Review", "review", "review"),
+            ("Done", "done", "completed"),
         ],
         "transitions": [("todo", "in_progress"), ("in_progress", "review"), ("review", "done"), ("done", "todo")],
     },
@@ -123,17 +123,12 @@ class WorkflowService:
     def ensure_project_workflow(self, project_id: int) -> WorkflowRead:
         existing = self.workflow_repository.get_for_project(project_id)
         if existing is not None:
-            return self.to_read(existing)
+            return self.to_read(self._ensure_default_statuses_and_transitions(existing))
         template_data = WORKFLOW_TEMPLATES["engineering"]
         workflow = self.workflow_repository.create(
             WorkflowCreate(project_id=project_id, name=template_data["name"], description=template_data["description"], is_default=True)
         )
-        statuses = {}
-        for index, (name, key, category) in enumerate(template_data["statuses"]):
-            statuses[key] = self.workflow_repository.create_status(workflow.id, WorkflowStatusCreate(name=name, key=key, category=category, sort_order=index))
-        for from_key, to_key in template_data["transitions"]:
-            self.workflow_repository.create_transition(workflow.id, WorkflowTransitionCreate(from_status_id=statuses[from_key].id, to_status_id=statuses[to_key].id))
-        return self.to_read(self.get_model(workflow.id))
+        return self.to_read(self._ensure_default_statuses_and_transitions(workflow))
 
     def get_or_create_status_for_project(self, project_id: int, key_or_name: str | None = None) -> WorkItemStatus:
         workflow = self.ensure_project_workflow(project_id)
@@ -142,15 +137,16 @@ class WorkflowService:
         if workflow_status is None:
             workflow_status = self.workflow_repository.find_status(workflow.id, "todo")
         if workflow_status is None:
+            workflow = self._ensure_default_statuses_and_transitions(self.get_model(workflow.id))
+            workflow_status = self.workflow_repository.find_status(workflow.id, "todo")
+        if workflow_status is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow status not found.")
         return workflow_status
 
     def validate_transition(self, project_id: int, from_status_id: int, to_status_id: int) -> None:
         if from_status_id == to_status_id:
             return
-        workflow = self.workflow_repository.get_for_project(project_id)
-        if workflow is None:
-            workflow = self.get_model(self.ensure_project_workflow(project_id).id)
+        workflow = self.get_model(self.ensure_project_workflow(project_id).id)
         workflow_status_ids = {workflow_status.id for workflow_status in workflow.statuses}
         if from_status_id not in workflow_status_ids or to_status_id not in workflow_status_ids:
             return
@@ -174,6 +170,32 @@ class WorkflowService:
         to_status = self.get_status_model(workflow_id, to_status_id)
         if from_status.id == to_status.id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transition cannot target the same status.")
+
+    def _ensure_default_statuses_and_transitions(self, workflow: Workflow) -> Workflow:
+        template_data = WORKFLOW_TEMPLATES["engineering"]
+        statuses = {}
+        for index, (name, key, category) in enumerate(template_data["statuses"]):
+            existing_status = self.workflow_repository.find_status(workflow.id, key)
+            if existing_status is None:
+                existing_status = self.workflow_repository.create_status(
+                    workflow.id,
+                    WorkflowStatusCreate(name=name, key=key, category=category, sort_order=index),
+                )
+            else:
+                existing_status = self.workflow_repository.update_status(
+                    existing_status,
+                    WorkflowStatusUpdate(name=name, key=key, category=category, sort_order=index, is_active=True),
+                )
+            statuses[key] = existing_status
+        for from_key, to_key in template_data["transitions"]:
+            from_status = statuses[from_key]
+            to_status = statuses[to_key]
+            if not self.workflow_repository.transition_exists(workflow.id, from_status.id, to_status.id):
+                self.workflow_repository.create_transition(
+                    workflow.id,
+                    WorkflowTransitionCreate(from_status_id=from_status.id, to_status_id=to_status.id),
+                )
+        return self.get_model(workflow.id)
 
     def to_read(self, workflow: Workflow) -> WorkflowRead:
         statuses = sorted(workflow.statuses, key=lambda workflow_status: workflow_status.sort_order)

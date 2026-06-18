@@ -44,7 +44,12 @@ Flow now presents a project-scoped work management experience:
 - Board cards now show attachment, comment, and dependency indicators.
 - Flow Workflows settings page now supports configurable workflows, statuses, transitions, templates, and project assignment.
 - Boards now render workflow statuses dynamically instead of hardcoded Todo/In Progress/Review/Done columns.
+- Project workflows now self-heal missing default statuses: Todo, In Progress, Review, and Done.
 - Work item detail status movement now respects configured workflow transitions.
+- Create Work Item loads status choices from the selected project workflow and falls back to safe defaults only when needed.
+- Create Work Item now uses an 85vh modal with internal scrolling and sticky actions so advanced fields remain usable.
+- Flow sub-navigation wraps instead of creating a horizontal scrollbar.
+- Board cards include a direct move action in addition to the status dropdown.
 - Board view grouped into Todo, In Progress, Review, and Done columns.
 - My Work, Backlog, and Reports pages added as lightweight product surfaces.
 

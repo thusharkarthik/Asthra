@@ -275,7 +275,10 @@ class WorkItemRepository:
     def _filter_status(self, statement, value: str):
         if value.isdigit():
             return statement.where(WorkItem.status_id == int(value))
-        status = self.db.scalar(select(WorkItemStatus).where(WorkItemStatus.name == value))
+        normalized = value.strip().lower().replace(" ", "_").replace("-", "_")
+        status = self.db.scalar(
+            select(WorkItemStatus).where((WorkItemStatus.name == value) | (WorkItemStatus.key == normalized))
+        )
         if status is None:
             return statement.where(WorkItem.status_id == -1)
         return statement.where(WorkItem.status_id == status.id)

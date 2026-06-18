@@ -49,7 +49,7 @@ export function FormActions({
   onCancel: () => void;
 }) {
   return (
-    <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+    <div className="sticky bottom-0 -mx-4 flex flex-wrap justify-end gap-2 border-t bg-card px-4 pb-1 pt-3">
       <Button type="button" variant="outline" onClick={onCancel}>
         Cancel
       </Button>

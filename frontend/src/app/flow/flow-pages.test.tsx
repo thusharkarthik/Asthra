@@ -463,16 +463,18 @@ describe("Flow frontend screens", () => {
 
   it("renders work item create dialog", () => {
     navigationMock.pathname = "/flow/work-items";
-    renderWithQuery(<WorkItemsPage />);
+    const { container } = renderWithQuery(<WorkItemsPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create Work Item" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText("Work item title")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show advanced fields" })).toBeInTheDocument();
+    expect(container.querySelector(".max-h-\\[85vh\\]")).toBeInTheDocument();
+    expect(container.querySelector(".overflow-y-auto")).toBeInTheDocument();
   });
 
-  it("create dialog shows advanced work item fields", () => {
+  it("create dialog shows advanced work item fields and workflow statuses", async () => {
     navigationMock.pathname = "/flow/work-items";
     renderWithQuery(<WorkItemsPage />);
 
@@ -485,6 +487,7 @@ describe("Flow frontend screens", () => {
     expect(screen.getByLabelText("Complexity")).toBeInTheDocument();
     expect(screen.getByLabelText("Acceptance criteria")).toBeInTheDocument();
     expect(screen.getByLabelText("Completion checklist")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("option", { name: "Development" })).toBeInTheDocument());
   });
 
   it("applies bug template content in create dialog", () => {
@@ -809,6 +812,20 @@ describe("Flow frontend screens", () => {
 
     await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Move Build Flow UI"), { target: { value: "development" } });
+
+    await waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ status_name: "development" });
+    });
+  });
+
+  it("moves a board card with the direct move action", async () => {
+    navigationMock.pathname = "/flow/boards";
+    renderWithQuery(<BoardsPage />);
+
+    await waitFor(() => expect(screen.getByText("Build Flow UI")).toBeInTheDocument());
+    fireEvent.click(screen.getAllByRole("button", { name: "Move to Development" })[0]);
 
     await waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(([url, init]) => String(url).includes("/api/flow/api/v1/work-items/7") && init?.method === "PATCH");
