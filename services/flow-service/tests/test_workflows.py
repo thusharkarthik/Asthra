@@ -40,3 +40,17 @@ def test_project_workflow_default_and_transition_validation(db, monkeypatch):
 
     assert moved.status_id == in_progress.id
     assert review.id != moved.status_id
+
+
+def test_project_workflow_repairs_missing_default_statuses(db):
+    service = WorkflowService(db)
+    workflow = service.create(WorkflowCreate(project_id=77, name="Broken Workflow", is_default=True))
+    service.add_status(workflow.id, WorkflowStatusCreate(name="Todo", key="todo", category="backlog", sort_order=0))
+
+    repaired = service.ensure_project_workflow(77)
+    status_keys = {status.key for status in repaired.statuses}
+    status_names = {status.name for status in repaired.statuses}
+
+    assert {"todo", "in_progress", "review", "done"}.issubset(status_keys)
+    assert {"Todo", "In Progress", "Review", "Done"}.issubset(status_names)
+    assert len(repaired.transitions) >= 4

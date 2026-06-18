@@ -9,11 +9,14 @@ import { Input } from "@/components/ui/input";
 import { assistantApi } from "@/services/api/assistant-api";
 import { useAssistantStore } from "@/stores/assistant-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function AssistantDock() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const isAssistantOpen = useUIStore((state) => state.isAssistantOpen);
+  const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const {
     conversations,
     activeConversationId,
@@ -131,16 +134,43 @@ export function AssistantDock() {
     }
   };
 
+  if (!isAssistantOpen) {
+    return (
+      <Button
+        className="fixed bottom-28 right-4 z-40 h-12 w-12 rounded-full shadow-lg md:bottom-24"
+        size="icon"
+        aria-label="Open assistant"
+        onClick={() => setAssistantOpen(true)}
+      >
+        <Bot className="h-5 w-5" />
+      </Button>
+    );
+  }
+
   return (
-    <aside className="hidden w-80 shrink-0 border-l bg-card xl:flex xl:flex-col" aria-label="AI assistant">
+    <>
+      <Button
+        className="fixed bottom-28 right-4 z-40 h-12 w-12 rounded-full shadow-lg md:bottom-24"
+        size="icon"
+        aria-label="Close assistant"
+        onClick={() => setAssistantOpen(false)}
+      >
+        <Bot className="h-5 w-5" />
+      </Button>
+      <aside className="fixed bottom-44 right-4 top-20 z-40 flex w-[min(420px,calc(100vw-2rem))] flex-col rounded-lg border bg-card shadow-xl md:bottom-40" aria-label="AI assistant">
       <div className="flex items-start justify-between gap-3 border-b p-4">
         <div>
           <div className="text-sm font-semibold">Asthra Assistant</div>
           <div className="text-xs text-muted-foreground">Workspace-aware, read-only assistant</div>
         </div>
+        <div className="flex gap-1">
         <Button size="icon" variant="ghost" aria-label="Clear assistant conversation" onClick={() => { resetAssistant(); setMessage(""); setLastMessage(""); }}>
           <Trash2 className="h-4 w-4" />
         </Button>
+        <Button size="icon" variant="ghost" aria-label="Close assistant drawer" onClick={() => setAssistantOpen(false)}>
+          x
+        </Button>
+        </div>
       </div>
       <div className="border-b p-3">
         {!selectedWorkspaceId ? (
@@ -213,6 +243,7 @@ export function AssistantDock() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-    </aside>
+      </aside>
+    </>
   );
 }

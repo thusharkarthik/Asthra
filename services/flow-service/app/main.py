@@ -64,6 +64,68 @@ def ensure_flow_sqlite_columns() -> None:
             connection.execute(text("ALTER TABLE work_item_statuses ADD COLUMN workflow_id INTEGER"))
         if "key" not in existing_statuses:
             connection.execute(text("ALTER TABLE work_item_statuses ADD COLUMN key VARCHAR(100) DEFAULT '' NOT NULL"))
+        status_table_sql = connection.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='work_item_statuses'")
+        ).scalar() or ""
+        has_unique_status_name_index = False
+        for index_row in connection.execute(text("PRAGMA index_list(work_item_statuses)")).fetchall():
+            index_name = index_row[1]
+            is_unique = bool(index_row[2])
+            if not is_unique:
+                continue
+            index_columns = {column_row[2] for column_row in connection.execute(text(f"PRAGMA index_info({index_name})")).fetchall()}
+            if "name" in index_columns:
+                has_unique_status_name_index = True
+                break
+        if ("UNIQUE" in status_table_sql.upper() and "NAME" in status_table_sql.upper()) or has_unique_status_name_index:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE work_item_statuses_rebuilt (
+                        id INTEGER NOT NULL,
+                        workflow_id INTEGER,
+                        name VARCHAR(100) NOT NULL,
+                        key VARCHAR(100) DEFAULT '' NOT NULL,
+                        description TEXT,
+                        category VARCHAR(50) DEFAULT 'todo' NOT NULL,
+                        sort_order INTEGER DEFAULT 0 NOT NULL,
+                        is_active BOOLEAN DEFAULT 1 NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY(workflow_id) REFERENCES workflows (id)
+                    )
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO work_item_statuses_rebuilt (
+                        id, workflow_id, name, key, description, category, sort_order, is_active, created_at, updated_at
+                    )
+                    SELECT
+                        id,
+                        workflow_id,
+                        name,
+                        COALESCE(NULLIF(key, ''), lower(replace(name, ' ', '_'))),
+                        description,
+                        category,
+                        sort_order,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM work_item_statuses
+                    """
+                )
+            )
+            connection.execute(text("DROP TABLE work_item_statuses"))
+            connection.execute(text("ALTER TABLE work_item_statuses_rebuilt RENAME TO work_item_statuses"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_work_item_statuses_id ON work_item_statuses (id)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_work_item_statuses_key ON work_item_statuses (key)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_work_item_statuses_workflow_id ON work_item_statuses (workflow_id)"))
+            connection.execute(text("PRAGMA foreign_keys=ON"))
 
 
 def create_app() -> FastAPI:

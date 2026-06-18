@@ -74,7 +74,7 @@ def test_create_work_item_succeeds_with_minimal_payload(db, monkeypatch):
     assert work_item.reporter_id == 0
     assert work_item.assignee_id is None
     assert db.get(WorkItemType, work_item.type_id).name == "task"
-    assert db.get(WorkItemStatus, work_item.status_id).name == "todo"
+    assert db.get(WorkItemStatus, work_item.status_id).key == "todo"
     assert db.get(WorkItemPriority, work_item.priority_id).name == "medium"
 
 
@@ -155,7 +155,7 @@ def test_update_work_item_accepts_status_and_priority_names(db, monkeypatch):
 
     assert updated.status_id is not None
     assert updated.priority_id is not None
-    assert db.get(WorkItemStatus, updated.status_id).name == "in_progress"
+    assert db.get(WorkItemStatus, updated.status_id).key == "in_progress"
     assert db.get(WorkItemPriority, updated.priority_id).name == "high"
 
 
@@ -186,7 +186,7 @@ def test_create_work_item_with_advanced_fields(db, monkeypatch):
     assert work_item.complexity == "high"
     assert work_item.acceptance_criteria.startswith("Given")
     assert work_item.definition_of_done.startswith("Tests")
-    assert db.get(WorkItemStatus, work_item.status_id).name == "review"
+    assert db.get(WorkItemStatus, work_item.status_id).key == "review"
     assert db.get(WorkItemPriority, work_item.priority_id).name == "critical"
 
 

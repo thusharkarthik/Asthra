@@ -57,6 +57,15 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
     enabled: open && Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
+  const workflowQuery = useQuery({
+    queryKey: ["flow", "project-workflow", selectedProjectId],
+    queryFn: () => flowApi.getProjectWorkflow(accessToken ?? "", selectedProjectId ?? 0),
+    enabled: open && Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const statusOptions = workflowQuery.data?.statuses?.length
+    ? workflowQuery.data.statuses.map((status) => ({ value: status.key, label: status.name }))
+    : FLOW_STATUS_OPTIONS.map((status) => ({ value: status.name, label: status.label }));
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -159,7 +168,7 @@ export function WorkItemCreateDialog({ open, onOpenChange }: WorkItemCreateDialo
           <FormField label="Status">
             <Select aria-label="Work item status" value={statusName} onChange={(event) => setStatusName(event.target.value)}>
               <option value="">Default Todo</option>
-              {FLOW_STATUS_OPTIONS.map((status) => <option key={status.name} value={status.name}>{status.label}</option>)}
+              {statusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
             </Select>
           </FormField>
           <FormField label="Priority">

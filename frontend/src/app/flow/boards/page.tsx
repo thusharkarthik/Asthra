@@ -103,6 +103,16 @@ export default function BoardsPage() {
                     <div className="space-y-2 p-3">
                       {columnItems.map((item) => (
                         <div key={item.id} className="rounded-md border bg-background p-3 text-sm">
+                          {(() => {
+                            const nextTargets = nextBoardTargets(workflowQuery.data, item.status_id);
+                            return nextTargets[0] ? (
+                              <div className="mb-2 flex justify-end">
+                                <Button size="sm" variant="outline" onClick={() => moveMutation.mutate({ id: item.id, statusName: nextTargets[0].key })}>
+                                  Move to {nextTargets[0].name}
+                                </Button>
+                              </div>
+                            ) : null;
+                          })()}
                           <Link href={`/flow/work-items/${item.id}`} className="font-medium text-primary hover:underline">{item.title}</Link>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <span className="rounded-md bg-muted px-2 py-0.5 text-xs">{itemLevelLabel(item.item_level)}</span>
@@ -154,6 +164,10 @@ function validBoardTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjec
   );
   const allowed = workflow.statuses.filter((statusOption) => statusOption.id === currentStatusId || allowedIds.has(statusOption.id));
   return allowed.length ? allowed : workflow.statuses;
+}
+
+function nextBoardTargets(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, currentStatusId?: number | null) {
+  return validBoardTargets(workflow, currentStatusId).filter((statusOption) => statusOption.id !== currentStatusId);
 }
 
 function statusKeyFor(workflow: Awaited<ReturnType<typeof flowApi.getProjectWorkflow>> | undefined, statusId?: number | null) {

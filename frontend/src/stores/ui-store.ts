@@ -10,7 +10,7 @@ type UIState = {
 };
 
 export const useUIStore = create<UIState>((set) => ({
-  isAssistantOpen: true,
+  isAssistantOpen: false,
   isSearchOpen: false,
   isCommandPaletteOpen: false,
   setAssistantOpen: (isAssistantOpen) => set({ isAssistantOpen }),

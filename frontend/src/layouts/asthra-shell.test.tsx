@@ -10,7 +10,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const navigationMock = (
   globalThis as typeof globalThis & {
-    __asthraNavigationMock: { pathname: string; push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
+    __asthraNavigationMock: { pathname: string; searchParams: string; push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
   }
 ).__asthraNavigationMock;
 
@@ -31,7 +31,8 @@ describe("AsthraShell", () => {
       selectedWorkspaceId: 2,
       selectedProjectId: 3
     });
-    useUIStore.setState({ isAssistantOpen: true, isSearchOpen: false, isCommandPaletteOpen: false });
+    navigationMock.searchParams = "";
+    useUIStore.setState({ isAssistantOpen: false, isSearchOpen: false, isCommandPaletteOpen: false });
   });
 
   it("renders shell regions and child content", () => {
@@ -47,11 +48,21 @@ describe("AsthraShell", () => {
     expect(screen.getAllByText("Asthra").length).toBeGreaterThan(0);
     expect(screen.getByRole("navigation", { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByText("Test content")).toBeInTheDocument();
-    expect(screen.getByLabelText(/ai assistant/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Hide assistant")).toBeInTheDocument();
+    expect(screen.getByLabelText("Open assistant")).toBeInTheDocument();
+    expect(screen.getByRole("contentinfo", { name: /workspace bottom dock/i })).toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByText("Platform workspace")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Organization")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("Project")).toBeInTheDocument();
+    expect(screen.getByText("Search Asthra")).toBeInTheDocument();
+    expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+    expect(screen.getByLabelText("Toggle theme")).toBeInTheDocument();
+    expect(screen.getByLabelText("Help")).toBeInTheDocument();
+    expect(screen.getByLabelText("User menu")).toBeInTheDocument();
   });
 
-  it("toggles the assistant panel from the header", () => {
+  it("toggles the floating assistant drawer", () => {
     useAuthStore.setState({
       accessToken: "token",
       currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
@@ -60,13 +71,13 @@ describe("AsthraShell", () => {
     });
 
     renderShell(<div>Test content</div>);
-    fireEvent.click(screen.getByLabelText("Hide assistant"));
+    fireEvent.click(screen.getByLabelText("Open assistant"));
 
-    expect(screen.queryByLabelText(/ai assistant/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Show assistant")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText("Show assistant"));
     expect(screen.getByLabelText(/ai assistant/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Close assistant")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Close assistant"));
+    expect(screen.queryByLabelText(/ai assistant/i)).not.toBeInTheDocument();
   });
 
   it("uses separate scroll containers for navigation and main content", () => {
@@ -81,6 +92,7 @@ describe("AsthraShell", () => {
 
     expect(container.querySelector("aside .overflow-y-auto")).toBeInTheDocument();
     expect(container.querySelector("main.overflow-y-auto")).toBeInTheDocument();
+    expect(screen.getByRole("contentinfo", { name: /workspace bottom dock/i })).toHaveClass("shrink-0");
   });
 
   it("redirects protected routes without auth", () => {
