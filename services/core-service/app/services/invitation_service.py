@@ -5,7 +5,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
-from app.models.user import User
+from app.models.role import Role
+from app.models.user import User, UserRole
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.invitation import InvitationAccept, InvitationCreate
 from app.services.activity_service import ActivityService
@@ -46,6 +47,20 @@ class InvitationService:
                 detail="A pending invitation already exists for this email and scope.",
             )
 
+        invited_user = self.repository.get_user_by_email(email)
+        self._ensure_role_allowed(invitation_create.role_id, current_user)
+        if invited_user is not None:
+            already_member = (
+                self.repository.is_workspace_member(invitation_create.workspace_id, invited_user.id)
+                if invitation_create.workspace_id is not None
+                else self.repository.is_organization_member(invitation_create.organization_id, invited_user.id)
+            )
+            if already_member:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="User is already an active member for this scope.",
+                )
+
         invitation = self.repository.create(
             email=email,
             organization_id=invitation_create.organization_id,
@@ -55,6 +70,9 @@ class InvitationService:
             token=token_urlsafe(32),
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
+        if invited_user is not None:
+            self.repository.add_memberships(invitation, invited_user.id)
+            invitation = self.repository.get_by_id(invitation.id) or invitation
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
@@ -64,13 +82,14 @@ class InvitationService:
             action="invitation.created",
             description=f"Invitation for {invitation.email} was created.",
         )
-        invited_user = self.repository.get_user_by_email(invitation.email)
         if invited_user is not None:
+            role = self.db.get(Role, invitation.role_id) if invitation.role_id else None
+            role_name = role.name if role else "Member"
             NotificationService(self.db).create_notification(
                 user_id=invited_user.id,
                 type="invitation.created",
-                title="New invitation",
-                message="You have been invited to join an Asthra organization.",
+                title="Asthra invitation",
+                message=f"You have been invited to Asthra as {role_name}.",
                 organization_id=invitation.organization_id,
                 workspace_id=invitation.workspace_id,
                 entity_type="invitation",
@@ -138,15 +157,34 @@ class InvitationService:
         invitation = self.get(invitation_id, current_user)
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be revoked.")
-        invitation = self.repository.update_status(invitation, "revoked")
+        invitation = self.repository.update_status(invitation, "cancelled")
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
             workspace_id=invitation.workspace_id,
             entity_type="invitation",
             entity_id=str(invitation.id),
-            action="invitation.revoked",
-            description=f"Invitation for {invitation.email} was revoked.",
+            action="invitation.cancelled",
+            description=f"Invitation for {invitation.email} was cancelled.",
+        )
+        return invitation
+
+    def resend(self, invitation_id: int, current_user: User) -> Invitation:
+        invitation = self.get(invitation_id, current_user)
+        if invitation.status != "pending":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be resent.")
+        invitation.token = token_urlsafe(32)
+        invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        self.db.commit()
+        self.db.refresh(invitation)
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+            action="invitation.resent",
+            description=f"Invitation for {invitation.email} was resent.",
         )
         return invitation
 
@@ -186,3 +224,24 @@ class InvitationService:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
+
+    def _ensure_role_allowed(self, role_id: int | None, current_user: User) -> None:
+        if role_id is None:
+            return
+        role = self.db.get(Role, role_id)
+        if role is None or not role.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
+        if role.scope != "platform" or current_user.is_superuser:
+            return
+        platform_assignment = (
+            self.db.query(UserRole)
+            .join(Role, Role.id == UserRole.role_id)
+            .filter(
+                UserRole.user_id == current_user.id,
+                Role.key.in_(["platform_owner", "platform_admin"]),
+                Role.is_active.is_(True),
+            )
+            .first()
+        )
+        if platform_assignment is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only platform owners or admins can assign platform roles.")

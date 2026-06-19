@@ -52,3 +52,18 @@ class OrganizationMemberRead(TimestampedRead):
     user_id: int
     role_id: int | None = None
     member_role: str
+
+
+class OrganizationMemberUpdate(BaseModel):
+    role_id: int | None = None
+    member_role: str | None = Field(default=None, min_length=1, max_length=50)
+
+    @field_validator("member_role")
+    @classmethod
+    def validate_member_role(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Member role is required.")
+        return normalized

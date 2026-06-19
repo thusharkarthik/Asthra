@@ -95,6 +95,7 @@ export type RoleRecord = {
   key?: string;
   description?: string | null;
   scope: string;
+  permission_preset?: string;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -136,8 +137,13 @@ export type InvitationRecord = {
   invited_by_id: number;
   role_id?: number | null;
   status: string;
+  scope_type?: string;
+  scope_id?: number;
   token?: string;
   expires_at?: string;
+  invited_at?: string;
+  accepted_at?: string | null;
+  cancelled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -156,6 +162,23 @@ export type UserRoleRecord = {
   id: number;
   user_id: number;
   role_id: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CoreNotificationRecord = {
+  id: number;
+  user_id: number;
+  organization_id?: number | null;
+  workspace_id?: number | null;
+  project_id?: number | null;
+  type: string;
+  title: string;
+  message: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  is_read: boolean;
+  read_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

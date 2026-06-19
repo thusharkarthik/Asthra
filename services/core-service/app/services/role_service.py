@@ -14,7 +14,33 @@ from app.services.activity_service import ActivityService
 from app.services.notification_service import NotificationService
 
 
-VALID_ROLE_SCOPES = {"global", "organization", "workspace", "project"}
+VALID_ROLE_SCOPES = {"global", "platform", "organization", "workspace", "project", "team", "functional"}
+
+ASTHRA_ROLE_CATALOG = [
+    ("Platform Owner", "platform_owner", "platform", "Full platform administration and future billing ownership."),
+    ("Platform Admin", "platform_admin", "platform", "Platform administration without owner-only protections."),
+    ("Platform Support", "platform_support", "Support operational access for platform assistance."),
+    ("Organization Owner", "organization_owner", "organization", "Full organization administration and last-owner protected access."),
+    ("Organization Admin", "organization_admin", "organization", "Manage organization settings, workspaces, and members."),
+    ("Organization Auditor", "organization_auditor", "organization", "Read organization settings and audit data."),
+    ("Workspace Admin", "workspace_admin", "workspace", "Manage workspace settings, projects, and members."),
+    ("Workspace Manager", "workspace_manager", "workspace", "Manage workspace execution and project delivery."),
+    ("Workspace Member", "workspace_member", "workspace", "Create and edit workspace/project work."),
+    ("Workspace Viewer", "workspace_viewer", "workspace", "Read-only workspace access."),
+    ("Project Admin", "project_admin", "project", "Manage project settings, members, and work."),
+    ("Project Manager", "project_manager", "project", "Manage project plans, sprints, releases, and delivery."),
+    ("Project Contributor", "project_contributor", "project", "Contribute work and comments in a project."),
+    ("Project Viewer", "project_viewer", "project", "Read-only project access."),
+    ("Team Lead", "team_lead", "team", "Manage team members and team-owned work."),
+    ("Team Member", "team_member", "team", "Participate in team-owned work."),
+    ("Team Observer", "team_observer", "team", "Read team activity and work."),
+    ("Product Owner", "product_owner", "functional", "Own product priorities and acceptance decisions."),
+    ("Scrum Master", "scrum_master", "functional", "Facilitate sprint execution and team ceremonies."),
+    ("Engineering Manager", "engineering_manager", "functional", "Manage engineering team delivery and ownership."),
+    ("Release Manager", "release_manager", "functional", "Coordinate release planning and rollout readiness."),
+    ("Incident Commander", "incident_commander", "functional", "Coordinate incident response and communications."),
+    ("Knowledge Manager", "knowledge_manager", "functional", "Manage knowledge quality and documentation practices."),
+]
 
 
 class RoleService:
@@ -51,6 +77,7 @@ class RoleService:
 
     def list(self, current_user: User) -> list[Role]:
         self._ensure_active_user(current_user)
+        self.ensure_role_catalog()
         return self.role_repository.list()
 
     def get(self, role_id: int, current_user: User) -> Role:
@@ -168,10 +195,26 @@ class RoleService:
         if normalized_scope not in VALID_ROLE_SCOPES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Role scope must be one of: global, organization, workspace, project.",
+                detail="Role scope must be one of: global, platform, organization, workspace, project, team, functional.",
             )
         return normalized_scope
 
     def _keyify(self, value: str) -> str:
         key = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
         return key or "role"
+
+    def ensure_role_catalog(self) -> None:
+        changed = False
+        for name, key, scope, description in ASTHRA_ROLE_CATALOG:
+            if self.role_repository.get_by_scope_and_name(scope, name) is not None:
+                continue
+            self.role_repository.create(
+                name=name,
+                key=key,
+                description=f"{description} Permission preset placeholder: {key}.",
+                scope=scope,
+                organization_id=None,
+            )
+            changed = True
+        if changed:
+            self.db.commit()
