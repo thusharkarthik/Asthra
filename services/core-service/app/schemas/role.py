@@ -132,6 +132,16 @@ class RolePermissionsReplace(BaseModel):
     permission_ids: list[int] = Field(default_factory=list)
 
 
+class RoleTemplateRead(BaseModel):
+    name: str
+    key: str
+    scope: str
+    description: str
+    permission_patterns: list[str]
+    is_system: bool
+    is_editable: bool
+
+
 class RolePermissionRead(TimestampedRead):
     role_id: int
     permission_id: int
