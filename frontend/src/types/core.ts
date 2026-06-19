@@ -128,6 +128,26 @@ export type PermissionRecord = {
   updated_at?: string;
 };
 
+export type CurrentUserPermissionScope = {
+  scope_type: string;
+  scope_id?: number | null;
+};
+
+export type CurrentUserResolvedRole = {
+  id: number;
+  name: string;
+  key: string;
+  scope: string;
+  source_scope_type: string;
+  source_scope_id?: number | null;
+};
+
+export type CurrentUserPermissions = {
+  permission_codes: string[];
+  roles: CurrentUserResolvedRole[];
+  scope: CurrentUserPermissionScope;
+};
+
 export type ApiKeyRecord = {
   id: number;
   user_id: number;

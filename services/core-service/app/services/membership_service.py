@@ -8,6 +8,7 @@ from app.models.workspace import WorkspaceMember
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.organization import OrganizationMemberUpdate
 from app.schemas.workspace import WorkspaceMemberUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.activity_service import ActivityService
 
 
@@ -24,6 +25,12 @@ class MembershipService:
     ) -> None:
         self._ensure_active_user(current_user)
         self._ensure_organization_access(organization_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.member.remove",
+            "organization",
+            organization_id,
+        )
         member = self._get_organization_member(organization_id, user_id)
         self._ensure_not_last_owner(
             members=self._list_organization_members(organization_id),
@@ -50,6 +57,12 @@ class MembershipService:
     ) -> None:
         self._ensure_active_user(current_user)
         self._ensure_workspace_access(workspace_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.member.remove",
+            "workspace",
+            workspace_id,
+        )
         member = self._get_workspace_member(workspace_id, user_id)
         self._ensure_not_last_owner(
             members=self._list_workspace_members(workspace_id),
@@ -77,6 +90,12 @@ class MembershipService:
     ) -> OrganizationMember:
         self._ensure_active_user(current_user)
         self._ensure_organization_access(organization_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.role.manage",
+            "organization",
+            organization_id,
+        )
         member = self._get_organization_member(organization_id, user_id)
         next_role = self._member_role_from_update(member_update.role_id, member_update.member_role, member.member_role, current_user)
         if self._is_owner(member) and next_role != "owner":
@@ -109,6 +128,12 @@ class MembershipService:
     ) -> WorkspaceMember:
         self._ensure_active_user(current_user)
         self._ensure_workspace_access(workspace_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.role.manage",
+            "workspace",
+            workspace_id,
+        )
         member = self._get_workspace_member(workspace_id, user_id)
         next_role = self._member_role_from_update(member_update.role_id, member_update.member_role, member.member_role, current_user)
         if self._is_owner(member) and next_role != "owner":

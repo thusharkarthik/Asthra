@@ -11,7 +11,7 @@ Settings now uses a scoped Asthra role catalog instead of only the original Owne
 - Team: Team Lead, Team Member, Team Observer
 - Functional: Product Owner, Scrum Master, Engineering Manager, Release Manager, Incident Commander, Knowledge Manager
 
-Each role has a `name`, `key`, `scope`, description, and placeholder permission preset. Permission presets are not fully enforced across every service yet.
+Each role has a `name`, `key`, `scope`, description, and permission mappings. Users receive roles; roles contain permissions; permissions drive access checks.
 
 ## Invite Flow
 
@@ -55,20 +55,33 @@ Columns:
 
 Search, role filter, status filter, scope filter, and sorting are client-side for now. Last active displays `Not tracked yet` until core-service stores real activity timestamps.
 
-## RBAC Foundation
+## RBAC Enforcement Foundation
 
-Frontend helpers now provide:
+Core-service now exposes:
 
-- `canManagePlatform`
-- `canManageOrganization`
-- `canManageWorkspace`
-- `canManageProject`
-- `canManageTeam`
-- `canInviteMembers`
-- `canManageRoles`
-- `canViewAudit`
+- `GET /api/v1/me/permissions`
+- `get_user_permissions(user_id, scope_type, scope_id)`
+- `can(user_id, permission_code, scope_type, scope_id)`
 
-These helpers are UI visibility foundations only. Backend enforcement currently covers membership access, platform-role assignment protection, and last-owner protection.
+The resolver includes inherited roles:
+
+- Organization roles apply inside that organization and its workspaces/projects.
+- Workspace roles apply inside that workspace and its projects.
+- Direct platform roles apply globally.
+
+Settings actions now use permission codes instead of role names.
+
+Protected actions:
+
+- Invite member: `settings.member.invite`
+- Remove member: `settings.member.remove`
+- Change role/manage role mapping: `settings.role.manage`
+- Create permission: `settings.permission.manage`
+- Manage organization: `settings.organization.manage`
+- Manage workspace: `settings.workspace.manage`
+- Manage project: `settings.project.manage`
+
+The frontend loads `/me/permissions` for the active Settings scope and hides or disables actions from those permission codes. It also shows a small Current User Permissions debug panel in Access Control for internal testing.
 
 ## Safety Rules
 
@@ -81,7 +94,8 @@ These helpers are UI visibility foundations only. Backend enforcement currently 
 ## Current RBAC Limitations
 
 - Project-scoped membership is still a future model.
-- Role permission presets are placeholders.
 - Cross-service authorization is not fully enforced yet.
+- Enforcement currently starts with Settings endpoints.
 - Notification Accept/Decline actions need direct invite-action endpoints.
 - Last active timestamps are not tracked yet.
+- First-organization creation remains open as a bootstrap path for clean local installs.
