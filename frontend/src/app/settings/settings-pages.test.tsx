@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPage from "@/app/settings/page";
 import AccountSettingsPage from "@/app/settings/account/page";
@@ -25,7 +25,12 @@ vi.mock("@/services/api/settings-api", () => ({
       { id: 7, workspace_id: 2, name: "Unowned Project", status: "active", owner_id: null, is_active: true }
     ]),
     listApiKeys: vi.fn(async () => []),
-    listRoles: vi.fn(async () => [{ id: 4, name: "Admin", scope: "organization", organization_id: 1, is_active: true }]),
+    listRoles: vi.fn(async () => [
+      { id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", organization_id: 1, is_active: true, permission_preset: "workspace:workspace_admin:placeholder" },
+      { id: 5, name: "Workspace Viewer", key: "workspace_viewer", scope: "workspace", organization_id: 1, is_active: true, permission_preset: "workspace:workspace_viewer:placeholder" },
+      { id: 6, name: "Product Owner", key: "product_owner", scope: "functional", organization_id: 1, is_active: true, permission_preset: "functional:product_owner:placeholder" },
+      { id: 7, name: "Platform Admin", key: "platform_admin", scope: "platform", organization_id: null, is_active: true, permission_preset: "platform:platform_admin:placeholder" }
+    ]),
     listPermissions: vi.fn(async () => [{ id: 5, code: "workspace.manage", name: "Manage workspace", is_active: true }]),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
@@ -48,9 +53,19 @@ vi.mock("@/services/api/settings-api", () => ({
     deletePermission: vi.fn(),
     assignUserRole: vi.fn(),
     addTeamMember: vi.fn(),
-    updateProject: vi.fn()
+    updateProject: vi.fn(),
+    updateOrganizationMember: vi.fn(async () => ({ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "admin" })),
+    updateWorkspaceMember: vi.fn(async () => ({ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin" })),
+    removeOrganizationMember: vi.fn(async () => undefined),
+    removeWorkspaceMember: vi.fn(async () => undefined),
+    resendInvitation: vi.fn(async () => ({ id: 12, email: "invite@example.com", organization_id: 1, workspace_id: 2, status: "pending", invited_by_id: 1 })),
+    revokeInvitation: vi.fn(async () => ({ id: 12, email: "invite@example.com", organization_id: 1, workspace_id: 2, status: "cancelled", invited_by_id: 1 })),
+    listNotifications: vi.fn(async () => []),
+    markNotificationRead: vi.fn()
   }
 }));
+
+import { settingsApi } from "@/services/api/settings-api";
 
 function renderWithQuery(children: ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -59,6 +74,7 @@ function renderWithQuery(children: ReactNode) {
 
 describe("Settings frontend screens", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useAuthStore.setState({
       accessToken: "token",
       currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
@@ -149,16 +165,68 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<MembersView workspaceId={2} />);
     expect(await screen.findByText("Test User")).toBeInTheDocument();
     expect(screen.getByText("Change Role")).toBeInTheDocument();
-    expect(screen.getAllByText("Workspace").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Workspace: Platform").length).toBeGreaterThan(0);
     expect(screen.getByText("Organization: Asthra")).toBeInTheDocument();
     expect(screen.getByText("Back to Workspace")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Workspaces.*Platform.*Members/);
   });
 
+  it("supports member search filters sort and invite actions", async () => {
+    renderWithQuery(<MembersView workspaceId={2} />);
+
+    expect((await screen.findAllByText("invite@example.com")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Test User")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search name or email"), { target: { value: "invite" } });
+    expect(screen.queryByText("Test User")).not.toBeInTheDocument();
+    expect(screen.getAllByText("invite@example.com").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByPlaceholderText("Search name or email"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Role filter"), { target: { value: "workspace_admin" } });
+    expect(screen.getByText("Test User")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Role filter"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Sort members"), { target: { value: "email" } });
+    expect(screen.getByLabelText("Sort members")).toHaveValue("email");
+
+    fireEvent.click(screen.getByRole("button", { name: "Resend Invite" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Invite" }));
+    await waitFor(() => expect(settingsApi.resendInvitation).toHaveBeenCalledWith("token", 12));
+    expect(settingsApi.revokeInvitation).toHaveBeenCalledWith("token", 12);
+  });
+
+  it("validates invite email and changes member role", async () => {
+    renderWithQuery(<MembersView workspaceId={2} />);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Invite Member" }))[0]);
+    expect(screen.getByRole("group", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Functional" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Platform" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("teammate@example.com"), { target: { value: "bad-email" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Invite Member" })[1]);
+    expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("teammate@example.com"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Invite Member" })[1]);
+    await waitFor(() => expect(settingsApi.createInvitation).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+    fireEvent.change(screen.getByLabelText("Change member role"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Assign Role" }));
+    await waitFor(() => expect(settingsApi.updateWorkspaceMember).toHaveBeenCalled());
+  });
+
+  it("hides member management actions for low roles", async () => {
+    vi.mocked(settingsApi.listWorkspaceMembers).mockResolvedValueOnce([{ id: 11, workspace_id: 2, user_id: 1, role_id: null, member_role: "viewer", created_at: "2026-01-01T00:00:00Z" }]);
+    renderWithQuery(<MembersView workspaceId={2} />);
+
+    expect(await screen.findByText("Test User")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite Member" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change Role" })).not.toBeInTheDocument();
+    expect(screen.getByText("Limited access")).toBeInTheDocument();
+  });
+
   it("renders organization member context", async () => {
     renderWithQuery(<MembersView organizationId={1} />);
     expect(await screen.findByText("Test User")).toBeInTheDocument();
-    expect(screen.getByText("Organization")).toBeInTheDocument();
+    expect(screen.getAllByText("Organization").length).toBeGreaterThan(0);
     expect(screen.getByText("Back to Organization")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Organizations.*Asthra.*Members/);
   });
@@ -192,7 +260,7 @@ describe("Settings frontend screens", () => {
 
   it("renders roles and permissions", async () => {
     renderWithQuery(<RolesSettingsPage />);
-    expect(await screen.findByText("Admin")).toBeInTheDocument();
+    expect(await screen.findByText("Workspace Admin")).toBeInTheDocument();
     renderWithQuery(<PermissionsSettingsPage />);
     expect(await screen.findByText("Permission matrix")).toBeInTheDocument();
   });

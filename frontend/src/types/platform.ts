@@ -56,7 +56,7 @@ export type ActivityItem = {
 
 export type NotificationItem = {
   id: string;
-  type: "work_item_update" | "comment" | "mention" | "incident" | "approval" | "ai_assistant";
+  type: "work_item_update" | "comment" | "mention" | "incident" | "approval" | "ai_assistant" | "invitation.pending" | string;
   title: string;
   message: string;
   href?: string;

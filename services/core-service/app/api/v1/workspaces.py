@@ -8,6 +8,7 @@ from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceMemberRead,
+    WorkspaceMemberUpdate,
     WorkspaceRead,
     WorkspaceUpdate,
 )
@@ -72,6 +73,17 @@ def list_workspace_members(
     current_user: User = Depends(get_current_user),
 ) -> list[WorkspaceMember]:
     return WorkspaceService(db).list_members(workspace_id, current_user)
+
+
+@router.patch("/{workspace_id}/members/{user_id}", response_model=WorkspaceMemberRead)
+def update_workspace_member(
+    workspace_id: int,
+    user_id: int,
+    member_update: WorkspaceMemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WorkspaceMember:
+    return MembershipService(db).update_workspace_member(workspace_id, user_id, member_update, current_user)
 
 
 @router.get("/{workspace_id}/settings", response_model=WorkspaceSettingsRead)

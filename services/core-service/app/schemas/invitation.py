@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, computed_field
 
 from app.schemas.base import TimestampedRead
 
@@ -25,6 +25,31 @@ class InvitationRead(TimestampedRead):
     status: str
     token: str
     expires_at: datetime
+
+    @computed_field
+    @property
+    def scope_type(self) -> str:
+        return "workspace" if self.workspace_id is not None else "organization"
+
+    @computed_field
+    @property
+    def scope_id(self) -> int:
+        return self.workspace_id if self.workspace_id is not None else self.organization_id
+
+    @computed_field
+    @property
+    def invited_at(self) -> datetime:
+        return self.created_at
+
+    @computed_field
+    @property
+    def accepted_at(self) -> datetime | None:
+        return self.updated_at if self.status == "accepted" else None
+
+    @computed_field
+    @property
+    def cancelled_at(self) -> datetime | None:
+        return self.updated_at if self.status == "cancelled" else None
 
 
 class MembershipRead(TimestampedRead):

@@ -1,6 +1,7 @@
 import { apiRequest } from "@/services/api/client";
 import type {
   ApiKeyRecord,
+  CoreNotificationRecord,
   CoreUser,
   InvitationRecord,
   Organization,
@@ -41,6 +42,12 @@ export const settingsApi = {
   listOrganizationMembers(token: string, organizationId: number) {
     return apiRequest<OrganizationMember[]>(`${CORE_PREFIX}/organizations/${organizationId}/members`, { method: "GET", authToken: token });
   },
+  updateOrganizationMember(token: string, organizationId: number, userId: number, payload: { role_id?: number | null; member_role?: string | null }) {
+    return apiRequest<OrganizationMember>(`${CORE_PREFIX}/organizations/${organizationId}/members/${userId}`, { method: "PATCH", authToken: token, json: payload });
+  },
+  removeOrganizationMember(token: string, organizationId: number, userId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/organizations/${organizationId}/members/${userId}`, { method: "DELETE", authToken: token });
+  },
 
   listWorkspaces(token: string) {
     return apiRequest<WorkspaceRecord[]>(`${CORE_PREFIX}/workspaces`, { method: "GET", authToken: token });
@@ -59,6 +66,12 @@ export const settingsApi = {
   },
   listWorkspaceMembers(token: string, workspaceId: number) {
     return apiRequest<WorkspaceMember[]>(`${CORE_PREFIX}/workspaces/${workspaceId}/members`, { method: "GET", authToken: token });
+  },
+  updateWorkspaceMember(token: string, workspaceId: number, userId: number, payload: { role_id?: number | null; member_role?: string | null }) {
+    return apiRequest<WorkspaceMember>(`${CORE_PREFIX}/workspaces/${workspaceId}/members/${userId}`, { method: "PATCH", authToken: token, json: payload });
+  },
+  removeWorkspaceMember(token: string, workspaceId: number, userId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE", authToken: token });
   },
 
   listProjects(token: string) {
@@ -153,6 +166,18 @@ export const settingsApi = {
   },
   listInvitations(token: string) {
     return apiRequest<InvitationRecord[]>(`${CORE_PREFIX}/invitations`, { method: "GET", authToken: token });
+  },
+  resendInvitation(token: string, invitationId: number) {
+    return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/resend`, { method: "POST", authToken: token });
+  },
+  revokeInvitation(token: string, invitationId: number) {
+    return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/revoke`, { method: "POST", authToken: token });
+  },
+  listNotifications(token: string) {
+    return apiRequest<CoreNotificationRecord[]>(`${CORE_PREFIX}/notifications`, { method: "GET", authToken: token });
+  },
+  markNotificationRead(token: string, notificationId: number) {
+    return apiRequest<CoreNotificationRecord>(`${CORE_PREFIX}/notifications/${notificationId}/read`, { method: "PATCH", authToken: token });
   },
   getUser(token: string, userId: number) {
     return apiRequest<CoreUser>(`${CORE_PREFIX}/users/${userId}`, { method: "GET", authToken: token });

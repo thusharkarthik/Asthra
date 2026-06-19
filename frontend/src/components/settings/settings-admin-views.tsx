@@ -9,7 +9,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { settingsApi } from "@/services/api/settings-api";
-import type { ApiKeyRecord, CoreUser, PermissionRecord, ProjectRecord, RoleRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
+import { canManageMembers, canManagePlatform, canManageRoles, normalizeRole } from "@/lib/rbac";
+import type { ApiKeyRecord, CoreUser, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
   FormField,
@@ -95,6 +96,59 @@ function displayUser(user?: CoreUser | null, fallbackId?: number) {
     email: user.email,
     status: user.is_active ? "Active" : "Inactive"
   };
+}
+
+const DEFAULT_ROLE_MEANINGS = [
+  ["Owner", "Full access, future billing ownership, and member/role administration."],
+  ["Admin", "Manage workspace, project, settings, and members except owner protection rules."],
+  ["Manager", "Manage projects, work items, sprints, releases, and invite members where allowed."],
+  ["Member", "Create or edit assigned work, comment, and view workspace/project data."],
+  ["Viewer", "Read-only access."]
+] as const;
+
+const ROLE_SCOPE_LABELS: Record<string, string> = {
+  platform: "Platform",
+  organization: "Organization",
+  workspace: "Workspace",
+  project: "Project",
+  team: "Team",
+  functional: "Functional"
+};
+
+function roleDisplayName(role?: string | null) {
+  return String(role || "member")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function roleNameFromRecord(role?: RoleRecord | null, fallback?: string | null) {
+  return role?.name ?? roleDisplayName(fallback);
+}
+
+function groupedRolesForInvite(roles: RoleRecord[], inviteScope: "organization" | "workspace" | "project" | "team", allowPlatformRoles: boolean) {
+  const validScopes = new Set([inviteScope, "functional"]);
+  if (allowPlatformRoles) validScopes.add("platform");
+  return roles
+    .filter((role) => role.is_active !== false)
+    .filter((role) => validScopes.has(role.scope))
+    .reduce<Record<string, RoleRecord[]>>((groups, role) => {
+      groups[role.scope] = [...(groups[role.scope] ?? []), role];
+      return groups;
+    }, {});
+}
+
+function RoleSelectOptions({ groupedRoles, includeDefault = true }: { groupedRoles: Record<string, RoleRecord[]>; includeDefault?: boolean }) {
+  const scopes = ["platform", "organization", "workspace", "project", "team", "functional"];
+  return (
+    <>
+      {includeDefault ? <option value="">Default member</option> : null}
+      {scopes.map((scope) => groupedRoles[scope]?.length ? (
+        <optgroup key={scope} label={ROLE_SCOPE_LABELS[scope] ?? roleDisplayName(scope)}>
+          {groupedRoles[scope].map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+        </optgroup>
+      ) : null)}
+    </>
+  );
 }
 
 function getOrganizationNameForWorkspace(
@@ -769,7 +823,12 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
 
 export function MembersView({ organizationId, workspaceId }: { organizationId?: number; workspaceId?: number }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [scopeFilter, setScopeFilter] = useState("");
+  const [sortKey, setSortKey] = useState("name");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -793,12 +852,27 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopeWorkspaceId = workspaceId ?? null;
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
-  const filteredMembers = members.filter((member) => {
-    const user = displayUser(profiles.get(member.user_id), member.user_id);
-    const role = roles.find((item) => item.id === member.role_id)?.name ?? member.member_role;
-    const haystack = `${user.name} ${user.email} ${role}`.toLowerCase();
-    return haystack.includes(search.toLowerCase());
-  });
+  const currentMembership = members.find((member) => member.user_id === currentUser?.id);
+  const currentRole = currentUser?.is_superuser ? "owner" : currentMembership?.member_role ?? (currentMembership?.role_id ? roles.find((role) => role.id === currentMembership.role_id)?.key : null) ?? "viewer";
+  const roleContext = { role: currentRole, isSuperuser: currentUser?.is_superuser };
+  const canInvite = canManageMembers(roleContext);
+  const canChangeRoles = canManageRoles(roleContext);
+  const inviteScope = workspaceId ? "workspace" : "organization";
+  const groupedInviteRoles = groupedRolesForInvite(roles, inviteScope, canManagePlatform(roleContext));
+  const scopedInvitations = (invitationsQuery.data ?? [])
+    .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
+    .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
+  const memberRows = buildMemberRows({ members, invitations: scopedInvitations, profiles, roles, organizations, workspaces });
+  const filteredRows = memberRows
+    .filter((row) => {
+      const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
+      if (search && !haystack.includes(search.toLowerCase())) return false;
+      if (roleFilter && normalizeRole(row.role) !== roleFilter) return false;
+      if (statusFilter && row.status.toLowerCase() !== statusFilter) return false;
+      if (scopeFilter && row.scopeType !== scopeFilter) return false;
+      return true;
+    })
+    .sort((left, right) => compareMemberRows(left, right, sortKey));
 
   const inviteMutation = useMutation({
     mutationFn: (payload: { email: string; organization_id: number; workspace_id?: number | null; role_id?: number | null }) =>
@@ -815,14 +889,46 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       addToast({ type: "error", title: "Invite failed", message });
     }
   });
-  const roleMutation = useMutation({
-    mutationFn: (payload: { userId: number; roleId: number }) => settingsApi.assignUserRole(accessToken ?? "", payload.userId, payload.roleId),
+  const roleMutation = useMutation<unknown, Error, { userId: number; roleId: number }>({
+    mutationFn: (payload: { userId: number; roleId: number }) => {
+      const role = roles.find((item) => item.id === payload.roleId);
+      const updatePayload = { role_id: payload.roleId, member_role: role?.key ?? role?.name?.toLowerCase() ?? null };
+      if (organizationId) return settingsApi.updateOrganizationMember(accessToken ?? "", organizationId, payload.userId, updatePayload);
+      return settingsApi.updateWorkspaceMember(accessToken ?? "", workspaceId ?? 0, payload.userId, updatePayload);
+    },
     onSuccess: async () => {
       setRoleOpen(null);
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
+  });
+  const removeMutation = useMutation({
+    mutationFn: (userId: number) => {
+      if (organizationId) return settingsApi.removeOrganizationMember(accessToken ?? "", organizationId, userId);
+      return settingsApi.removeWorkspaceMember(accessToken ?? "", workspaceId ?? 0, userId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      addToast({ type: "success", title: "Member removed" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Remove member failed", message: error instanceof Error ? error.message : "Unable to remove member." })
+  });
+  const resendMutation = useMutation({
+    mutationFn: (invitationId: number) => settingsApi.resendInvitation(accessToken ?? "", invitationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "invitations"] });
+      addToast({ type: "success", title: "Invitation resent" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Resend failed", message: error instanceof Error ? error.message : "Unable to resend invitation." })
+  });
+  const cancelInviteMutation = useMutation({
+    mutationFn: (invitationId: number) => settingsApi.revokeInvitation(accessToken ?? "", invitationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "invitations"] });
+      addToast({ type: "success", title: "Invitation cancelled" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Cancel invite failed", message: error instanceof Error ? error.message : "Unable to cancel invitation." })
   });
 
   function submitInvite(event: FormEvent<HTMLFormElement>) {
@@ -836,6 +942,10 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     }
     if (!email) {
       setFormError("Email is required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFormError("Enter a valid email address.");
       return;
     }
     inviteMutation.mutate({ email, organization_id: scopeOrganizationId, workspace_id: scopeWorkspaceId, role_id: roleId });
@@ -900,54 +1010,97 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Members" description="Invite members, review status, and assign roles without using raw database screens." actions={<QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton>} />
-      <SearchBox value={search} onChange={setSearch} placeholder="Search members by name, email, or role" />
+      <SettingsSectionHeader
+        title="Members"
+        description="Invite members, review status, filter membership, and assign roles without using raw database screens."
+        actions={canInvite ? <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton> : undefined}
+      />
+      {!canInvite ? <SettingsCard title="Limited access" description="Your current role can view members, but cannot invite or change roles." /> : null}
+      <SettingsCard title="Role model" description="These default meanings guide the current UI and future backend enforcement.">
+        <div className="grid gap-2 md:grid-cols-5">
+          {DEFAULT_ROLE_MEANINGS.map(([role, meaning]) => (
+            <div key={role} className="rounded-md border bg-muted/20 p-3">
+              <div className="font-medium">{role}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{meaning}</p>
+            </div>
+          ))}
+        </div>
+      </SettingsCard>
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_160px_160px_180px]">
+        <SearchBox value={search} onChange={setSearch} placeholder="Search name or email" />
+        <select aria-label="Role filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+          <option value="">All roles</option>
+          {Array.from(new Set(memberRows.map((row) => normalizeRole(row.role)))).sort().map((role) => <option key={role} value={role}>{roleDisplayName(role)}</option>)}
+        </select>
+        <select aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select aria-label="Scope filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+          <option value="">All scopes</option>
+          <option value="organization">Organization</option>
+          <option value="workspace">Workspace</option>
+        </select>
+        <select aria-label="Sort members" value={sortKey} onChange={(event) => setSortKey(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+          <option value="name">Sort by name</option>
+          <option value="email">Sort by email</option>
+          <option value="role">Sort by role</option>
+          <option value="status">Sort by status</option>
+          <option value="date">Sort by joined/invited</option>
+        </select>
+      </div>
       <SettingsDataTable
-        columns={["Full Name", "Email", "Role", "Status", "Joined Date", "Actions"]}
-        rows={filteredMembers.map((member) => {
-          const user = displayUser(profiles.get(member.user_id), member.user_id);
-          const role = roles.find((item) => item.id === member.role_id)?.name ?? member.member_role;
+        columns={["Name", "Email", "Role", "Scope", "Status", "Joined / Invited", "Last Active", "Actions"]}
+        rows={filteredRows.map((row) => {
+          if (row.kind === "invitation") {
+            return [
+              <div key={`${row.id}-name`}><div>{row.name}</div><div className="text-xs text-muted-foreground">Pending invitation</div></div>,
+              row.email,
+              row.role,
+              row.scopeLabel,
+              roleDisplayName(row.status),
+              formatDate(row.date),
+              "Not tracked yet",
+              <div key={`${row.id}-actions`} className="flex flex-wrap gap-2">
+                {row.status === "pending" && canInvite ? <Button type="button" size="sm" variant="outline" onClick={() => resendMutation.mutate(row.id)}>Resend Invite</Button> : null}
+                {row.status === "pending" && canInvite ? <Button type="button" size="sm" variant="outline" onClick={() => cancelInviteMutation.mutate(row.id)}>Cancel Invite</Button> : null}
+              </div>
+            ];
+          }
           return [
-            <div key={`${member.user_id}-name`}><div>{user.name}</div><div className="text-xs text-muted-foreground">User ID {member.user_id}</div></div>,
-            <div key={`${member.user_id}-email`}><div>{user.email}</div>{!profiles.get(member.user_id) ? <div className="text-xs text-muted-foreground">Detailed user profile lookup pending</div> : null}</div>,
-            role,
-            user.status,
-            "Current member",
-            <div key={member.user_id} className="flex flex-wrap gap-2">
-              <SettingsLinkButton href={`/settings/members/${member.user_id}`} variant="outline">View</SettingsLinkButton>
-              <Button type="button" size="sm" variant="outline" onClick={() => setRoleOpen(member.user_id)}>Change Role</Button>
-              <ConfirmActionButton label="Remove" message="Remove member is a placeholder until scoped removal UX is finalized." onConfirm={() => addToast({ type: "info", title: "Remove member placeholder", message: "Use organization/workspace member removal after confirmation UX is finalized." })} />
+            <div key={`${row.userId}-name`}><div>{row.name}</div><div className="text-xs text-muted-foreground">User ID {row.userId}</div></div>,
+            <div key={`${row.userId}-email`}><div>{row.email}</div>{row.profilePending ? <div className="text-xs text-muted-foreground">Detailed user profile lookup pending</div> : null}</div>,
+            row.role,
+            row.scopeLabel,
+            row.status,
+            formatDate(row.date),
+            "Not tracked yet",
+            <div key={row.userId} className="flex flex-wrap gap-2">
+              <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
+              {canChangeRoles ? <Button type="button" size="sm" variant="outline" onClick={() => setRoleOpen(row.userId)}>Change Role</Button> : null}
+              {canInvite ? (
+                <ConfirmActionButton
+                  label="Remove"
+                  message={`Remove ${row.name} from ${row.scopeLabel}?`}
+                  onConfirm={() => removeMutation.mutate(row.userId)}
+                />
+              ) : null}
             </div>
           ];
         })}
         emptyMessage="No members found"
       />
-      <SettingsCard title="Pending invitations" description="Invitations are created through core-service and appear here when visible to the signed-in admin.">
-        <SettingsDataTable
-          columns={["Email", "Scope", "Role", "Status", "Expires"]}
-          rows={(invitationsQuery.data ?? [])
-            .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
-            .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true))
-            .map((invitation) => [
-              invitation.email,
-              invitation.workspace_id ? "Workspace" : "Organization",
-              roles.find((role) => role.id === invitation.role_id)?.name ?? "Default member",
-              invitation.status,
-              formatDate(invitation.expires_at)
-            ])}
-          emptyMessage="No pending invitations"
-        />
-      </SettingsCard>
       <SettingsCreateDialog title="Invite member" open={inviteOpen} onOpenChange={setInviteOpen} onSubmit={submitInvite} error={formError}>
         <FormField label="Email" required><Input name="email" type="email" placeholder="teammate@example.com" /></FormField>
         <FormField label="Role">
-          <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            <option value="">Default member</option>
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+          <select name="role_id" aria-label="Invite role" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <RoleSelectOptions groupedRoles={groupedInviteRoles} />
           </select>
         </FormField>
         <FormField label="Scope">
-          <Input value={workspaceId ? "Workspace" : "Organization"} readOnly />
+          <Input value={workspaceId ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}` : `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}`} readOnly />
         </FormField>
         <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => setInviteOpen(false)} />
       </SettingsCreateDialog>
@@ -957,14 +1110,110 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         if (roleOpen && roleId) roleMutation.mutate({ userId: roleOpen, roleId });
       }}>
         <FormField label="Role" required>
-          <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+          <select name="role_id" aria-label="Change member role" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <RoleSelectOptions groupedRoles={groupedInviteRoles} includeDefault={false} />
           </select>
         </FormField>
         <FormActions submitLabel="Assign Role" isSubmitting={roleMutation.isPending} onCancel={() => setRoleOpen(null)} />
       </SettingsCreateDialog>
     </SettingsLayout>
   );
+}
+
+type MemberListRow =
+  | {
+      kind: "member";
+      userId: number;
+      name: string;
+      email: string;
+      role: string;
+      scopeType: "organization" | "workspace";
+      scopeLabel: string;
+      status: string;
+      date?: string;
+      profilePending: boolean;
+    }
+  | {
+      kind: "invitation";
+      id: number;
+      name: string;
+      email: string;
+      role: string;
+      scopeType: "organization" | "workspace";
+      scopeLabel: string;
+      status: string;
+      date?: string;
+    };
+
+function buildMemberRows({
+  members,
+  invitations,
+  profiles,
+  roles,
+  organizations,
+  workspaces
+}: {
+  members: Array<{ user_id: number; role_id?: number | null; member_role: string; created_at?: string; organization_id?: number; workspace_id?: number }>;
+  invitations: InvitationRecord[];
+  profiles: Map<number, CoreUser>;
+  roles: RoleRecord[];
+  organizations: Array<{ id: number; name: string }>;
+  workspaces: Array<{ id: number; name: string; organization_id: number }>;
+}): MemberListRow[] {
+  const activeRows: MemberListRow[] = members.map((member) => {
+    const user = displayUser(profiles.get(member.user_id), member.user_id);
+    const workspace = member.workspace_id ? workspaces.find((item) => item.id === member.workspace_id) : null;
+    const organizationId = member.organization_id ?? workspace?.organization_id;
+    const organization = organizationId ? organizations.find((item) => item.id === organizationId) : null;
+    const role = roles.find((item) => item.id === member.role_id);
+    return {
+      kind: "member",
+      userId: member.user_id,
+      name: user.name,
+      email: user.email,
+      role: roleNameFromRecord(role, member.member_role),
+      scopeType: member.workspace_id ? "workspace" : "organization",
+      scopeLabel: member.workspace_id
+        ? `Workspace: ${workspace?.name ?? member.workspace_id}`
+        : `Organization: ${organization?.name ?? member.organization_id ?? "Selected"}`,
+      status: user.status,
+      date: member.created_at,
+      profilePending: !profiles.get(member.user_id)
+    };
+  });
+  const invitationRows: MemberListRow[] = invitations.map((invitation) => {
+    const workspace = invitation.workspace_id ? workspaces.find((item) => item.id === invitation.workspace_id) : null;
+    const organization = organizations.find((item) => item.id === invitation.organization_id);
+    const role = roles.find((item) => item.id === invitation.role_id);
+    return {
+      kind: "invitation",
+      id: invitation.id,
+      name: invitation.email,
+      email: invitation.email,
+      role: roleNameFromRecord(role, "member"),
+      scopeType: invitation.workspace_id ? "workspace" : "organization",
+      scopeLabel: invitation.workspace_id
+        ? `Workspace: ${workspace?.name ?? invitation.workspace_id}`
+        : `Organization: ${organization?.name ?? invitation.organization_id}`,
+      status: invitation.status,
+      date: invitation.created_at ?? invitation.expires_at
+    };
+  });
+  return [...activeRows, ...invitationRows];
+}
+
+function compareMemberRows(left: MemberListRow, right: MemberListRow, sortKey: string) {
+  const leftValue = memberSortValue(left, sortKey);
+  const rightValue = memberSortValue(right, sortKey);
+  return leftValue.localeCompare(rightValue);
+}
+
+function memberSortValue(row: MemberListRow, sortKey: string) {
+  if (sortKey === "email") return row.email.toLowerCase();
+  if (sortKey === "role") return row.role.toLowerCase();
+  if (sortKey === "status") return row.status.toLowerCase();
+  if (sortKey === "date") return row.date ?? "";
+  return row.name.toLowerCase();
 }
 
 export function MemberDetailView({ userId }: { userId: number }) {

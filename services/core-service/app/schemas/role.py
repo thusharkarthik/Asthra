@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.schemas.base import TimestampedRead
 
@@ -42,6 +42,11 @@ class RoleRead(TimestampedRead):
     description: str | None = None
     scope: str
     is_active: bool
+
+    @computed_field
+    @property
+    def permission_preset(self) -> str:
+        return f"{self.scope}:{self.key}:placeholder"
 
 
 class PermissionCreate(BaseModel):
