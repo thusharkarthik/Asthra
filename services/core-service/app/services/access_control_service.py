@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.models.organization import OrganizationMember
 from app.models.permission import Permission
-from app.models.project import Project
+from app.models.project import Project, ProjectMembership
 from app.models.role import Role, RolePermission
-from app.models.user import User, UserRole
+from app.models.team import Team, TeamMember
+from app.models.user import RoleAssignment, User, UserRole
 from app.models.workspace import Workspace, WorkspaceMember
 from app.services.role_service import RoleService
 
@@ -108,6 +109,12 @@ class AccessControlService:
         resolved = self.get_user_permissions(user_id, scope_type, scope_id)
         return permission_code in set(resolved["permission_codes"])
 
+    def get_effective_roles(self, user_id: int, scope_type: str | None = None, scope_id: int | None = None) -> list[dict]:
+        return self.get_user_permissions(user_id, scope_type, scope_id)["roles"]
+
+    def get_effective_permissions(self, user_id: int, scope_type: str | None = None, scope_id: int | None = None) -> list[str]:
+        return self.get_user_permissions(user_id, scope_type, scope_id)["permission_codes"]
+
     def require(
         self,
         user: User,
@@ -124,7 +131,7 @@ class AccessControlService:
 
     def _normalize_scope(self, scope_type: str | None, scope_id: int | None) -> tuple[str, int | None]:
         normalized = (scope_type or "platform").strip().lower()
-        if normalized not in {"platform", "organization", "workspace", "project"}:
+        if normalized not in {"platform", "organization", "workspace", "project", "team"}:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported permission scope.")
         if normalized != "platform" and scope_id is None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="scope_id is required for scoped permissions.")
@@ -137,6 +144,7 @@ class AccessControlService:
             role = user_role.role
             if role and role.is_active:
                 self._add_role(roles, role, "platform", None)
+        self._add_role_assignments(roles, user_id, scope_type, scope_id)
 
         if scope_type == "organization" and scope_id is not None:
             self._add_organization_membership_role(roles, user_id, scope_id)
@@ -151,8 +159,48 @@ class AccessControlService:
             workspace = project.workspace
             self._add_organization_membership_role(roles, user_id, workspace.organization_id)
             self._add_workspace_membership_role(roles, user_id, workspace.id)
+            self._add_project_membership_role(roles, user_id, project.id)
+
+        if scope_type == "team" and scope_id is not None:
+            team = self._get_team(scope_id)
+            self._add_organization_membership_role(roles, user_id, team.workspace.organization_id)
+            self._add_workspace_membership_role(roles, user_id, team.workspace_id)
+            self._add_team_membership_role(roles, user_id, team.id)
 
         return sorted(roles.values(), key=lambda role: (role.source_scope_type, role.scope, role.name))
+
+    def _add_role_assignments(
+        self,
+        roles: dict[tuple[int, str, int | None], ResolvedRole],
+        user_id: int,
+        scope_type: str,
+        scope_id: int | None,
+    ) -> None:
+        assignments = self.db.query(RoleAssignment).filter(RoleAssignment.user_id == user_id, RoleAssignment.status == "active").all()
+        for assignment in assignments:
+            if assignment.role and assignment.role.is_active and self._assignment_applies(assignment, scope_type, scope_id):
+                self._add_role(roles, assignment.role, assignment.scope_type, assignment.scope_id)
+
+    def _assignment_applies(self, assignment: RoleAssignment, scope_type: str, scope_id: int | None) -> bool:
+        if assignment.scope_type == "platform":
+            return True
+        if assignment.scope_type == scope_type and assignment.scope_id == scope_id:
+            return True
+        if scope_type == "workspace" and assignment.scope_type == "organization" and scope_id is not None:
+            return assignment.scope_id == self._get_workspace(scope_id).organization_id
+        if scope_type == "project" and scope_id is not None:
+            project = self._get_project(scope_id)
+            if assignment.scope_type == "organization":
+                return assignment.scope_id == project.workspace.organization_id
+            if assignment.scope_type == "workspace":
+                return assignment.scope_id == project.workspace_id
+        if scope_type == "team" and scope_id is not None:
+            team = self._get_team(scope_id)
+            if assignment.scope_type == "organization":
+                return assignment.scope_id == team.workspace.organization_id
+            if assignment.scope_type == "workspace":
+                return assignment.scope_id == team.workspace_id
+        return False
 
     def _add_organization_membership_role(
         self,
@@ -193,6 +241,34 @@ class AccessControlService:
         role = member.role or self._role_by_key(LEGACY_WORKSPACE_ROLE_MAP.get(member.member_role.lower()))
         if role and role.is_active:
             self._add_role(roles, role, "workspace", workspace_id)
+
+    def _add_project_membership_role(
+        self,
+        roles: dict[tuple[int, str, int | None], ResolvedRole],
+        user_id: int,
+        project_id: int,
+    ) -> None:
+        member = (
+            self.db.query(ProjectMembership)
+            .filter(ProjectMembership.project_id == project_id, ProjectMembership.user_id == user_id, ProjectMembership.status == "active")
+            .first()
+        )
+        if member and member.role and member.role.is_active:
+            self._add_role(roles, member.role, "project", project_id)
+
+    def _add_team_membership_role(
+        self,
+        roles: dict[tuple[int, str, int | None], ResolvedRole],
+        user_id: int,
+        team_id: int,
+    ) -> None:
+        member = (
+            self.db.query(TeamMember)
+            .filter(TeamMember.team_id == team_id, TeamMember.user_id == user_id, TeamMember.status == "active")
+            .first()
+        )
+        if member and member.role and member.role.is_active:
+            self._add_role(roles, member.role, "team", team_id)
 
     def _add_role(
         self,
@@ -256,3 +332,9 @@ class AccessControlService:
         if project is None or not project.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         return project
+
+    def _get_team(self, team_id: int) -> Team:
+        team = self.db.get(Team, team_id)
+        if team is None or not team.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found.")
+        return team

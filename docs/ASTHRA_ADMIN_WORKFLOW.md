@@ -64,10 +64,26 @@ Protected Settings actions:
 
 Frontend Settings uses `/api/v1/me/permissions` and permission codes only. It does not rely on role names for access decisions.
 
+## Scoped Membership Foundation
+
+Scoped access is stored through role assignments:
+
+- `platform`: applies globally.
+- `organization`: inherits into workspaces and projects in the organization.
+- `workspace`: inherits into projects in the workspace.
+- `project`: applies only to that project.
+- `team`: applies only inside that team.
+
+Project memberships store which users belong to a project and can carry a project role and optional team. Team memberships store which users belong to a team and can carry a team role.
+
+Admins can review scoped assignments from Settings -> Access Control -> Assignments. Member detail pages show direct roles, inherited roles, and effective permission codes for the active scope.
+
+The local core demo seed creates Asthra Labs, Engineering, Asthra Platform, Asthra Flow, Asthra Docs, Backend Team, Frontend Team, Platform Team, and example users with platform/workspace/project/team assignments.
+
 ## Current Limitations
 
 - Backend RBAC enforcement currently starts with Settings endpoints.
 - Full backend RBAC across every service is not implemented yet.
-- Project-scoped membership is still a future model.
+- Project and team scoped membership now exists, but richer member lookup and assignment UX is still being expanded.
 - Last active timestamps display `Not tracked yet` until activity tracking is connected.
 - First-organization creation remains available as an install bootstrap path.

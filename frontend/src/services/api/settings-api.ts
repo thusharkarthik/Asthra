@@ -4,11 +4,14 @@ import type {
   CoreNotificationRecord,
   CoreUser,
   CurrentUserPermissions,
+  EffectivePermissionsRecord,
   InvitationRecord,
   Organization,
   OrganizationMember,
   PermissionRecord,
+  ProjectMembershipRecord,
   ProjectRecord,
+  RoleAssignmentRecord,
   RoleRecord,
   RoleTemplateRecord,
   TeamMemberRecord,
@@ -99,6 +102,18 @@ export const settingsApi = {
   deleteProject(token: string, projectId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/projects/${projectId}`, { method: "DELETE", authToken: token });
   },
+  listProjectMembers(token: string, projectId: number) {
+    return apiRequest<ProjectMembershipRecord[]>(`${CORE_PREFIX}/projects/${projectId}/members`, { method: "GET", authToken: token });
+  },
+  addProjectMember(token: string, projectId: number, payload: { user_id: number; role_id?: number | null; team_id?: number | null; status?: string }) {
+    return apiRequest<ProjectMembershipRecord>(`${CORE_PREFIX}/projects/${projectId}/members`, { method: "POST", authToken: token, json: payload });
+  },
+  updateProjectMember(token: string, projectId: number, membershipId: number, payload: { role_id?: number | null; team_id?: number | null; status?: string }) {
+    return apiRequest<ProjectMembershipRecord>(`${CORE_PREFIX}/projects/${projectId}/members/${membershipId}`, { method: "PATCH", authToken: token, json: payload });
+  },
+  removeProjectMember(token: string, projectId: number, membershipId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/projects/${projectId}/members/${membershipId}`, { method: "DELETE", authToken: token });
+  },
 
   listTeams(token: string) {
     return apiRequest<TeamRecord[]>(`${CORE_PREFIX}/teams`, { method: "GET", authToken: token });
@@ -120,6 +135,9 @@ export const settingsApi = {
   },
   addTeamMember(token: string, teamId: number, payload: { user_id: number; role_id?: number | null; member_role?: string }) {
     return apiRequest<TeamMemberRecord>(`${CORE_PREFIX}/teams/${teamId}/members`, { method: "POST", authToken: token, json: payload });
+  },
+  updateTeamMember(token: string, teamId: number, membershipId: number, payload: { role_id?: number | null; member_role?: string; status?: string }) {
+    return apiRequest<TeamMemberRecord>(`${CORE_PREFIX}/teams/${teamId}/members/${membershipId}`, { method: "PATCH", authToken: token, json: payload });
   },
   removeTeamMember(token: string, teamId: number, userId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/teams/${teamId}/members/${userId}`, { method: "DELETE", authToken: token });
@@ -159,6 +177,23 @@ export const settingsApi = {
       authToken: token,
       json: { permission_ids: permissionIds }
     });
+  },
+  listRoleAssignments(token: string, params: { user_id?: number; role_id?: number; scope_type?: string; scope_id?: number; status?: string } = {}) {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
+    });
+    const query = search.toString();
+    return apiRequest<RoleAssignmentRecord[]>(`${CORE_PREFIX}/role-assignments${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
+  },
+  createRoleAssignment(token: string, payload: { user_id: number; role_id: number; scope_type: string; scope_id?: number | null; status?: string }) {
+    return apiRequest<RoleAssignmentRecord>(`${CORE_PREFIX}/role-assignments`, { method: "POST", authToken: token, json: payload });
+  },
+  updateRoleAssignment(token: string, assignmentId: number, payload: { role_id?: number; status?: string }) {
+    return apiRequest<RoleAssignmentRecord>(`${CORE_PREFIX}/role-assignments/${assignmentId}`, { method: "PATCH", authToken: token, json: payload });
+  },
+  deleteRoleAssignment(token: string, assignmentId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/role-assignments/${assignmentId}`, { method: "DELETE", authToken: token });
   },
 
   listPermissions(token: string) {
@@ -213,5 +248,12 @@ export const settingsApi = {
   },
   removeUserRole(token: string, userId: number, roleId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/users/${userId}/roles/${roleId}`, { method: "DELETE", authToken: token });
+  },
+  getUserEffectivePermissions(token: string, userId: number, params: { scope_type?: string; scope_id?: number | null } = {}) {
+    const search = new URLSearchParams();
+    if (params.scope_type) search.set("scope_type", params.scope_type);
+    if (params.scope_id) search.set("scope_id", String(params.scope_id));
+    const query = search.toString();
+    return apiRequest<EffectivePermissionsRecord>(`${CORE_PREFIX}/users/${userId}/effective-permissions${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   }
 };

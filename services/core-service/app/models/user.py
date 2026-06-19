@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -35,3 +37,24 @@ class UserRole(TimestampMixin, Base):
 
     user = relationship("User", back_populates="user_roles")
     role = relationship("Role")
+
+
+class RoleAssignment(TimestampMixin, Base):
+    __tablename__ = "role_assignments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "role_id", "scope_type", "scope_id", name="uq_role_assignment_scope"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False, index=True)
+    scope_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    scope_id: Mapped[int | None] = mapped_column(index=True)
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False, index=True)
+    assigned_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user = relationship("User", foreign_keys=[user_id])
+    role = relationship("Role")
+    assigned_by_user = relationship("User", foreign_keys=[assigned_by])

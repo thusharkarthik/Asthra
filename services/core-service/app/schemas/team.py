@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import TimestampedRead
@@ -46,6 +48,7 @@ class TeamMemberCreate(BaseModel):
     user_id: int
     role_id: int | None = None
     member_role: str = "member"
+    status: str = "active"
 
 
 class TeamMemberRead(TimestampedRead):
@@ -53,3 +56,11 @@ class TeamMemberRead(TimestampedRead):
     user_id: int
     role_id: int | None = None
     member_role: str
+    status: str = "active"
+    joined_at: datetime | None = None
+
+
+class TeamMemberUpdate(BaseModel):
+    role_id: int | None = None
+    member_role: str | None = None
+    status: str | None = None

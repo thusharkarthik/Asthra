@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
-from app.models.project import Project, ProjectTeam
+from app.models.project import Project, ProjectMembership, ProjectTeam
 from app.models.user import User
 from app.schemas.project import (
     ProjectCreate,
@@ -12,7 +12,9 @@ from app.schemas.project import (
     ProjectTeamRead,
     ProjectUpdate,
 )
+from app.schemas.scoped_membership import ProjectMembershipCreate, ProjectMembershipRead, ProjectMembershipUpdate
 from app.services.project_service import ProjectService
+from app.services.scoped_membership_service import ScopedMembershipService
 
 router = APIRouter()
 
@@ -90,4 +92,45 @@ def unlink_project_team(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     ProjectService(db).unlink_team(project_id, team_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{project_id}/members", response_model=list[ProjectMembershipRead])
+def list_project_members(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ProjectMembership]:
+    return ScopedMembershipService(db).list_project_members(project_id, current_user)
+
+
+@router.post("/{project_id}/members", response_model=ProjectMembershipRead, status_code=status.HTTP_201_CREATED)
+def add_project_member(
+    project_id: int,
+    member_create: ProjectMembershipCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ProjectMembership:
+    return ScopedMembershipService(db).add_project_member(project_id, member_create, current_user)
+
+
+@router.patch("/{project_id}/members/{membership_id}", response_model=ProjectMembershipRead)
+def update_project_member(
+    project_id: int,
+    membership_id: int,
+    member_update: ProjectMembershipUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ProjectMembership:
+    return ScopedMembershipService(db).update_project_member(project_id, membership_id, member_update, current_user)
+
+
+@router.delete("/{project_id}/members/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_project_member(
+    project_id: int,
+    membership_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    ScopedMembershipService(db).remove_project_member(project_id, membership_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
