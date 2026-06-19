@@ -122,7 +122,7 @@ export const settingsApi = {
   listRoleTemplates(token: string) {
     return apiRequest<RoleTemplateRecord[]>(`${CORE_PREFIX}/role-templates`, { method: "GET", authToken: token });
   },
-  createRole(token: string, payload: NamedCreatePayload & { organization_id?: number; scope?: string }) {
+  createRole(token: string, payload: NamedCreatePayload & { organization_id?: number; scope?: string; is_system?: boolean; is_editable?: boolean }) {
     return apiRequest<RoleRecord>(`${CORE_PREFIX}/roles`, { method: "POST", authToken: token, json: payload });
   },
   updateRole(token: string, roleId: number, payload: Partial<NamedCreatePayload> & { scope?: string; is_active?: boolean }) {
@@ -155,7 +155,7 @@ export const settingsApi = {
   listPermissions(token: string) {
     return apiRequest<PermissionRecord[]>(`${CORE_PREFIX}/permissions`, { method: "GET", authToken: token });
   },
-  createPermission(token: string, payload: { code: string; name: string; description?: string }) {
+  createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });
   },
   updatePermission(token: string, permissionId: number, payload: { code?: string; name?: string; description?: string; is_active?: boolean }) {
