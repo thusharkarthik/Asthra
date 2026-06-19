@@ -96,9 +96,21 @@ export type RoleRecord = {
   description?: string | null;
   scope: string;
   permission_preset?: string;
+  is_system?: boolean;
+  is_editable?: boolean;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type RoleTemplateRecord = {
+  name: string;
+  key: string;
+  scope: string;
+  description: string;
+  permission_patterns: string[];
+  is_system: boolean;
+  is_editable: boolean;
 };
 
 export type PermissionRecord = {
@@ -108,6 +120,9 @@ export type PermissionRecord = {
   code: string;
   name: string;
   description?: string | null;
+  module?: string | null;
+  scope?: string;
+  status?: string;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;

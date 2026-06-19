@@ -9,6 +9,7 @@ import type {
   PermissionRecord,
   ProjectRecord,
   RoleRecord,
+  RoleTemplateRecord,
   TeamMemberRecord,
   TeamRecord,
   UserRoleRecord,
@@ -118,6 +119,9 @@ export const settingsApi = {
   listRoles(token: string) {
     return apiRequest<RoleRecord[]>(`${CORE_PREFIX}/roles`, { method: "GET", authToken: token });
   },
+  listRoleTemplates(token: string) {
+    return apiRequest<RoleTemplateRecord[]>(`${CORE_PREFIX}/role-templates`, { method: "GET", authToken: token });
+  },
   createRole(token: string, payload: NamedCreatePayload & { organization_id?: number; scope?: string }) {
     return apiRequest<RoleRecord>(`${CORE_PREFIX}/roles`, { method: "POST", authToken: token, json: payload });
   },
@@ -135,6 +139,16 @@ export const settingsApi = {
       method: "POST",
       authToken: token,
       json: { permission_id: permissionId }
+    });
+  },
+  removeRolePermission(token: string, roleId: number, permissionId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/roles/${roleId}/permissions/${permissionId}`, { method: "DELETE", authToken: token });
+  },
+  replaceRolePermissions(token: string, roleId: number, permissionIds: number[]) {
+    return apiRequest<Array<{ id: number; role_id: number; permission_id: number }>>(`${CORE_PREFIX}/roles/${roleId}/permissions`, {
+      method: "PUT",
+      authToken: token,
+      json: { permission_ids: permissionIds }
     });
   },
 
@@ -187,5 +201,8 @@ export const settingsApi = {
   },
   listUserRoles(token: string, userId: number) {
     return apiRequest<UserRoleRecord[]>(`${CORE_PREFIX}/users/${userId}/roles`, { method: "GET", authToken: token });
+  },
+  removeUserRole(token: string, userId: number, roleId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/users/${userId}/roles/${roleId}`, { method: "DELETE", authToken: token });
   }
 };

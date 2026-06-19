@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPage from "@/app/settings/page";
 import AccountSettingsPage from "@/app/settings/account/page";
@@ -12,6 +12,9 @@ import PreferencesSettingsPage from "@/app/settings/preferences/page";
 import RolesSettingsPage from "@/app/settings/roles/page";
 import TeamsSettingsPage from "@/app/settings/teams/page";
 import WorkspaceSettingsPage from "@/app/settings/workspace/page";
+import AccessControlPage from "@/app/settings/access-control/page";
+import AccessControlMappingPage from "@/app/settings/access-control/mapping/page";
+import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
 import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, TeamDetailView, WorkspaceDetailView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -26,12 +29,23 @@ vi.mock("@/services/api/settings-api", () => ({
     ]),
     listApiKeys: vi.fn(async () => []),
     listRoles: vi.fn(async () => [
-      { id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", organization_id: 1, is_active: true, permission_preset: "workspace:workspace_admin:placeholder" },
-      { id: 5, name: "Workspace Viewer", key: "workspace_viewer", scope: "workspace", organization_id: 1, is_active: true, permission_preset: "workspace:workspace_viewer:placeholder" },
-      { id: 6, name: "Product Owner", key: "product_owner", scope: "functional", organization_id: 1, is_active: true, permission_preset: "functional:product_owner:placeholder" },
-      { id: 7, name: "Platform Admin", key: "platform_admin", scope: "platform", organization_id: null, is_active: true, permission_preset: "platform:platform_admin:placeholder" }
+      { id: 1, name: "Platform Owner", key: "platform_owner", scope: "platform", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "platform:platform_owner:placeholder" },
+      { id: 2, name: "Platform Admin", key: "platform_admin", scope: "platform", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "platform:platform_admin:placeholder" },
+      { id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", organization_id: 1, is_system: true, is_editable: false, is_active: true, permission_preset: "workspace:workspace_admin:placeholder" },
+      { id: 5, name: "Workspace Viewer", key: "workspace_viewer", scope: "workspace", organization_id: 1, is_system: true, is_editable: false, is_active: true, permission_preset: "workspace:workspace_viewer:placeholder" },
+      { id: 6, name: "Product Owner", key: "product_owner", scope: "functional", organization_id: 1, is_system: true, is_editable: false, is_active: true, permission_preset: "functional:product_owner:placeholder" },
+      { id: 8, name: "Project Manager", key: "project_manager", scope: "project", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "project:project_manager:placeholder" },
+      { id: 9, name: "Project Contributor", key: "project_contributor", scope: "project", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "project:project_contributor:placeholder" }
     ]),
-    listPermissions: vi.fn(async () => [{ id: 5, code: "workspace.manage", name: "Manage workspace", is_active: true }]),
+    listRoleTemplates: vi.fn(async () => [
+      { name: "Platform Owner", key: "platform_owner", scope: "platform", description: "Full platform administration.", permission_patterns: ["*"], is_system: true, is_editable: false },
+      { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.workitem.*"], is_system: true, is_editable: false }
+    ]),
+    listPermissions: vi.fn(async () => [
+      { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", scope: "workspace", status: "active", is_active: true },
+      { id: 6, code: "flow.workitem.view", name: "View work items", module: "flow", scope: "project", status: "active", is_active: true },
+      { id: 7, code: "flow.workitem.create", name: "Create work items", module: "flow", scope: "project", status: "active", is_active: true }
+    ]),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
     listInvitations: vi.fn(async () => [{ id: 12, email: "invite@example.com", organization_id: 1, workspace_id: 2, status: "pending", invited_by_id: 1, expires_at: "2026-01-08T00:00:00Z" }]),
@@ -40,7 +54,7 @@ vi.mock("@/services/api/settings-api", () => ({
     listTeamMembers: vi.fn(async () => [{ id: 13, team_id: 6, user_id: 1, role_id: 4, member_role: "lead" }]),
     getUser: vi.fn(async () => ({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true })),
     listUserRoles: vi.fn(async () => [{ id: 14, user_id: 1, role_id: 4 }]),
-    listRolePermissions: vi.fn(async () => [{ id: 15, role_id: 4, permission_id: 5 }]),
+    listRolePermissions: vi.fn(async (_token: string, roleId: number) => roleId === 4 ? [{ id: 15, role_id: 4, permission_id: 5 }] : roleId === 8 ? [{ id: 16, role_id: 8, permission_id: 6 }, { id: 17, role_id: 8, permission_id: 7 }] : []),
     createOrganization: vi.fn(),
     createWorkspace: vi.fn(),
     createProject: vi.fn(),
@@ -52,6 +66,10 @@ vi.mock("@/services/api/settings-api", () => ({
     createPermission: vi.fn(),
     deletePermission: vi.fn(),
     assignUserRole: vi.fn(),
+    removeUserRole: vi.fn(),
+    addRolePermission: vi.fn(),
+    removeRolePermission: vi.fn(),
+    replaceRolePermissions: vi.fn(),
     addTeamMember: vi.fn(),
     updateProject: vi.fn(),
     updateOrganizationMember: vi.fn(async () => ({ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "admin" })),
@@ -234,6 +252,9 @@ describe("Settings frontend screens", () => {
   it("renders member detail", async () => {
     renderWithQuery(<MemberDetailView userId={1} />);
     expect(await screen.findByText("user@example.com")).toBeInTheDocument();
+    expect(await screen.findByText("Current Roles")).toBeInTheDocument();
+    expect(screen.getByText("Inherited Permissions Count")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assign member role")).toBeInTheDocument();
     expect(screen.getByText("Activity Placeholder")).toBeInTheDocument();
   });
 
@@ -260,8 +281,33 @@ describe("Settings frontend screens", () => {
 
   it("renders roles and permissions", async () => {
     renderWithQuery(<RolesSettingsPage />);
+    expect(await screen.findByRole("heading", { name: "Access Control" })).toBeInTheDocument();
+    expect(screen.getByText("Role Based Access Control")).toBeInTheDocument();
     expect(await screen.findByText("Workspace Admin")).toBeInTheDocument();
+    expect(screen.getByText("Permissions Count")).toBeInTheDocument();
+
+    cleanup();
     renderWithQuery(<PermissionsSettingsPage />);
-    expect(await screen.findByText("Permission matrix")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Access Control" })).toBeInTheDocument();
+    expect(await screen.findByText("Manage workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("Permission module filter")).toBeInTheDocument();
+  });
+
+  it("renders unified access control pages", async () => {
+    renderWithQuery(<AccessControlPage />);
+    expect(await screen.findByText("Role Mapping")).toBeInTheDocument();
+    expect(await screen.findByText("System Role")).toBeInTheDocument();
+
+    cleanup();
+    renderWithQuery(<AccessControlPermissionsPage />);
+    expect(await screen.findByText("Flow")).toBeInTheDocument();
+    expect(await screen.findByText("Create work items")).toBeInTheDocument();
+
+    cleanup();
+    renderWithQuery(<AccessControlMappingPage />);
+    expect(await screen.findByText("Role Mapping Matrix")).toBeInTheDocument();
+    expect(await screen.findByText("View work items")).toBeInTheDocument();
+    expect(await screen.findByText("Platform Owner")).toBeInTheDocument();
+    expect(screen.getByText("Project Manager")).toBeInTheDocument();
   });
 });

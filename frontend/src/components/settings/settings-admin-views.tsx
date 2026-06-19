@@ -10,7 +10,7 @@ import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { settingsApi } from "@/services/api/settings-api";
 import { canManageMembers, canManagePlatform, canManageRoles, normalizeRole } from "@/lib/rbac";
-import type { ApiKeyRecord, CoreUser, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
+import type { ApiKeyRecord, CoreUser, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
   FormField,
@@ -115,10 +115,50 @@ const ROLE_SCOPE_LABELS: Record<string, string> = {
   functional: "Functional"
 };
 
+const ACCESS_CONTROL_MODULES = ["settings", "flow", "docs", "desk", "pulse", "discover", "dev", "automation"];
+const ACCESS_MATRIX_ROLES = [
+  { key: "platform_owner", label: "Platform Owner" },
+  { key: "platform_admin", label: "Platform Admin" },
+  { key: "organization_owner", label: "Organization Owner" },
+  { key: "workspace_admin", label: "Workspace Admin" },
+  { key: "project_manager", label: "Project Manager" },
+  { key: "project_contributor", label: "Project Contributor" },
+  { key: "workspace_viewer", label: "Viewer" }
+];
+
 function roleDisplayName(role?: string | null) {
   return String(role || "member")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function moduleLabel(module?: string | null) {
+  return roleDisplayName(module || "uncategorized");
+}
+
+function permissionModule(permission: PermissionRecord) {
+  return permission.module || permission.code.split(".")[0] || "uncategorized";
+}
+
+function accessLevelForPermission(permission: PermissionRecord, role?: RoleRecord, mapped = false) {
+  if (!mapped || !role) return "None";
+  if (role.key === "platform_owner") return "Full";
+  if (permission.code.endsWith(".view")) return "Read";
+  if (permission.code.includes(".manage") || permission.code.includes(".delete") || permission.code.includes(".remove")) return "Manage";
+  if (permission.code.includes(".create") || permission.code.includes(".edit") || permission.code.includes(".invite")) return "Use";
+  return "Use";
+}
+
+function groupPermissionsByModule(permissions: PermissionRecord[]) {
+  return permissions.reduce<Record<string, PermissionRecord[]>>((groups, permission) => {
+    const module = permissionModule(permission);
+    groups[module] = [...(groups[module] ?? []), permission];
+    return groups;
+  }, {});
+}
+
+function countMembersForRole(role: RoleRecord, members: Array<{ role_id?: number | null; member_role?: string | null }>) {
+  return members.filter((member) => member.role_id === role.id || normalizeRole(member.member_role) === normalizeRole(role.key ?? role.name)).length;
 }
 
 function roleNameFromRecord(role?: RoleRecord | null, fallback?: string | null) {
@@ -242,8 +282,7 @@ export function SettingsHomeView() {
     { title: "Projects", value: projects.length, href: "/settings/projects" },
     { title: "Members", value: "Manage", href: "/settings/members" },
     { title: "Teams", value: "Manage", href: "/settings/teams" },
-    { title: "Roles", value: "Manage", href: "/settings/roles" },
-    { title: "Permissions", value: "Manage", href: "/settings/permissions" },
+    { title: "Access Control", value: "Manage", href: "/settings/access-control" },
     { title: "API Keys", value: "Manage", href: "/settings/api-keys" }
   ];
 
@@ -303,11 +342,12 @@ export function SettingsHomeView() {
           <div>
             <h3 className="text-sm font-semibold">Administration</h3>
             <div className="mt-2 flex flex-col gap-1 text-sm">
-              {["Organizations", "Workspaces", "Projects", "Members", "Teams", "Roles", "Permissions"].map((item) => (
+              {["Organizations", "Workspaces", "Projects", "Members", "Teams"].map((item) => (
                 <Link key={item} className="text-muted-foreground hover:text-foreground" href={`/settings/${item.toLowerCase()}`}>
                   {item}
                 </Link>
               ))}
+              <Link className="text-muted-foreground hover:text-foreground" href="/settings/access-control">Access Control</Link>
             </div>
           </div>
           <div>
@@ -337,8 +377,7 @@ export function AdministrationDashboardView() {
     { title: "Projects", count: projects.length, href: "/settings/projects" },
     { title: "Members", count: membersEstimate, href: "/settings/members" },
     { title: "Teams", count: teamsQuery.data?.length ?? 0, href: "/settings/teams" },
-    { title: "Roles", count: rolesQuery.data?.length ?? 0, href: "/settings/roles" },
-    { title: "Permissions", count: permissionsQuery.data?.length ?? 0, href: "/settings/permissions" }
+    { title: "Access Control", count: (rolesQuery.data?.length ?? 0) + (permissionsQuery.data?.length ?? 0), href: "/settings/access-control" }
   ];
 
   return (
@@ -1218,10 +1257,40 @@ function memberSortValue(row: MemberListRow, sortKey: string) {
 
 export function MemberDetailView({ userId }: { userId: number }) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
+  const [assignRoleId, setAssignRoleId] = useState("");
   const userQuery = useQuery({ queryKey: ["settings", "user", userId], queryFn: () => settingsApi.getUser(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const userRolesQuery = useQuery({ queryKey: ["settings", "user-roles", userId], queryFn: () => settingsApi.listUserRoles(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const memberRoleIds = (userRolesQuery.data ?? []).map((assignment) => assignment.role_id);
+  const inheritedPermissionsQuery = useQuery({
+    queryKey: ["settings", "member-inherited-permissions", userId, memberRoleIds.join(",")],
+    queryFn: async () => {
+      const mappings = await Promise.all(memberRoleIds.map((roleId) => settingsApi.listRolePermissions(accessToken ?? "", roleId).catch(() => [])));
+      return Array.from(new Set(mappings.flat().map((mapping) => mapping.permission_id)));
+    },
+    enabled: Boolean(accessToken && memberRoleIds.length)
+  });
+  const assignRoleMutation = useMutation({
+    mutationFn: (roleId: number) => settingsApi.assignUserRole(accessToken ?? "", userId, roleId),
+    onSuccess: async () => {
+      setAssignRoleId("");
+      await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
+      addToast({ type: "success", title: "Role assigned" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
+  });
+  const removeRoleMutation = useMutation({
+    mutationFn: (roleId: number) => settingsApi.removeUserRole(accessToken ?? "", userId, roleId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
+      addToast({ type: "success", title: "Role removed" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Role removal failed", message: error instanceof Error ? error.message : "Unable to remove role." })
+  });
   const user = userQuery.data;
+  const availableRoles = (rolesQuery.data ?? []).filter((role) => !memberRoleIds.includes(role.id));
   return (
     <SettingsLayout
       breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members", href: "/settings/members" }, { label: displayUser(user, userId).name }]}
@@ -1236,12 +1305,34 @@ export function MemberDetailView({ userId }: { userId: number }) {
           <div><dt className="text-muted-foreground">Status</dt><dd>{displayUser(user, userId).status}</dd></div>
           <div><dt className="text-muted-foreground">Job Title</dt><dd>{user?.job_title ?? "Not set"}</dd></div>
           <div><dt className="text-muted-foreground">Joined</dt><dd>{formatDate(user?.created_at)}</dd></div>
+          <div><dt className="text-muted-foreground">Inherited Permissions Count</dt><dd>{inheritedPermissionsQuery.data?.length ?? 0}</dd></div>
         </dl>
       </SettingsCard>
-      <SettingsCard title="Roles">
+      <SettingsCard
+        title="Current Roles"
+        description="Users receive roles. Inherited permissions are calculated from assigned role mappings."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <select aria-label="Assign member role" value={assignRoleId} onChange={(event) => setAssignRoleId(event.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm">
+              <option value="">Select role</option>
+              {availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            </select>
+            <Button type="button" size="sm" disabled={!assignRoleId || assignRoleMutation.isPending} onClick={() => assignRoleMutation.mutate(Number(assignRoleId))}>Assign Role</Button>
+          </div>
+        }
+      >
         <SettingsDataTable
-          columns={["Role", "Assigned"]}
-          rows={(userRolesQuery.data ?? []).map((assignment) => [rolesQuery.data?.find((role) => role.id === assignment.role_id)?.name ?? `Role ${assignment.role_id}`, formatDate(assignment.created_at)])}
+          columns={["Role", "Scope", "System Role", "Assigned", "Actions"]}
+          rows={(userRolesQuery.data ?? []).map((assignment) => {
+            const role = rolesQuery.data?.find((item) => item.id === assignment.role_id);
+            return [
+              role?.name ?? `Role ${assignment.role_id}`,
+              roleDisplayName(role?.scope),
+              role?.is_system ? "Yes" : "No",
+              formatDate(assignment.created_at),
+              <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.role_id)} disabled={removeRoleMutation.isPending}>Remove</Button>
+            ];
+          })}
           emptyMessage="No assigned roles"
         />
       </SettingsCard>
@@ -1448,7 +1539,136 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   );
 }
 
+function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" }) {
+  const tabs = [
+    { key: "roles", label: "Roles", href: "/settings/access-control" },
+    { key: "permissions", label: "Permissions", href: "/settings/access-control/permissions" },
+    { key: "mapping", label: "Role Mapping", href: "/settings/access-control/mapping" }
+  ] as const;
+  return (
+    <nav aria-label="Access Control sections" className="flex flex-wrap gap-2 border-b pb-2">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.key}
+          href={tab.href}
+          className={`rounded-md px-3 py-2 text-sm font-medium ${
+            active === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" }) {
+  const { accessToken, organizations, workspaces } = useSettingsData();
+  const [search, setSearch] = useState("");
+  const [moduleFilter, setModuleFilter] = useState("");
+  const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const roles = rolesQuery.data ?? [];
+  const permissions = permissionsQuery.data ?? [];
+  const rolePermissionsQuery = useQuery({
+    queryKey: ["settings", "role-permissions", roles.map((role) => role.id).join(",")],
+    queryFn: async () => {
+      const mappings = await Promise.all(roles.map(async (role) => [role.id, await settingsApi.listRolePermissions(accessToken ?? "", role.id)] as const));
+      return Object.fromEntries(mappings) as Record<number, Array<{ id: number; role_id: number; permission_id: number }>>;
+    },
+    enabled: Boolean(accessToken && roles.length)
+  });
+  const membersQuery = useQuery({
+    queryKey: ["settings", "access-control-members", organizations.map((item) => item.id).join(","), workspaces.map((item) => item.id).join(",")],
+    queryFn: async () => {
+      const organizationMembers = await Promise.all(organizations.map((organization) => settingsApi.listOrganizationMembers(accessToken ?? "", organization.id).catch(() => [])));
+      const workspaceMembers = await Promise.all(workspaces.map((workspace) => settingsApi.listWorkspaceMembers(accessToken ?? "", workspace.id).catch(() => [])));
+      return [...organizationMembers.flat(), ...workspaceMembers.flat()];
+    },
+    enabled: Boolean(accessToken)
+  });
+  const rolePermissionMap = rolePermissionsQuery.data ?? {};
+  const members = membersQuery.data ?? [];
+  const filteredPermissions = permissions
+    .filter((permission) => `${permission.code} ${permission.name} ${permission.description ?? ""}`.toLowerCase().includes(search.toLowerCase()))
+    .filter((permission) => (moduleFilter ? permissionModule(permission) === moduleFilter : true));
+  const groupedPermissions = groupPermissionsByModule(filteredPermissions);
+  const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...permissions.map(permissionModule)])).sort();
+
+  return (
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Access Control" }]}
+      backHref="/settings"
+      backLabel="Back to Settings"
+      parentContext={{
+        label: "Access Control",
+        title: "Role Based Access Control",
+        description: "Users receive roles, roles contain permissions, and permissions drive access across Asthra.",
+        meta: `${roles.length} roles / ${permissions.length} permissions / ${roleTemplatesQuery.data?.length ?? 0} templates`
+      }}
+    >
+      <SettingsSectionHeader title="Access Control" description="Unified RBAC center for roles, permission catalog, and role-permission mapping." />
+      <AccessControlTabs active={section} />
+      {section === "roles" ? (
+        <SettingsCard title="Roles" description="System roles are locked templates. Custom roles can be added later without assigning permissions directly to users.">
+          <SettingsDataTable
+            columns={["Name", "Scope", "System Role", "Members Count", "Permissions Count", "Actions"]}
+            rows={roles.map((role) => [
+              <div key={`${role.id}-name`}><div className="font-medium">{role.name}</div><div className="text-xs text-muted-foreground">{role.description ?? role.key}</div></div>,
+              roleDisplayName(role.scope),
+              role.is_system ? "Yes" : "No",
+              String(countMembersForRole(role, members)),
+              String(rolePermissionMap[role.id]?.length ?? 0),
+              <SettingsLinkButton key={role.id} href={`/settings/access-control/roles/${role.id}`} variant="outline">View</SettingsLinkButton>
+            ])}
+            emptyMessage="No roles yet"
+          />
+        </SettingsCard>
+      ) : null}
+      {section === "permissions" ? (
+        <div className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+            <SearchBox value={search} onChange={setSearch} placeholder="Search permissions" />
+            <select aria-label="Permission module filter" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All modules</option>
+              {modules.map((module) => <option key={module} value={module}>{moduleLabel(module)}</option>)}
+            </select>
+          </div>
+          {modules.filter((module) => groupedPermissions[module]?.length).map((module) => (
+            <SettingsCard key={module} title={moduleLabel(module)} description={`${groupedPermissions[module].length} permissions`}>
+              <SettingsDataTable
+                columns={["Code", "Name", "Scope", "Status"]}
+                rows={groupedPermissions[module].map((permission) => [permission.code, permission.name, roleDisplayName(permission.scope), roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active"))])}
+                emptyMessage={`No ${moduleLabel(module)} permissions`}
+              />
+            </SettingsCard>
+          ))}
+          {!filteredPermissions.length ? <SettingsEmptyState title="No permissions found" description="Adjust search or module filters." /> : null}
+        </div>
+      ) : null}
+      {section === "mapping" ? (
+        <SettingsCard title="Role Mapping Matrix" description="Effective access levels derived from current role-permission mappings.">
+          <SettingsDataTable
+            columns={["Permission", ...ACCESS_MATRIX_ROLES.map((role) => role.label)]}
+            rows={permissions.map((permission) => [
+              <div key={permission.id}><div className="font-medium">{permission.name}</div><div className="text-xs text-muted-foreground">{permission.code}</div></div>,
+              ...ACCESS_MATRIX_ROLES.map((matrixRole) => {
+                const role = roles.find((item) => item.key === matrixRole.key);
+                const mapped = Boolean(role && rolePermissionMap[role.id]?.some((mapping) => mapping.permission_id === permission.id));
+                return accessLevelForPermission(permission, role, mapped);
+              })
+            ])}
+            emptyMessage="No permissions available for mapping"
+          />
+        </SettingsCard>
+      ) : null}
+    </SettingsLayout>
+  );
+}
+
 export function RolesView({ organizationId }: { organizationId?: number }) {
+  if (!organizationId) return <AccessControlView section="roles" />;
   const { accessToken, organizations } = useSettingsData();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -1526,6 +1746,7 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
 }
 
 export function PermissionsView({ organizationId }: { organizationId?: number } = {}) {
+  if (!organizationId) return <AccessControlView section="permissions" />;
   const { accessToken, organizations } = useSettingsData();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -1617,30 +1838,73 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
 
 export function RoleDetailView({ roleId }: { roleId: number }) {
   const { accessToken } = useSettingsData();
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const rolePermissionsQuery = useQuery({ queryKey: ["settings", "role-permissions", roleId], queryFn: () => settingsApi.listRolePermissions(accessToken ?? "", roleId), enabled: Boolean(accessToken && roleId) });
   const role = rolesQuery.data?.find((item) => item.id === roleId);
-  if (!role) return <SettingsEmptyState title="Role not found" description="Open the roles list or refresh the page." action={<SettingsLinkButton href="/settings/roles">Roles</SettingsLinkButton>} />;
+  const addPermissionMutation = useMutation({
+    mutationFn: (permissionId: number) => settingsApi.addRolePermission(accessToken ?? "", roleId, permissionId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      addToast({ type: "success", title: "Permission assigned" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Permission assignment failed", message: error instanceof Error ? error.message : "Unable to assign permission." })
+  });
+  const removePermissionMutation = useMutation({
+    mutationFn: (permissionId: number) => settingsApi.removeRolePermission(accessToken ?? "", roleId, permissionId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      addToast({ type: "success", title: "Permission removed" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Permission removal failed", message: error instanceof Error ? error.message : "Unable to remove permission." })
+  });
+  if (!role) return <SettingsEmptyState title="Role not found" description="Open the access control center or refresh the page." action={<SettingsLinkButton href="/settings/access-control">Access Control</SettingsLinkButton>} />;
   const linkedPermissionIds = new Set((rolePermissionsQuery.data ?? []).map((item) => item.permission_id));
+  const groupedPermissions = groupPermissionsByModule(permissionsQuery.data ?? []);
+  const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...Object.keys(groupedPermissions)])).filter((module) => groupedPermissions[module]?.length);
   return (
-    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Roles", href: "/settings/roles" }, { label: role.name }]} backHref="/settings/roles" backLabel="Back to Roles" parentContext={{ label: "Role", title: role.name, description: role.description ?? undefined, meta: `Scope: ${role.scope}` }}>
+    <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Access Control", href: "/settings/access-control" }, { label: "Roles", href: "/settings/access-control" }, { label: role.name }]} backHref="/settings/access-control" backLabel="Back to Access Control" parentContext={{ label: "Role", title: role.name, description: role.description ?? undefined, meta: `Scope: ${roleDisplayName(role.scope)}` }}>
       <SettingsSectionHeader title={role.name} description={role.description ?? "Role detail and permission mapping."} />
-      <SettingsCard title="Overview">
+      <SettingsCard title="Role Information">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
-          <div><dt className="text-muted-foreground">Scope</dt><dd>{role.scope}</dd></div>
+          <div><dt className="text-muted-foreground">Scope</dt><dd>{roleDisplayName(role.scope)}</dd></div>
           <div><dt className="text-muted-foreground">Status</dt><dd>{role.is_active === false ? "Archived" : "Active"}</dd></div>
           <div><dt className="text-muted-foreground">Key</dt><dd>{role.key ?? "Generated by core-service"}</dd></div>
-          <div><dt className="text-muted-foreground">Organization</dt><dd>{role.organization_id ?? "Global"}</dd></div>
+          <div><dt className="text-muted-foreground">System Role</dt><dd>{role.is_system ? "Yes" : "No"}</dd></div>
+          <div><dt className="text-muted-foreground">Editable</dt><dd>{role.is_editable === false ? "No" : "Yes"}</dd></div>
+          <div><dt className="text-muted-foreground">Assigned Permissions</dt><dd>{linkedPermissionIds.size}</dd></div>
         </dl>
       </SettingsCard>
-      <SettingsCard title="Permissions">
-        <SettingsDataTable
-          columns={["Code", "Name", "Mapped"]}
-          rows={(permissionsQuery.data ?? []).map((permission) => [permission.code, permission.name, linkedPermissionIds.has(permission.id) ? "Yes" : "No"])}
-          emptyMessage="No permissions available"
-        />
-      </SettingsCard>
+      {role.is_editable === false ? <SettingsCard title="System Role Locked" description="System role templates are managed by Asthra and cannot be manually edited or remapped." /> : null}
+      {modules.map((module) => (
+        <SettingsCard key={module} title={`${moduleLabel(module)} Permissions`} description="Assign or remove permissions from this role.">
+          <SettingsDataTable
+            columns={["Permission", "Scope", "Status", "Assigned", "Action"]}
+            rows={(groupedPermissions[module] ?? []).map((permission) => {
+              const linked = linkedPermissionIds.has(permission.id);
+              return [
+                <div key={`${permission.id}-permission`}><div className="font-medium">{permission.name}</div><div className="text-xs text-muted-foreground">{permission.code}</div></div>,
+                roleDisplayName(permission.scope),
+                roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active")),
+                linked ? "Yes" : "No",
+                <Button
+                  key={`${permission.id}-action`}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
+                  onClick={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
+                >
+                  {linked ? "Remove Permission" : "Assign Permission"}
+                </Button>
+              ];
+            })}
+            emptyMessage={`No ${moduleLabel(module)} permissions`}
+          />
+        </SettingsCard>
+      ))}
       <SettingsCard title="Assigned Members" description="User-role assignments are shown on member detail pages. Bulk role membership editing is planned." />
     </SettingsLayout>
   );
