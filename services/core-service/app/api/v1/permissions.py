@@ -48,6 +48,16 @@ def update_permission(
     return PermissionService(db).update(permission_id, permission_update, current_user)
 
 
+@router.put("/{permission_id}", response_model=PermissionRead)
+def replace_permission(
+    permission_id: int,
+    permission_update: PermissionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Permission:
+    return PermissionService(db).update(permission_id, permission_update, current_user)
+
+
 @router.delete("/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_permission(
     permission_id: int,

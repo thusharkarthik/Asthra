@@ -14,7 +14,9 @@ from app.core.exceptions import (
 from app.core.logging import configure_logging
 from app.core.responses import error_response, success_response
 from app.db.session import SessionLocal
+from app.db.session import engine
 from app.middleware.request_id import RequestIdMiddleware
+from app.services.access_control_bootstrap import initialize_access_control
 
 
 def create_app() -> FastAPI:
@@ -80,6 +82,12 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    @app.on_event("startup")
+    def seed_access_control_catalog() -> None:
+        with SessionLocal() as db:
+            initialize_access_control(engine, db)
+
     return app
 
 

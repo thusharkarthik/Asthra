@@ -9,7 +9,7 @@ from app.models.role import Role, RolePermission
 from app.models.user import User, UserRole
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
-from app.schemas.role import RoleCreate, RolePermissionCreate, RoleUpdate, UserRoleCreate
+from app.schemas.role import RoleCreate, RolePermissionCreate, RolePermissionsReplace, RoleUpdate, UserRoleCreate
 from app.services.activity_service import ActivityService
 from app.services.notification_service import NotificationService
 
@@ -64,6 +64,8 @@ class RoleService:
             description=role_create.description,
             scope=scope,
             organization_id=role_create.organization_id,
+            is_system=role_create.is_system,
+            is_editable=role_create.is_editable,
         )
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
@@ -89,6 +91,8 @@ class RoleService:
 
     def update(self, role_id: int, role_update: RoleUpdate, current_user: User) -> Role:
         role = self.get(role_id, current_user)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         if role_update.scope is not None:
             role_update.scope = self._validate_scope(role_update.scope)
         name = role_update.name.strip() if role_update.name is not None else role.name
@@ -103,6 +107,8 @@ class RoleService:
 
     def delete(self, role_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         self.role_repository.update(role, RoleUpdate(is_active=False))
 
     def link_permission(
@@ -125,6 +131,22 @@ class RoleService:
     def list_permissions(self, role_id: int, current_user: User) -> list[RolePermission]:
         role = self.get(role_id, current_user)
         return self.role_repository.list_permissions(role.id)
+
+    def replace_permissions(
+        self,
+        role_id: int,
+        replace_create: RolePermissionsReplace,
+        current_user: User,
+    ) -> list[RolePermission]:
+        role = self.get(role_id, current_user)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
+        permission_ids = list(dict.fromkeys(replace_create.permission_ids))
+        for permission_id in permission_ids:
+            permission = self.permission_repository.get_by_id(permission_id)
+            if permission is None or not permission.is_active:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Permission {permission_id} not found.")
+        return self.role_repository.replace_permissions(role.id, permission_ids)
 
     def unlink_permission(self, role_id: int, permission_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
@@ -206,7 +228,15 @@ class RoleService:
     def ensure_role_catalog(self) -> None:
         changed = False
         for name, key, scope, description in ASTHRA_ROLE_CATALOG:
-            if self.role_repository.get_by_scope_and_name(scope, name) is not None:
+            existing = self.role_repository.get_by_scope_and_name(scope, name)
+            if existing is not None:
+                if not existing.is_system or existing.is_editable or existing.key != key:
+                    existing.key = key
+                    existing.is_system = True
+                    existing.is_editable = False
+                    if not existing.description:
+                        existing.description = f"{description} Permission preset placeholder: {key}."
+                    changed = True
                 continue
             self.role_repository.create(
                 name=name,
@@ -214,6 +244,8 @@ class RoleService:
                 description=f"{description} Permission preset placeholder: {key}.",
                 scope=scope,
                 organization_id=None,
+                is_system=True,
+                is_editable=False,
             )
             changed = True
         if changed:
