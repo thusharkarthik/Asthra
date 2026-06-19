@@ -33,6 +33,8 @@ class RoleRepository:
         description: str | None,
         scope: str,
         organization_id: int | None,
+        is_system: bool = False,
+        is_editable: bool = True,
     ) -> Role:
         role = Role(
             name=name,
@@ -40,6 +42,8 @@ class RoleRepository:
             description=description,
             scope=scope,
             organization_id=organization_id,
+            is_system=is_system,
+            is_editable=is_editable,
         )
         self.db.add(role)
         self.db.commit()
@@ -73,6 +77,19 @@ class RoleRepository:
     def unlink_permission(self, role_permission: RolePermission) -> None:
         self.db.delete(role_permission)
         self.db.commit()
+
+    def replace_permissions(self, role_id: int, permission_ids: list[int]) -> list[RolePermission]:
+        existing = self.list_permissions(role_id)
+        wanted = set(permission_ids)
+        for role_permission in existing:
+            if role_permission.permission_id not in wanted:
+                self.db.delete(role_permission)
+        existing_permission_ids = {role_permission.permission_id for role_permission in existing}
+        for permission_id in permission_ids:
+            if permission_id not in existing_permission_ids:
+                self.db.add(RolePermission(role_id=role_id, permission_id=permission_id))
+        self.db.commit()
+        return self.list_permissions(role_id)
 
     def list_permissions(self, role_id: int) -> list[RolePermission]:
         statement = (

@@ -9,6 +9,7 @@ from app.schemas.role import (
     RoleCreate,
     RolePermissionCreate,
     RolePermissionRead,
+    RolePermissionsReplace,
     RoleRead,
     RoleUpdate,
 )
@@ -53,6 +54,16 @@ def update_role(
     return RoleService(db).update(role_id, role_update, current_user)
 
 
+@router.put("/{role_id}", response_model=RoleRead)
+def replace_role(
+    role_id: int,
+    role_update: RoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Role:
+    return RoleService(db).update(role_id, role_update, current_user)
+
+
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_role(
     role_id: int,
@@ -80,6 +91,16 @@ def list_role_permissions(
     current_user: User = Depends(get_current_user),
 ) -> list[RolePermission]:
     return RoleService(db).list_permissions(role_id, current_user)
+
+
+@router.put("/{role_id}/permissions", response_model=list[RolePermissionRead])
+def replace_role_permissions(
+    role_id: int,
+    replace_create: RolePermissionsReplace,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[RolePermission]:
+    return RoleService(db).replace_permissions(role_id, replace_create, current_user)
 
 
 @router.delete("/{role_id}/permissions/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
