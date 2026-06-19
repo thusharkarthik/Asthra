@@ -3,15 +3,19 @@ services:
     build:
       context: ./services/api-gateway
     container_name: asthra-api-gateway
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/api-gateway/.env.example
     ports:
       - "8080:8000"
+    volumes:
+      - ./services/api-gateway/app:/app/app
 
   event-service:
     build:
       context: ./services/event-service
     container_name: asthra-event-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/event-service/.env.example
     environment:
@@ -19,13 +23,14 @@ services:
     ports:
       - "8015:8000"
     volumes:
+      - ./services/event-service/app:/app/app
       - event_service_data:/app/data
 
   core-service:
     build:
       context: ./services/core-service
     container_name: asthra-core-service
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app"
     env_file:
       - ./services/core-service/.env.example
     environment:
@@ -33,6 +38,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - ./services/core-service/app:/app/app
+      - ./services/core-service/scripts:/app/scripts
       - core_service_data:/app/data
 
   flow-service:
@@ -55,6 +62,7 @@ services:
     build:
       context: ./services/docs-service
     container_name: asthra-docs-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/docs-service/.env.example
     environment:
@@ -62,12 +70,15 @@ services:
     ports:
       - "8002:8000"
     volumes:
+      - ./services/docs-service/app:/app/app
+      - ./services/docs-service/scripts:/app/scripts
       - docs_service_data:/app/data
 
   ai-service:
     build:
       context: ./services/ai-service
     container_name: asthra-ai-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/ai-service/.env.example
     environment:
@@ -75,12 +86,15 @@ services:
     ports:
       - "8003:8000"
     volumes:
+      - ./services/ai-service/app:/app/app
+      - ./services/ai-service/scripts:/app/scripts
       - ai_service_data:/app/data
 
   memory-service:
     build:
       context: ./services/memory-service
     container_name: asthra-memory-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/memory-service/.env.example
     environment:
@@ -88,12 +102,15 @@ services:
     ports:
       - "8004:8000"
     volumes:
+      - ./services/memory-service/app:/app/app
+      - ./services/memory-service/scripts:/app/scripts
       - memory_service_data:/app/data
 
   discover-service:
     build:
       context: ./services/discover-service
     container_name: asthra-discover-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/discover-service/.env.example
     environment:
@@ -101,12 +118,15 @@ services:
     ports:
       - "8005:8000"
     volumes:
+      - ./services/discover-service/app:/app/app
+      - ./services/discover-service/scripts:/app/scripts
       - discover_service_data:/app/data
 
   desk-service:
     build:
       context: ./services/desk-service
     container_name: asthra-desk-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/desk-service/.env.example
     environment:
@@ -114,12 +134,15 @@ services:
     ports:
       - "8006:8000"
     volumes:
+      - ./services/desk-service/app:/app/app
+      - ./services/desk-service/scripts:/app/scripts
       - desk_service_data:/app/data
 
   pulse-service:
     build:
       context: ./services/pulse-service
     container_name: asthra-pulse-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/pulse-service/.env.example
     environment:
@@ -127,12 +150,15 @@ services:
     ports:
       - "8007:8000"
     volumes:
+      - ./services/pulse-service/app:/app/app
+      - ./services/pulse-service/scripts:/app/scripts
       - pulse_service_data:/app/data
 
   dev-service:
     build:
       context: ./services/dev-service
     container_name: asthra-dev-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/dev-service/.env.example
     environment:
@@ -140,12 +166,15 @@ services:
     ports:
       - "8008:8000"
     volumes:
+      - ./services/dev-service/app:/app/app
+      - ./services/dev-service/scripts:/app/scripts
       - dev_service_data:/app/data
 
   collab-service:
     build:
       context: ./services/collab-service
     container_name: asthra-collab-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/collab-service/.env.example
     environment:
@@ -153,12 +182,15 @@ services:
     ports:
       - "8009:8000"
     volumes:
+      - ./services/collab-service/app:/app/app
+      - ./services/collab-service/scripts:/app/scripts
       - collab_service_data:/app/data
 
   automation-service:
     build:
       context: ./services/automation-service
     container_name: asthra-automation-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/automation-service/.env.example
     environment:
@@ -166,12 +198,15 @@ services:
     ports:
       - "8010:8000"
     volumes:
+      - ./services/automation-service/app:/app/app
+      - ./services/automation-service/scripts:/app/scripts
       - automation_service_data:/app/data
 
   connect-service:
     build:
       context: ./services/connect-service
     container_name: asthra-connect-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/connect-service/.env.example
     environment:
@@ -179,12 +214,15 @@ services:
     ports:
       - "8011:8000"
     volumes:
+      - ./services/connect-service/app:/app/app
+      - ./services/connect-service/scripts:/app/scripts
       - connect_service_data:/app/data
 
   guard-service:
     build:
       context: ./services/guard-service
     container_name: asthra-guard-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/guard-service/.env.example
     environment:
@@ -192,12 +230,15 @@ services:
     ports:
       - "8012:8000"
     volumes:
+      - ./services/guard-service/app:/app/app
+      - ./services/guard-service/scripts:/app/scripts
       - guard_service_data:/app/data
 
   insights-service:
     build:
       context: ./services/insights-service
     container_name: asthra-insights-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/insights-service/.env.example
     environment:
@@ -205,12 +246,15 @@ services:
     ports:
       - "8013:8000"
     volumes:
+      - ./services/insights-service/app:/app/app
+      - ./services/insights-service/scripts:/app/scripts
       - insights_service_data:/app/data
 
   media-service:
     build:
       context: ./services/media-service
     container_name: asthra-media-service
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     env_file:
       - ./services/media-service/.env.example
     environment:
@@ -218,6 +262,8 @@ services:
     ports:
       - "8014:8000"
     volumes:
+      - ./services/media-service/app:/app/app
+      - ./services/media-service/scripts:/app/scripts
       - media_service_data:/app/data
 
   frontend:

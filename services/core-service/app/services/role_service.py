@@ -9,12 +9,181 @@ from app.models.role import Role, RolePermission
 from app.models.user import User, UserRole
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
-from app.schemas.role import RoleCreate, RolePermissionCreate, RoleUpdate, UserRoleCreate
+from app.schemas.role import RoleCreate, RolePermissionCreate, RolePermissionsReplace, RoleUpdate, UserRoleCreate
 from app.services.activity_service import ActivityService
 from app.services.notification_service import NotificationService
 
 
-VALID_ROLE_SCOPES = {"global", "organization", "workspace", "project"}
+VALID_ROLE_SCOPES = {"global", "platform", "organization", "workspace", "project", "team", "functional"}
+
+ASTHRA_ROLE_TEMPLATES = [
+    {
+        "name": "Platform Owner",
+        "key": "platform_owner",
+        "scope": "platform",
+        "description": "Full platform administration and future billing ownership.",
+        "permission_patterns": ["*"],
+    },
+    {
+        "name": "Platform Admin",
+        "key": "platform_admin",
+        "scope": "platform",
+        "description": "Platform administration without owner-only protections.",
+        "permission_patterns": ["settings.*", "flow.*", "docs.*", "discover.*", "desk.*", "pulse.*", "dev.*", "automation.*", "guard.*", "insights.*", "media.*"],
+    },
+    {
+        "name": "Platform Support",
+        "key": "platform_support",
+        "scope": "platform",
+        "description": "Support operational access for platform assistance.",
+        "permission_patterns": ["*.view", "desk.ticket.manage", "pulse.incident.view"],
+    },
+    {
+        "name": "Organization Owner",
+        "key": "organization_owner",
+        "scope": "organization",
+        "description": "Full organization administration and last-owner protected access.",
+        "permission_patterns": ["settings.organization.*", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.*", "settings.permission.*", "settings.team.*", "guard.audit.view", "insights.report.view"],
+    },
+    {
+        "name": "Organization Admin",
+        "key": "organization_admin",
+        "scope": "organization",
+        "description": "Manage organization settings, workspaces, and members.",
+        "permission_patterns": ["settings.organization.view", "settings.organization.manage", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.view", "settings.permission.view", "settings.team.*", "guard.audit.view", "insights.report.view"],
+    },
+    {
+        "name": "Organization Auditor",
+        "key": "organization_auditor",
+        "scope": "organization",
+        "description": "Read organization settings and audit data.",
+        "permission_patterns": ["*.view", "guard.audit.view", "insights.report.view"],
+    },
+    {
+        "name": "Workspace Admin",
+        "key": "workspace_admin",
+        "scope": "workspace",
+        "description": "Manage workspace settings, projects, teams, and members.",
+        "permission_patterns": ["settings.workspace.*", "settings.project.*", "settings.member.*", "settings.team.*", "flow.*", "docs.*", "discover.*", "desk.ticket.view", "pulse.incident.view", "insights.report.view", "media.asset.view"],
+    },
+    {
+        "name": "Workspace Manager",
+        "key": "workspace_manager",
+        "scope": "workspace",
+        "description": "Manage workspace execution and project delivery.",
+        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.member.view", "settings.member.invite", "settings.team.view", "flow.*", "docs.space.view", "docs.page.*", "discover.idea.*", "desk.ticket.view", "pulse.incident.view", "insights.report.view"],
+    },
+    {
+        "name": "Workspace Member",
+        "key": "workspace_member",
+        "scope": "workspace",
+        "description": "Create and edit workspace/project work.",
+        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.member.view", "flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.space.view", "docs.page.view", "docs.page.create", "docs.page.edit", "discover.idea.view", "desk.ticket.view", "pulse.incident.view", "media.asset.view"],
+    },
+    {
+        "name": "Workspace Viewer",
+        "key": "workspace_viewer",
+        "scope": "workspace",
+        "description": "Read-only workspace access.",
+        "permission_patterns": ["*.view"],
+    },
+    {
+        "name": "Project Admin",
+        "key": "project_admin",
+        "scope": "project",
+        "description": "Manage project settings, members, and work.",
+        "permission_patterns": ["settings.project.*", "settings.member.view", "flow.*", "docs.page.view", "discover.idea.view", "desk.ticket.view", "pulse.incident.view", "dev.release.view"],
+    },
+    {
+        "name": "Project Manager",
+        "key": "project_manager",
+        "scope": "project",
+        "description": "Manage project plans, sprints, releases, reports, and delivery.",
+        "permission_patterns": ["flow.work_item.*", "flow.board.view", "flow.sprint.*", "flow.release.*", "flow.workflow.view", "flow.report.view", "docs.page.view"],
+    },
+    {
+        "name": "Project Contributor",
+        "key": "project_contributor",
+        "scope": "project",
+        "description": "Contribute work and comments in a project.",
+        "permission_patterns": ["flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.work_item.assign", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.page.view"],
+    },
+    {
+        "name": "Project Viewer",
+        "key": "project_viewer",
+        "scope": "project",
+        "description": "Read-only project access.",
+        "permission_patterns": ["settings.project.view", "flow.work_item.view", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.workflow.view", "flow.report.view", "docs.page.view"],
+    },
+    {
+        "name": "Team Lead",
+        "key": "team_lead",
+        "scope": "team",
+        "description": "Manage team members and team-owned work.",
+        "permission_patterns": ["settings.team.*", "flow.work_item.*", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.view"],
+    },
+    {
+        "name": "Team Member",
+        "key": "team_member",
+        "scope": "team",
+        "description": "Participate in team-owned work.",
+        "permission_patterns": ["settings.team.view", "flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.page.view"],
+    },
+    {
+        "name": "Team Observer",
+        "key": "team_observer",
+        "scope": "team",
+        "description": "Read team activity and work.",
+        "permission_patterns": ["settings.team.view", "flow.work_item.view", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view"],
+    },
+    {
+        "name": "Product Owner",
+        "key": "product_owner",
+        "scope": "functional",
+        "description": "Own product priorities and acceptance decisions.",
+        "permission_patterns": ["flow.work_item.*", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.*", "discover.idea.*"],
+    },
+    {
+        "name": "Scrum Master",
+        "key": "scrum_master",
+        "scope": "functional",
+        "description": "Facilitate sprint execution and team ceremonies.",
+        "permission_patterns": ["flow.work_item.view", "flow.work_item.edit", "flow.work_item.assign", "flow.board.view", "flow.sprint.*", "flow.report.view"],
+    },
+    {
+        "name": "Engineering Manager",
+        "key": "engineering_manager",
+        "scope": "functional",
+        "description": "Manage engineering team delivery and ownership.",
+        "permission_patterns": ["flow.*", "docs.page.view", "desk.ticket.view", "pulse.incident.view", "dev.release.*", "insights.report.view"],
+    },
+    {
+        "name": "Release Manager",
+        "key": "release_manager",
+        "scope": "functional",
+        "description": "Coordinate release planning and rollout readiness.",
+        "permission_patterns": ["flow.work_item.view", "flow.board.view", "flow.release.*", "flow.report.view", "dev.release.*"],
+    },
+    {
+        "name": "Incident Commander",
+        "key": "incident_commander",
+        "scope": "functional",
+        "description": "Coordinate incident response and communications.",
+        "permission_patterns": ["desk.ticket.*", "pulse.incident.*", "flow.work_item.view", "flow.work_item.create", "docs.page.view"],
+    },
+    {
+        "name": "Knowledge Manager",
+        "key": "knowledge_manager",
+        "scope": "functional",
+        "description": "Manage knowledge quality and documentation practices.",
+        "permission_patterns": ["docs.page.*", "settings.workspace.view"],
+    },
+]
+
+ASTHRA_ROLE_CATALOG = [
+    (template["name"], template["key"], template["scope"], template["description"])
+    for template in ASTHRA_ROLE_TEMPLATES
+]
 
 
 class RoleService:
@@ -25,6 +194,7 @@ class RoleService:
 
     def create(self, role_create: RoleCreate, current_user: User) -> Role:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "organization" if role_create.organization_id else "platform", role_create.organization_id)
         scope = self._validate_scope(role_create.scope)
         name = role_create.name.strip()
         if self.role_repository.get_by_scope_and_name(scope, name) is not None:
@@ -38,6 +208,8 @@ class RoleService:
             description=role_create.description,
             scope=scope,
             organization_id=role_create.organization_id,
+            is_system=role_create.is_system,
+            is_editable=role_create.is_editable,
         )
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
@@ -51,7 +223,24 @@ class RoleService:
 
     def list(self, current_user: User) -> list[Role]:
         self._ensure_active_user(current_user)
+        self.ensure_role_catalog()
         return self.role_repository.list()
+
+    def list_templates(self, current_user: User) -> list[dict]:
+        self._ensure_active_user(current_user)
+        self.ensure_role_catalog()
+        return [
+            {
+                "name": template["name"],
+                "key": template["key"],
+                "scope": template["scope"],
+                "description": template["description"],
+                "permission_patterns": template["permission_patterns"],
+                "is_system": True,
+                "is_editable": False,
+            }
+            for template in ASTHRA_ROLE_TEMPLATES
+        ]
 
     def get(self, role_id: int, current_user: User) -> Role:
         self._ensure_active_user(current_user)
@@ -62,6 +251,9 @@ class RoleService:
 
     def update(self, role_id: int, role_update: RoleUpdate, current_user: User) -> Role:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         if role_update.scope is not None:
             role_update.scope = self._validate_scope(role_update.scope)
         name = role_update.name.strip() if role_update.name is not None else role.name
@@ -76,6 +268,9 @@ class RoleService:
 
     def delete(self, role_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         self.role_repository.update(role, RoleUpdate(is_active=False))
 
     def link_permission(
@@ -85,6 +280,9 @@ class RoleService:
         current_user: User,
     ) -> RolePermission:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         permission = self.permission_repository.get_by_id(link_create.permission_id)
         if permission is None or not permission.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permission not found.")
@@ -99,8 +297,28 @@ class RoleService:
         role = self.get(role_id, current_user)
         return self.role_repository.list_permissions(role.id)
 
+    def replace_permissions(
+        self,
+        role_id: int,
+        replace_create: RolePermissionsReplace,
+        current_user: User,
+    ) -> list[RolePermission]:
+        role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
+        permission_ids = list(dict.fromkeys(replace_create.permission_ids))
+        for permission_id in permission_ids:
+            permission = self.permission_repository.get_by_id(permission_id)
+            if permission is None or not permission.is_active:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Permission {permission_id} not found.")
+        return self.role_repository.replace_permissions(role.id, permission_ids)
+
     def unlink_permission(self, role_id: int, permission_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
+        if not role.is_editable:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         role_permission = self.role_repository.get_role_permission(role.id, permission_id)
         if role_permission is None:
             raise HTTPException(
@@ -116,6 +334,7 @@ class RoleService:
         current_user: User,
     ) -> UserRole:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "platform", None)
         user = self.role_repository.get_user(user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -148,6 +367,7 @@ class RoleService:
 
     def remove_user_role(self, user_id: int, role_id: int, current_user: User) -> None:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "platform", None)
         user = self.role_repository.get_user(user_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -163,15 +383,88 @@ class RoleService:
                 detail="User account is inactive.",
             )
 
+    def _require_role_manage(self, user: User, scope_type: str, scope_id: int | None) -> None:
+        from app.services.access_control_service import AccessControlService
+
+        AccessControlService(self.db).require(
+            user,
+            "settings.role.manage",
+            scope_type,
+            scope_id,
+        )
+
     def _validate_scope(self, scope: str) -> str:
         normalized_scope = scope.strip().lower()
         if normalized_scope not in VALID_ROLE_SCOPES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Role scope must be one of: global, organization, workspace, project.",
+                detail="Role scope must be one of: global, platform, organization, workspace, project, team, functional.",
             )
         return normalized_scope
 
     def _keyify(self, value: str) -> str:
         key = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
         return key or "role"
+
+    def ensure_role_catalog(self) -> None:
+        from app.services.permission_service import PermissionService
+
+        PermissionService(self.db).ensure_permission_catalog()
+        changed = False
+        role_by_key: dict[str, Role] = {}
+        for template in ASTHRA_ROLE_TEMPLATES:
+            name = template["name"]
+            key = template["key"]
+            scope = template["scope"]
+            description = template["description"]
+            existing = self.role_repository.get_by_scope_and_name(scope, name)
+            if existing is not None:
+                if not existing.is_system or existing.is_editable or existing.key != key or existing.description != description:
+                    existing.key = key
+                    existing.is_system = True
+                    existing.is_editable = False
+                    existing.description = description
+                    changed = True
+                role_by_key[key] = existing
+                continue
+            role = self.role_repository.create(
+                name=name,
+                key=key,
+                description=description,
+                scope=scope,
+                organization_id=None,
+                is_system=True,
+                is_editable=False,
+            )
+            role_by_key[key] = role
+            changed = True
+        if changed:
+            self.db.commit()
+        self._sync_role_template_permissions(role_by_key)
+
+    def _sync_role_template_permissions(self, role_by_key: dict[str, Role]) -> None:
+        permissions = self.permission_repository.list()
+        permission_ids_by_code = {permission.code: permission.id for permission in permissions}
+        permission_codes = sorted(permission_ids_by_code)
+        for template in ASTHRA_ROLE_TEMPLATES:
+            role = role_by_key.get(template["key"])
+            if role is None:
+                continue
+            wanted_permission_ids = [
+                permission_ids_by_code[code]
+                for code in permission_codes
+                if self._permission_matches_template(code, template["permission_patterns"])
+            ]
+            self.role_repository.replace_permissions(role.id, wanted_permission_ids)
+
+    def _permission_matches_template(self, permission_code: str, patterns: list[str]) -> bool:
+        for pattern in patterns:
+            if pattern == "*":
+                return True
+            if pattern.startswith("*.") and permission_code.endswith(pattern[1:]):
+                return True
+            if pattern.endswith(".*") and permission_code.startswith(pattern[:-1]):
+                return True
+            if permission_code == pattern:
+                return True
+        return False

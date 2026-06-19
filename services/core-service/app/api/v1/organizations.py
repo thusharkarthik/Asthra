@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.organization import (
     OrganizationCreate,
     OrganizationMemberRead,
+    OrganizationMemberUpdate,
     OrganizationRead,
     OrganizationUpdate,
 )
@@ -76,6 +77,17 @@ def list_organization_members(
     current_user: User = Depends(get_current_user),
 ) -> list[OrganizationMember]:
     return OrganizationService(db).list_members(organization_id, current_user)
+
+
+@router.patch("/{organization_id}/members/{user_id}", response_model=OrganizationMemberRead)
+def update_organization_member(
+    organization_id: int,
+    user_id: int,
+    member_update: OrganizationMemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationMember:
+    return MembershipService(db).update_organization_member(organization_id, user_id, member_update, current_user)
 
 
 @router.get("/{organization_id}/settings", response_model=OrganizationSettingsRead)

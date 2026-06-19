@@ -95,9 +95,22 @@ export type RoleRecord = {
   key?: string;
   description?: string | null;
   scope: string;
+  permission_preset?: string;
+  is_system?: boolean;
+  is_editable?: boolean;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type RoleTemplateRecord = {
+  name: string;
+  key: string;
+  scope: string;
+  description: string;
+  permission_patterns: string[];
+  is_system: boolean;
+  is_editable: boolean;
 };
 
 export type PermissionRecord = {
@@ -107,9 +120,32 @@ export type PermissionRecord = {
   code: string;
   name: string;
   description?: string | null;
+  module?: string | null;
+  scope?: string;
+  status?: string;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type CurrentUserPermissionScope = {
+  scope_type: string;
+  scope_id?: number | null;
+};
+
+export type CurrentUserResolvedRole = {
+  id: number;
+  name: string;
+  key: string;
+  scope: string;
+  source_scope_type: string;
+  source_scope_id?: number | null;
+};
+
+export type CurrentUserPermissions = {
+  permission_codes: string[];
+  roles: CurrentUserResolvedRole[];
+  scope: CurrentUserPermissionScope;
 };
 
 export type ApiKeyRecord = {
@@ -136,8 +172,13 @@ export type InvitationRecord = {
   invited_by_id: number;
   role_id?: number | null;
   status: string;
+  scope_type?: string;
+  scope_id?: number;
   token?: string;
   expires_at?: string;
+  invited_at?: string;
+  accepted_at?: string | null;
+  cancelled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -148,6 +189,8 @@ export type TeamMemberRecord = {
   user_id: number;
   role_id?: number | null;
   member_role: string;
+  status?: string;
+  joined_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -156,6 +199,57 @@ export type UserRoleRecord = {
   id: number;
   user_id: number;
   role_id: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleAssignmentRecord = {
+  id: number;
+  user_id: number;
+  role_id: number;
+  scope_type: string;
+  scope_id?: number | null;
+  status: string;
+  assigned_by?: number | null;
+  assigned_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProjectMembershipRecord = {
+  id: number;
+  project_id: number;
+  user_id: number;
+  role_id?: number | null;
+  team_id?: number | null;
+  status: string;
+  joined_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EffectivePermissionsRecord = {
+  user: CoreUser;
+  active_roles: Array<Record<string, unknown>>;
+  inherited_roles: Array<Record<string, unknown>>;
+  permission_codes: string[];
+  scope_context: Record<string, unknown>;
+};
+
+export type CoreNotificationRecord = {
+  id: number;
+  user_id: number;
+  organization_id?: number | null;
+  workspace_id?: number | null;
+  project_id?: number | null;
+  type: string;
+  title: string;
+  message: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  is_read: boolean;
+  read_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };

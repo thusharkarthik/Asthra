@@ -18,6 +18,9 @@ class Permission(TimestampMixin, Base):
     code: Mapped[str] = mapped_column(String(150), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    module: Mapped[str | None] = mapped_column(String(100))
+    scope: Mapped[str] = mapped_column(String(50), default="workspace", nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     role = relationship("Role", back_populates="permissions")

@@ -1,18 +1,89 @@
 # Asthra Admin Workflow
 
-Asthra requires a basic hierarchy before project-scoped modules become useful:
+## Setup Order
 
-1. Organization: top-level account boundary.
-2. Workspace: collaboration and operational boundary inside an organization.
-3. Project: project-level scope used by Flow and other modules.
+1. Create an organization.
+2. Create a workspace under that organization.
+3. Create projects under the workspace.
+4. Invite members by email from Settings -> Members.
+5. Assign scoped Asthra roles.
+6. Use project-specific modules such as Flow.
 
-Frontend settings now supports the internal alpha setup flow:
+## Role Catalog
 
-- Create organization.
-- Create workspace under organization.
-- Create project under workspace.
-- Select the created context in the shell.
-- Use Flow with the selected project.
+Asthra roles are grouped by scope:
 
-The current implementation calls core-service through the API Gateway and keeps advanced security, billing, audit, and policy behavior out of scope.
+- Platform: Platform Owner, Platform Admin, Platform Support
+- Organization: Organization Owner, Organization Admin, Organization Auditor
+- Workspace: Workspace Admin, Workspace Manager, Workspace Member, Workspace Viewer
+- Project: Project Admin, Project Manager, Project Contributor, Project Viewer
+- Team: Team Lead, Team Member, Team Observer
+- Functional: Product Owner, Scrum Master, Engineering Manager, Release Manager, Incident Commander, Knowledge Manager
 
+Every role has a stable key, scope, description, and role-permission mappings. Users receive roles; roles contain permissions; permissions control protected Settings actions.
+
+## Inviting Members
+
+Admins invite users by email. If the email belongs to an existing Asthra user, core-service adds the membership directly and marks the invitation accepted. If the email is unknown, core-service creates a pending invitation.
+
+Pending invitations can be resent or cancelled. Duplicate pending invitations for the same email and scope are rejected.
+
+## Invitation Notifications
+
+When an existing user is invited, core-service creates an in-app notification. If the user does not exist yet, the pending invitation remains stored. After signup/login with the same email, core-service syncs the pending invite into that user's notification center.
+
+Notification actions currently show Accept and Decline placeholders. Direct notification-action endpoints are a future improvement.
+
+## Safety Rules
+
+- The last Organization Owner cannot be removed.
+- The last Organization Owner cannot be downgraded.
+- Workspace owner protection follows the same pattern.
+- Platform roles can only be assigned by Platform Owner/Admin users or superusers.
+- Viewer roles should not see member or role management actions in the UI.
+
+## Permission Enforcement Flow
+
+Core-service resolves permissions with `get_user_permissions(user_id, scope_type, scope_id)`.
+
+Inheritance rules:
+
+- Organization roles inherit into workspaces and projects in that organization.
+- Workspace roles inherit into projects in that workspace.
+- Platform roles apply globally.
+
+Protected Settings actions:
+
+- Member invite: `settings.member.invite`
+- Member remove: `settings.member.remove`
+- Role management and role-permission mapping: `settings.role.manage`
+- Permission management: `settings.permission.manage`
+- Organization management: `settings.organization.manage`
+- Workspace management: `settings.workspace.manage`
+- Project management: `settings.project.manage`
+
+Frontend Settings uses `/api/v1/me/permissions` and permission codes only. It does not rely on role names for access decisions.
+
+## Scoped Membership Foundation
+
+Scoped access is stored through role assignments:
+
+- `platform`: applies globally.
+- `organization`: inherits into workspaces and projects in the organization.
+- `workspace`: inherits into projects in the workspace.
+- `project`: applies only to that project.
+- `team`: applies only inside that team.
+
+Project memberships store which users belong to a project and can carry a project role and optional team. Team memberships store which users belong to a team and can carry a team role.
+
+Admins can review scoped assignments from Settings -> Access Control -> Assignments. Member detail pages show direct roles, inherited roles, and effective permission codes for the active scope.
+
+The local core demo seed creates Asthra Labs, Engineering, Asthra Platform, Asthra Flow, Asthra Docs, Backend Team, Frontend Team, Platform Team, and example users with platform/workspace/project/team assignments.
+
+## Current Limitations
+
+- Backend RBAC enforcement currently starts with Settings endpoints.
+- Full backend RBAC across every service is not implemented yet.
+- Project and team scoped membership now exists, but richer member lookup and assignment UX is still being expanded.
+- Last active timestamps display `Not tracked yet` until activity tracking is connected.
+- First-organization creation remains available as an install bootstrap path.

@@ -10,18 +10,26 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectTeamCreate, ProjectUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
 
 
 class ProjectService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.project_repository = ProjectRepository(db)
 
     def create(self, project_create: ProjectCreate, current_user: User) -> Project:
         self._ensure_active_user(current_user)
         workspace = self._get_active_workspace(project_create.workspace_id)
         self._ensure_workspace_access(workspace, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.project.manage",
+            "workspace",
+            workspace.id,
+        )
         owner_id = self._resolve_owner_id(project_create.owner_id, workspace.id)
         key = self._build_unique_key(workspace_id=workspace.id, name=project_create.name)
         project = self.project_repository.create(
@@ -72,12 +80,24 @@ class ProjectService:
 
     def update(self, project_id: int, project_update: ProjectUpdate, current_user: User) -> Project:
         project = self.get(project_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.project.manage",
+            "project",
+            project.id,
+        )
         if project_update.owner_id is not None:
             self._resolve_owner_id(project_update.owner_id, project.workspace_id)
         return self.project_repository.update(project, project_update)
 
     def delete(self, project_id: int, current_user: User) -> None:
         project = self.get(project_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.project.manage",
+            "project",
+            project.id,
+        )
         self.project_repository.update(project, ProjectUpdate(is_active=False))
 
     def link_team(
@@ -87,6 +107,12 @@ class ProjectService:
         current_user: User,
     ) -> ProjectTeam:
         project = self.get(project_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.project.manage",
+            "project",
+            project.id,
+        )
         team = self.project_repository.get_team(project_team_create.team_id)
         if team is None or not team.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found.")
@@ -112,6 +138,12 @@ class ProjectService:
 
     def unlink_team(self, project_id: int, team_id: int, current_user: User) -> None:
         project = self.get(project_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.project.manage",
+            "project",
+            project.id,
+        )
         project_team = self.project_repository.get_project_team(project.id, team_id)
         if project_team is None:
             raise HTTPException(

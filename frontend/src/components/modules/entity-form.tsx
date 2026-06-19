@@ -79,7 +79,7 @@ export function EntityCreateDialog({
 }) {
   return (
     <CreateDialog title={title} open={open} onOpenChange={onOpenChange} size={size}>
-      <form className="space-y-4" onSubmit={onSubmit}>
+      <form className="space-y-4" onSubmit={onSubmit} noValidate>
         {children}
         {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{error}</p> : null}
       </form>

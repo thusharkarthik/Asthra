@@ -22,12 +22,25 @@ class PermissionRepository:
             statement = statement.where(Permission.is_active.is_(True))
         return list(self.db.scalars(statement).all())
 
-    def create(self, *, code: str, name: str, description: str | None) -> Permission:
+    def create(
+        self,
+        *,
+        code: str,
+        name: str,
+        description: str | None,
+        module: str | None = None,
+        scope: str = "workspace",
+        status: str = "active",
+    ) -> Permission:
         permission = Permission(
             code=code,
             key=code,
             name=name,
             description=description,
+            module=module,
+            scope=scope,
+            status=status,
+            is_active=status == "active",
         )
         self.db.add(permission)
         self.db.commit()
@@ -40,6 +53,10 @@ class PermissionRepository:
             setattr(permission, field, value)
         if "code" in update_data:
             permission.key = update_data["code"]
+        if "status" in update_data and "is_active" not in update_data:
+            permission.is_active = update_data["status"] == "active"
+        if "is_active" in update_data and "status" not in update_data:
+            permission.status = "active" if update_data["is_active"] else "inactive"
         self.db.commit()
         self.db.refresh(permission)
         return permission

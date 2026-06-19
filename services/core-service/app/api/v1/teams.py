@@ -9,9 +9,11 @@ from app.schemas.team import (
     TeamCreate,
     TeamMemberCreate,
     TeamMemberRead,
+    TeamMemberUpdate,
     TeamRead,
     TeamUpdate,
 )
+from app.services.scoped_membership_service import ScopedMembershipService
 from app.services.team_service import TeamService
 
 router = APIRouter()
@@ -82,12 +84,23 @@ def list_team_members(
     return TeamService(db).list_members(team_id, current_user)
 
 
-@router.delete("/{team_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/{team_id}/members/{membership_id}", response_model=TeamMemberRead)
+def update_team_member(
+    team_id: int,
+    membership_id: int,
+    member_update: TeamMemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TeamMember:
+    return ScopedMembershipService(db).update_team_member(team_id, membership_id, member_update, current_user)
+
+
+@router.delete("/{team_id}/members/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_team_member(
     team_id: int,
-    user_id: int,
+    membership_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
-    TeamService(db).remove_member(team_id, user_id, current_user)
+    ScopedMembershipService(db).remove_team_member_by_id(team_id, membership_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
