@@ -39,12 +39,14 @@ vi.mock("@/services/api/settings-api", () => ({
     ]),
     listRoleTemplates: vi.fn(async () => [
       { name: "Platform Owner", key: "platform_owner", scope: "platform", description: "Full platform administration.", permission_patterns: ["*"], is_system: true, is_editable: false },
-      { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.workitem.*"], is_system: true, is_editable: false }
+      { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.work_item.*"], is_system: true, is_editable: false }
     ]),
     listPermissions: vi.fn(async () => [
       { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", scope: "workspace", status: "active", is_active: true },
-      { id: 6, code: "flow.workitem.view", name: "View work items", module: "flow", scope: "project", status: "active", is_active: true },
-      { id: 7, code: "flow.workitem.create", name: "Create work items", module: "flow", scope: "project", status: "active", is_active: true }
+      { id: 6, code: "flow.work_item.view", name: "View work items", module: "flow", scope: "project", status: "active", is_active: true },
+      { id: 7, code: "flow.work_item.create", name: "Create work items", module: "flow", scope: "project", status: "active", is_active: true },
+      { id: 8, code: "docs.page.edit", name: "Edit Docs pages", module: "docs", scope: "workspace", status: "active", is_active: true },
+      { id: 9, code: "automation.rule.manage", name: "Manage automation rules", module: "automation", scope: "workspace", status: "active", is_active: true }
     ]),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
@@ -297,6 +299,8 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<AccessControlPage />);
     expect(await screen.findByText("Role Mapping")).toBeInTheDocument();
     expect(await screen.findByText("System Role")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Custom Role" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Permission" })).toBeInTheDocument();
 
     cleanup();
     renderWithQuery(<AccessControlPermissionsPage />);
@@ -307,7 +311,9 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<AccessControlMappingPage />);
     expect(await screen.findByText("Role Mapping Matrix")).toBeInTheDocument();
     expect(await screen.findByText("View work items")).toBeInTheDocument();
-    expect(await screen.findByText("Platform Owner")).toBeInTheDocument();
-    expect(screen.getByText("Project Manager")).toBeInTheDocument();
+    expect(await screen.findByText("Manage Role Permissions")).toBeInTheDocument();
+    expect(screen.getAllByText("Manage Permissions").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Platform Owner")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Project Manager").length).toBeGreaterThan(0);
   });
 });

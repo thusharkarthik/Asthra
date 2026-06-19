@@ -99,11 +99,12 @@ function displayUser(user?: CoreUser | null, fallbackId?: number) {
 }
 
 const DEFAULT_ROLE_MEANINGS = [
-  ["Owner", "Full access, future billing ownership, and member/role administration."],
-  ["Admin", "Manage workspace, project, settings, and members except owner protection rules."],
-  ["Manager", "Manage projects, work items, sprints, releases, and invite members where allowed."],
-  ["Member", "Create or edit assigned work, comment, and view workspace/project data."],
-  ["Viewer", "Read-only access."]
+  ["Platform Owner", "Full platform access and owner-only administration."],
+  ["Organization Owner", "Full organization, workspace, project, member, role, and audit access."],
+  ["Workspace Admin", "Manage workspace setup, members, teams, projects, Flow, Docs, and operational visibility."],
+  ["Project Manager", "Manage Flow work items, boards, sprints, releases, and reports."],
+  ["Project Contributor", "Create and edit project work while using scoped project knowledge."],
+  ["Workspace Viewer / Project Viewer", "Read-only access through view permissions."]
 ] as const;
 
 const ROLE_SCOPE_LABELS: Record<string, string> = {
@@ -1055,7 +1056,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         actions={canInvite ? <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton> : undefined}
       />
       {!canInvite ? <SettingsCard title="Limited access" description="Your current role can view members, but cannot invite or change roles." /> : null}
-      <SettingsCard title="Role model" description="These default meanings guide the current UI and future backend enforcement.">
+      <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
           {DEFAULT_ROLE_MEANINGS.map(([role, meaning]) => (
             <div key={role} className="rounded-md border bg-muted/20 p-3">
@@ -1566,6 +1567,10 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const { accessToken, organizations, workspaces } = useSettingsData();
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
+  const [roleCreateOpen, setRoleCreateOpen] = useState(false);
+  const [permissionCreateOpen, setPermissionCreateOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
@@ -1595,6 +1600,53 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     .filter((permission) => (moduleFilter ? permissionModule(permission) === moduleFilter : true));
   const groupedPermissions = groupPermissionsByModule(filteredPermissions);
   const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...permissions.map(permissionModule)])).sort();
+  const createRoleMutation = useMutation({
+    mutationFn: (payload: { name: string; description?: string; scope: string }) => settingsApi.createRole(accessToken ?? "", { ...payload, is_system: false, is_editable: true }),
+    onSuccess: async () => {
+      setRoleCreateOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
+      addToast({ type: "success", title: "Custom role created" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Role create failed", message: error instanceof Error ? error.message : "Unable to create role." })
+  });
+  const createPermissionMutation = useMutation({
+    mutationFn: (payload: { code: string; name: string; description?: string; module: string; scope: string; status: string }) => settingsApi.createPermission(accessToken ?? "", payload),
+    onSuccess: async () => {
+      setPermissionCreateOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] });
+      addToast({ type: "success", title: "Permission created" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Permission create failed", message: error instanceof Error ? error.message : "Unable to create permission." })
+  });
+
+  function submitCustomRole(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = getFormValue(event.currentTarget, "name");
+    const scope = getFormValue(event.currentTarget, "scope") || "project";
+    if (name) {
+      createRoleMutation.mutate({
+        name,
+        scope,
+        description: getFormValue(event.currentTarget, "description") || undefined
+      });
+    }
+  }
+
+  function submitPermission(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = getFormValue(event.currentTarget, "code");
+    const name = getFormValue(event.currentTarget, "name");
+    if (code && name) {
+      createPermissionMutation.mutate({
+        code,
+        name,
+        description: getFormValue(event.currentTarget, "description") || undefined,
+        module: getFormValue(event.currentTarget, "module") || code.split(".")[0] || "settings",
+        scope: getFormValue(event.currentTarget, "scope") || "workspace",
+        status: getFormValue(event.currentTarget, "status") || "active"
+      });
+    }
+  }
 
   return (
     <SettingsLayout
@@ -1608,7 +1660,16 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         meta: `${roles.length} roles / ${permissions.length} permissions / ${roleTemplatesQuery.data?.length ?? 0} templates`
       }}
     >
-      <SettingsSectionHeader title="Access Control" description="Unified RBAC center for roles, permission catalog, and role-permission mapping." />
+      <SettingsSectionHeader
+        title="Access Control"
+        description="Unified RBAC center for roles, permission catalog, and role-permission mapping."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton>
+            <Button type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</Button>
+          </div>
+        }
+      />
       <AccessControlTabs active={section} />
       {section === "roles" ? (
         <SettingsCard title="Roles" description="System roles are locked templates. Custom roles can be added later without assigning permissions directly to users.">
@@ -1620,7 +1681,9 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               role.is_system ? "Yes" : "No",
               String(countMembersForRole(role, members)),
               String(rolePermissionMap[role.id]?.length ?? 0),
-              <SettingsLinkButton key={role.id} href={`/settings/access-control/roles/${role.id}`} variant="outline">View</SettingsLinkButton>
+              <div key={role.id} className="flex flex-wrap gap-2">
+                <SettingsLinkButton href={`/settings/access-control/roles/${role.id}`} variant="outline">{role.is_editable === false ? "View" : "View/Edit"}</SettingsLinkButton>
+              </div>
             ])}
             emptyMessage="No roles yet"
           />
@@ -1648,21 +1711,59 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         </div>
       ) : null}
       {section === "mapping" ? (
-        <SettingsCard title="Role Mapping Matrix" description="Effective access levels derived from current role-permission mappings.">
-          <SettingsDataTable
-            columns={["Permission", ...ACCESS_MATRIX_ROLES.map((role) => role.label)]}
-            rows={permissions.map((permission) => [
-              <div key={permission.id}><div className="font-medium">{permission.name}</div><div className="text-xs text-muted-foreground">{permission.code}</div></div>,
-              ...ACCESS_MATRIX_ROLES.map((matrixRole) => {
-                const role = roles.find((item) => item.key === matrixRole.key);
-                const mapped = Boolean(role && rolePermissionMap[role.id]?.some((mapping) => mapping.permission_id === permission.id));
-                return accessLevelForPermission(permission, role, mapped);
-              })
-            ])}
-            emptyMessage="No permissions available for mapping"
-          />
-        </SettingsCard>
+        <div className="space-y-4">
+          <SettingsCard title="Manage Role Permissions" description="Open a role to view or change its permission assignments. System roles are view-only.">
+            <SettingsDataTable
+              columns={["Role", "Scope", "System Role", "Permissions Count", "Action"]}
+              rows={roles.map((role) => [
+                role.name,
+                roleDisplayName(role.scope),
+                role.is_system ? "Yes" : "No",
+                String(rolePermissionMap[role.id]?.length ?? 0),
+                <SettingsLinkButton key={role.id} href={`/settings/access-control/roles/${role.id}`} variant="outline">Manage Permissions</SettingsLinkButton>
+              ])}
+              emptyMessage="No roles available for mapping"
+            />
+          </SettingsCard>
+          <SettingsCard title="Role Mapping Matrix" description="Effective access levels derived from current role-permission mappings.">
+            <SettingsDataTable
+              columns={["Permission", ...ACCESS_MATRIX_ROLES.map((role) => role.label)]}
+              rows={permissions.map((permission) => [
+                <div key={permission.id}><div className="font-medium">{permission.name}</div><div className="text-xs text-muted-foreground">{permission.code}</div></div>,
+                ...ACCESS_MATRIX_ROLES.map((matrixRole) => {
+                  const role = roles.find((item) => item.key === matrixRole.key);
+                  const mapped = Boolean(role && rolePermissionMap[role.id]?.some((mapping) => mapping.permission_id === permission.id));
+                  return accessLevelForPermission(permission, role, mapped);
+                })
+              ])}
+              emptyMessage="No permissions available for mapping"
+            />
+          </SettingsCard>
+        </div>
       ) : null}
+      <SettingsCreateDialog title="Create custom role" open={roleCreateOpen} onOpenChange={setRoleCreateOpen} onSubmit={submitCustomRole}>
+        <FormField label="Name" required><Input name="name" placeholder="QA Lead" /></FormField>
+        <FormField label="Scope">
+          <select name="scope" className="h-10 w-full rounded-md border bg-background px-3 text-sm" defaultValue="project">
+            {["platform", "organization", "workspace", "project", "team", "functional"].map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Description"><Input name="description" placeholder="Custom access role for this team" /></FormField>
+        <FormActions submitLabel="Create Custom Role" isSubmitting={createRoleMutation.isPending} onCancel={() => setRoleCreateOpen(false)} />
+      </SettingsCreateDialog>
+      <SettingsCreateDialog title="Create permission" open={permissionCreateOpen} onOpenChange={setPermissionCreateOpen} onSubmit={submitPermission}>
+        <FormField label="Code" required><Input name="code" placeholder="flow.custom.view" /></FormField>
+        <FormField label="Name" required><Input name="name" placeholder="View custom Flow area" /></FormField>
+        <FormField label="Module"><Input name="module" placeholder="flow" /></FormField>
+        <FormField label="Scope">
+          <select name="scope" className="h-10 w-full rounded-md border bg-background px-3 text-sm" defaultValue="workspace">
+            {["platform", "organization", "workspace", "project", "team", "functional"].map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Description"><Input name="description" placeholder="What this permission allows" /></FormField>
+        <input type="hidden" name="status" value="active" />
+        <FormActions submitLabel="Create Permission" isSubmitting={createPermissionMutation.isPending} onCancel={() => setPermissionCreateOpen(false)} />
+      </SettingsCreateDialog>
     </SettingsLayout>
   );
 }
@@ -1812,13 +1913,13 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
         ])}
         emptyMessage="No permissions yet"
       />
-      <SettingsCard title="Permission matrix" description="Simple display mapping for administrator planning. Enforcement remains backend-owned.">
+      <SettingsCard title="Permission matrix" description="Legacy scoped planning view. Use Access Control for live role-permission mappings.">
         <SettingsDataTable
-          columns={["Permission", "Owner", "Admin", "Manager", "Member", "Viewer"]}
+          columns={["Permission", "Platform Owner", "Workspace Admin", "Project Manager", "Project Contributor", "Viewer"]}
           rows={permissions.map((permission) => [
             permission.code,
             "Full",
-            "Full",
+            permission.code.includes(".view") ? "Read" : "Manage",
             permission.code.includes("delete") ? "No" : "Manage",
             permission.code.includes("manage") ? "No" : "Use",
             "Read"
@@ -1889,16 +1990,15 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
                 roleDisplayName(permission.scope),
                 roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active")),
                 linked ? "Yes" : "No",
-                <Button
-                  key={`${permission.id}-action`}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
-                  onClick={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
-                >
-                  {linked ? "Remove Permission" : "Assign Permission"}
-                </Button>
+                <label key={`${permission.id}-action`} className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={linked}
+                    disabled={role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
+                    onChange={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
+                  />
+                  {role.is_editable === false ? "View only" : linked ? "Assigned" : "Assign Permission"}
+                </label>
               ];
             })}
             emptyMessage={`No ${moduleLabel(module)} permissions`}
@@ -1927,7 +2027,7 @@ export function PermissionDetailView({ permissionId }: { permissionId: number })
         </dl>
       </SettingsCard>
       <SettingsCard title="Permission matrix">
-        <SettingsDataTable columns={["Owner", "Admin", "Manager", "Member", "Viewer"]} rows={[["Full", "Full", "Manage", "Use", "Read"]]} emptyMessage="No matrix mapping" />
+        <SettingsDataTable columns={["Platform Owner", "Workspace Admin", "Project Manager", "Project Contributor", "Viewer"]} rows={[["Full", "Manage", "Manage", "Use", "Read"]]} emptyMessage="No matrix mapping" />
       </SettingsCard>
     </SettingsLayout>
   );

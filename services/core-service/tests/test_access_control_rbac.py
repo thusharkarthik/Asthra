@@ -11,10 +11,16 @@ def test_permission_catalog_is_seeded_from_permissions_api(client):
     codes = {permission["code"] for permission in permissions}
     assert "settings.organization.view" in codes
     assert "settings.member.invite" in codes
-    assert "flow.workitem.create" in codes
+    assert "settings.member.view" in codes
+    assert "settings.role.manage" in codes
+    assert "flow.work_item.create" in codes
+    assert "flow.board.view" in codes
+    assert "automation.rule.manage" in codes
+    assert "media.asset.manage" in codes
     assert "docs.page.edit" in codes
     assert "desk.ticket.manage" in codes
-    flow_permission = next(permission for permission in permissions if permission["code"] == "flow.workitem.create")
+    assert len(codes) >= 40
+    flow_permission = next(permission for permission in permissions if permission["code"] == "flow.work_item.create")
     assert flow_permission["module"] == "flow"
     assert flow_permission["scope"] == "project"
     assert flow_permission["status"] == "active"
@@ -48,8 +54,8 @@ def test_role_create_update_and_permission_mapping(client):
     headers = create_auth_headers(client)
     permissions = client.get("/api/v1/permissions", headers=headers).json()
     selected_permissions = [
-        next(permission for permission in permissions if permission["code"] == "flow.workitem.view"),
-        next(permission for permission in permissions if permission["code"] == "flow.workitem.create"),
+        next(permission for permission in permissions if permission["code"] == "flow.work_item.view"),
+        next(permission for permission in permissions if permission["code"] == "flow.work_item.create"),
     ]
 
     role_response = client.post(
@@ -124,7 +130,7 @@ def test_role_templates_api_lists_enterprise_templates(client):
     project_manager = next(template for template in templates if template["key"] == "project_manager")
     assert project_manager["is_system"] is True
     assert project_manager["is_editable"] is False
-    assert "flow.workitem.*" in project_manager["permission_patterns"]
+    assert "flow.work_item.*" in project_manager["permission_patterns"]
 
 
 def test_system_role_templates_are_seeded_and_locked(client):
@@ -166,16 +172,17 @@ def test_role_template_permissions_are_mapped(client):
     project_manager = next(role for role in roles if role["key"] == "project_manager")
     project_manager_mappings = client.get(f"/api/v1/roles/{project_manager['id']}/permissions", headers=headers).json()
     project_manager_codes = {permission_codes_by_id[mapping["permission_id"]] for mapping in project_manager_mappings}
-    assert "flow.workitem.create" in project_manager_codes
+    assert "flow.work_item.create" in project_manager_codes
     assert "flow.sprint.manage" in project_manager_codes
     assert "flow.release.manage" in project_manager_codes
-    assert "flow.report.manage" in project_manager_codes
+    assert "flow.report.view" in project_manager_codes
     assert "settings.organization.manage" not in project_manager_codes
 
     project_viewer = next(role for role in roles if role["key"] == "project_viewer")
     project_viewer_mappings = client.get(f"/api/v1/roles/{project_viewer['id']}/permissions", headers=headers).json()
     project_viewer_codes = {permission_codes_by_id[mapping["permission_id"]] for mapping in project_viewer_mappings}
-    assert "flow.workitem.view" in project_viewer_codes
+    assert "flow.work_item.view" in project_viewer_codes
+    assert "flow.board.view" in project_viewer_codes
     assert "flow.sprint.view" in project_viewer_codes
     assert "flow.release.view" in project_viewer_codes
     assert all(code.endswith(".view") for code in project_viewer_codes)

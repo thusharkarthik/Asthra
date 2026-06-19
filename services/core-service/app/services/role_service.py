@@ -29,147 +29,147 @@ ASTHRA_ROLE_TEMPLATES = [
         "key": "platform_admin",
         "scope": "platform",
         "description": "Platform administration without owner-only protections.",
-        "permission_patterns": ["settings.*", "flow.*", "docs.*", "desk.*"],
+        "permission_patterns": ["settings.*", "flow.*", "docs.*", "discover.*", "desk.*", "pulse.*", "dev.*", "automation.*", "guard.*", "insights.*", "media.*"],
     },
     {
         "name": "Platform Support",
         "key": "platform_support",
         "scope": "platform",
         "description": "Support operational access for platform assistance.",
-        "permission_patterns": ["settings.organization.view", "settings.workspace.view", "settings.project.view", "desk.ticket.view"],
+        "permission_patterns": ["*.view", "desk.ticket.manage", "pulse.incident.view"],
     },
     {
         "name": "Organization Owner",
         "key": "organization_owner",
         "scope": "organization",
         "description": "Full organization administration and last-owner protected access.",
-        "permission_patterns": ["settings.organization.*", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.team.*"],
+        "permission_patterns": ["settings.organization.*", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.*", "settings.permission.*", "settings.team.*", "guard.audit.view", "insights.report.view"],
     },
     {
         "name": "Organization Admin",
         "key": "organization_admin",
         "scope": "organization",
         "description": "Manage organization settings, workspaces, and members.",
-        "permission_patterns": ["settings.organization.view", "settings.organization.manage", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.team.*"],
+        "permission_patterns": ["settings.organization.view", "settings.organization.manage", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.view", "settings.permission.view", "settings.team.*", "guard.audit.view", "insights.report.view"],
     },
     {
         "name": "Organization Auditor",
         "key": "organization_auditor",
         "scope": "organization",
         "description": "Read organization settings and audit data.",
-        "permission_patterns": ["settings.organization.view", "settings.workspace.view", "settings.project.view", "settings.team.view"],
+        "permission_patterns": ["*.view", "guard.audit.view", "insights.report.view"],
     },
     {
         "name": "Workspace Admin",
         "key": "workspace_admin",
         "scope": "workspace",
         "description": "Manage workspace settings, projects, teams, and members.",
-        "permission_patterns": ["settings.workspace.*", "settings.project.*", "settings.member.*", "settings.team.*", "flow.*", "docs.*", "desk.*"],
+        "permission_patterns": ["settings.workspace.*", "settings.project.*", "settings.member.*", "settings.team.*", "flow.*", "docs.*", "discover.*", "desk.ticket.view", "pulse.incident.view", "insights.report.view", "media.asset.view"],
     },
     {
         "name": "Workspace Manager",
         "key": "workspace_manager",
         "scope": "workspace",
         "description": "Manage workspace execution and project delivery.",
-        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.member.invite", "settings.team.view", "flow.*", "docs.page.*", "desk.ticket.view"],
+        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.member.view", "settings.member.invite", "settings.team.view", "flow.*", "docs.space.view", "docs.page.*", "discover.idea.*", "desk.ticket.view", "pulse.incident.view", "insights.report.view"],
     },
     {
         "name": "Workspace Member",
         "key": "workspace_member",
         "scope": "workspace",
         "description": "Create and edit workspace/project work.",
-        "permission_patterns": ["settings.workspace.view", "settings.project.view", "flow.workitem.view", "flow.workitem.create", "flow.workitem.edit", "docs.page.view", "docs.page.create", "docs.page.edit", "desk.ticket.view"],
+        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.member.view", "flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.space.view", "docs.page.view", "docs.page.create", "docs.page.edit", "discover.idea.view", "desk.ticket.view", "pulse.incident.view", "media.asset.view"],
     },
     {
         "name": "Workspace Viewer",
         "key": "workspace_viewer",
         "scope": "workspace",
         "description": "Read-only workspace access.",
-        "permission_patterns": ["settings.workspace.view", "settings.project.view", "settings.team.view", "*.view"],
+        "permission_patterns": ["*.view"],
     },
     {
         "name": "Project Admin",
         "key": "project_admin",
         "scope": "project",
         "description": "Manage project settings, members, and work.",
-        "permission_patterns": ["settings.project.*", "flow.*"],
+        "permission_patterns": ["settings.project.*", "settings.member.view", "flow.*", "docs.page.view", "discover.idea.view", "desk.ticket.view", "pulse.incident.view", "dev.release.view"],
     },
     {
         "name": "Project Manager",
         "key": "project_manager",
         "scope": "project",
         "description": "Manage project plans, sprints, releases, reports, and delivery.",
-        "permission_patterns": ["flow.workitem.*", "flow.sprint.*", "flow.release.*", "flow.report.*"],
+        "permission_patterns": ["flow.work_item.*", "flow.board.view", "flow.sprint.*", "flow.release.*", "flow.workflow.view", "flow.report.view", "docs.page.view"],
     },
     {
         "name": "Project Contributor",
         "key": "project_contributor",
         "scope": "project",
         "description": "Contribute work and comments in a project.",
-        "permission_patterns": ["flow.workitem.view", "flow.workitem.create", "flow.workitem.edit", "flow.sprint.view", "flow.release.view", "flow.report.view"],
+        "permission_patterns": ["flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.work_item.assign", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.page.view"],
     },
     {
         "name": "Project Viewer",
         "key": "project_viewer",
         "scope": "project",
         "description": "Read-only project access.",
-        "permission_patterns": ["settings.project.view", "flow.workitem.view", "flow.sprint.view", "flow.release.view", "flow.report.view"],
+        "permission_patterns": ["settings.project.view", "flow.work_item.view", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.workflow.view", "flow.report.view", "docs.page.view"],
     },
     {
         "name": "Team Lead",
         "key": "team_lead",
         "scope": "team",
         "description": "Manage team members and team-owned work.",
-        "permission_patterns": ["settings.team.*", "flow.workitem.*", "flow.sprint.view", "flow.release.view", "flow.report.view"],
+        "permission_patterns": ["settings.team.*", "flow.work_item.*", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.view"],
     },
     {
         "name": "Team Member",
         "key": "team_member",
         "scope": "team",
         "description": "Participate in team-owned work.",
-        "permission_patterns": ["settings.team.view", "flow.workitem.view", "flow.workitem.create", "flow.workitem.edit", "flow.sprint.view", "flow.release.view"],
+        "permission_patterns": ["settings.team.view", "flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.board.view", "flow.sprint.view", "flow.release.view", "docs.page.view"],
     },
     {
         "name": "Team Observer",
         "key": "team_observer",
         "scope": "team",
         "description": "Read team activity and work.",
-        "permission_patterns": ["settings.team.view", "flow.workitem.view", "flow.sprint.view", "flow.release.view", "flow.report.view"],
+        "permission_patterns": ["settings.team.view", "flow.work_item.view", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view"],
     },
     {
         "name": "Product Owner",
         "key": "product_owner",
         "scope": "functional",
         "description": "Own product priorities and acceptance decisions.",
-        "permission_patterns": ["flow.workitem.*", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.*"],
+        "permission_patterns": ["flow.work_item.*", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.*", "discover.idea.*"],
     },
     {
         "name": "Scrum Master",
         "key": "scrum_master",
         "scope": "functional",
         "description": "Facilitate sprint execution and team ceremonies.",
-        "permission_patterns": ["flow.workitem.view", "flow.workitem.edit", "flow.sprint.*", "flow.report.view"],
+        "permission_patterns": ["flow.work_item.view", "flow.work_item.edit", "flow.work_item.assign", "flow.board.view", "flow.sprint.*", "flow.report.view"],
     },
     {
         "name": "Engineering Manager",
         "key": "engineering_manager",
         "scope": "functional",
         "description": "Manage engineering team delivery and ownership.",
-        "permission_patterns": ["flow.*", "docs.page.view", "desk.ticket.view"],
+        "permission_patterns": ["flow.*", "docs.page.view", "desk.ticket.view", "pulse.incident.view", "dev.release.*", "insights.report.view"],
     },
     {
         "name": "Release Manager",
         "key": "release_manager",
         "scope": "functional",
         "description": "Coordinate release planning and rollout readiness.",
-        "permission_patterns": ["flow.workitem.view", "flow.release.*", "flow.report.view"],
+        "permission_patterns": ["flow.work_item.view", "flow.board.view", "flow.release.*", "flow.report.view", "dev.release.*"],
     },
     {
         "name": "Incident Commander",
         "key": "incident_commander",
         "scope": "functional",
         "description": "Coordinate incident response and communications.",
-        "permission_patterns": ["desk.ticket.*", "flow.workitem.view", "flow.workitem.create", "docs.page.view"],
+        "permission_patterns": ["desk.ticket.*", "pulse.incident.*", "flow.work_item.view", "flow.work_item.create", "docs.page.view"],
     },
     {
         "name": "Knowledge Manager",
@@ -401,19 +401,18 @@ class RoleService:
             description = template["description"]
             existing = self.role_repository.get_by_scope_and_name(scope, name)
             if existing is not None:
-                if not existing.is_system or existing.is_editable or existing.key != key:
+                if not existing.is_system or existing.is_editable or existing.key != key or existing.description != description:
                     existing.key = key
                     existing.is_system = True
                     existing.is_editable = False
-                    if not existing.description:
-                        existing.description = f"{description} Permission preset placeholder: {key}."
+                    existing.description = description
                     changed = True
                 role_by_key[key] = existing
                 continue
             role = self.role_repository.create(
                 name=name,
                 key=key,
-                description=f"{description} Permission preset placeholder: {key}.",
+                description=description,
                 scope=scope,
                 organization_id=None,
                 is_system=True,
