@@ -9,11 +9,13 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.event_publisher import publish_event
 
 
 class OrganizationService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.organization_repository = OrganizationRepository(db)
 
     def create(
@@ -63,10 +65,22 @@ class OrganizationService:
         current_user: User,
     ) -> Organization:
         organization = self.get(organization_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.organization.manage",
+            "organization",
+            organization.id,
+        )
         return self.organization_repository.update(organization, organization_update)
 
     def delete(self, organization_id: int, current_user: User) -> None:
         organization = self.get(organization_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.organization.manage",
+            "organization",
+            organization.id,
+        )
         self.organization_repository.update(organization, OrganizationUpdate(is_active=False))
 
     def list_members(

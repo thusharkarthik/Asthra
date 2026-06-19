@@ -9,6 +9,7 @@ from app.models.role import Role
 from app.models.user import User, UserRole
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.invitation import InvitationAccept, InvitationCreate
+from app.services.access_control_service import AccessControlService
 from app.services.activity_service import ActivityService
 from app.services.notification_service import NotificationService
 
@@ -25,6 +26,8 @@ class InvitationService:
         if organization is None or not organization.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
         self._ensure_organization_access(invitation_create.organization_id, current_user)
+        permission_scope_type = "organization"
+        permission_scope_id = invitation_create.organization_id
 
         if invitation_create.workspace_id is not None:
             workspace = self.repository.get_workspace(invitation_create.workspace_id)
@@ -36,6 +39,15 @@ class InvitationService:
                     detail="Workspace does not belong to this organization.",
                 )
             self._ensure_workspace_access(invitation_create.workspace_id, current_user)
+            permission_scope_type = "workspace"
+            permission_scope_id = invitation_create.workspace_id
+
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.member.invite",
+            permission_scope_type,
+            permission_scope_id,
+        )
 
         if self.repository.get_pending_duplicate(
             email=email,
@@ -155,6 +167,7 @@ class InvitationService:
 
     def revoke(self, invitation_id: int, current_user: User) -> Invitation:
         invitation = self.get(invitation_id, current_user)
+        self._require_invitation_manage(invitation, current_user)
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be revoked.")
         invitation = self.repository.update_status(invitation, "cancelled")
@@ -171,6 +184,7 @@ class InvitationService:
 
     def resend(self, invitation_id: int, current_user: User) -> Invitation:
         invitation = self.get(invitation_id, current_user)
+        self._require_invitation_manage(invitation, current_user)
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be resent.")
         invitation.token = token_urlsafe(32)
@@ -245,3 +259,19 @@ class InvitationService:
         )
         if platform_assignment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only platform owners or admins can assign platform roles.")
+
+    def _require_invitation_manage(self, invitation: Invitation, current_user: User) -> None:
+        if invitation.workspace_id is not None:
+            AccessControlService(self.db).require(
+                current_user,
+                "settings.member.invite",
+                "workspace",
+                invitation.workspace_id,
+            )
+            return
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.member.invite",
+            "organization",
+            invitation.organization_id,
+        )

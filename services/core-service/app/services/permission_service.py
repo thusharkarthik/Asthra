@@ -68,6 +68,7 @@ class PermissionService:
 
     def create(self, permission_create: PermissionCreate, current_user: User) -> Permission:
         self._ensure_active_user(current_user)
+        self._require_permission_manage(current_user)
         code = self._normalize_code(permission_create.code)
         self._validate_status(permission_create.status)
         if self.permission_repository.get_by_code(code) is not None:
@@ -111,6 +112,7 @@ class PermissionService:
         current_user: User,
     ) -> Permission:
         permission = self.get(permission_id, current_user)
+        self._require_permission_manage(current_user)
         if permission_update.code is not None:
             permission_update.code = self._normalize_code(permission_update.code)
             duplicate = self.permission_repository.get_by_code(permission_update.code)
@@ -127,6 +129,7 @@ class PermissionService:
 
     def delete(self, permission_id: int, current_user: User) -> None:
         permission = self.get(permission_id, current_user)
+        self._require_permission_manage(current_user)
         self.permission_repository.update(permission, PermissionUpdate(status="inactive", is_active=False))
 
     def ensure_permission_catalog(self) -> None:
@@ -165,6 +168,16 @@ class PermissionService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is inactive.",
             )
+
+    def _require_permission_manage(self, user: User) -> None:
+        from app.services.access_control_service import AccessControlService
+
+        AccessControlService(self.db).require(
+            user,
+            "settings.permission.manage",
+            "platform",
+            None,
+        )
 
     def _normalize_code(self, code: str) -> str:
         return code.strip().lower()

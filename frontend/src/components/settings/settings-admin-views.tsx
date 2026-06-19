@@ -9,8 +9,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { settingsApi } from "@/services/api/settings-api";
-import { canManageMembers, canManagePlatform, canManageRoles, normalizeRole } from "@/lib/rbac";
-import type { ApiKeyRecord, CoreUser, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
+import { normalizeRole } from "@/lib/rbac";
+import { can as hasPermission } from "@/lib/permissions";
+import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
   FormField,
@@ -77,6 +78,31 @@ function useSettingsData() {
     projects: projectsQuery.data ?? [],
     isLoading: organizationsQuery.isLoading || workspacesQuery.isLoading || projectsQuery.isLoading,
     error: organizationsQuery.error ?? workspacesQuery.error ?? projectsQuery.error
+  };
+}
+
+function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: number; projectId?: number }) {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
+  const orgId = scopeOverride?.orgId ?? selectedOrganizationId ?? undefined;
+  const workspaceId = scopeOverride?.workspaceId ?? selectedWorkspaceId ?? undefined;
+  const projectId = scopeOverride?.projectId ?? selectedProjectId ?? undefined;
+  const query = useQuery<CurrentUserPermissions>({
+    queryKey: ["settings", "me-permissions", orgId ?? null, workspaceId ?? null, projectId ?? null],
+    queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {
+      org_id: orgId,
+      workspace_id: workspaceId,
+      project_id: projectId
+    }),
+    enabled: Boolean(accessToken)
+  });
+  const permissionCodes = query.data?.permission_codes ?? [];
+  return {
+    ...query,
+    permissionCodes,
+    can: (permissionCode: string) => hasPermission(permissionCodes, permissionCode)
   };
 }
 
@@ -276,6 +302,10 @@ function SetupSummary() {
 
 export function SettingsHomeView() {
   const { organizations, workspaces, projects } = useSettingsData();
+  const permissions = useCurrentPermissions();
+  const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
+  const canCreateWorkspace = permissions.can("settings.workspace.manage");
+  const canCreateProject = permissions.can("settings.project.manage");
   const cards = [
     { title: "Administration", value: "Open", href: "/settings/administration" },
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
@@ -304,9 +334,9 @@ export function SettingsHomeView() {
       </div>
       <SettingsCard title="Operational setup flow" description="Create the required hierarchy before using project-scoped modules like Flow.">
         <div className="grid gap-3 md:grid-cols-3">
-          <SettingsLinkButton href="/settings/organizations" variant="outline">Create Organization</SettingsLinkButton>
-          <SettingsLinkButton href="/settings/workspaces" variant="outline">Create Workspace</SettingsLinkButton>
-          <SettingsLinkButton href="/settings/projects" variant="outline">Create Project</SettingsLinkButton>
+          {canCreateOrganization ? <SettingsLinkButton href="/settings/organizations" variant="outline">Create Organization</SettingsLinkButton> : <Button type="button" variant="outline" disabled>Create Organization</Button>}
+          {canCreateWorkspace ? <SettingsLinkButton href="/settings/workspaces" variant="outline">Create Workspace</SettingsLinkButton> : <Button type="button" variant="outline" disabled>Create Workspace</Button>}
+          {canCreateProject ? <SettingsLinkButton href="/settings/projects" variant="outline">Create Project</SettingsLinkButton> : <Button type="button" variant="outline" disabled>Create Project</Button>}
         </div>
       </SettingsCard>
       <SettingsCard title="Administration hierarchy" description="Use this relationship map when setting up Asthra for module CRUD testing.">
@@ -400,6 +430,8 @@ export function AdministrationDashboardView() {
 
 export function OrganizationsView() {
   const { accessToken, organizations } = useSettingsData();
+  const permissions = useCurrentPermissions();
+  const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -431,7 +463,12 @@ export function OrganizationsView() {
 
   return (
     <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Organizations" }]} backHref="/settings" backLabel="Back to Settings">
-      <SettingsSectionHeader title="Organizations" description="Create and manage the top-level homes for Asthra work." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>} />
+      <SettingsSectionHeader
+        title="Organizations"
+        description="Create and manage the top-level homes for Asthra work."
+        actions={canCreateOrganization ? <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton> : undefined}
+      />
+      {!canCreateOrganization ? <SettingsCard title="Limited access" description="You need settings.organization.manage to create organizations." /> : null}
       <SettingsDataTable
         columns={["Name", "Description", "Status", "Actions"]}
         rows={organizations.map((organization) => [
@@ -466,6 +503,8 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const targetOrganizationId = organizationId ?? selectedOrganizationId ?? organizations[0]?.id;
+  const permissions = useCurrentPermissions({ orgId: targetOrganizationId ?? undefined });
+  const canCreateWorkspace = permissions.can("settings.workspace.manage");
   const visibleWorkspaces = organizationId ? workspaces.filter((workspace) => workspace.organization_id === organizationId) : workspaces;
 
   const mutation = useMutation({
@@ -528,7 +567,12 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Workspaces" description="Workspaces connect teams, projects, and module data under an organization." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton>} />
+      <SettingsSectionHeader
+        title="Workspaces"
+        description="Workspaces connect teams, projects, and module data under an organization."
+        actions={canCreateWorkspace ? <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton> : undefined}
+      />
+      {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.manage to create workspaces in this scope." /> : null}
       {!organizations.length ? (
         <SettingsEmptyState title="Create an organization first" description="A workspace must belong to an organization." action={<SettingsLinkButton href="/settings/organizations">Create Organization</SettingsLinkButton>} />
       ) : (
@@ -576,6 +620,8 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
   const targetWorkspaceId = workspaceId ?? selectedWorkspaceId ?? workspaces[0]?.id;
+  const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
+  const canCreateProject = permissions.can("settings.project.manage");
   const visibleProjects = workspaceId ? projects.filter((project) => project.workspace_id === workspaceId) : projects;
 
   const mutation = useMutation({
@@ -637,7 +683,12 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Projects" description="Projects scope Flow work, Docs knowledge, discovery, tickets, and operations." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Project</QuickCreateButton>} />
+      <SettingsSectionHeader
+        title="Projects"
+        description="Projects scope Flow work, Docs knowledge, discovery, tickets, and operations."
+        actions={canCreateProject ? <QuickCreateButton onClick={() => setOpen(true)}>Create Project</QuickCreateButton> : undefined}
+      />
+      {!canCreateProject ? <SettingsCard title="Limited access" description="You need settings.project.manage to create projects in this scope." /> : null}
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
       ) : (
@@ -863,7 +914,6 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
 
 export function MembersView({ organizationId, workspaceId }: { organizationId?: number; workspaceId?: number }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
-  const currentUser = useAuthStore((state) => state.currentUser);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -892,13 +942,12 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopeWorkspaceId = workspaceId ?? null;
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
-  const currentMembership = members.find((member) => member.user_id === currentUser?.id);
-  const currentRole = currentUser?.is_superuser ? "owner" : currentMembership?.member_role ?? (currentMembership?.role_id ? roles.find((role) => role.id === currentMembership.role_id)?.key : null) ?? "viewer";
-  const roleContext = { role: currentRole, isSuperuser: currentUser?.is_superuser };
-  const canInvite = canManageMembers(roleContext);
-  const canChangeRoles = canManageRoles(roleContext);
+  const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
+  const canInvite = permissions.can("settings.member.invite");
+  const canChangeRoles = permissions.can("settings.role.manage");
+  const canRemoveMembers = permissions.can("settings.member.remove");
   const inviteScope = workspaceId ? "workspace" : "organization";
-  const groupedInviteRoles = groupedRolesForInvite(roles, inviteScope, canManagePlatform(roleContext));
+  const groupedInviteRoles = groupedRolesForInvite(roles, inviteScope, false);
   const scopedInvitations = (invitationsQuery.data ?? [])
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
@@ -1055,7 +1104,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         description="Invite members, review status, filter membership, and assign roles without using raw database screens."
         actions={canInvite ? <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton> : undefined}
       />
-      {!canInvite ? <SettingsCard title="Limited access" description="Your current role can view members, but cannot invite or change roles." /> : null}
+      {!canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
       <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
           {DEFAULT_ROLE_MEANINGS.map(([role, meaning]) => (
@@ -1120,7 +1169,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             <div key={row.userId} className="flex flex-wrap gap-2">
               <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
               {canChangeRoles ? <Button type="button" size="sm" variant="outline" onClick={() => setRoleOpen(row.userId)}>Change Role</Button> : null}
-              {canInvite ? (
+              {canRemoveMembers ? (
                 <ConfirmActionButton
                   label="Remove"
                   message={`Remove ${row.name} from ${row.scopeLabel}?`}
@@ -1565,6 +1614,9 @@ function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapp
 
 export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
+  const currentPermissions = useCurrentPermissions();
+  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
+  const canCreatePermission = currentPermissions.can("settings.permission.manage");
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [roleCreateOpen, setRoleCreateOpen] = useState(false);
@@ -1665,12 +1717,32 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         description="Unified RBAC center for roles, permission catalog, and role-permission mapping."
         actions={
           <div className="flex flex-wrap gap-2">
-            <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton>
-            <Button type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</Button>
+            {canManageRoleMappings ? <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton> : null}
+            {canCreatePermission ? <Button type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</Button> : null}
           </div>
         }
       />
       <AccessControlTabs active={section} />
+      <SettingsCard title="Current User Permissions" description="Debug view for the active Settings scope. Backend enforcement uses these permission codes.">
+        <div className="grid gap-4 text-sm lg:grid-cols-3">
+          <div>
+            <div className="font-medium">Current scope</div>
+            <div className="mt-1 text-muted-foreground">{currentPermissions.data?.scope.scope_type ?? "loading"} {currentPermissions.data?.scope.scope_id ?? ""}</div>
+          </div>
+          <div>
+            <div className="font-medium">Active roles</div>
+            <div className="mt-1 max-h-28 overflow-auto text-muted-foreground">
+              {(currentPermissions.data?.roles ?? []).map((role) => role.name).join(", ") || "No roles resolved"}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium">Active permissions</div>
+            <div className="mt-1 max-h-28 overflow-auto text-muted-foreground">
+              {currentPermissions.permissionCodes.join(", ") || "No permissions resolved"}
+            </div>
+          </div>
+        </div>
+      </SettingsCard>
       {section === "roles" ? (
         <SettingsCard title="Roles" description="System roles are locked templates. Custom roles can be added later without assigning permissions directly to users.">
           <SettingsDataTable
@@ -1741,7 +1813,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
           </SettingsCard>
         </div>
       ) : null}
-      <SettingsCreateDialog title="Create custom role" open={roleCreateOpen} onOpenChange={setRoleCreateOpen} onSubmit={submitCustomRole}>
+      <SettingsCreateDialog title="Create custom role" open={roleCreateOpen && canManageRoleMappings} onOpenChange={setRoleCreateOpen} onSubmit={submitCustomRole}>
         <FormField label="Name" required><Input name="name" placeholder="QA Lead" /></FormField>
         <FormField label="Scope">
           <select name="scope" className="h-10 w-full rounded-md border bg-background px-3 text-sm" defaultValue="project">
@@ -1751,7 +1823,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         <FormField label="Description"><Input name="description" placeholder="Custom access role for this team" /></FormField>
         <FormActions submitLabel="Create Custom Role" isSubmitting={createRoleMutation.isPending} onCancel={() => setRoleCreateOpen(false)} />
       </SettingsCreateDialog>
-      <SettingsCreateDialog title="Create permission" open={permissionCreateOpen} onOpenChange={setPermissionCreateOpen} onSubmit={submitPermission}>
+      <SettingsCreateDialog title="Create permission" open={permissionCreateOpen && canCreatePermission} onOpenChange={setPermissionCreateOpen} onSubmit={submitPermission}>
         <FormField label="Code" required><Input name="code" placeholder="flow.custom.view" /></FormField>
         <FormField label="Name" required><Input name="name" placeholder="View custom Flow area" /></FormField>
         <FormField label="Module"><Input name="module" placeholder="flow" /></FormField>
@@ -1771,6 +1843,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
 export function RolesView({ organizationId }: { organizationId?: number }) {
   if (!organizationId) return <AccessControlView section="roles" />;
   const { accessToken, organizations } = useSettingsData();
+  const currentPermissions = useCurrentPermissions({ orgId: organizationId });
+  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -1820,7 +1894,12 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Roles" description="Define role records for future access-control assignment." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Role</QuickCreateButton>} />
+      <SettingsSectionHeader
+        title="Roles"
+        description="Define role records for future access-control assignment."
+        actions={canManageRoleMappings ? <QuickCreateButton onClick={() => setOpen(true)}>Create Role</QuickCreateButton> : undefined}
+      />
+      {!canManageRoleMappings ? <SettingsCard title="Limited access" description="You need settings.role.manage to create, edit, or archive roles." /> : null}
       <SearchBox value={search} onChange={setSearch} placeholder="Search roles" />
       <SettingsDataTable
         columns={["Name", "Description", "Scope", "Status", "Actions"]}
@@ -1831,13 +1910,13 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
           role.is_active === false ? "Archived" : "Active",
           <div key={role.id} className="flex flex-wrap gap-2">
             <SettingsLinkButton href={`/settings/roles/${role.id}`} variant="outline">View</SettingsLinkButton>
-            <SettingsLinkButton href={`/settings/roles/${role.id}`} variant="outline">Edit</SettingsLinkButton>
-            <ConfirmActionButton label="Delete" message={`Archive role ${role.name}?`} onConfirm={() => deleteMutation.mutate(role.id)} />
+            {canManageRoleMappings ? <SettingsLinkButton href={`/settings/roles/${role.id}`} variant="outline">Edit</SettingsLinkButton> : null}
+            {canManageRoleMappings ? <ConfirmActionButton label="Delete" message={`Archive role ${role.name}?`} onConfirm={() => deleteMutation.mutate(role.id)} /> : null}
           </div>
         ])}
         emptyMessage="No roles yet"
       />
-      <SettingsCreateDialog title="Create role" open={open} onOpenChange={setOpen} onSubmit={submit}>
+      <SettingsCreateDialog title="Create role" open={open && canManageRoleMappings} onOpenChange={setOpen} onSubmit={submit}>
         <FormField label="Name" required><Input name="name" placeholder="Workspace Admin" /></FormField>
         <FormField label="Description"><Input name="description" placeholder="Can manage workspace setup" /></FormField>
         <FormActions submitLabel="Create Role" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
@@ -1849,6 +1928,8 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
 export function PermissionsView({ organizationId }: { organizationId?: number } = {}) {
   if (!organizationId) return <AccessControlView section="permissions" />;
   const { accessToken, organizations } = useSettingsData();
+  const currentPermissions = useCurrentPermissions({ orgId: organizationId });
+  const canManagePermissions = currentPermissions.can("settings.permission.manage");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -1897,7 +1978,12 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Permissions" description="Permission records are available for future role binding." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Permission</QuickCreateButton>} />
+      <SettingsSectionHeader
+        title="Permissions"
+        description="Permission records are available for future role binding."
+        actions={canManagePermissions ? <QuickCreateButton onClick={() => setOpen(true)}>Create Permission</QuickCreateButton> : undefined}
+      />
+      {!canManagePermissions ? <SettingsCard title="Limited access" description="You need settings.permission.manage to create or archive permissions." /> : null}
       <SearchBox value={search} onChange={setSearch} placeholder="Search permissions" />
       <SettingsDataTable
         columns={["Code", "Name", "Description", "Status", "Actions"]}
@@ -1908,7 +1994,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
           permission.is_active === false ? "Archived" : "Active",
           <div key={permission.id} className="flex flex-wrap gap-2">
             <SettingsLinkButton href={`/settings/permissions/${permission.id}`} variant="outline">View</SettingsLinkButton>
-            <ConfirmActionButton label="Delete" message={`Archive permission ${permission.name}?`} onConfirm={() => deleteMutation.mutate(permission.id)} />
+            {canManagePermissions ? <ConfirmActionButton label="Delete" message={`Archive permission ${permission.name}?`} onConfirm={() => deleteMutation.mutate(permission.id)} /> : null}
           </div>
         ])}
         emptyMessage="No permissions yet"
@@ -1927,7 +2013,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
           emptyMessage="No permissions to map"
         />
       </SettingsCard>
-      <SettingsCreateDialog title="Create permission" open={open} onOpenChange={setOpen} onSubmit={submit}>
+      <SettingsCreateDialog title="Create permission" open={open && canManagePermissions} onOpenChange={setOpen} onSubmit={submit}>
         <FormField label="Code" required><Input name="code" placeholder="workspace.manage" /></FormField>
         <FormField label="Name" required><Input name="name" placeholder="Manage workspace" /></FormField>
         <FormField label="Description"><Input name="description" placeholder="Allows workspace setup changes" /></FormField>
@@ -1939,6 +2025,8 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
 
 export function RoleDetailView({ roleId }: { roleId: number }) {
   const { accessToken } = useSettingsData();
+  const currentPermissions = useCurrentPermissions();
+  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
@@ -1979,6 +2067,7 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
         </dl>
       </SettingsCard>
       {role.is_editable === false ? <SettingsCard title="System Role Locked" description="System role templates are managed by Asthra and cannot be manually edited or remapped." /> : null}
+      {!canManageRoleMappings ? <SettingsCard title="View Only" description="You need settings.role.manage to change role-permission mappings." /> : null}
       {modules.map((module) => (
         <SettingsCard key={module} title={`${moduleLabel(module)} Permissions`} description="Assign or remove permissions from this role.">
           <SettingsDataTable
@@ -1994,10 +2083,10 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
                   <input
                     type="checkbox"
                     checked={linked}
-                    disabled={role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
+                    disabled={!canManageRoleMappings || role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
                     onChange={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
                   />
-                  {role.is_editable === false ? "View only" : linked ? "Assigned" : "Assign Permission"}
+                  {!canManageRoleMappings || role.is_editable === false ? "View only" : linked ? "Assigned" : "Assign Permission"}
                 </label>
               ];
             })}

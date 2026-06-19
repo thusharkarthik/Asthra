@@ -20,7 +20,7 @@ Asthra roles are grouped by scope:
 - Team: Team Lead, Team Member, Team Observer
 - Functional: Product Owner, Scrum Master, Engineering Manager, Release Manager, Incident Commander, Knowledge Manager
 
-Every role has a stable key, scope, description, and placeholder permission preset. The preset is a contract for future full RBAC enforcement.
+Every role has a stable key, scope, description, and role-permission mappings. Users receive roles; roles contain permissions; permissions control protected Settings actions.
 
 ## Inviting Members
 
@@ -42,10 +42,32 @@ Notification actions currently show Accept and Decline placeholders. Direct noti
 - Platform roles can only be assigned by Platform Owner/Admin users or superusers.
 - Viewer roles should not see member or role management actions in the UI.
 
+## Permission Enforcement Flow
+
+Core-service resolves permissions with `get_user_permissions(user_id, scope_type, scope_id)`.
+
+Inheritance rules:
+
+- Organization roles inherit into workspaces and projects in that organization.
+- Workspace roles inherit into projects in that workspace.
+- Platform roles apply globally.
+
+Protected Settings actions:
+
+- Member invite: `settings.member.invite`
+- Member remove: `settings.member.remove`
+- Role management and role-permission mapping: `settings.role.manage`
+- Permission management: `settings.permission.manage`
+- Organization management: `settings.organization.manage`
+- Workspace management: `settings.workspace.manage`
+- Project management: `settings.project.manage`
+
+Frontend Settings uses `/api/v1/me/permissions` and permission codes only. It does not rely on role names for access decisions.
+
 ## Current Limitations
 
-- Role-based UI visibility exists as a frontend foundation.
+- Backend RBAC enforcement currently starts with Settings endpoints.
 - Full backend RBAC across every service is not implemented yet.
 - Project-scoped membership is still a future model.
 - Last active timestamps display `Not tracked yet` until activity tracking is connected.
-- Permission presets are placeholders and not a complete permission matrix yet.
+- First-organization creation remains available as an install bootstrap path.

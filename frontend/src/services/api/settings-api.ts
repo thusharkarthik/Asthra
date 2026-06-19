@@ -3,6 +3,7 @@ import type {
   ApiKeyRecord,
   CoreNotificationRecord,
   CoreUser,
+  CurrentUserPermissions,
   InvitationRecord,
   Organization,
   OrganizationMember,
@@ -25,6 +26,14 @@ export type NamedCreatePayload = {
 };
 
 export const settingsApi = {
+  getCurrentPermissions(token: string, params: { org_id?: number | null; workspace_id?: number | null; project_id?: number | null } = {}) {
+    const search = new URLSearchParams();
+    if (params.org_id) search.set("org_id", String(params.org_id));
+    if (params.workspace_id) search.set("workspace_id", String(params.workspace_id));
+    if (params.project_id) search.set("project_id", String(params.project_id));
+    const query = search.toString();
+    return apiRequest<CurrentUserPermissions>(`${CORE_PREFIX}/me/permissions${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
+  },
   listOrganizations(token: string) {
     return apiRequest<Organization[]>(`${CORE_PREFIX}/organizations`, { method: "GET", authToken: token });
   },

@@ -194,6 +194,7 @@ class RoleService:
 
     def create(self, role_create: RoleCreate, current_user: User) -> Role:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "organization" if role_create.organization_id else "platform", role_create.organization_id)
         scope = self._validate_scope(role_create.scope)
         name = role_create.name.strip()
         if self.role_repository.get_by_scope_and_name(scope, name) is not None:
@@ -250,6 +251,7 @@ class RoleService:
 
     def update(self, role_id: int, role_update: RoleUpdate, current_user: User) -> Role:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         if role_update.scope is not None:
@@ -266,6 +268,7 @@ class RoleService:
 
     def delete(self, role_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         self.role_repository.update(role, RoleUpdate(is_active=False))
@@ -277,6 +280,7 @@ class RoleService:
         current_user: User,
     ) -> RolePermission:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         permission = self.permission_repository.get_by_id(link_create.permission_id)
@@ -300,6 +304,7 @@ class RoleService:
         current_user: User,
     ) -> list[RolePermission]:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         permission_ids = list(dict.fromkeys(replace_create.permission_ids))
@@ -311,6 +316,7 @@ class RoleService:
 
     def unlink_permission(self, role_id: int, permission_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
+        self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         role_permission = self.role_repository.get_role_permission(role.id, permission_id)
@@ -328,6 +334,7 @@ class RoleService:
         current_user: User,
     ) -> UserRole:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "platform", None)
         user = self.role_repository.get_user(user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -360,6 +367,7 @@ class RoleService:
 
     def remove_user_role(self, user_id: int, role_id: int, current_user: User) -> None:
         self._ensure_active_user(current_user)
+        self._require_role_manage(current_user, "platform", None)
         user = self.role_repository.get_user(user_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -374,6 +382,16 @@ class RoleService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is inactive.",
             )
+
+    def _require_role_manage(self, user: User, scope_type: str, scope_id: int | None) -> None:
+        from app.services.access_control_service import AccessControlService
+
+        AccessControlService(self.db).require(
+            user,
+            "settings.role.manage",
+            scope_type,
+            scope_id,
+        )
 
     def _validate_scope(self, scope: str) -> str:
         normalized_scope = scope.strip().lower()

@@ -9,11 +9,13 @@ from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.event_publisher import publish_event
 
 
 class WorkspaceService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.workspace_repository = WorkspaceRepository(db)
 
     def create(self, workspace_create: WorkspaceCreate, current_user: User) -> Workspace:
@@ -23,6 +25,12 @@ class WorkspaceService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Organization not found.",
             )
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.workspace.manage",
+            "organization",
+            workspace_create.organization_id,
+        )
 
         slug = self._build_unique_slug(
             organization_id=workspace_create.organization_id,
@@ -75,10 +83,22 @@ class WorkspaceService:
         current_user: User,
     ) -> Workspace:
         workspace = self.get(workspace_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.workspace.manage",
+            "workspace",
+            workspace.id,
+        )
         return self.workspace_repository.update(workspace, workspace_update)
 
     def delete(self, workspace_id: int, current_user: User) -> None:
         workspace = self.get(workspace_id, current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.workspace.manage",
+            "workspace",
+            workspace.id,
+        )
         self.workspace_repository.update(workspace, WorkspaceUpdate(is_active=False))
 
     def list_members(self, workspace_id: int, current_user: User) -> list[WorkspaceMember]:

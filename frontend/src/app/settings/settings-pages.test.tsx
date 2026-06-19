@@ -21,6 +21,19 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 vi.mock("@/services/api/settings-api", () => ({
   settingsApi: {
+    getCurrentPermissions: vi.fn(async () => ({
+      permission_codes: [
+        "settings.organization.manage",
+        "settings.workspace.manage",
+        "settings.project.manage",
+        "settings.member.invite",
+        "settings.member.remove",
+        "settings.role.manage",
+        "settings.permission.manage"
+      ],
+      roles: [{ id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", source_scope_type: "workspace", source_scope_id: 2 }],
+      scope: { scope_type: "workspace", scope_id: 2 }
+    })),
     listOrganizations: vi.fn(async () => [{ id: 1, name: "Asthra", description: "Platform org", is_active: true }]),
     listWorkspaces: vi.fn(async () => [{ id: 2, organization_id: 1, name: "Platform", description: "Default workspace", is_active: true }]),
     listProjects: vi.fn(async () => [
@@ -234,7 +247,11 @@ describe("Settings frontend screens", () => {
   });
 
   it("hides member management actions for low roles", async () => {
-    vi.mocked(settingsApi.listWorkspaceMembers).mockResolvedValueOnce([{ id: 11, workspace_id: 2, user_id: 1, role_id: null, member_role: "viewer", created_at: "2026-01-01T00:00:00Z" }]);
+    vi.mocked(settingsApi.getCurrentPermissions).mockResolvedValueOnce({
+      permission_codes: ["settings.member.view"],
+      roles: [{ id: 5, name: "Workspace Viewer", key: "workspace_viewer", scope: "workspace", source_scope_type: "workspace", source_scope_id: 2 }],
+      scope: { scope_type: "workspace", scope_id: 2 }
+    });
     renderWithQuery(<MembersView workspaceId={2} />);
 
     expect(await screen.findByText("Test User")).toBeInTheDocument();
@@ -285,7 +302,7 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<RolesSettingsPage />);
     expect(await screen.findByRole("heading", { name: "Access Control" })).toBeInTheDocument();
     expect(screen.getByText("Role Based Access Control")).toBeInTheDocument();
-    expect(await screen.findByText("Workspace Admin")).toBeInTheDocument();
+    expect((await screen.findAllByText("Workspace Admin")).length).toBeGreaterThan(0);
     expect(screen.getByText("Permissions Count")).toBeInTheDocument();
 
     cleanup();
@@ -298,6 +315,7 @@ describe("Settings frontend screens", () => {
   it("renders unified access control pages", async () => {
     renderWithQuery(<AccessControlPage />);
     expect(await screen.findByText("Role Mapping")).toBeInTheDocument();
+    expect(screen.getByText("Current User Permissions")).toBeInTheDocument();
     expect(await screen.findByText("System Role")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Custom Role" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Permission" })).toBeInTheDocument();
