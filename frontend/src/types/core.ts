@@ -189,6 +189,8 @@ export type TeamMemberRecord = {
   user_id: number;
   role_id?: number | null;
   member_role: string;
+  status?: string;
+  joined_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -199,6 +201,40 @@ export type UserRoleRecord = {
   role_id: number;
   created_at?: string;
   updated_at?: string;
+};
+
+export type RoleAssignmentRecord = {
+  id: number;
+  user_id: number;
+  role_id: number;
+  scope_type: string;
+  scope_id?: number | null;
+  status: string;
+  assigned_by?: number | null;
+  assigned_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProjectMembershipRecord = {
+  id: number;
+  project_id: number;
+  user_id: number;
+  role_id?: number | null;
+  team_id?: number | null;
+  status: string;
+  joined_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EffectivePermissionsRecord = {
+  user: CoreUser;
+  active_roles: Array<Record<string, unknown>>;
+  inherited_roles: Array<Record<string, unknown>>;
+  permission_codes: string[];
+  scope_context: Record<string, unknown>;
 };
 
 export type CoreNotificationRecord = {

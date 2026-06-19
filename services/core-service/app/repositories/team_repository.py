@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -83,6 +85,8 @@ class TeamRepository:
                 team_id=team.id,
                 user_id=created_by_id,
                 member_role="owner",
+                status="active",
+                joined_at=datetime.now(timezone.utc),
             )
         )
         self.db.add(
@@ -123,6 +127,8 @@ class TeamRepository:
             user_id=user_id,
             role_id=role_id,
             member_role=member_role,
+            status="active",
+            joined_at=datetime.now(timezone.utc),
         )
         self.db.add(member)
         self.db.add(

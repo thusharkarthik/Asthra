@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -25,6 +27,7 @@ class Project(TimestampMixin, Base):
     owner = relationship("User", foreign_keys=[owner_id])
     created_by = relationship("User", foreign_keys=[created_by_id])
     project_teams = relationship("ProjectTeam", back_populates="project")
+    members = relationship("ProjectMembership", back_populates="project")
 
 
 class ProjectTeam(TimestampMixin, Base):
@@ -36,4 +39,22 @@ class ProjectTeam(TimestampMixin, Base):
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False)
 
     project = relationship("Project", back_populates="project_teams")
+    team = relationship("Team")
+
+
+class ProjectMembership(TimestampMixin, Base):
+    __tablename__ = "project_memberships"
+    __table_args__ = (UniqueConstraint("project_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id"))
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"))
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False, index=True)
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    project = relationship("Project", back_populates="members")
+    user = relationship("User")
+    role = relationship("Role")
     team = relationship("Team")

@@ -13,6 +13,7 @@ import RolesSettingsPage from "@/app/settings/roles/page";
 import TeamsSettingsPage from "@/app/settings/teams/page";
 import WorkspaceSettingsPage from "@/app/settings/workspace/page";
 import AccessControlPage from "@/app/settings/access-control/page";
+import AccessControlAssignmentsPage from "@/app/settings/access-control/assignments/page";
 import AccessControlMappingPage from "@/app/settings/access-control/mapping/page";
 import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
 import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, TeamDetailView, WorkspaceDetailView } from "@/components/settings/settings-admin-views";
@@ -63,12 +64,27 @@ vi.mock("@/services/api/settings-api", () => ({
     ]),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
+    listProjectMembers: vi.fn(async () => [{ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active", joined_at: "2026-01-02T00:00:00Z" }]),
+    addProjectMember: vi.fn(async () => ({ id: 22, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active" })),
+    updateProjectMember: vi.fn(async () => ({ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active" })),
+    removeProjectMember: vi.fn(async () => undefined),
     listInvitations: vi.fn(async () => [{ id: 12, email: "invite@example.com", organization_id: 1, workspace_id: 2, status: "pending", invited_by_id: 1, expires_at: "2026-01-08T00:00:00Z" }]),
     listTeams: vi.fn(async () => [{ id: 6, workspace_id: 2, name: "Engineering", description: "Build team", created_by_id: 1, is_active: true }]),
     getTeam: vi.fn(async () => ({ id: 6, workspace_id: 2, name: "Engineering", description: "Build team", created_by_id: 1, is_active: true })),
-    listTeamMembers: vi.fn(async () => [{ id: 13, team_id: 6, user_id: 1, role_id: 4, member_role: "lead" }]),
+    listTeamMembers: vi.fn(async () => [{ id: 13, team_id: 6, user_id: 1, role_id: 4, member_role: "lead", status: "active", joined_at: "2026-01-03T00:00:00Z" }]),
     getUser: vi.fn(async () => ({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true })),
     listUserRoles: vi.fn(async () => [{ id: 14, user_id: 1, role_id: 4 }]),
+    listRoleAssignments: vi.fn(async () => [{ id: 31, user_id: 1, role_id: 8, scope_type: "project", scope_id: 3, status: "active", assigned_by: 1, assigned_at: "2026-01-04T00:00:00Z" }]),
+    createRoleAssignment: vi.fn(async () => ({ id: 32, user_id: 1, role_id: 8, scope_type: "project", scope_id: 3, status: "active" })),
+    updateRoleAssignment: vi.fn(async () => ({ id: 31, user_id: 1, role_id: 8, scope_type: "project", scope_id: 3, status: "active" })),
+    deleteRoleAssignment: vi.fn(async () => undefined),
+    getUserEffectivePermissions: vi.fn(async () => ({
+      user: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      active_roles: [{ id: 8, name: "Project Manager", key: "project_manager", scope: "project" }],
+      inherited_roles: [{ id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace" }],
+      permission_codes: ["flow.work_item.view", "flow.work_item.edit", "settings.project.manage"],
+      scope_context: { scope_type: "project", scope_id: 3 }
+    })),
     listRolePermissions: vi.fn(async (_token: string, roleId: number) => roleId === 4 ? [{ id: 15, role_id: 4, permission_id: 5 }] : roleId === 8 ? [{ id: 16, role_id: 8, permission_id: 6 }, { id: 17, role_id: 8, permission_id: 7 }] : []),
     createOrganization: vi.fn(),
     createWorkspace: vi.fn(),
@@ -86,6 +102,8 @@ vi.mock("@/services/api/settings-api", () => ({
     removeRolePermission: vi.fn(),
     replaceRolePermissions: vi.fn(),
     addTeamMember: vi.fn(),
+    updateTeamMember: vi.fn(),
+    removeTeamMember: vi.fn(async () => undefined),
     updateProject: vi.fn(),
     updateOrganizationMember: vi.fn(async () => ({ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "admin" })),
     updateWorkspaceMember: vi.fn(async () => ({ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin" })),
@@ -272,7 +290,9 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<MemberDetailView userId={1} />);
     expect(await screen.findByText("user@example.com")).toBeInTheDocument();
     expect(await screen.findByText("Current Roles")).toBeInTheDocument();
-    expect(screen.getByText("Inherited Permissions Count")).toBeInTheDocument();
+    expect(screen.getByText("Effective Permissions")).toBeInTheDocument();
+    expect(screen.getByText("Scoped Role Assignments")).toBeInTheDocument();
+    expect(await screen.findByText("flow.work_item.edit")).toBeInTheDocument();
     expect(screen.getByLabelText("Assign member role")).toBeInTheDocument();
     expect(screen.getByText("Activity Placeholder")).toBeInTheDocument();
   });
@@ -288,6 +308,8 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<ProjectDetailView projectId={3} />);
     expect(await screen.findByText("Owner Email")).toBeInTheDocument();
     expect(screen.getByText("Change Owner")).toBeInTheDocument();
+    expect(await screen.findByText("Add Project Member")).toBeInTheDocument();
+    expect(await screen.findByText("Project Manager")).toBeInTheDocument();
   });
 
   it("renders project ownership help when no owner is assigned", async () => {
@@ -333,5 +355,11 @@ describe("Settings frontend screens", () => {
     expect(screen.getAllByText("Manage Permissions").length).toBeGreaterThan(0);
     expect((await screen.findAllByText("Platform Owner")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Project Manager").length).toBeGreaterThan(0);
+
+    cleanup();
+    renderWithQuery(<AccessControlAssignmentsPage />);
+    expect(await screen.findByText("Scoped Role Assignments")).toBeInTheDocument();
+    expect(await screen.findByText("Assign Role")).toBeInTheDocument();
+    expect(await screen.findByText("Project 3")).toBeInTheDocument();
   });
 });

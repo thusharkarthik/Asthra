@@ -11,7 +11,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { settingsApi } from "@/services/api/settings-api";
 import { normalizeRole } from "@/lib/rbac";
 import { can as hasPermission } from "@/lib/permissions";
-import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
+import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
   FormField,
@@ -182,6 +182,25 @@ function groupPermissionsByModule(permissions: PermissionRecord[]) {
     groups[module] = [...(groups[module] ?? []), permission];
     return groups;
   }, {});
+}
+
+function groupPermissionCodesByModule(permissionCodes: string[]) {
+  return permissionCodes.reduce<Record<string, string[]>>((groups, code) => {
+    const module = code.split(".")[0] || "uncategorized";
+    groups[module] = [...(groups[module] ?? []), code];
+    return groups;
+  }, {});
+}
+
+function roleNameById(roles: RoleRecord[], roleId?: number | null) {
+  return roles.find((role) => role.id === roleId)?.name ?? (roleId ? `Role ${roleId}` : "No role assigned");
+}
+
+function scopeLabelForAssignment(assignment: RoleAssignmentRecord, organizations: Array<{ id: number; name: string }>, workspaces: Array<{ id: number; name: string }>) {
+  if (assignment.scope_type === "platform") return "Platform";
+  if (assignment.scope_type === "organization") return organizations.find((item) => item.id === assignment.scope_id)?.name ?? `Organization ${assignment.scope_id}`;
+  if (assignment.scope_type === "workspace") return workspaces.find((item) => item.id === assignment.scope_id)?.name ?? `Workspace ${assignment.scope_id}`;
+  return `${roleDisplayName(assignment.scope_type)} ${assignment.scope_id ?? ""}`.trim();
 }
 
 function countMembersForRole(role: RoleRecord, members: Array<{ role_id?: number | null; member_role?: string | null }>) {
@@ -827,6 +846,8 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
 export function ProjectDetailView({ projectId }: { projectId: number }) {
   const { accessToken, projects, workspaces } = useSettingsData();
   const [ownerOpen, setOwnerOpen] = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [memberFormError, setMemberFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const project = projects.find((item) => item.id === projectId);
@@ -835,8 +856,15 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", project?.workspace_id ?? 0),
     enabled: Boolean(accessToken && project?.workspace_id)
   });
+  const projectMembersQuery = useQuery({
+    queryKey: ["settings", "project-members", projectId],
+    queryFn: () => settingsApi.listProjectMembers(accessToken ?? "", projectId),
+    enabled: Boolean(accessToken && projectId)
+  });
+  const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const ownerProfiles = useUserProfiles([
     ...(workspaceMembersQuery.data ?? []).map((member) => member.user_id),
+    ...(projectMembersQuery.data ?? []).map((member) => member.user_id),
     ...(project?.owner_id ? [project.owner_id] : [])
   ]).data ?? new Map<number, CoreUser>();
   const owner = project?.owner_id ? displayUser(ownerProfiles.get(project.owner_id), project.owner_id) : null;
@@ -849,9 +877,43 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     },
     onError: (error) => addToast({ type: "error", title: "Owner update failed", message: error instanceof Error ? error.message : "Unable to update owner." })
   });
+  const addProjectMemberMutation = useMutation({
+    mutationFn: (payload: { user_id: number; role_id?: number | null }) => settingsApi.addProjectMember(accessToken ?? "", projectId, payload),
+    onSuccess: async () => {
+      setMemberOpen(false);
+      setMemberFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "project-members", projectId] });
+      addToast({ type: "success", title: "Project member added" });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to add project member.";
+      setMemberFormError(message);
+      addToast({ type: "error", title: "Project member add failed", message });
+    }
+  });
+  const removeProjectMemberMutation = useMutation({
+    mutationFn: (membershipId: number) => settingsApi.removeProjectMember(accessToken ?? "", projectId, membershipId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "project-members", projectId] });
+      addToast({ type: "success", title: "Project member removed" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Project member remove failed", message: error instanceof Error ? error.message : "Unable to remove project member." })
+  });
   if (!project) {
     return <SettingsEmptyState title="Project not found" description="Refresh the page or open the projects list." action={<SettingsLinkButton href="/settings/projects">Projects</SettingsLinkButton>} />;
   }
+
+  function submitProjectMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const userId = Number(getFormValue(event.currentTarget, "user_id"));
+    const roleId = Number(getFormValue(event.currentTarget, "role_id")) || null;
+    if (!userId) {
+      setMemberFormError("Select a workspace member.");
+      return;
+    }
+    addProjectMemberMutation.mutate({ user_id: userId, role_id: roleId });
+  }
+
   return (
     <SettingsLayout
       breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Projects", href: "/settings/projects" }, { label: project.name }]}
@@ -891,6 +953,28 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} />
         </div>
       </SettingsCard>
+      <SettingsCard
+        title="Members"
+        description="Project membership gives users project-scoped roles without assigning permissions directly."
+        actions={<QuickCreateButton onClick={() => setMemberOpen(true)}>Add Project Member</QuickCreateButton>}
+      >
+        <SettingsDataTable
+          columns={["Name", "Email", "Role", "Team", "Status", "Joined", "Actions"]}
+          rows={(projectMembersQuery.data ?? []).map((member: ProjectMembershipRecord) => {
+            const user = displayUser(ownerProfiles.get(member.user_id), member.user_id);
+            return [
+              user.name,
+              user.email,
+              roleNameById(rolesQuery.data ?? [], member.role_id),
+              member.team_id ? `Team ${member.team_id}` : "No team",
+              roleDisplayName(member.status),
+              formatDate(member.joined_at),
+              <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this project?`} onConfirm={() => removeProjectMemberMutation.mutate(member.id)} />
+            ];
+          })}
+          emptyMessage="No project members"
+        />
+      </SettingsCard>
       <SettingsDangerZone description="Project archive is a placeholder for the usability pass. Project records remain managed by core-service." />
       <SettingsCreateDialog title="Assign project owner" open={ownerOpen} onOpenChange={setOwnerOpen} onSubmit={(event) => {
         event.preventDefault();
@@ -908,12 +992,31 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         </FormField>
         <FormActions submitLabel="Assign Owner" isSubmitting={ownerMutation.isPending} onCancel={() => setOwnerOpen(false)} />
       </SettingsCreateDialog>
+      <SettingsCreateDialog title="Add project member" open={memberOpen} onOpenChange={setMemberOpen} onSubmit={submitProjectMember} error={memberFormError}>
+        <FormField label="Workspace member" required>
+          <select name="user_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="">Select member</option>
+            {(workspaceMembersQuery.data ?? []).map((member) => {
+              const user = displayUser(ownerProfiles.get(member.user_id), member.user_id);
+              return <option key={member.user_id} value={member.user_id}>{user.name} - {user.email}</option>;
+            })}
+          </select>
+        </FormField>
+        <FormField label="Project role">
+          <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="">No project role</option>
+            {(rolesQuery.data ?? []).filter((role) => role.scope === "project" || role.scope === "functional").map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+          </select>
+        </FormField>
+        <FormActions submitLabel="Add Member" isSubmitting={addProjectMemberMutation.isPending} onCancel={() => setMemberOpen(false)} />
+      </SettingsCreateDialog>
     </SettingsLayout>
   );
 }
 
 export function MembersView({ organizationId, workspaceId }: { organizationId?: number; workspaceId?: number }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -937,7 +1040,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const invitationsQuery = useQuery({ queryKey: ["settings", "invitations"], queryFn: () => settingsApi.listInvitations(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roles = rolesQuery.data ?? [];
-  const profiles = userProfiles.data ?? new Map<number, CoreUser>();
+  const profiles = new Map<number, CoreUser>(userProfiles.data ?? []);
+  if (currentUser && !profiles.has(currentUser.id)) profiles.set(currentUser.id, currentUser);
   const scopeOrganizationId = organizationId ?? workspaces.find((workspace) => workspace.id === workspaceId)?.organization_id ?? organizations[0]?.id;
   const scopeWorkspaceId = workspaceId ?? null;
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
@@ -1307,12 +1411,32 @@ function memberSortValue(row: MemberListRow, sortKey: string) {
 
 export function MemberDetailView({ userId }: { userId: number }) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const [assignRoleId, setAssignRoleId] = useState("");
   const userQuery = useQuery({ queryKey: ["settings", "user", userId], queryFn: () => settingsApi.getUser(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const userRolesQuery = useQuery({ queryKey: ["settings", "user-roles", userId], queryFn: () => settingsApi.listUserRoles(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const roleAssignmentsQuery = useQuery({
+    queryKey: ["settings", "role-assignments", userId],
+    queryFn: () => settingsApi.listRoleAssignments(accessToken ?? "", { user_id: userId }),
+    enabled: Boolean(accessToken && userId)
+  });
+  const effectiveScope = selectedProjectId
+    ? { scope_type: "project", scope_id: selectedProjectId }
+    : selectedWorkspaceId
+      ? { scope_type: "workspace", scope_id: selectedWorkspaceId }
+      : selectedOrganizationId
+        ? { scope_type: "organization", scope_id: selectedOrganizationId }
+        : { scope_type: "platform", scope_id: null };
+  const effectivePermissionsQuery = useQuery({
+    queryKey: ["settings", "effective-permissions", userId, effectiveScope.scope_type, effectiveScope.scope_id],
+    queryFn: () => settingsApi.getUserEffectivePermissions(accessToken ?? "", userId, effectiveScope),
+    enabled: Boolean(accessToken && userId)
+  });
   const memberRoleIds = (userRolesQuery.data ?? []).map((assignment) => assignment.role_id);
   const inheritedPermissionsQuery = useQuery({
     queryKey: ["settings", "member-inherited-permissions", userId, memberRoleIds.join(",")],
@@ -1355,8 +1479,50 @@ export function MemberDetailView({ userId }: { userId: number }) {
           <div><dt className="text-muted-foreground">Status</dt><dd>{displayUser(user, userId).status}</dd></div>
           <div><dt className="text-muted-foreground">Job Title</dt><dd>{user?.job_title ?? "Not set"}</dd></div>
           <div><dt className="text-muted-foreground">Joined</dt><dd>{formatDate(user?.created_at)}</dd></div>
-          <div><dt className="text-muted-foreground">Inherited Permissions Count</dt><dd>{inheritedPermissionsQuery.data?.length ?? 0}</dd></div>
+          <div><dt className="text-muted-foreground">Legacy Role Permissions Count</dt><dd>{inheritedPermissionsQuery.data?.length ?? 0}</dd></div>
+          <div><dt className="text-muted-foreground">Effective Permissions Count</dt><dd>{effectivePermissionsQuery.data?.permission_codes.length ?? 0}</dd></div>
         </dl>
+      </SettingsCard>
+      <SettingsCard title="Scoped Role Assignments" description="Roles are assigned to this user at platform, organization, workspace, project, or team scope. Permissions come from the assigned roles.">
+        <SettingsDataTable
+          columns={["Role", "Scope Type", "Scope ID", "Status", "Assigned", "Revoked"]}
+          rows={(roleAssignmentsQuery.data ?? []).map((assignment: RoleAssignmentRecord) => [
+            roleNameById(rolesQuery.data ?? [], assignment.role_id),
+            roleDisplayName(assignment.scope_type),
+            assignment.scope_id ?? "Global",
+            roleDisplayName(assignment.status),
+            formatDate(assignment.assigned_at),
+            formatDate(assignment.revoked_at)
+          ])}
+          emptyMessage="No scoped role assignments"
+        />
+      </SettingsCard>
+      <SettingsCard title="Effective Permissions" description={`Resolved for ${roleDisplayName(effectiveScope.scope_type)} ${effectiveScope.scope_id ?? "global"}. Higher-scope roles are inherited where applicable.`}>
+        <div className="space-y-3">
+          <div className="grid gap-3 text-sm md:grid-cols-2">
+            <div>
+              <div className="font-medium">Direct roles</div>
+              <div className="mt-1 text-muted-foreground">
+                {(effectivePermissionsQuery.data?.active_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No direct roles"}
+              </div>
+            </div>
+            <div>
+              <div className="font-medium">Inherited roles</div>
+              <div className="mt-1 text-muted-foreground">
+                {(effectivePermissionsQuery.data?.inherited_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No inherited roles"}
+              </div>
+            </div>
+          </div>
+          {Object.entries(groupPermissionCodesByModule(effectivePermissionsQuery.data?.permission_codes ?? [])).map(([module, codes]) => (
+            <div key={module} className="rounded-md border p-3">
+              <div className="mb-2 text-sm font-medium">{moduleLabel(module)}</div>
+              <div className="flex flex-wrap gap-2">
+                {codes.map((code) => <span key={code} className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">{code}</span>)}
+              </div>
+            </div>
+          ))}
+          {!effectivePermissionsQuery.data?.permission_codes.length ? <p className="text-sm text-muted-foreground">No effective permissions resolved for this scope.</p> : null}
+        </div>
       </SettingsCard>
       <SettingsCard
         title="Current Roles"
@@ -1520,6 +1686,14 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
       addToast({ type: "error", title: "Assignment failed", message });
     }
   });
+  const removeTeamMemberMutation = useMutation({
+    mutationFn: (membershipId: number) => settingsApi.removeTeamMember(accessToken ?? "", teamId, membershipId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "team-members", teamId] });
+      addToast({ type: "success", title: "Team member removed" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Team member remove failed", message: error instanceof Error ? error.message : "Unable to remove team member." })
+  });
   const team = teamQuery.data;
   if (!team) return <SettingsEmptyState title="Team not found" description="Open the teams list or refresh the page." action={<SettingsLinkButton href="/settings/teams">Teams</SettingsLinkButton>} />;
 
@@ -1557,16 +1731,23 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
       </SettingsCard>
       <SettingsCard title="Members">
         <SettingsDataTable
-          columns={["Name", "Email", "Role", "Status"]}
+          columns={["Name", "Email", "Role", "Status", "Joined", "Actions"]}
           rows={teamMembers.map((member: TeamMemberRecord) => {
             const user = displayUser(profiles.get(member.user_id), member.user_id);
-            return [user.name, user.email, rolesQuery.data?.find((role) => role.id === member.role_id)?.name ?? member.member_role, user.status];
+            return [
+              user.name,
+              user.email,
+              rolesQuery.data?.find((role) => role.id === member.role_id)?.name ?? member.member_role,
+              roleDisplayName(member.status ?? user.status),
+              formatDate(member.joined_at ?? member.created_at),
+              <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this team?`} onConfirm={() => removeTeamMemberMutation.mutate(member.id)} />
+            ];
           })}
           emptyMessage="No team members"
         />
       </SettingsCard>
-      <SettingsCard title="Projects" description="Project/team linking is supported by core-service and will be surfaced here in a later pass." />
-      <SettingsCard title="Lead" description="The team creator is shown as the temporary lead until explicit lead assignment is added." />
+      <SettingsCard title="Projects" description="Project/team links are stored on project memberships. Add users to a project and assign this team from the project detail page." />
+      <SettingsCard title="Roles" description="Team scoped roles apply inside this team only. Higher workspace and project roles remain visible in member effective permissions." />
       <SettingsCreateDialog title="Assign member to team" open={assignOpen} onOpenChange={setAssignOpen} onSubmit={submitAssign} error={formError}>
         <FormField label="Workspace member" required>
           <select name="user_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -1589,11 +1770,12 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   );
 }
 
-function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" }) {
+function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" | "assignments" }) {
   const tabs = [
     { key: "roles", label: "Roles", href: "/settings/access-control" },
     { key: "permissions", label: "Permissions", href: "/settings/access-control/permissions" },
-    { key: "mapping", label: "Role Mapping", href: "/settings/access-control/mapping" }
+    { key: "mapping", label: "Role Mapping", href: "/settings/access-control/mapping" },
+    { key: "assignments", label: "Assignments", href: "/settings/access-control/assignments" }
   ] as const;
   return (
     <nav aria-label="Access Control sections" className="flex flex-wrap gap-2 border-b pb-2">
@@ -1612,7 +1794,7 @@ function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapp
   );
 }
 
-export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" }) {
+export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" | "assignments" }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
   const canManageRoleMappings = currentPermissions.can("settings.role.manage");
@@ -1621,11 +1803,14 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const [moduleFilter, setModuleFilter] = useState("");
   const [roleCreateOpen, setRoleCreateOpen] = useState(false);
   const [permissionCreateOpen, setPermissionCreateOpen] = useState(false);
+  const [assignmentCreateOpen, setAssignmentCreateOpen] = useState(false);
+  const [assignmentFormError, setAssignmentFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const roleAssignmentsQuery = useQuery({ queryKey: ["settings", "role-assignments"], queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roles = rolesQuery.data ?? [];
   const permissions = permissionsQuery.data ?? [];
   const rolePermissionsQuery = useQuery({
@@ -1670,6 +1855,28 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     },
     onError: (error) => addToast({ type: "error", title: "Permission create failed", message: error instanceof Error ? error.message : "Unable to create permission." })
   });
+  const createAssignmentMutation = useMutation({
+    mutationFn: (payload: { user_id: number; role_id: number; scope_type: string; scope_id?: number | null }) => settingsApi.createRoleAssignment(accessToken ?? "", payload),
+    onSuccess: async () => {
+      setAssignmentCreateOpen(false);
+      setAssignmentFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments"] });
+      addToast({ type: "success", title: "Role assignment created" });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to create role assignment.";
+      setAssignmentFormError(message);
+      addToast({ type: "error", title: "Assignment failed", message });
+    }
+  });
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: number) => settingsApi.deleteRoleAssignment(accessToken ?? "", assignmentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments"] });
+      addToast({ type: "success", title: "Role assignment revoked" });
+    },
+    onError: (error) => addToast({ type: "error", title: "Assignment revoke failed", message: error instanceof Error ? error.message : "Unable to revoke assignment." })
+  });
 
   function submitCustomRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1700,6 +1907,20 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     }
   }
 
+  function submitRoleAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const userId = Number(getFormValue(event.currentTarget, "user_id"));
+    const roleId = Number(getFormValue(event.currentTarget, "role_id"));
+    const scopeType = getFormValue(event.currentTarget, "scope_type") || "project";
+    const rawScopeId = getFormValue(event.currentTarget, "scope_id");
+    const scopeId = scopeType === "platform" || !rawScopeId ? null : Number(rawScopeId);
+    if (!userId || !roleId) {
+      setAssignmentFormError("User ID and role are required.");
+      return;
+    }
+    createAssignmentMutation.mutate({ user_id: userId, role_id: roleId, scope_type: scopeType, scope_id: scopeId });
+  }
+
   return (
     <SettingsLayout
       breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Access Control" }]}
@@ -1718,6 +1939,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         actions={
           <div className="flex flex-wrap gap-2">
             {canManageRoleMappings ? <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton> : null}
+            {canManageRoleMappings ? <Button type="button" variant="outline" onClick={() => setAssignmentCreateOpen(true)}>Assign Role</Button> : null}
             {canCreatePermission ? <Button type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</Button> : null}
           </div>
         }
@@ -1813,6 +2035,24 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
           </SettingsCard>
         </div>
       ) : null}
+      {section === "assignments" ? (
+        <SettingsCard title="Scoped Role Assignments" description="Users receive roles at a scope. Effective permissions are resolved from these assignments plus inherited higher-scope roles.">
+          <SettingsDataTable
+            columns={["User", "Role", "Scope Type", "Scope Name", "Assigned By", "Assigned On", "Status", "Actions"]}
+            rows={(roleAssignmentsQuery.data ?? []).map((assignment: RoleAssignmentRecord) => [
+              <SettingsLinkButton key={`${assignment.id}-user`} href={`/settings/members/${assignment.user_id}`} variant="outline">User {assignment.user_id}</SettingsLinkButton>,
+              roleNameById(roles, assignment.role_id),
+              roleDisplayName(assignment.scope_type),
+              scopeLabelForAssignment(assignment, organizations, workspaces),
+              assignment.assigned_by ? `User ${assignment.assigned_by}` : "System",
+              formatDate(assignment.assigned_at),
+              roleDisplayName(assignment.status),
+              <ConfirmActionButton key={assignment.id} label="Revoke" message="Revoke this role assignment?" onConfirm={() => deleteAssignmentMutation.mutate(assignment.id)} />
+            ])}
+            emptyMessage="No scoped role assignments"
+          />
+        </SettingsCard>
+      ) : null}
       <SettingsCreateDialog title="Create custom role" open={roleCreateOpen && canManageRoleMappings} onOpenChange={setRoleCreateOpen} onSubmit={submitCustomRole}>
         <FormField label="Name" required><Input name="name" placeholder="QA Lead" /></FormField>
         <FormField label="Scope">
@@ -1835,6 +2075,22 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         <FormField label="Description"><Input name="description" placeholder="What this permission allows" /></FormField>
         <input type="hidden" name="status" value="active" />
         <FormActions submitLabel="Create Permission" isSubmitting={createPermissionMutation.isPending} onCancel={() => setPermissionCreateOpen(false)} />
+      </SettingsCreateDialog>
+      <SettingsCreateDialog title="Assign scoped role" open={assignmentCreateOpen && canManageRoleMappings} onOpenChange={setAssignmentCreateOpen} onSubmit={submitRoleAssignment} error={assignmentFormError}>
+        <FormField label="User ID" required><Input name="user_id" type="number" min="1" placeholder="1" /></FormField>
+        <FormField label="Role" required>
+          <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="">Select role</option>
+            {roles.map((role) => <option key={role.id} value={role.id}>{role.name} ({roleDisplayName(role.scope)})</option>)}
+          </select>
+        </FormField>
+        <FormField label="Scope type">
+          <select name="scope_type" className="h-10 w-full rounded-md border bg-background px-3 text-sm" defaultValue="project">
+            {["platform", "organization", "workspace", "project", "team"].map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Scope ID"><Input name="scope_id" type="number" min="1" placeholder="Leave blank for platform" /></FormField>
+        <FormActions submitLabel="Assign Role" isSubmitting={createAssignmentMutation.isPending} onCancel={() => setAssignmentCreateOpen(false)} />
       </SettingsCreateDialog>
     </SettingsLayout>
   );

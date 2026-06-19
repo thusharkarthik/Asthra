@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.role import UserRoleCreate, UserRoleRead
+from app.schemas.scoped_membership import EffectivePermissionsRead
 from app.schemas.user import UserProfileRead, UserProfileUpdate
 from app.services.role_service import RoleService
+from app.services.scoped_membership_service import ScopedMembershipService
 from app.services.user_service import UserService
 
 router = APIRouter()
@@ -66,3 +68,16 @@ def remove_user_role(
 ) -> Response:
     RoleService(db).remove_user_role(user_id, role_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{user_id}/effective-permissions", response_model=EffectivePermissionsRead)
+def get_user_effective_permissions(
+    user_id: int,
+    scope_type: str = Query(default="platform"),
+    scope_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    # current_user is required for authentication; detailed viewer permissions are handled in Settings UI for now.
+    _ = current_user
+    return ScopedMembershipService(db).effective_permissions(user_id, scope_type, scope_id)
