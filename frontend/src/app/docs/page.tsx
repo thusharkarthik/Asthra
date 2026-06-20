@@ -42,6 +42,8 @@ export default function DocsPage() {
   const drafts = pages.filter((page) => (page.status ?? "draft") === "draft").slice(0, 5);
   const draftPages = pages.filter((page) => (page.status ?? "draft") === "draft");
   const publishedPages = pages.filter((page) => page.status === "published");
+  const pagesLinkedToWork = pages.filter((page) => /flow|work item|work/i.test(`${page.title} ${page.content}`));
+  const pagesWithoutWork = pages.filter((page) => !pagesLinkedToWork.some((linkedPage) => linkedPage.id === page.id));
 
   return (
     <>
@@ -70,6 +72,9 @@ export default function DocsPage() {
             <ModuleDashboardCard title="Draft Pages" value={draftPages.length} />
             <ModuleDashboardCard title="Published Pages" value={publishedPages.length} />
             <ModuleDashboardCard title="Recently Updated" value={recentPages.length} />
+            <ModuleDashboardCard title="Pages Linked To Work" value={pagesLinkedToWork.length} />
+            <ModuleDashboardCard title="Pages Without Work" value={pagesWithoutWork.length} />
+            <ModuleDashboardCard title="Recently Referenced" value={recentViewed.length} />
           </div>
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr_0.9fr]">
             <DocsExplorer spaces={spaces} pages={pages} />

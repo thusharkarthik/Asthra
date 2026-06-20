@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DiscoverPage from "@/app/discover/page";
+import DiscoverDeliveryPage from "@/app/discover/delivery/page";
 import FeatureRequestsPage from "@/app/discover/feature-requests/page";
 import FeedbackPage from "@/app/discover/feedback/page";
 import IdeaDetailPage from "@/app/discover/ideas/[id]/page";
@@ -46,6 +47,18 @@ function mockDiscoverFetch() {
     }
     if (url.includes("/roadmap-items")) {
       return new Response(JSON.stringify([{ id: 5, workspace_id: 2, title: "Portal beta", description: "Beta milestone", status: "planned", target_quarter: "Q3" }]), { status: 200 });
+    }
+    if (url.includes("/api/docs/api/v1/pages")) {
+      return new Response(JSON.stringify([{ id: 5, space_id: 1, title: "Customer portal requirements", content: "Customer portal requirements", status: "published" }]), { status: 200 });
+    }
+    if (url.includes("/api/flow/api/v1/work-items")) {
+      return new Response(JSON.stringify([{ id: 9, project_id: 3, title: "Customer portal story", description: "Build customer portal", sprint_id: 4, release_id: 6 }]), { status: 200 });
+    }
+    if (url.includes("/api/flow/api/v1/sprints")) {
+      return new Response(JSON.stringify([{ id: 4, project_id: 3, name: "Sprint 1", status: "active" }]), { status: 200 });
+    }
+    if (url.includes("/api/flow/api/v1/releases")) {
+      return new Response(JSON.stringify([{ id: 6, project_id: 3, name: "v1.0", status: "planned" }]), { status: 200 });
     }
     return new Response(JSON.stringify([]), { status: 200 });
   });
@@ -149,5 +162,26 @@ describe("Discover frontend screens", () => {
     fireEvent.click(screen.getByText("Create Flow Work Item"));
     expect(screen.getByText("Flow Work Item Draft")).toBeInTheDocument();
     expect(screen.getByText("Mark Converted to Work")).toBeInTheDocument();
+  });
+
+  it("renders idea conversion wizard", async () => {
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<IdeaDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Convert Idea")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Convert Idea"));
+    expect(screen.getByText("Convert Idea - Step 1 of 4")).toBeInTheDocument();
+    expect(screen.getByText("Requirements document draft")).toBeInTheDocument();
+  });
+
+  it("renders delivery lifecycle view", async () => {
+    renderWithQuery(<DiscoverDeliveryPage />);
+
+    expect(screen.getByRole("heading", { name: "Delivery View" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Self-service billing").length).toBeGreaterThan(0));
+    expect(screen.getByText("Documents")).toBeInTheDocument();
+    expect(screen.getByText("Work Items")).toBeInTheDocument();
+    expect(screen.getByText("Sprint")).toBeInTheDocument();
+    expect(screen.getByText("Release")).toBeInTheDocument();
   });
 });

@@ -68,8 +68,24 @@ This pass made the product discovery lifecycle testable end to end:
 Discover now exposes the future execution handoff clearly:
 
 - `Create Flow Work Item` displays the intended Flow create payload with project, title, description, and Discover source metadata.
+- `Convert Idea` opens a manual four-step wizard: Create Documentation, Create Flow Structure, Review, Execute.
 - `Mark Converted to Work` updates the idea status to `converted_to_work`.
+- Idea detail shows Related Documents, Related Work Items, Related Roadmap Items, and Linked Flow Work placeholder sections.
+- `/discover/delivery` shows the product delivery lifecycle: Idea -> Documents -> Work Items -> Sprint -> Release.
+- Roadmap cards expose Idea Count, Document Count, Work Item Count, and Completion % placeholders.
 - Persisted Flow work item creation and link storage are intentionally not automatic yet.
+
+## Lifecycle Model
+
+Discover is now organized around:
+
+Idea
+-> Documentation
+-> Execution
+-> Sprint
+-> Release
+
+The current implementation makes the lifecycle visible and testable in the UI. Automatic creation and persisted cross-service relationship graphs are future backend integrations.
 
 ## RBAC Readiness
 

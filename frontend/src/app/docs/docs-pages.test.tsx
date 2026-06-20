@@ -43,6 +43,15 @@ function mockDocsFetch() {
     if (url.includes("/spaces")) {
       return new Response(JSON.stringify([{ id: 1, workspace_id: 2, name: "Engineering", description: "Team docs" }]), { status: 200 });
     }
+    if (url.includes("/api/discover/api/v1/ideas")) {
+      return new Response(JSON.stringify([{ id: 7, workspace_id: 2, project_id: 3, title: "Frontend Notes idea", description: "Docs page content", status: "approved", created_by_id: 1 }]), { status: 200 });
+    }
+    if (url.includes("/api/flow/api/v1/work-items")) {
+      return new Response(JSON.stringify([{ id: 9, project_id: 3, title: "Frontend Notes work item", description: "Docs page content", release_id: 6 }]), { status: 200 });
+    }
+    if (url.includes("/api/flow/api/v1/releases")) {
+      return new Response(JSON.stringify([{ id: 6, project_id: 3, name: "Frontend v1", status: "planned" }]), { status: 200 });
+    }
     if (url.includes("/pages") || url.includes("/search/pages")) {
       return new Response(JSON.stringify([
         { id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" },
@@ -127,6 +136,8 @@ describe("Docs frontend screens", () => {
     await waitFor(() => expect(screen.getAllByText("Docs page content").length).toBeGreaterThan(0));
     expect(screen.getByText("Helpful page")).toBeInTheDocument();
     expect(screen.getByText("Linked Work Items")).toBeInTheDocument();
+    expect(screen.getByText("Related Ideas")).toBeInTheDocument();
+    expect(screen.getByText("Linked Releases")).toBeInTheDocument();
     expect(screen.getByText("Link Flow Work Item")).toBeInTheDocument();
     expect(screen.getByText("Publish")).toBeInTheDocument();
     expect(screen.getByText("Version 1: Frontend Notes")).toBeInTheDocument();

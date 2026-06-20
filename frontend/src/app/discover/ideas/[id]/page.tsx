@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { discoverDate, isHighImpactIdea, needsValidation } from "@/components/discover/discover-utils";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
+import { docsApi } from "@/services/api/docs-api";
 import { discoverApi } from "@/services/api/discover-api";
+import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -22,6 +24,7 @@ export default function IdeaDetailPage() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [isEditing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -29,6 +32,8 @@ export default function IdeaDetailPage() {
   const [targetUsers, setTargetUsers] = useState("");
   const [businessValue, setBusinessValue] = useState("");
   const [showFlowDraft, setShowFlowDraft] = useState(false);
+  const [showConversionWizard, setShowConversionWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
 
   const ideaQuery = useQuery({ queryKey: ["discover", "idea", id], queryFn: () => discoverApi.getIdea(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const mvpPlanQuery = useQuery({ queryKey: ["discover", "mvp-plan", id], queryFn: () => discoverApi.getMvpPlan(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: false });
@@ -42,6 +47,18 @@ export default function IdeaDetailPage() {
     queryKey: ["discover", "feedback", selectedWorkspaceId],
     queryFn: () => discoverApi.listFeedback(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
     enabled: Boolean(accessToken && selectedWorkspaceId),
+    retry: 1
+  });
+  const docsPagesQuery = useQuery({
+    queryKey: ["discover", "idea-docs", selectedWorkspaceId],
+    queryFn: () => docsApi.listPages(accessToken ?? "", { limit: 100 }),
+    enabled: Boolean(accessToken && selectedWorkspaceId),
+    retry: 1
+  });
+  const workItemsQuery = useQuery({
+    queryKey: ["discover", "idea-work-items", selectedProjectId],
+    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
   const analysisMutation = useMutation({ mutationFn: () => discoverApi.analyzeIdea(accessToken ?? "", id) });
@@ -80,6 +97,9 @@ export default function IdeaDetailPage() {
 
   const relatedRoadmap = (roadmapQuery.data ?? []).filter((item) => item.idea_id === idea.id);
   const relatedFeedback = (feedbackQuery.data ?? []).filter((feedback) => feedback.idea_id === idea.id);
+  const ideaToken = idea.title.toLowerCase().split(" ")[0] ?? "";
+  const relatedDocs = (docsPagesQuery.data ?? []).filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(ideaToken));
+  const relatedWorkItems = (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(ideaToken));
 
   function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,6 +120,7 @@ export default function IdeaDetailPage() {
             <Button variant="outline" onClick={() => setEditing((value) => !value)}>{isEditing ? "Close Edit" : "Edit Idea"}</Button>
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("approve")} disabled={lifecycleMutation.isPending}>Approve</Button>
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("reject")} disabled={lifecycleMutation.isPending}>Reject</Button>
+            <Button variant="outline" onClick={() => { setShowConversionWizard(true); setWizardStep(1); }}>Convert Idea</Button>
             <Button variant="outline" onClick={() => setShowFlowDraft((value) => !value)}>Create Flow Work Item</Button>
             <Button onClick={() => analysisMutation.mutate()} disabled={analysisMutation.isPending}>{analysisMutation.isPending ? "Analyzing..." : "AI analyze idea"}</Button>
           </div>
@@ -145,6 +166,46 @@ export default function IdeaDetailPage() {
                 {idea.status === "converted_to_work" ? "Already converted" : "Mark Converted to Work"}
               </Button>
               <Button variant="outline" onClick={() => setShowFlowDraft(false)}>Close Draft</Button>
+            </div>
+          </div>
+        </DetailPanel>
+      ) : null}
+      {showConversionWizard ? (
+        <DetailPanel title={`Convert Idea - Step ${wizardStep} of 4`}>
+          <div className="space-y-4 text-sm">
+            {wizardStep === 1 ? (
+              <div>
+                <h3 className="font-medium">Create Documentation</h3>
+                <p className="mt-1 text-muted-foreground">Prepare Requirements, Architecture, Meeting Notes, and Research docs before execution.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {["Requirements", "Architecture", "Meeting Notes", "Research"].map((label) => <div key={label} className="rounded-md border p-3">{label} document draft</div>)}
+                </div>
+              </div>
+            ) : null}
+            {wizardStep === 2 ? (
+              <div>
+                <h3 className="font-medium">Create Flow Structure</h3>
+                <p className="mt-1 text-muted-foreground">Confirm the execution shape manually: Epic, Feature, Stories, and Tasks.</p>
+                <pre className="mt-3 overflow-auto rounded-md border bg-muted p-3 text-xs">{JSON.stringify({ epic: idea.title, feature: `${idea.title} MVP`, stories: ["Validate user workflow", "Build first usable path"], tasks: ["Create requirements", "Create implementation checklist"] }, null, 2)}</pre>
+              </div>
+            ) : null}
+            {wizardStep === 3 ? (
+              <div>
+                <h3 className="font-medium">Review</h3>
+                <p className="mt-1 text-muted-foreground">Review documents and Flow structure. No AI or automation is used; the user confirms the handoff.</p>
+              </div>
+            ) : null}
+            {wizardStep === 4 ? (
+              <div>
+                <h3 className="font-medium">Execute</h3>
+                <p className="mt-1 text-muted-foreground">When the docs and Flow work are created, mark this idea converted to work.</p>
+                <Button className="mt-3" variant="outline" onClick={() => lifecycleMutation.mutate("convert")} disabled={lifecycleMutation.isPending || idea.status === "converted_to_work"}>Mark Converted to Work</Button>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={wizardStep === 1} onClick={() => setWizardStep((step) => Math.max(1, step - 1))}>Back</Button>
+              <Button variant="outline" disabled={wizardStep === 4} onClick={() => setWizardStep((step) => Math.min(4, step + 1))}>Next</Button>
+              <Button variant="outline" onClick={() => setShowConversionWizard(false)}>Close Wizard</Button>
             </div>
           </div>
         </DetailPanel>
@@ -200,6 +261,26 @@ export default function IdeaDetailPage() {
           ) : (
             <p className="text-sm text-muted-foreground">No MVP plan yet. Define scope, assumptions, risks, and success metrics before roadmap commitment.</p>
           )}
+        </DetailPanel>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DetailPanel title="Related Documents">
+          {relatedDocs.length === 0 ? <p className="text-sm text-muted-foreground">No related documents found. Create Requirements, Architecture, Meeting Notes, or Research docs for this idea.</p> : (
+            <div className="space-y-2">{relatedDocs.slice(0, 4).map((page) => <a key={page.id} className="block rounded-md border p-3 text-sm text-primary hover:bg-muted" href={`/docs/pages/${page.id}`}>{page.title}</a>)}</div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowConversionWizard(true)}>Create Document</Button>
+            <Button size="sm" variant="outline" disabled>Link Existing Document</Button>
+          </div>
+        </DetailPanel>
+        <DetailPanel title="Related Work Items">
+          {relatedWorkItems.length === 0 ? <p className="text-sm text-muted-foreground">No related Flow work items found yet.</p> : (
+            <div className="space-y-2">{relatedWorkItems.slice(0, 4).map((item) => <a key={item.id} className="block rounded-md border p-3 text-sm text-primary hover:bg-muted" href={`/flow/work-items/${item.id}`}>{item.title}</a>)}</div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowFlowDraft(true)}>Create Work Item</Button>
+            <Button size="sm" variant="outline" disabled>Link Existing Work Item</Button>
+          </div>
         </DetailPanel>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
