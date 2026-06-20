@@ -40,6 +40,8 @@ export type SpaceCreate = {
   created_by_id: number;
 };
 
+export type SpaceUpdate = Partial<Pick<SpaceCreate, "project_id" | "name" | "description">>;
+
 export type PageCreate = {
   space_id: number;
   parent_page_id?: number | null;

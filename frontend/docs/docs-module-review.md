@@ -33,13 +33,41 @@ Docs now presents a knowledge management experience:
 
 This pass made Docs usable as a knowledge workflow instead of only a browsing surface:
 
+- Dashboard cards now show Total Spaces, Total Pages, Draft Pages, Published Pages, and Recently Updated.
+- Dashboard sections cover Recent Pages, Spaces/Explorer, Drafts, Recently Viewed, and Knowledge Shortcuts.
 - Spaces can now carry optional project context for project-scoped knowledge.
-- Space detail includes breadcrumbs, a back link, and a scoped Create Page action.
-- Page detail includes breadcrumbs, a back link, edit mode, publish, and archive actions.
+- Spaces list supports create and links to operational space detail.
+- Space detail includes breadcrumbs, a back link, scoped Create Page, Edit Space, safe Delete Space, page tree, recent pages, and metadata.
+- Page creation supports title, space, optional parent page, content, and draft/published status.
+- Page detail includes breadcrumbs, a back link, edit mode, status editing, parent page editing, publish, and archive actions.
 - Page version history is visible on page detail when versions exist.
 - Backend page endpoints now support publish, archive, and version listing.
 - Existing databases are upgraded safely at service startup for the new `spaces.project_id` column.
 - The frontend uses typed API helpers for page publishing, archiving, and version history through the gateway.
+
+## Routes
+
+- `/docs`
+- `/docs/spaces`
+- `/docs/spaces/[id]`
+- `/docs/pages`
+- `/docs/pages/[id]`
+- `/docs/search`
+- `/docs/favorites`
+- `/docs/recent`
+
+## CRUD Status
+
+- Create space: available from Docs headers and Spaces.
+- List spaces: available on Spaces and dashboard explorer.
+- Read space detail: available on Space Detail.
+- Edit space: available on Space Detail.
+- Delete space: available on Space Detail when the space has no pages.
+- Create page: available from Docs headers, Pages, and Space Detail.
+- List/search/filter pages: available on Pages and Search.
+- Read page detail: available on Page Detail.
+- Edit page: available on Page Detail.
+- Publish/archive page: available on Page Detail.
 
 ## RBAC Readiness
 

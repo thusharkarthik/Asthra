@@ -14,6 +14,7 @@ import { EntityDetailHeader } from "@/components/modules/entity-detail-header";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
@@ -27,12 +28,15 @@ export default function PageDetail() {
   const addViewed = useRecentItemsStore((state) => state.addViewed);
   const [isEditing, setEditing] = useState(false);
   const pageQuery = useQuery({ queryKey: ["docs", "page", id], queryFn: () => docsApi.getPage(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken), retry: 1 });
   const commentsQuery = useQuery({ queryKey: ["docs", "comments", id], queryFn: () => docsApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const versionsQuery = useQuery({ queryKey: ["docs", "page-versions", id], queryFn: () => docsApi.listPageVersions(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [status, setStatus] = useState("draft");
+  const [parentPageId, setParentPageId] = useState("");
   const updateMutation = useMutation({
-    mutationFn: () => docsApi.updatePage(accessToken ?? "", id, { title, content, updated_by_id: currentUser?.id }),
+    mutationFn: () => docsApi.updatePage(accessToken ?? "", id, { title, content, status, parent_page_id: parentPageId ? Number(parentPageId) : null, updated_by_id: currentUser?.id }),
     onSuccess: () => {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["docs", "page", id] });
@@ -51,6 +55,8 @@ export default function PageDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["docs", "page", id] })
   });
   const page = pageQuery.data;
+  const spaces = spacesQuery.data ?? [];
+  const currentSpace = spaces.find((space) => space.id === page?.space_id);
 
   useEffect(() => {
     if (page) {
@@ -61,6 +67,8 @@ export default function PageDetail() {
   const startEditing = () => {
     setTitle(page?.title ?? "");
     setContent(page?.content ?? "");
+    setStatus(page?.status ?? "draft");
+    setParentPageId(page?.parent_page_id ? String(page.parent_page_id) : "");
     setEditing(true);
   };
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
@@ -78,7 +86,7 @@ export default function PageDetail() {
       <DocsBreadcrumbs items={[{ label: "Pages", href: "/docs/pages" }, { label: page.title }]} />
       <EntityDetailHeader
         title={page.title}
-        description={`Space ${page.space_id} · Updated ${docsDate(page.updated_at ?? page.created_at)}`}
+        description={`${currentSpace?.name ?? `Space ${page.space_id}`} · Updated ${docsDate(page.updated_at ?? page.created_at)}`}
         meta={<StatusBadge value={page.status ?? "draft"} />}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -93,6 +101,7 @@ export default function PageDetail() {
           <DetailPanel title="Overview">
             <div className="grid gap-3 text-sm sm:grid-cols-3">
               <div><div className="text-muted-foreground">Space</div><div className="font-medium">{page.space_id}</div></div>
+              <div><div className="text-muted-foreground">Parent</div><div className="font-medium">{page.parent_page_id ? `Page ${page.parent_page_id}` : "Top-level"}</div></div>
               <div><div className="text-muted-foreground">Status</div><StatusBadge value={page.status ?? "draft"} /></div>
               <div><div className="text-muted-foreground">Versions</div><div className="font-medium">{versionsQuery.data?.length ?? 0}</div></div>
             </div>
@@ -101,6 +110,20 @@ export default function PageDetail() {
             {isEditing ? (
               <form className="space-y-3" onSubmit={handleSave}>
                 <Input aria-label="Edit page title" value={title} onChange={(event) => setTitle(event.target.value)} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium">Status</span>
+                    <Select aria-label="Edit page status" value={status} onChange={(event) => setStatus(event.target.value)}>
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                      <option value="archived">Archived</option>
+                    </Select>
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium">Parent page</span>
+                    <Input aria-label="Edit parent page ID" placeholder="Optional parent page ID" value={parentPageId} onChange={(event) => setParentPageId(event.target.value)} />
+                  </label>
+                </div>
                 <textarea aria-label="Edit page content" className="min-h-56 w-full rounded-md border bg-background p-3 text-sm" value={content} onChange={(event) => setContent(event.target.value)} />
                 <div className="flex gap-2">
                   <Button disabled={updateMutation.isPending}>Save</Button>

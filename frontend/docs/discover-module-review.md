@@ -27,13 +27,39 @@ Discover now behaves like a product discovery and innovation planning workspace:
 
 This pass made the product discovery lifecycle testable end to end:
 
+- Dashboard cards now show Total Ideas, Reviewing, Validating, Approved, Rejected, and Converted to Work.
+- Dashboard sections cover Recent Ideas, High Impact Ideas, Ideas Needing Validation, Roadmap Preview, and Product Signals.
+- Ideas list supports search, status filter, impact filter, and project filter.
 - Ideas now support `captured`, `reviewing`, `validating`, `approved`, `rejected`, and `converted_to_work` statuses.
 - Idea records capture problem, target user, business value, impact score, confidence score, and effort score.
 - Idea detail includes edit actions and lifecycle actions for approve, reject, and convert to Flow placeholder.
-- Discover breadcrumbs and contextual back links were added to the dashboard, ideas list, and idea detail.
+- Idea detail is organized around Overview, Problem, Target Users, Scores, Validation Notes, Decision, Roadmap Links, and Linked Flow Work placeholder.
+- Validation shows ideas needing evidence with confidence, impact, decision status, and validation/business context.
+- Roadmap is grouped into Now, Next, and Later and shows approved ideas as planning candidates.
+- Discover breadcrumbs and contextual back links were added to dashboard, ideas, validation, roadmap, and detail screens.
 - Backend endpoints now support idea approval, rejection, and conversion marking.
 - Existing databases are upgraded safely at service startup for the new scoring and business value columns.
 - The frontend uses typed API helpers for idea update and lifecycle actions through the gateway.
+
+## Routes
+
+- `/discover`
+- `/discover/ideas`
+- `/discover/ideas/[id]`
+- `/discover/validation`
+- `/discover/roadmap`
+- `/discover/feature-requests`
+- `/discover/feedback`
+- `/discover/prioritization`
+
+## CRUD Status
+
+- Create idea: available from Discover headers and Ideas.
+- List/search/filter ideas: available on Ideas.
+- Read idea detail: available on Idea Detail.
+- Edit idea: available on Idea Detail.
+- Approve/reject idea: available on Idea Detail.
+- Convert to Flow: marks the idea as converted; actual Flow work item creation remains a placeholder.
 
 ## RBAC Readiness
 

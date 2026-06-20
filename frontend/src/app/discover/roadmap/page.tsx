@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
+import { DiscoverBreadcrumbs } from "@/components/discover/discover-breadcrumbs";
 import { CreateRoadmapItemDialog } from "@/components/discover/discover-create-dialogs";
 import { DiscoverSetupState } from "@/components/discover/discover-setup-state";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
@@ -25,46 +27,74 @@ export default function RoadmapPage() {
     enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
     retry: 1
   });
+  const ideasQuery = useQuery({
+    queryKey: ["discover", "ideas", selectedWorkspaceId],
+    queryFn: () => discoverApi.listIdeas(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
+    retry: 1
+  });
 
   const roadmap = roadmapQuery.data ?? [];
+  const roadmapIdeaIds = new Set(roadmap.map((item) => item.idea_id).filter(Boolean));
+  const approvedCandidates = (ideasQuery.data ?? []).filter((idea) => idea.status === "approved" && !roadmapIdeaIds.has(idea.id));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Roadmap"
         description="Turn validated opportunities into visible product outcomes."
+        breadcrumbs={<DiscoverBreadcrumbs items={[{ label: "Roadmap" }]} />}
         actions={<Button onClick={() => setOpen(true)}>Create roadmap item</Button>}
       />
       <DiscoverSubnav />
       {!selectedOrganizationId || !selectedWorkspaceId ? <DiscoverSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="context" /> : roadmapQuery.isLoading ? <LoadingState /> : roadmap.length === 0 ? <DiscoverSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="roadmap" /> : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {["Now", "Next", "Later"].map((bucket) => {
-            const items = roadmap.filter((item) => roadmapBucket(item) === bucket);
-            return (
-              <section key={bucket} className="rounded-lg border bg-card p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold">{bucket}</h2>
-                  <span className="text-xs text-muted-foreground">{items.length} items</span>
-                </div>
-                {items.length === 0 ? (
-                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">No {bucket.toLowerCase()} roadmap items.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {items.map((item) => (
-                      <div key={item.id} className="rounded-md border bg-background p-3">
-                        <div className="font-medium">{item.title}</div>
-                        <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{item.description ?? "No description"}</p>
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <RoadmapStatusBadge value={item.status} />
-                          <span className="text-xs text-muted-foreground">{item.target_quarter ?? "TBD"}</span>
-                        </div>
-                      </div>
-                    ))}
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {["Now", "Next", "Later"].map((bucket) => {
+              const items = roadmap.filter((item) => roadmapBucket(item) === bucket);
+              return (
+                <section key={bucket} className="rounded-lg border bg-card p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">{bucket}</h2>
+                    <span className="text-xs text-muted-foreground">{items.length} items</span>
                   </div>
-                )}
-              </section>
-            );
-          })}
+                  {items.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">No {bucket.toLowerCase()} roadmap items.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {items.map((item) => (
+                        <div key={item.id} className="rounded-md border bg-background p-3">
+                          <div className="font-medium">{item.title}</div>
+                          <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{item.description ?? "No description"}</p>
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <RoadmapStatusBadge value={item.status} />
+                            <span className="text-xs text-muted-foreground">{item.target_quarter ?? "TBD"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+          <section className="rounded-lg border bg-card p-4">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold">Approved Idea Candidates</h2>
+              <p className="text-sm text-muted-foreground">Approved ideas can be promoted into roadmap items when planning is ready.</p>
+            </div>
+            {approvedCandidates.length === 0 ? <EmptyState title="No approved ideas waiting for roadmap planning" /> : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {approvedCandidates.map((idea) => (
+                  <div key={idea.id} className="rounded-md border p-3">
+                    <div className="font-medium">{idea.title}</div>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{idea.business_value ?? idea.description}</p>
+                    <div className="mt-2 text-xs text-muted-foreground">Impact {idea.impact_score ?? "unscored"} · Confidence {idea.confidence_score ?? "unscored"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
       <CreateRoadmapItemDialog open={open} onOpenChange={setOpen} />
