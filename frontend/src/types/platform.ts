@@ -29,6 +29,14 @@ export type PlatformEntityType =
   | "dashboard"
   | "media_asset";
 
+export type OperationalEntityType =
+  | "flow_work_item"
+  | "docs_page"
+  | "discover_idea"
+  | "desk_ticket"
+  | "collab_thread"
+  | "pulse_incident";
+
 export type EntityReference = {
   source: PlatformSource;
   entity_type: PlatformEntityType | string;
@@ -40,9 +48,29 @@ export type EntityReference = {
 
 export type CrossModuleLink = {
   id: string;
+  source_type?: OperationalEntityType | string;
+  source_id?: string | number;
+  target_type?: OperationalEntityType | string;
+  target_id?: string | number;
+  relationship_type?: string;
+  source?: EntityReference;
+  target?: EntityReference;
   from: EntityReference;
   to: EntityReference;
   relation: string;
+  created_by?: string | number | null;
+  created_at?: string;
+};
+
+export type RelationshipCreate = {
+  source_type: OperationalEntityType;
+  source_id: string | number;
+  target_type: OperationalEntityType;
+  target_id: string | number;
+  relationship_type: "relates_to" | "blocks" | "references" | "originates_from" | "documents" | "supports" | "duplicates";
+  source_title?: string | null;
+  target_title?: string | null;
+  created_by?: string | number | null;
 };
 
 export type ActivityItem = {

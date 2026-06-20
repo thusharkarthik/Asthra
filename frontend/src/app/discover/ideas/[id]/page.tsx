@@ -10,6 +10,7 @@ import { RoadmapStatusBadge } from "@/components/modules/roadmap-status-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { discoverDate, isHighImpactIdea, needsValidation } from "@/components/discover/discover-utils";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
 import { docsApi } from "@/services/api/docs-api";
@@ -442,6 +443,7 @@ export default function IdeaDetailPage() {
           </div>
         </DetailPanel>
       </div>
+      <LinkedResourcesPanel entityType="discover_idea" entityId={idea.id} entityTitle={idea.title} />
       <DetailPanel title="AI Analysis">
         {analysisMutation.data ? (
           <div className="grid gap-3 text-sm md:grid-cols-2">

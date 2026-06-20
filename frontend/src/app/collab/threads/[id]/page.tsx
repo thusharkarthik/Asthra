@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { ThreadMessageList } from "@/components/modules/thread-message-list";
 import { Button } from "@/components/ui/button";
 import { CollabBackLink, CollabBreadcrumbs } from "@/components/collab/collab-breadcrumbs";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { collabApi } from "@/services/api/collab-api";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -50,9 +51,7 @@ export default function ThreadDetailPage() {
         <ThreadMessageList messages={messagesQuery.data ?? []} />
         <div className="mt-4"><CommentComposer onSubmit={(content) => messageMutation.mutate(content)} isSubmitting={messageMutation.isPending} /></div>
       </DetailPanel>
-      <DetailPanel title="Linked Resources">
-        <p className="text-sm text-muted-foreground">Future links will connect this discussion to Flow work items, Docs pages, Desk tickets, and Pulse incidents.</p>
-      </DetailPanel>
+      <LinkedResourcesPanel entityType="collab_thread" entityId={thread.id} entityTitle={thread.title} />
     </div>
   );
 }

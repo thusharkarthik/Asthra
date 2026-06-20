@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { docsApi } from "@/services/api/docs-api";
 import { discoverApi } from "@/services/api/discover-api";
 import { flowApi } from "@/services/api/flow-api";
@@ -363,6 +364,7 @@ export default function PageDetail() {
           </div>
         </DetailPanel>
       </div>
+      <LinkedResourcesPanel entityType="docs_page" entityId={page.id} entityTitle={page.title} />
     </div>
   );
 }
