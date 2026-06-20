@@ -58,7 +58,7 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
       setEffortScore("");
       setStatus("captured");
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ["discover", "ideas", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["discover"] });
     }
   });
 
@@ -87,6 +87,7 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
         <Button disabled={createMutation.isPending || !selectedWorkspaceId || !title.trim() || !description.trim()}>
           {createMutation.isPending ? "Creating..." : "Create idea"}
         </Button>
+        {createMutation.isError ? <p className="text-sm text-destructive">{createMutation.error.message}</p> : null}
       </form>
     </CreateDialog>
   );
@@ -119,7 +120,7 @@ export function CreateFeatureRequestDialog({ open, onOpenChange }: { open: boole
       setRequestedBy("");
       setStatus("new");
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ["discover", "feature-requests", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["discover"] });
     }
   });
 
@@ -142,6 +143,7 @@ export function CreateFeatureRequestDialog({ open, onOpenChange }: { open: boole
         <Button disabled={createMutation.isPending || !selectedWorkspaceId || !title.trim() || !description.trim()}>
           {createMutation.isPending ? "Adding..." : "Add request"}
         </Button>
+        {createMutation.isError ? <p className="text-sm text-destructive">{createMutation.error.message}</p> : null}
       </form>
     </CreateDialog>
   );
@@ -171,7 +173,7 @@ export function CreateFeedbackDialog({ open, onOpenChange }: { open: boolean; on
       setContent("");
       setSentiment("neutral");
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ["discover", "feedback", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["discover"] });
     }
   });
 
@@ -193,6 +195,7 @@ export function CreateFeedbackDialog({ open, onOpenChange }: { open: boolean; on
         <Button disabled={createMutation.isPending || !selectedWorkspaceId || !content.trim()}>
           {createMutation.isPending ? "Adding..." : "Add feedback"}
         </Button>
+        {createMutation.isError ? <p className="text-sm text-destructive">{createMutation.error.message}</p> : null}
       </form>
     </CreateDialog>
   );
@@ -222,7 +225,7 @@ export function CreateRoadmapItemDialog({ open, onOpenChange }: { open: boolean;
       setTargetQuarter("");
       setStatus("planned");
       onOpenChange(false);
-      queryClient.invalidateQueries({ queryKey: ["discover", "roadmap", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["discover"] });
     }
   });
 
@@ -244,6 +247,7 @@ export function CreateRoadmapItemDialog({ open, onOpenChange }: { open: boolean;
         <Button disabled={createMutation.isPending || !selectedWorkspaceId || !title.trim()}>
           {createMutation.isPending ? "Creating..." : "Create roadmap item"}
         </Button>
+        {createMutation.isError ? <p className="text-sm text-destructive">{createMutation.error.message}</p> : null}
       </form>
     </CreateDialog>
   );

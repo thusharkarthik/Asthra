@@ -10,7 +10,7 @@ class IdeaRepository:
         self.db = db
 
     def create(self, data: IdeaCreate) -> Idea:
-        item = Idea(**data.model_dump())
+        item = Idea(**data.model_dump(exclude={"problem", "target_user"}))
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
@@ -32,7 +32,7 @@ class IdeaRepository:
         return self.db.get(Idea, item_id)
 
     def update(self, item: Idea, data: IdeaUpdate) -> Idea:
-        for field, value in data.model_dump(exclude_unset=True).items():
+        for field, value in data.model_dump(exclude={"problem", "target_user"}, exclude_unset=True).items():
             setattr(item, field, value)
         self.db.add(item)
         self.db.commit()
