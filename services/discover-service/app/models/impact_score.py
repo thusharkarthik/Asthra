@@ -19,4 +19,4 @@ class ImpactScore(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    idea = relationship("Idea", back_populates="impact_score")
+    idea = relationship("Idea", back_populates="impact_score_record")

@@ -27,7 +27,7 @@ class Idea(Base):
 
     feature_requests = relationship("FeatureRequest", back_populates="idea")
     feedback = relationship("Feedback", back_populates="idea")
-    impact_score = relationship("ImpactScore", back_populates="idea", uselist=False)
+    impact_score_record = relationship("ImpactScore", back_populates="idea", uselist=False)
     validation_notes = relationship("ValidationNote", back_populates="idea")
     mvp_plan = relationship("MVPPlan", back_populates="idea", uselist=False)
     roadmap_items = relationship("RoadmapItem", back_populates="idea")
