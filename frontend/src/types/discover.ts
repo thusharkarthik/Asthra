@@ -5,7 +5,13 @@ export type Idea = {
   title: string;
   description: string;
   problem_statement?: string | null;
+  problem?: string | null;
   target_users?: string | null;
+  target_user?: string | null;
+  business_value?: string | null;
+  impact_score?: number | null;
+  confidence_score?: number | null;
+  effort_score?: number | null;
   status: string;
   created_by_id: number;
   created_at?: string;
@@ -18,7 +24,13 @@ export type IdeaCreate = {
   title: string;
   description: string;
   problem_statement?: string | null;
+  problem?: string | null;
   target_users?: string | null;
+  target_user?: string | null;
+  business_value?: string | null;
+  impact_score?: number | null;
+  confidence_score?: number | null;
+  effort_score?: number | null;
   status?: string;
   created_by_id: number;
 };

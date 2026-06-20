@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DocsPage from "@/app/docs/page";
 import DocsFavoritesPage from "@/app/docs/favorites/page";
@@ -31,6 +31,9 @@ function mockDocsFetch() {
     if (url.includes("/pages/5/comments")) {
       return new Response(JSON.stringify([{ id: 1, page_id: 5, user_id: 1, content: "Helpful page" }]), { status: 200 });
     }
+    if (url.includes("/pages/5/versions")) {
+      return new Response(JSON.stringify([{ id: 3, page_id: 5, version_number: 1, title: "Frontend Notes", content: "Docs page content", created_by_id: 1, created_at: "2026-06-04T10:00:00.000Z" }]), { status: 200 });
+    }
     if (url.includes("/pages/5")) {
       return new Response(JSON.stringify({ id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" }), { status: 200 });
     }
@@ -41,7 +44,10 @@ function mockDocsFetch() {
       return new Response(JSON.stringify([{ id: 1, workspace_id: 2, name: "Engineering", description: "Team docs" }]), { status: 200 });
     }
     if (url.includes("/pages") || url.includes("/search/pages")) {
-      return new Response(JSON.stringify([{ id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" }]), { status: 200 });
+      return new Response(JSON.stringify([
+        { id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" },
+        { id: 6, space_id: 1, parent_page_id: 5, title: "Frontend Child Notes", content: "Nested docs content", status: "published", updated_at: "2026-06-04T11:00:00.000Z" }
+      ]), { status: 200 });
     }
     return new Response(JSON.stringify([]), { status: 200 });
   });
@@ -100,6 +106,8 @@ describe("Docs frontend screens", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "Engineering" })).toBeInTheDocument());
     expect(screen.getByText("Pages in this space")).toBeInTheDocument();
+    expect(screen.getAllByText("Frontend Child Notes").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Docs breadcrumbs")).toBeInTheDocument();
   });
 
   it("renders pages page", async () => {
@@ -116,9 +124,23 @@ describe("Docs frontend screens", () => {
     navigationMock.params = { id: "5" };
     renderWithQuery(<PageDetail />);
 
-    await waitFor(() => expect(screen.getByText("Docs page content")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Docs page content").length).toBeGreaterThan(0));
     expect(screen.getByText("Helpful page")).toBeInTheDocument();
     expect(screen.getByText("Linked Work Items")).toBeInTheDocument();
+    expect(screen.getByText("Link Flow Work Item")).toBeInTheDocument();
+    expect(screen.getByText("Publish")).toBeInTheDocument();
+    expect(screen.getByText("Version 1: Frontend Notes")).toBeInTheDocument();
+  });
+
+  it("renders docs link work draft action", async () => {
+    navigationMock.pathname = "/docs/pages/5";
+    navigationMock.params = { id: "5" };
+    renderWithQuery(<PageDetail />);
+
+    await waitFor(() => expect(screen.getByText("Link Flow Work Item")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Link Flow Work Item"));
+    expect(screen.getByText("Flow Link Draft")).toBeInTheDocument();
+    expect(screen.getByText(/entity_type/)).toBeInTheDocument();
   });
 
   it("renders favorites page", () => {

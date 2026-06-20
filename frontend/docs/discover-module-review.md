@@ -23,9 +23,72 @@ Discover now behaves like a product discovery and innovation planning workspace:
 - Idea detail pages now show Overview, Problem Statement, Target Users, Validation Notes, Impact Score, MVP Plan, Roadmap Links, AI Analysis, and future Linked Work Items.
 - Roadmap is grouped into Now, Next, and Later.
 
+## Operational Foundation
+
+This pass made the product discovery lifecycle testable end to end:
+
+- Dashboard cards now show Total Ideas, Reviewing, Validating, Approved, Rejected, and Converted to Work.
+- Dashboard sections cover Recent Ideas, High Impact Ideas, Ideas Needing Validation, Roadmap Preview, and Product Signals.
+- Ideas list supports search, status filter, impact filter, and project filter.
+- Ideas now support `captured`, `reviewing`, `validating`, `approved`, `rejected`, and `converted_to_work` statuses.
+- Idea records capture problem, target user, business value, impact score, confidence score, and effort score.
+- Idea detail includes edit actions and lifecycle actions for approve, reject, and convert to Flow placeholder.
+- Idea detail includes a Create Flow Work Item action that shows a reviewable draft payload before marking the idea converted.
+- Idea detail is organized around Overview, Problem, Target Users, Scores, Validation Notes, Decision, Roadmap Links, and Linked Flow Work placeholder.
+- Validation shows ideas needing evidence with confidence, impact, decision status, and validation/business context.
+- Roadmap is grouped into Now, Next, and Later and shows approved ideas as planning candidates inside those buckets.
+- Roadmap candidate movement is client-side only for now; persisted bucket changes need a backend roadmap promotion/update flow.
+- Discover breadcrumbs and contextual back links were added to dashboard, ideas, validation, roadmap, and detail screens.
+- Backend endpoints now support idea approval, rejection, and conversion marking.
+- Existing databases are upgraded safely at service startup for the new scoring and business value columns.
+- The frontend uses typed API helpers for idea update and lifecycle actions through the gateway.
+
+## Routes
+
+- `/discover`
+- `/discover/ideas`
+- `/discover/ideas/[id]`
+- `/discover/validation`
+- `/discover/roadmap`
+- `/discover/feature-requests`
+- `/discover/feedback`
+- `/discover/prioritization`
+
+## CRUD Status
+
+- Create idea: available from Discover headers and Ideas.
+- List/search/filter ideas: available on Ideas.
+- Read idea detail: available on Idea Detail.
+- Edit idea: available on Idea Detail.
+- Approve/reject idea: available on Idea Detail.
+- Convert to Flow: marks the idea as converted; actual Flow work item creation remains a placeholder.
+
+## Cross-Module Readiness
+
+Discover now exposes the future execution handoff clearly:
+
+- `Create Flow Work Item` displays the intended Flow create payload with project, title, description, and Discover source metadata.
+- `Mark Converted to Work` updates the idea status to `converted_to_work`.
+- Persisted Flow work item creation and link storage are intentionally not automatic yet.
+
+## RBAC Readiness
+
+Discover actions are structured around permission-ready operations:
+
+- `discover.idea.view`
+- `discover.idea.create`
+- `discover.idea.edit`
+- `discover.idea.manage`
+
+Full enforcement depends on the shared permission helper being adopted across module pages.
+
+## Flow Integration Placeholder
+
+The Convert to Flow action marks an idea as `converted_to_work` today. It does not create a Flow work item yet. The next integration step is to call Flow with a mapped title, description, project, and discovery link once cross-module reference creation is finalized.
+
 ## Remaining Gaps
 
-- Impact scoring is still a placeholder until the frontend wires the backend score endpoint.
+- Impact scoring is manually captured; automated scoring can come later.
 - Validation notes currently use linked feedback where available; a dedicated validation note UI should be added later.
 - Roadmap links depend on backend `idea_id` relationships being populated.
 - AI suggestions are lightweight UI prompts; richer AI workflows can build on existing backend AI endpoints.

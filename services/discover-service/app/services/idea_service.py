@@ -11,7 +11,7 @@ class IdeaService:
         self.repository = IdeaRepository(db)
 
     def create(self, data: IdeaCreate) -> Idea:
-        return self.repository.create(data)
+        return self.repository.create(self._normalize_payload(data))
 
     def list(self, **filters) -> list[Idea]:
         return self.repository.list(**filters)
@@ -23,7 +23,16 @@ class IdeaService:
         return idea
 
     def update(self, idea_id: int, data: IdeaUpdate) -> Idea:
-        return self.repository.update(self.get(idea_id), data)
+        return self.repository.update(self.get(idea_id), self._normalize_payload(data))
+
+    def approve(self, idea_id: int) -> Idea:
+        return self.update(idea_id, IdeaUpdate(status="approved"))
+
+    def reject(self, idea_id: int) -> Idea:
+        return self.update(idea_id, IdeaUpdate(status="rejected"))
+
+    def mark_converted_to_work(self, idea_id: int) -> Idea:
+        return self.update(idea_id, IdeaUpdate(status="converted_to_work"))
 
     def delete(self, idea_id: int) -> None:
         self.repository.delete(self.get(idea_id))
@@ -48,7 +57,21 @@ class IdeaService:
                 "project_id": idea.project_id,
                 "status": idea.status,
                 "created_by_id": idea.created_by_id,
+                "business_value": idea.business_value,
+                "impact_score": idea.impact_score,
+                "confidence_score": idea.confidence_score,
+                "effort_score": idea.effort_score,
             },
         )
+
+    def _normalize_payload(self, data: IdeaCreate | IdeaUpdate) -> IdeaCreate | IdeaUpdate:
+        payload = data.model_dump(exclude_unset=True)
+        if payload.get("problem") and not payload.get("problem_statement"):
+            payload["problem_statement"] = payload["problem"]
+        if payload.get("target_user") and not payload.get("target_users"):
+            payload["target_users"] = payload["target_user"]
+        payload.pop("problem", None)
+        payload.pop("target_user", None)
+        return data.__class__(**payload)
 
     # TODO: Add AI feasibility, competitor, MVP, and monetization analysis in later tiers.

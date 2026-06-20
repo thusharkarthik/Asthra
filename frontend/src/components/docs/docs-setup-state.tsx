@@ -19,7 +19,7 @@ export function DocsSetupState({ hasOrganization, hasWorkspace, hasSpaces = true
         ? {
             icon: FolderOpen,
             title: "Knowledge begins with a Space.",
-            body: "Start with spaces like Engineering, Architecture, Product, or Operations.",
+            body: "Create Space -> Create Page -> Publish -> Link Work. Start with spaces like Engineering, Architecture, Product, or Operations.",
             action: "Create First Space",
             href: "/docs/spaces"
           }
@@ -27,7 +27,7 @@ export function DocsSetupState({ hasOrganization, hasWorkspace, hasSpaces = true
           ? {
               icon: FilePlus2,
               title: "This space has no pages yet.",
-              body: "Create a page to capture decisions, guides, runbooks, or product knowledge.",
+              body: "Create a draft page, publish it when ready, then link it to Flow work when the execution reference exists.",
               action: "Create First Page",
               href: "/docs/pages"
             }
@@ -35,7 +35,7 @@ export function DocsSetupState({ hasOrganization, hasWorkspace, hasSpaces = true
             ? {
                 icon: BookOpen,
                 title: "Docs is ready for your team knowledge.",
-                body: "Create a space, then add pages that Asthra can help search and summarize later.",
+                body: "Create Space -> Create Page -> Publish -> Link Work. Keep knowledge organized so it can support search, decisions, and execution later.",
                 action: "Browse Docs",
                 href: "/docs/spaces"
               }

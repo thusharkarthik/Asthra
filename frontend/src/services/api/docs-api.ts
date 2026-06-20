@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { Page, PageComment, PageCreate, PageFilters, PageUpdate, Space, SpaceCreate } from "@/types/docs";
+import type { Page, PageComment, PageCreate, PageFilters, PageUpdate, PageVersion, Space, SpaceCreate, SpaceUpdate } from "@/types/docs";
 
 const DOCS_PREFIX = "/api/docs/api/v1";
 
@@ -24,6 +24,12 @@ export const docsApi = {
   getSpace(accessToken: string, id: string | number) {
     return apiRequest<Space>(`${DOCS_PREFIX}/spaces/${id}`, { method: "GET", authToken: accessToken });
   },
+  updateSpace(accessToken: string, id: string | number, payload: SpaceUpdate) {
+    return apiRequest<Space>(`${DOCS_PREFIX}/spaces/${id}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  deleteSpace(accessToken: string, id: string | number) {
+    return apiRequest<void>(`${DOCS_PREFIX}/spaces/${id}`, { method: "DELETE", authToken: accessToken });
+  },
   listPages(accessToken: string, filters: PageFilters = {}) {
     return apiRequest<Page[]>(`${DOCS_PREFIX}/pages${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
@@ -35,6 +41,15 @@ export const docsApi = {
   },
   updatePage(accessToken: string, id: string | number, payload: PageUpdate) {
     return apiRequest<Page>(`${DOCS_PREFIX}/pages/${id}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  publishPage(accessToken: string, id: string | number, updatedById?: number | null) {
+    return apiRequest<Page>(`${DOCS_PREFIX}/pages/${id}/publish${toQuery({ updated_by_id: updatedById })}`, { method: "POST", authToken: accessToken });
+  },
+  archivePage(accessToken: string, id: string | number, updatedById?: number | null) {
+    return apiRequest<Page>(`${DOCS_PREFIX}/pages/${id}/archive${toQuery({ updated_by_id: updatedById })}`, { method: "POST", authToken: accessToken });
+  },
+  listPageVersions(accessToken: string, pageId: string | number) {
+    return apiRequest<PageVersion[]>(`${DOCS_PREFIX}/pages/${pageId}/versions`, { method: "GET", authToken: accessToken });
   },
   listComments(accessToken: string, pageId: string | number) {
     return apiRequest<PageComment[]>(`${DOCS_PREFIX}/pages/${pageId}/comments`, { method: "GET", authToken: accessToken });

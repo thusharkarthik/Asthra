@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateFeatureRequestDialog, CreateFeedbackDialog, CreateIdeaDialog, CreateRoadmapItemDialog } from "@/components/discover/discover-create-dialogs";
+import { DiscoverBreadcrumbs } from "@/components/discover/discover-breadcrumbs";
 import { DiscoverHeaderActions } from "@/components/discover/discover-header-actions";
 import { DiscoverSetupState } from "@/components/discover/discover-setup-state";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
@@ -31,6 +32,7 @@ export default function IdeasPage() {
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [impact, setImpact] = useState("all");
   const [project, setProject] = useState("all");
 
   const ideasQuery = useQuery({
@@ -46,16 +48,18 @@ export default function IdeasPage() {
     return ideas.filter((idea) => {
       const matchesSearch = !normalizedSearch || `${idea.title} ${idea.description} ${idea.problem_statement ?? ""} ${idea.target_users ?? ""}`.toLowerCase().includes(normalizedSearch);
       const matchesStatus = status === "all" || idea.status === status;
+      const matchesImpact = impact === "all" || (impact === "high" ? isHighImpactIdea(idea) : !isHighImpactIdea(idea));
       const matchesProject = project === "all" || (project === "selected" ? idea.project_id === selectedProjectId : !idea.project_id);
-      return matchesSearch && matchesStatus && matchesProject;
+      return matchesSearch && matchesStatus && matchesImpact && matchesProject;
     });
-  }, [ideas, project, search, selectedProjectId, status]);
+  }, [ideas, impact, project, search, selectedProjectId, status]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Ideas"
         description="Capture opportunities, clarify the problem, and move promising ideas toward validation."
+        breadcrumbs={<DiscoverBreadcrumbs items={[{ label: "Ideas" }]} />}
         actions={
           <DiscoverHeaderActions
             onCreateIdea={() => setIdeaOpen(true)}
@@ -68,7 +72,7 @@ export default function IdeasPage() {
       <DiscoverSubnav />
       {!selectedOrganizationId || !selectedWorkspaceId ? <DiscoverSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="context" /> : (
         <div className="space-y-4">
-          <div className="grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-[1fr_160px_180px]">
+          <div className="grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-[1fr_160px_160px_180px]">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input aria-label="Search ideas" className="pl-9" placeholder="Search ideas, problems, or users" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -76,6 +80,11 @@ export default function IdeasPage() {
             <Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="all">All statuses</option>
               {DISCOVER_IDEA_STATUSES.map((option) => <option key={option} value={option}>{option.replace("_", " ")}</option>)}
+            </Select>
+            <Select aria-label="Filter by impact" value={impact} onChange={(event) => setImpact(event.target.value)}>
+              <option value="all">All impact</option>
+              <option value="high">High impact</option>
+              <option value="unscored">Unscored/normal</option>
             </Select>
             <Select aria-label="Filter by project" value={project} onChange={(event) => setProject(event.target.value)}>
               <option value="all">All projects</option>

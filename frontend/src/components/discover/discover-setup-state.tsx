@@ -16,12 +16,12 @@ export function DiscoverSetupState({
   }
 
   const step = mode === "ideas"
-        ? { icon: Lightbulb, title: "Start with an idea. Capture a problem, opportunity, or product improvement.", body: "Ideas become validated concepts, MVP plans, and eventually planned work.", action: "Create First Idea", href: "/discover/ideas" }
+        ? { icon: Lightbulb, title: "Start with an idea.", body: "Create Idea -> Validate -> Approve -> Roadmap -> Create Flow Work Item. Capture the problem, target users, business value, and confidence before execution.", action: "Create First Idea", href: "/discover/ideas" }
         : mode === "roadmap"
-          ? { icon: Map, title: "Prioritized ideas can become roadmap items.", body: "Use the roadmap to communicate Now, Next, and Later product bets.", action: "Create Roadmap Item", href: "/discover/roadmap" }
+          ? { icon: Map, title: "Approved ideas are ready for roadmap planning.", body: "Group approved ideas into Now, Next, or Later, then create roadmap items when the team is ready to commit.", action: "Create Roadmap Item", href: "/discover/roadmap" }
           : mode === "feature-requests"
             ? { icon: Lightbulb, title: "Feature requests turn customer asks into product signals.", body: "Capture the source, requester, and requested outcome so ideas can be prioritized with real demand.", action: "Add Feature Request", href: "/discover/feature-requests" }
-            : { icon: Lightbulb, title: "Discover is ready for product planning.", body: "Capture ideas, validate them, prioritize impact, and convert the best ones into roadmap items.", action: "Browse Ideas", href: "/discover/ideas" };
+            : { icon: Lightbulb, title: "Discover is ready for product planning.", body: "Create Idea -> Validate -> Approve -> Roadmap -> Flow. Use this module to turn raw product signals into planned work.", action: "Browse Ideas", href: "/discover/ideas" };
   const Icon = step.icon;
   return (
     <section className="rounded-lg border bg-card p-6">

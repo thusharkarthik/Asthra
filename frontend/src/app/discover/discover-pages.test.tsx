@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DiscoverPage from "@/app/discover/page";
 import FeatureRequestsPage from "@/app/discover/feature-requests/page";
@@ -30,10 +30,13 @@ function mockDiscoverFetch() {
       return new Response(JSON.stringify({ id: 1, idea_id: 7, scope: "Ship a lightweight validation MVP" }), { status: 200 });
     }
     if (url.includes("/ideas/7")) {
-      return new Response(JSON.stringify({ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", status: "new", created_by_id: 1 }), { status: 200 });
+      return new Response(JSON.stringify({ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", business_value: "Reduce support load", impact_score: 8, confidence_score: 7, effort_score: 4, status: "captured", created_by_id: 1 }), { status: 200 });
     }
     if (url.includes("/ideas")) {
-      return new Response(JSON.stringify([{ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", status: "new", created_by_id: 1 }]), { status: 200 });
+      return new Response(JSON.stringify([
+        { id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", business_value: "Reduce support load", impact_score: 8, confidence_score: 7, effort_score: 4, status: "captured", created_by_id: 1 },
+        { id: 8, workspace_id: 2, project_id: 3, title: "Self-service billing", description: "Let admins manage billing", target_users: "Billing admins", business_value: "Reduce finance support", impact_score: 9, confidence_score: 8, effort_score: 5, status: "approved", created_by_id: 1 }
+      ]), { status: 200 });
     }
     if (url.includes("/feature-requests")) {
       return new Response(JSON.stringify([{ id: 1, workspace_id: 2, title: "Export roadmap", description: "CSV export", source: "customer", requested_by: "Taylor", status: "new" }]), { status: 200 });
@@ -76,6 +79,17 @@ describe("Discover frontend screens", () => {
     await waitFor(() => expect(screen.getByText("Customer portal")).toBeInTheDocument());
   });
 
+  it("opens create idea dialog with product discovery fields", async () => {
+    renderWithQuery(<IdeasPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Idea" }));
+    expect(await screen.findByLabelText("Idea title")).toBeInTheDocument();
+    expect(screen.getByLabelText("Business value")).toBeInTheDocument();
+    expect(screen.getByLabelText("Impact score")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confidence score")).toBeInTheDocument();
+    expect(screen.getByLabelText("Effort score")).toBeInTheDocument();
+  });
+
   it("renders feature requests page", async () => {
     renderWithQuery(<FeatureRequestsPage />);
 
@@ -95,6 +109,10 @@ describe("Discover frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Roadmap" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Portal beta")).toBeInTheDocument());
+    expect(screen.getByText("Now")).toBeInTheDocument();
+    expect(screen.getByText("Next")).toBeInTheDocument();
+    expect(screen.getByText("Later")).toBeInTheDocument();
+    expect(screen.getAllByText("Self-service billing").length).toBeGreaterThan(0);
   });
 
   it("renders validation page", async () => {
@@ -117,5 +135,19 @@ describe("Discover frontend screens", () => {
 
     await waitFor(() => expect(screen.getByText("Let customers track requests")).toBeInTheDocument());
     expect(screen.getByText("Ship a lightweight validation MVP")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.getByText("Reject")).toBeInTheDocument();
+    expect(screen.getByText("Create Flow Work Item")).toBeInTheDocument();
+    expect(screen.getByText("Reduce support load")).toBeInTheDocument();
+  });
+
+  it("renders idea conversion draft action", async () => {
+    navigationMock.params = { id: "7" };
+    renderWithQuery(<IdeaDetailPage />);
+
+    await waitFor(() => expect(screen.getByText("Create Flow Work Item")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Create Flow Work Item"));
+    expect(screen.getByText("Flow Work Item Draft")).toBeInTheDocument();
+    expect(screen.getByText("Mark Converted to Work")).toBeInTheDocument();
   });
 });

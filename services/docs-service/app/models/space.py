@@ -10,6 +10,7 @@ class Space(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     workspace_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    project_id: Mapped[int | None] = mapped_column(Integer, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     created_by_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)

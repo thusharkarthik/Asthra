@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { CreatePageDialog, CreateSpaceDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsBreadcrumbs } from "@/components/docs/docs-breadcrumbs";
 import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
 import { DocsSetupState } from "@/components/docs/docs-setup-state";
 import { DocsSubnav } from "@/components/docs/docs-subnav";
@@ -48,6 +49,7 @@ export default function PagesPage() {
       <PageHeader
         title="Pages"
         description="Browse, search, and create knowledge pages."
+        breadcrumbs={<DocsBreadcrumbs items={[{ label: "Pages" }]} />}
         actions={<DocsHeaderActions onCreateSpace={selectedWorkspaceId ? () => setCreateSpaceOpen(true) : undefined} onCreatePage={spaces.length > 0 ? () => setCreatePageOpen(true) : undefined} />}
       />
       <DocsSubnav />

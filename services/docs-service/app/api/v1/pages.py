@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.page import Page
-from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageRead, PageUpdate
+from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageRead, PageUpdate, PageVersionRead
 from app.services.page_service import PageService
 
 router = APIRouter()
@@ -53,6 +53,15 @@ def get_page(
     return PageService(db).get(page_id)
 
 
+@router.get("/{page_id}/versions", response_model=list[PageVersionRead])
+def list_page_versions(
+    page_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+):
+    return PageService(db).list_versions(page_id)
+
+
 @router.post("/{page_id}/prepare-memory-document", response_model=PageMemoryDocumentPayload)
 def prepare_memory_document(
     page_id: int,
@@ -79,6 +88,26 @@ def update_page(
     _: None = Depends(auth_placeholder),
 ) -> Page:
     return PageService(db).update(page_id, page_update)
+
+
+@router.post("/{page_id}/publish", response_model=PageRead)
+def publish_page(
+    page_id: int,
+    updated_by_id: int | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> Page:
+    return PageService(db).publish(page_id, updated_by_id=updated_by_id)
+
+
+@router.post("/{page_id}/archive", response_model=PageRead)
+def archive_page(
+    page_id: int,
+    updated_by_id: int | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+) -> Page:
+    return PageService(db).archive(page_id, updated_by_id=updated_by_id)
 
 
 @router.delete("/{page_id}", status_code=status.HTTP_204_NO_CONTENT)

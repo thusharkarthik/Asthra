@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CreateSpaceDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsBreadcrumbs } from "@/components/docs/docs-breadcrumbs";
 import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
 import { DocsSetupState } from "@/components/docs/docs-setup-state";
 import { DocsSubnav } from "@/components/docs/docs-subnav";
@@ -32,6 +33,7 @@ export default function SpacesPage() {
       <PageHeader
         title="Spaces"
         description="Spaces group pages by team, domain, product, or operating area."
+        breadcrumbs={<DocsBreadcrumbs items={[{ label: "Spaces" }]} />}
         actions={<DocsHeaderActions onCreateSpace={selectedWorkspaceId ? () => setCreateOpen(true) : undefined} />}
       />
       <DocsSubnav />

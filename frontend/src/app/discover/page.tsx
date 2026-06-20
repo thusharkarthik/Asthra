@@ -8,10 +8,11 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateFeatureRequestDialog, CreateFeedbackDialog, CreateIdeaDialog, CreateRoadmapItemDialog } from "@/components/discover/discover-create-dialogs";
+import { DiscoverBreadcrumbs } from "@/components/discover/discover-breadcrumbs";
 import { DiscoverHeaderActions } from "@/components/discover/discover-header-actions";
 import { DiscoverSetupState } from "@/components/discover/discover-setup-state";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
-import { discoverDate, isHighImpactIdea, isValidatedIdea, needsValidation } from "@/components/discover/discover-utils";
+import { discoverDate, isHighImpactIdea, needsValidation } from "@/components/discover/discover-utils";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { RoadmapStatusBadge } from "@/components/modules/roadmap-status-badge";
@@ -53,14 +54,19 @@ export default function DiscoverPage() {
   const roadmap = roadmapQuery.data ?? [];
   const featureRequests = featureRequestsQuery.data ?? [];
   const validationIdeas = ideas.filter(needsValidation);
-  const validatedIdeas = ideas.filter(isValidatedIdea);
   const highImpactIdeas = ideas.filter(isHighImpactIdea);
+  const reviewingIdeas = ideas.filter((idea) => idea.status === "reviewing");
+  const validatingIdeas = ideas.filter((idea) => idea.status === "validating");
+  const approvedIdeas = ideas.filter((idea) => idea.status === "approved");
+  const rejectedIdeas = ideas.filter((idea) => idea.status === "rejected");
+  const convertedIdeas = ideas.filter((idea) => idea.status === "converted_to_work");
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Discover"
         description="Shape product opportunities from raw signals into validated ideas, MVP plans, and roadmap outcomes."
+        breadcrumbs={<DiscoverBreadcrumbs items={[]} />}
         actions={
           <DiscoverHeaderActions
             onCreateIdea={() => setIdeaOpen(true)}
@@ -78,10 +84,11 @@ export default function DiscoverPage() {
           <ModuleStatsGrid
             stats={[
               { title: "Total Ideas", value: ideas.length, description: "Captured opportunities" },
-              { title: "Feature Requests", value: featureRequests.length, description: "Incoming product asks" },
-              { title: "Validated Ideas", value: validatedIdeas.length, description: "Ready for prioritization" },
-              { title: "Roadmap Items", value: roadmap.length, description: "Planned outcomes" },
-              { title: "High Impact Ideas", value: highImpactIdeas.length, description: "Prioritized or customer-heavy" }
+              { title: "Reviewing", value: reviewingIdeas.length, description: "Being triaged" },
+              { title: "Validating", value: validatingIdeas.length, description: "Needs evidence" },
+              { title: "Approved", value: approvedIdeas.length, description: "Ready for planning" },
+              { title: "Rejected", value: rejectedIdeas.length, description: "Not moving forward" },
+              { title: "Converted to Work", value: convertedIdeas.length, description: "Sent toward execution" }
             ]}
           />
           {ideasQuery.isLoading || roadmapQuery.isLoading || featureRequestsQuery.isLoading ? <LoadingState /> : ideas.length === 0 ? (
@@ -148,6 +155,18 @@ export default function DiscoverPage() {
                     ))}
                   </div>
                 )}
+              </ModuleDashboardCard>
+              <ModuleDashboardCard title="Product Signals">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border p-3">
+                    <div className="text-2xl font-semibold">{featureRequests.length}</div>
+                    <p className="text-sm text-muted-foreground">Feature requests captured</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-2xl font-semibold">{roadmap.length}</div>
+                    <p className="text-sm text-muted-foreground">Roadmap items planned</p>
+                  </div>
+                </div>
               </ModuleDashboardCard>
               <ModuleDashboardCard title="AI Discovery Suggestions">
                 <div className="grid gap-3 sm:grid-cols-2">

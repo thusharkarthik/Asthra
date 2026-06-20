@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Brain, FileSearch, FileText, Sparkles } from "lucide-react";
 import { CreatePageDialog, CreateSpaceDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsBreadcrumbs } from "@/components/docs/docs-breadcrumbs";
 import { DocsExplorer } from "@/components/docs/docs-explorer";
 import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
 import { DocsSetupState } from "@/components/docs/docs-setup-state";
@@ -17,7 +18,6 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
-import { useFavoritesStore } from "@/stores/favorites-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { Page, Space } from "@/types/docs";
@@ -30,7 +30,6 @@ export default function DocsPage() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
-  const favorites = useFavoritesStore((state) => state.favorites).filter((item) => item.source === "docs");
   const recentViewed = useRecentItemsStore((state) => state.viewed).filter((item) => item.source === "docs");
   const hasOrganization = Boolean(selectedOrganizationId) || organizations.length > 0;
   const hasWorkspace = Boolean(selectedWorkspaceId) || workspaces.length > 0;
@@ -41,12 +40,15 @@ export default function DocsPage() {
   const pages = pagesQuery.data ?? [];
   const recentPages = sortedDocsPages(pages).slice(0, 6);
   const drafts = pages.filter((page) => (page.status ?? "draft") === "draft").slice(0, 5);
+  const draftPages = pages.filter((page) => (page.status ?? "draft") === "draft");
+  const publishedPages = pages.filter((page) => page.status === "published");
 
   return (
     <>
       <PageHeader
         title="Docs"
         description="Organize workspace knowledge into spaces and pages that are searchable, discussable, and AI-ready."
+        breadcrumbs={<DocsBreadcrumbs items={[]} />}
         actions={<DocsHeaderActions onCreateSpace={hasWorkspace ? () => setCreateSpaceOpen(true) : undefined} onCreatePage={hasWorkspace && spaces.length > 0 ? () => setCreatePageOpen(true) : undefined} />}
       />
       <DocsSubnav />
@@ -65,8 +67,9 @@ export default function DocsPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <ModuleDashboardCard title="Total Spaces" value={spaces.length} />
             <ModuleDashboardCard title="Total Pages" value={pages.length} />
+            <ModuleDashboardCard title="Draft Pages" value={draftPages.length} />
+            <ModuleDashboardCard title="Published Pages" value={publishedPages.length} />
             <ModuleDashboardCard title="Recently Updated" value={recentPages.length} />
-            <ModuleDashboardCard title="Favorite Pages" value={favorites.length} />
           </div>
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr_0.9fr]">
             <DocsExplorer spaces={spaces} pages={pages} />

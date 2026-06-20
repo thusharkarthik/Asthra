@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -17,7 +17,29 @@ from app.db.session import SessionLocal, engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_operational_columns()
     yield
+
+
+def _ensure_operational_columns() -> None:
+    inspector = inspect(engine)
+    if "ideas" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("ideas")}
+    statements = []
+    if "business_value" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN business_value TEXT")
+    if "impact_score" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN impact_score FLOAT")
+    if "confidence_score" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN confidence_score FLOAT")
+    if "effort_score" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN effort_score FLOAT")
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def create_app() -> FastAPI:

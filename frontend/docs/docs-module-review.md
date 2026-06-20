@@ -29,6 +29,74 @@ Docs now presents a knowledge management experience:
 - Future-ready links for work items, tickets, incidents, and ideas.
 - Favorites, Recent Pages, and Docs Search routes.
 
+## Operational Foundation
+
+This pass made Docs usable as a knowledge workflow instead of only a browsing surface:
+
+- Dashboard cards now show Total Spaces, Total Pages, Draft Pages, Published Pages, and Recently Updated.
+- Dashboard sections cover Recent Pages, Spaces/Explorer, Drafts, Recently Viewed, and Knowledge Shortcuts.
+- Spaces can now carry optional project context for project-scoped knowledge.
+- Spaces list supports create and links to operational space detail.
+- Space detail includes breadcrumbs, a back link, scoped Create Page, Edit Space, safe Delete Space, page tree, recent pages, and metadata.
+- Space detail and Docs Explorer render parent/child page hierarchy.
+- Page creation supports title, space, optional parent page, content, and draft/published status.
+- Page detail includes breadcrumbs, a back link, edit mode, status editing, parent page editing, publish, and archive actions.
+- Page detail breadcrumbs follow `Docs > Spaces > Space Name > Page Title`.
+- Page detail includes a Link Flow Work Item action that shows the Flow linked-entity payload.
+- Page version history is visible on page detail when versions exist.
+- Backend page endpoints now support publish, archive, and version listing.
+- Existing databases are upgraded safely at service startup for the new `spaces.project_id` column.
+- The frontend uses typed API helpers for page publishing, archiving, and version history through the gateway.
+
+## Routes
+
+- `/docs`
+- `/docs/spaces`
+- `/docs/spaces/[id]`
+- `/docs/pages`
+- `/docs/pages/[id]`
+- `/docs/search`
+- `/docs/favorites`
+- `/docs/recent`
+
+## CRUD Status
+
+- Create space: available from Docs headers and Spaces.
+- List spaces: available on Spaces and dashboard explorer.
+- Read space detail: available on Space Detail.
+- Edit space: available on Space Detail.
+- Delete space: available on Space Detail when the space has no pages.
+- Create page: available from Docs headers, Pages, and Space Detail.
+- List/search/filter pages: available on Pages and Search.
+- Read page detail: available on Page Detail.
+- Edit page: available on Page Detail.
+- Publish/archive page: available on Page Detail.
+
+## Cross-Module Readiness
+
+Docs now exposes the future execution reference flow clearly:
+
+- `Link Flow Work Item` displays the payload needed for Flow's linked entity endpoint.
+- The placeholder uses `entity_type=doc_page`, the page id, page title, and page URL.
+- Actual link creation still requires a Flow work item lookup/selector before calling Flow's link endpoint.
+
+## RBAC Readiness
+
+Docs actions are structured around permission-ready operations:
+
+- `docs.space.view`
+- `docs.space.manage`
+- `docs.page.view`
+- `docs.page.create`
+- `docs.page.edit`
+- `docs.page.delete`
+
+Full enforcement depends on the shared permission helper being adopted across module pages.
+
+## Flow Integration Placeholder
+
+Page detail keeps future Linked Work Items, Tickets, Incidents, and Ideas sections visible. These are placeholders until platform references and lookup APIs are wired across Flow, Discover, Desk, and Pulse.
+
 ## Remaining Gaps
 
 - Space and page creation from guided setup still routes through existing settings/docs pages instead of a global creation flow.
