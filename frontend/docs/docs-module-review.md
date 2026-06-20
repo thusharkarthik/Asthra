@@ -38,8 +38,11 @@ This pass made Docs usable as a knowledge workflow instead of only a browsing su
 - Spaces can now carry optional project context for project-scoped knowledge.
 - Spaces list supports create and links to operational space detail.
 - Space detail includes breadcrumbs, a back link, scoped Create Page, Edit Space, safe Delete Space, page tree, recent pages, and metadata.
+- Space detail and Docs Explorer render parent/child page hierarchy.
 - Page creation supports title, space, optional parent page, content, and draft/published status.
 - Page detail includes breadcrumbs, a back link, edit mode, status editing, parent page editing, publish, and archive actions.
+- Page detail breadcrumbs follow `Docs > Spaces > Space Name > Page Title`.
+- Page detail includes a Link Flow Work Item action that shows the Flow linked-entity payload.
 - Page version history is visible on page detail when versions exist.
 - Backend page endpoints now support publish, archive, and version listing.
 - Existing databases are upgraded safely at service startup for the new `spaces.project_id` column.
@@ -68,6 +71,14 @@ This pass made Docs usable as a knowledge workflow instead of only a browsing su
 - Read page detail: available on Page Detail.
 - Edit page: available on Page Detail.
 - Publish/archive page: available on Page Detail.
+
+## Cross-Module Readiness
+
+Docs now exposes the future execution reference flow clearly:
+
+- `Link Flow Work Item` displays the payload needed for Flow's linked entity endpoint.
+- The placeholder uses `entity_type=doc_page`, the page id, page title, and page URL.
+- Actual link creation still requires a Flow work item lookup/selector before calling Flow's link endpoint.
 
 ## RBAC Readiness
 

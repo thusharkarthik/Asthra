@@ -28,6 +28,7 @@ export default function IdeaDetailPage() {
   const [problemStatement, setProblemStatement] = useState("");
   const [targetUsers, setTargetUsers] = useState("");
   const [businessValue, setBusinessValue] = useState("");
+  const [showFlowDraft, setShowFlowDraft] = useState(false);
 
   const ideaQuery = useQuery({ queryKey: ["discover", "idea", id], queryFn: () => discoverApi.getIdea(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const mvpPlanQuery = useQuery({ queryKey: ["discover", "mvp-plan", id], queryFn: () => discoverApi.getMvpPlan(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: false });
@@ -99,7 +100,7 @@ export default function IdeaDetailPage() {
             <Button variant="outline" onClick={() => setEditing((value) => !value)}>{isEditing ? "Close Edit" : "Edit Idea"}</Button>
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("approve")} disabled={lifecycleMutation.isPending}>Approve</Button>
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("reject")} disabled={lifecycleMutation.isPending}>Reject</Button>
-            <Button variant="outline" onClick={() => lifecycleMutation.mutate("convert")} disabled={lifecycleMutation.isPending}>Convert to Flow placeholder</Button>
+            <Button variant="outline" onClick={() => setShowFlowDraft((value) => !value)}>Create Flow Work Item</Button>
             <Button onClick={() => analysisMutation.mutate()} disabled={analysisMutation.isPending}>{analysisMutation.isPending ? "Analyzing..." : "AI analyze idea"}</Button>
           </div>
         }
@@ -118,6 +119,34 @@ export default function IdeaDetailPage() {
               <Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
             </div>
           </form>
+        </DetailPanel>
+      ) : null}
+      {showFlowDraft ? (
+        <DetailPanel title="Flow Work Item Draft">
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Flow work item creation from Discover is not wired yet. Review this draft payload, then mark the idea converted when the Flow item is created manually.
+            </p>
+            <pre className="overflow-auto rounded-md border bg-muted p-3 text-xs">
+              {JSON.stringify(
+                {
+                  project_id: idea.project_id,
+                  title: idea.title,
+                  description: [idea.description, idea.problem_statement ? `Problem: ${idea.problem_statement}` : null, idea.target_users ? `Target users: ${idea.target_users}` : null, idea.business_value ? `Business value: ${idea.business_value}` : null].filter(Boolean).join("\n\n"),
+                  source: "discover_idea",
+                  source_id: idea.id
+                },
+                null,
+                2
+              )}
+            </pre>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => lifecycleMutation.mutate("convert")} disabled={lifecycleMutation.isPending || idea.status === "converted_to_work"}>
+                {idea.status === "converted_to_work" ? "Already converted" : "Mark Converted to Work"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowFlowDraft(false)}>Close Draft</Button>
+            </div>
+          </div>
         </DetailPanel>
       ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -189,7 +218,10 @@ export default function IdeaDetailPage() {
           )}
         </DetailPanel>
         <DetailPanel title="Linked Work Items">
-          <p className="text-sm text-muted-foreground">Future cross-module links will connect this idea to Flow work items, Docs pages, Desk tickets, and Pulse incidents.</p>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>No Flow work item is linked yet.</p>
+            <p>Use Create Flow Work Item to review a draft payload. Automatic creation and persisted cross-module references are still pending.</p>
+          </div>
         </DetailPanel>
       </div>
       <DetailPanel title="AI Analysis">

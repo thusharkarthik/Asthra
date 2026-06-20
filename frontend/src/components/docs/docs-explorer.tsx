@@ -2,6 +2,27 @@ import Link from "next/link";
 import { FileText, FolderOpen } from "lucide-react";
 import type { Page, Space } from "@/types/docs";
 
+function PageTree({ pages, parentPageId = null, depth = 0 }: { pages: Page[]; parentPageId?: number | null; depth?: number }) {
+  const children = pages.filter((page) => (page.parent_page_id ?? null) === parentPageId);
+  if (children.length === 0) {
+    return parentPageId === null ? <div className="text-xs text-muted-foreground">No pages in this space.</div> : null;
+  }
+
+  return (
+    <div className={depth === 0 ? "space-y-1" : "ml-4 space-y-1 border-l pl-3"}>
+      {children.map((page) => (
+        <div key={page.id} className="space-y-1">
+          <Link href={`/docs/pages/${page.id}`} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            {page.title}
+          </Link>
+          <PageTree pages={pages} parentPageId={page.id} depth={depth + 1} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DocsExplorer({ spaces, pages }: { spaces: Space[]; pages: Page[] }) {
   if (spaces.length === 0) {
     return (
@@ -25,12 +46,7 @@ export function DocsExplorer({ spaces, pages }: { spaces: Space[]; pages: Page[]
                 {space.name}
               </Link>
               <div className="ml-6 space-y-1 border-l pl-3">
-                {spacePages.length === 0 ? <div className="text-xs text-muted-foreground">No pages in this space.</div> : spacePages.map((page) => (
-                  <Link key={page.id} href={`/docs/pages/${page.id}`} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    {page.title}
-                  </Link>
-                ))}
+                <PageTree pages={spacePages} />
               </div>
             </div>
           );

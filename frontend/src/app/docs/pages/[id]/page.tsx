@@ -35,6 +35,7 @@ export default function PageDetail() {
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("draft");
   const [parentPageId, setParentPageId] = useState("");
+  const [showFlowLinkDraft, setShowFlowLinkDraft] = useState(false);
   const updateMutation = useMutation({
     mutationFn: () => docsApi.updatePage(accessToken ?? "", id, { title, content, status, parent_page_id: parentPageId ? Number(parentPageId) : null, updated_by_id: currentUser?.id }),
     onSuccess: () => {
@@ -83,7 +84,7 @@ export default function PageDetail() {
     <div className="space-y-4">
       <DocsSubnav />
       <DocsBackLink href="/docs/pages" label="Back to Pages" />
-      <DocsBreadcrumbs items={[{ label: "Pages", href: "/docs/pages" }, { label: page.title }]} />
+      <DocsBreadcrumbs items={[{ label: "Spaces", href: "/docs/spaces" }, { label: currentSpace?.name ?? "Space", href: currentSpace ? `/docs/spaces/${currentSpace.id}` : undefined }, { label: page.title }]} />
       <EntityDetailHeader
         title={page.title}
         description={`${currentSpace?.name ?? `Space ${page.space_id}`} · Updated ${docsDate(page.updated_at ?? page.created_at)}`}
@@ -93,14 +94,37 @@ export default function PageDetail() {
             <Button size="sm" onClick={startEditing}>Edit</Button>
             <Button size="sm" variant="outline" onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending || page.status === "published"}>Publish</Button>
             <Button size="sm" variant="outline" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending || page.status === "archived"}>Archive</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowFlowLinkDraft((value) => !value)}>Link Flow Work Item</Button>
           </div>
         }
       />
+      {showFlowLinkDraft ? (
+        <DetailPanel title="Flow Link Draft">
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Flow link creation requires selecting a work item. Lookup is not wired on Docs yet, so this action shows the payload that should be attached to a Flow work item through Flow links.
+            </p>
+            <pre className="overflow-auto rounded-md border bg-muted p-3 text-xs">
+              {JSON.stringify(
+                {
+                  entity_type: "doc_page",
+                  entity_id: String(page.id),
+                  entity_title: page.title,
+                  entity_url: `/docs/pages/${page.id}`
+                },
+                null,
+                2
+              )}
+            </pre>
+            <Button variant="outline" onClick={() => setShowFlowLinkDraft(false)}>Close Draft</Button>
+          </div>
+        </DetailPanel>
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
         <div className="space-y-4">
           <DetailPanel title="Overview">
             <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <div><div className="text-muted-foreground">Space</div><div className="font-medium">{page.space_id}</div></div>
+              <div><div className="text-muted-foreground">Space</div><div className="font-medium">{currentSpace?.name ?? "Space unavailable"}</div></div>
               <div><div className="text-muted-foreground">Parent</div><div className="font-medium">{page.parent_page_id ? `Page ${page.parent_page_id}` : "Top-level"}</div></div>
               <div><div className="text-muted-foreground">Status</div><StatusBadge value={page.status ?? "draft"} /></div>
               <div><div className="text-muted-foreground">Versions</div><div className="font-medium">{versionsQuery.data?.length ?? 0}</div></div>
@@ -161,7 +185,11 @@ export default function PageDetail() {
         </div>
         <DetailPanel title="Links">
           <div className="space-y-3 text-sm">
-            {["Linked Work Items", "Linked Tickets", "Linked Incidents", "Linked Ideas"].map((label) => (
+            <div className="rounded-md border border-dashed p-3">
+              <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Linked Work Items</div>
+              <p className="mt-1 text-muted-foreground">No Flow work item is linked yet. Use Link Flow Work Item to review the link payload.</p>
+            </div>
+            {["Linked Tickets", "Linked Incidents", "Linked Ideas"].map((label) => (
               <div key={label} className="rounded-md border border-dashed p-3">
                 <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> {label}</div>
                 <p className="mt-1 text-muted-foreground">Future cross-module references will appear here.</p>

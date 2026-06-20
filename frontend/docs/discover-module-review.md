@@ -33,9 +33,11 @@ This pass made the product discovery lifecycle testable end to end:
 - Ideas now support `captured`, `reviewing`, `validating`, `approved`, `rejected`, and `converted_to_work` statuses.
 - Idea records capture problem, target user, business value, impact score, confidence score, and effort score.
 - Idea detail includes edit actions and lifecycle actions for approve, reject, and convert to Flow placeholder.
+- Idea detail includes a Create Flow Work Item action that shows a reviewable draft payload before marking the idea converted.
 - Idea detail is organized around Overview, Problem, Target Users, Scores, Validation Notes, Decision, Roadmap Links, and Linked Flow Work placeholder.
 - Validation shows ideas needing evidence with confidence, impact, decision status, and validation/business context.
-- Roadmap is grouped into Now, Next, and Later and shows approved ideas as planning candidates.
+- Roadmap is grouped into Now, Next, and Later and shows approved ideas as planning candidates inside those buckets.
+- Roadmap candidate movement is client-side only for now; persisted bucket changes need a backend roadmap promotion/update flow.
 - Discover breadcrumbs and contextual back links were added to dashboard, ideas, validation, roadmap, and detail screens.
 - Backend endpoints now support idea approval, rejection, and conversion marking.
 - Existing databases are upgraded safely at service startup for the new scoring and business value columns.
@@ -60,6 +62,14 @@ This pass made the product discovery lifecycle testable end to end:
 - Edit idea: available on Idea Detail.
 - Approve/reject idea: available on Idea Detail.
 - Convert to Flow: marks the idea as converted; actual Flow work item creation remains a placeholder.
+
+## Cross-Module Readiness
+
+Discover now exposes the future execution handoff clearly:
+
+- `Create Flow Work Item` displays the intended Flow create payload with project, title, description, and Discover source metadata.
+- `Mark Converted to Work` updates the idea status to `converted_to_work`.
+- Persisted Flow work item creation and link storage are intentionally not automatic yet.
 
 ## RBAC Readiness
 
