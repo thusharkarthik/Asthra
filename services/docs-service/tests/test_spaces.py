@@ -18,6 +18,9 @@ def test_space_crud(db):
     updated_space = service.update(space.id, SpaceUpdate(name="Product Knowledge"))
     assert updated_space.name == "Product Knowledge"
 
+    scoped_space = service.update(space.id, SpaceUpdate(project_id=10))
+    assert scoped_space.project_id == 10
+
     service.delete(space.id)
 
     try:

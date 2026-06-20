@@ -1,6 +1,7 @@
 export type Space = {
   id: number;
   workspace_id: number;
+  project_id?: number | null;
   name: string;
   description?: string | null;
   created_by_id?: number | null;
@@ -33,6 +34,7 @@ export type PageComment = {
 
 export type SpaceCreate = {
   workspace_id: number;
+  project_id?: number | null;
   name: string;
   description?: string | null;
   created_by_id: number;
@@ -49,6 +51,16 @@ export type PageCreate = {
 
 export type PageUpdate = Partial<Pick<PageCreate, "title" | "content" | "status" | "parent_page_id">> & {
   updated_by_id?: number | null;
+};
+
+export type PageVersion = {
+  id: number;
+  page_id: number;
+  version_number: number;
+  title: string;
+  content: string;
+  created_by_id: number;
+  created_at: string;
 };
 
 export type PageFilters = {

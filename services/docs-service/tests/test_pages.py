@@ -47,6 +47,15 @@ def test_page_crud_and_versions(db, monkeypatch):
     ).all()
     assert [version.version_number for version in versions] == [1, 2]
 
+    published = service.publish(page.id, updated_by_id=2)
+    assert published.status == "published"
+
+    archived = service.archive(page.id, updated_by_id=2)
+    assert archived.status == "archived"
+
+    version_history = service.list_versions(page.id)
+    assert len(version_history) >= 2
+
     service.delete(page.id)
     try:
         service.get(page.id)

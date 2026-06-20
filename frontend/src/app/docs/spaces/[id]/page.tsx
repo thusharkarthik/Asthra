@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { CreatePageDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsBackLink, DocsBreadcrumbs } from "@/components/docs/docs-breadcrumbs";
 import { DocsExplorer } from "@/components/docs/docs-explorer";
 import { DocsSubnav } from "@/components/docs/docs-subnav";
 import { docsDate } from "@/components/docs/docs-utils";
@@ -11,12 +14,14 @@ import { LoadingState } from "@/components/layout/loading-state";
 import { DetailPanel } from "@/components/modules/detail-panel";
 import { EntityDetailHeader } from "@/components/modules/entity-detail-header";
 import { StatusBadge } from "@/components/modules/status-badge";
+import { Button } from "@/components/ui/button";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
 
 export default function SpaceDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const [pageOpen, setPageOpen] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const spaceQuery = useQuery({ queryKey: ["docs", "space", id], queryFn: () => docsApi.getSpace(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: 1 });
   const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken), retry: 1 });
@@ -30,7 +35,14 @@ export default function SpaceDetailPage() {
   return (
     <div className="space-y-4">
       <DocsSubnav />
-      <EntityDetailHeader title={space.name} description={space.description ?? "Knowledge space"} meta={<span className="rounded-md bg-muted px-2 py-0.5 text-xs">Updated {docsDate(space.updated_at ?? space.created_at)}</span>} />
+      <DocsBackLink href="/docs/spaces" label="Back to Spaces" />
+      <DocsBreadcrumbs items={[{ label: "Spaces", href: "/docs/spaces" }, { label: space.name }]} />
+      <EntityDetailHeader
+        title={space.name}
+        description={space.description ?? "Knowledge space"}
+        meta={<span className="rounded-md bg-muted px-2 py-0.5 text-xs">Updated {docsDate(space.updated_at ?? space.created_at)}</span>}
+        actions={<Button size="sm" onClick={() => setPageOpen(true)}>Create Page</Button>}
+      />
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.4fr]">
         <DocsExplorer spaces={spacesQuery.data ?? [space]} pages={pages} />
         <DetailPanel title="Pages in this space">
@@ -51,6 +63,7 @@ export default function SpaceDetailPage() {
           )}
         </DetailPanel>
       </div>
+      <CreatePageDialog open={pageOpen} onOpenChange={setPageOpen} spaces={[space]} />
     </div>
   );
 }

@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -21,7 +21,19 @@ from app.db.session import SessionLocal, engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_operational_columns()
     yield
+
+
+def _ensure_operational_columns() -> None:
+    inspector = inspect(engine)
+    if "spaces" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("spaces")}
+    if "project_id" in existing:
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE spaces ADD COLUMN project_id INTEGER"))
 
 
 def create_app() -> FastAPI:

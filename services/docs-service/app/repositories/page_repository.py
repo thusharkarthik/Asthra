@@ -87,3 +87,7 @@ class PageRepository:
         statement = select(func.max(PageVersion.version_number)).where(PageVersion.page_id == page_id)
         current_version = self.db.scalar(statement)
         return int(current_version or 0) + 1
+
+    def list_versions(self, page_id: int) -> list[PageVersion]:
+        statement = select(PageVersion).where(PageVersion.page_id == page_id).order_by(PageVersion.version_number.desc())
+        return list(self.db.scalars(statement).all())

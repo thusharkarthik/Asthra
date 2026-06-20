@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DiscoverPage from "@/app/discover/page";
 import FeatureRequestsPage from "@/app/discover/feature-requests/page";
@@ -30,10 +30,10 @@ function mockDiscoverFetch() {
       return new Response(JSON.stringify({ id: 1, idea_id: 7, scope: "Ship a lightweight validation MVP" }), { status: 200 });
     }
     if (url.includes("/ideas/7")) {
-      return new Response(JSON.stringify({ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", status: "new", created_by_id: 1 }), { status: 200 });
+      return new Response(JSON.stringify({ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", business_value: "Reduce support load", impact_score: 8, confidence_score: 7, effort_score: 4, status: "captured", created_by_id: 1 }), { status: 200 });
     }
     if (url.includes("/ideas")) {
-      return new Response(JSON.stringify([{ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", status: "new", created_by_id: 1 }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", business_value: "Reduce support load", impact_score: 8, confidence_score: 7, effort_score: 4, status: "captured", created_by_id: 1 }]), { status: 200 });
     }
     if (url.includes("/feature-requests")) {
       return new Response(JSON.stringify([{ id: 1, workspace_id: 2, title: "Export roadmap", description: "CSV export", source: "customer", requested_by: "Taylor", status: "new" }]), { status: 200 });
@@ -74,6 +74,17 @@ describe("Discover frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Ideas" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Customer portal")).toBeInTheDocument());
+  });
+
+  it("opens create idea dialog with product discovery fields", async () => {
+    renderWithQuery(<IdeasPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Idea" }));
+    expect(await screen.findByLabelText("Idea title")).toBeInTheDocument();
+    expect(screen.getByLabelText("Business value")).toBeInTheDocument();
+    expect(screen.getByLabelText("Impact score")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confidence score")).toBeInTheDocument();
+    expect(screen.getByLabelText("Effort score")).toBeInTheDocument();
   });
 
   it("renders feature requests page", async () => {
@@ -117,5 +128,9 @@ describe("Discover frontend screens", () => {
 
     await waitFor(() => expect(screen.getByText("Let customers track requests")).toBeInTheDocument());
     expect(screen.getByText("Ship a lightweight validation MVP")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.getByText("Reject")).toBeInTheDocument();
+    expect(screen.getByText("Convert to Flow placeholder")).toBeInTheDocument();
+    expect(screen.getByText("Reduce support load")).toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Brain, FileSearch, FileText, Sparkles } from "lucide-react";
 import { CreatePageDialog, CreateSpaceDialog } from "@/components/docs/docs-create-dialogs";
+import { DocsBreadcrumbs } from "@/components/docs/docs-breadcrumbs";
 import { DocsExplorer } from "@/components/docs/docs-explorer";
 import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
 import { DocsSetupState } from "@/components/docs/docs-setup-state";
@@ -47,6 +48,7 @@ export default function DocsPage() {
       <PageHeader
         title="Docs"
         description="Organize workspace knowledge into spaces and pages that are searchable, discussable, and AI-ready."
+        breadcrumbs={<DocsBreadcrumbs items={[]} />}
         actions={<DocsHeaderActions onCreateSpace={hasWorkspace ? () => setCreateSpaceOpen(true) : undefined} onCreatePage={hasWorkspace && spaces.length > 0 ? () => setCreatePageOpen(true) : undefined} />}
       />
       <DocsSubnav />

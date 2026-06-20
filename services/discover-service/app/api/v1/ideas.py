@@ -50,6 +50,22 @@ def update_idea(idea_id: int, data: IdeaUpdate, db: Session = Depends(get_db)):
     return IdeaService(db).update(idea_id, data)
 
 
+@router.post("/{idea_id}/approve", response_model=IdeaRead)
+def approve_idea(idea_id: int, db: Session = Depends(get_db)):
+    return IdeaService(db).approve(idea_id)
+
+
+@router.post("/{idea_id}/reject", response_model=IdeaRead)
+def reject_idea(idea_id: int, db: Session = Depends(get_db)):
+    return IdeaService(db).reject(idea_id)
+
+
+@router.post("/{idea_id}/convert-to-work", response_model=IdeaRead)
+def convert_idea_to_work_placeholder(idea_id: int, db: Session = Depends(get_db)):
+    # Placeholder for future Flow work item creation. This marks lifecycle state only.
+    return IdeaService(db).mark_converted_to_work(idea_id)
+
+
 @router.delete("/{idea_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_idea(idea_id: int, db: Session = Depends(get_db)):
     IdeaService(db).delete(idea_id)

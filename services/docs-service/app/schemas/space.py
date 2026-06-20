@@ -5,12 +5,14 @@ from app.schemas.base import TimestampedRead
 
 class SpaceCreate(BaseModel):
     workspace_id: int
+    project_id: int | None = None
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     created_by_id: int
 
 
 class SpaceUpdate(BaseModel):
+    project_id: int | None = None
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     is_active: bool | None = None
@@ -18,6 +20,7 @@ class SpaceUpdate(BaseModel):
 
 class SpaceRead(TimestampedRead):
     workspace_id: int
+    project_id: int | None = None
     name: str
     description: str | None = None
     created_by_id: int

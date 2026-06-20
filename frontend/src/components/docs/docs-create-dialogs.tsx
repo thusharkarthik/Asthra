@@ -17,10 +17,11 @@ export function CreateSpaceDialog({ open, onOpenChange }: { open: boolean; onOpe
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const createMutation = useMutation({
-    mutationFn: () => docsApi.createSpace(accessToken ?? "", { workspace_id: selectedWorkspaceId ?? 0, name, description, created_by_id: currentUser?.id ?? 1 }),
+    mutationFn: () => docsApi.createSpace(accessToken ?? "", { workspace_id: selectedWorkspaceId ?? 0, project_id: selectedProjectId, name, description, created_by_id: currentUser?.id ?? 1 }),
     onSuccess: () => {
       setName("");
       setDescription("");

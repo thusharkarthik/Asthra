@@ -25,7 +25,11 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [description, setDescription] = useState("");
   const [problemStatement, setProblemStatement] = useState("");
   const [targetUsers, setTargetUsers] = useState("");
-  const [status, setStatus] = useState("new");
+  const [businessValue, setBusinessValue] = useState("");
+  const [impactScore, setImpactScore] = useState("");
+  const [confidenceScore, setConfidenceScore] = useState("");
+  const [effortScore, setEffortScore] = useState("");
+  const [status, setStatus] = useState("captured");
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -36,6 +40,10 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
         description,
         problem_statement: problemStatement || null,
         target_users: targetUsers || null,
+        business_value: businessValue || null,
+        impact_score: impactScore ? Number(impactScore) : null,
+        confidence_score: confidenceScore ? Number(confidenceScore) : null,
+        effort_score: effortScore ? Number(effortScore) : null,
         status,
         created_by_id: currentUser?.id ?? 1
       }),
@@ -44,7 +52,11 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
       setDescription("");
       setProblemStatement("");
       setTargetUsers("");
-      setStatus("new");
+      setBusinessValue("");
+      setImpactScore("");
+      setConfidenceScore("");
+      setEffortScore("");
+      setStatus("captured");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["discover", "ideas", selectedWorkspaceId] });
     }
@@ -63,6 +75,12 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
         <DialogTextarea aria-label="Idea description" placeholder="Describe the opportunity" value={description} onChange={(event) => setDescription(event.target.value)} />
         <DialogTextarea aria-label="Problem statement" placeholder="Problem statement" value={problemStatement} onChange={(event) => setProblemStatement(event.target.value)} />
         <Input aria-label="Target users" placeholder="Target users" value={targetUsers} onChange={(event) => setTargetUsers(event.target.value)} />
+        <DialogTextarea aria-label="Business value" placeholder="Business value" value={businessValue} onChange={(event) => setBusinessValue(event.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Input aria-label="Impact score" type="number" min="0" max="10" placeholder="Impact" value={impactScore} onChange={(event) => setImpactScore(event.target.value)} />
+          <Input aria-label="Confidence score" type="number" min="0" max="10" placeholder="Confidence" value={confidenceScore} onChange={(event) => setConfidenceScore(event.target.value)} />
+          <Input aria-label="Effort score" type="number" min="0" max="10" placeholder="Effort" value={effortScore} onChange={(event) => setEffortScore(event.target.value)} />
+        </div>
         <Select aria-label="Idea status" value={status} onChange={(event) => setStatus(event.target.value)}>
           {DISCOVER_IDEA_STATUSES.map((option) => <option key={option} value={option}>{option.replace("_", " ")}</option>)}
         </Select>

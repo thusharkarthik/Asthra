@@ -31,6 +31,9 @@ function mockDocsFetch() {
     if (url.includes("/pages/5/comments")) {
       return new Response(JSON.stringify([{ id: 1, page_id: 5, user_id: 1, content: "Helpful page" }]), { status: 200 });
     }
+    if (url.includes("/pages/5/versions")) {
+      return new Response(JSON.stringify([{ id: 3, page_id: 5, version_number: 1, title: "Frontend Notes", content: "Docs page content", created_by_id: 1, created_at: "2026-06-04T10:00:00.000Z" }]), { status: 200 });
+    }
     if (url.includes("/pages/5")) {
       return new Response(JSON.stringify({ id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" }), { status: 200 });
     }
@@ -116,9 +119,11 @@ describe("Docs frontend screens", () => {
     navigationMock.params = { id: "5" };
     renderWithQuery(<PageDetail />);
 
-    await waitFor(() => expect(screen.getByText("Docs page content")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Docs page content").length).toBeGreaterThan(0));
     expect(screen.getByText("Helpful page")).toBeInTheDocument();
     expect(screen.getByText("Linked Work Items")).toBeInTheDocument();
+    expect(screen.getByText("Publish")).toBeInTheDocument();
+    expect(screen.getByText("Version 1: Frontend Notes")).toBeInTheDocument();
   });
 
   it("renders favorites page", () => {

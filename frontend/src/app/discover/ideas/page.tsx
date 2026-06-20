@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateFeatureRequestDialog, CreateFeedbackDialog, CreateIdeaDialog, CreateRoadmapItemDialog } from "@/components/discover/discover-create-dialogs";
+import { DiscoverBreadcrumbs } from "@/components/discover/discover-breadcrumbs";
 import { DiscoverHeaderActions } from "@/components/discover/discover-header-actions";
 import { DiscoverSetupState } from "@/components/discover/discover-setup-state";
 import { DiscoverSubnav } from "@/components/discover/discover-subnav";
@@ -56,6 +57,7 @@ export default function IdeasPage() {
       <PageHeader
         title="Ideas"
         description="Capture opportunities, clarify the problem, and move promising ideas toward validation."
+        breadcrumbs={<DiscoverBreadcrumbs items={[{ label: "Ideas" }]} />}
         actions={
           <DiscoverHeaderActions
             onCreateIdea={() => setIdeaOpen(true)}

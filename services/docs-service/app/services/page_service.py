@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.page import Page
+from app.models.page_version import PageVersion
 from app.repositories.page_repository import PageRepository
 from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageUpdate
 from app.services.ai_client import AIClient
@@ -61,6 +62,10 @@ class PageService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found.")
         return page
 
+    def list_versions(self, page_id: int) -> list[PageVersion]:
+        self.get(page_id)
+        return self.page_repository.list_versions(page_id)
+
     def update(self, page_id: int, page_update: PageUpdate) -> Page:
         page = self.get(page_id)
         if page_update.parent_page_id is not None:
@@ -86,6 +91,12 @@ class PageService:
             entity_id=str(updated_page.id),
         )
         return updated_page
+
+    def publish(self, page_id: int, updated_by_id: int | None = None) -> Page:
+        return self.update(page_id, PageUpdate(status="published", updated_by_id=updated_by_id))
+
+    def archive(self, page_id: int, updated_by_id: int | None = None) -> Page:
+        return self.update(page_id, PageUpdate(status="archived", updated_by_id=updated_by_id))
 
     def delete(self, page_id: int) -> None:
         page = self.get(page_id)

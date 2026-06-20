@@ -29,6 +29,35 @@ Docs now presents a knowledge management experience:
 - Future-ready links for work items, tickets, incidents, and ideas.
 - Favorites, Recent Pages, and Docs Search routes.
 
+## Operational Foundation
+
+This pass made Docs usable as a knowledge workflow instead of only a browsing surface:
+
+- Spaces can now carry optional project context for project-scoped knowledge.
+- Space detail includes breadcrumbs, a back link, and a scoped Create Page action.
+- Page detail includes breadcrumbs, a back link, edit mode, publish, and archive actions.
+- Page version history is visible on page detail when versions exist.
+- Backend page endpoints now support publish, archive, and version listing.
+- Existing databases are upgraded safely at service startup for the new `spaces.project_id` column.
+- The frontend uses typed API helpers for page publishing, archiving, and version history through the gateway.
+
+## RBAC Readiness
+
+Docs actions are structured around permission-ready operations:
+
+- `docs.space.view`
+- `docs.space.manage`
+- `docs.page.view`
+- `docs.page.create`
+- `docs.page.edit`
+- `docs.page.delete`
+
+Full enforcement depends on the shared permission helper being adopted across module pages.
+
+## Flow Integration Placeholder
+
+Page detail keeps future Linked Work Items, Tickets, Incidents, and Ideas sections visible. These are placeholders until platform references and lookup APIs are wired across Flow, Discover, Desk, and Pulse.
+
 ## Remaining Gaps
 
 - Space and page creation from guided setup still routes through existing settings/docs pages instead of a global creation flow.

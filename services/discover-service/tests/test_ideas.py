@@ -19,6 +19,15 @@ def test_create_list_get_update_delete_idea(db):
     updated = IdeaService(db).update(idea.id, IdeaUpdate(status="validating"))
     assert updated.status == "validating"
 
+    approved = IdeaService(db).approve(idea.id)
+    assert approved.status == "approved"
+
+    rejected = IdeaService(db).reject(idea.id)
+    assert rejected.status == "rejected"
+
+    converted = IdeaService(db).mark_converted_to_work(idea.id)
+    assert converted.status == "converted_to_work"
+
     IdeaService(db).delete(idea.id)
     with pytest.raises(HTTPException):
         IdeaService(db).get(idea.id)

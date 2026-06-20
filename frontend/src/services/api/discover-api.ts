@@ -22,6 +22,18 @@ export const discoverApi = {
   getIdea(accessToken: string, id: string | number) {
     return apiRequest<Idea>(`${DISCOVER_PREFIX}/ideas/${id}`, { method: "GET", authToken: accessToken });
   },
+  updateIdea(accessToken: string, id: string | number, payload: Partial<IdeaCreate>) {
+    return apiRequest<Idea>(`${DISCOVER_PREFIX}/ideas/${id}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
+  approveIdea(accessToken: string, id: string | number) {
+    return apiRequest<Idea>(`${DISCOVER_PREFIX}/ideas/${id}/approve`, { method: "POST", authToken: accessToken });
+  },
+  rejectIdea(accessToken: string, id: string | number) {
+    return apiRequest<Idea>(`${DISCOVER_PREFIX}/ideas/${id}/reject`, { method: "POST", authToken: accessToken });
+  },
+  convertIdeaToWork(accessToken: string, id: string | number) {
+    return apiRequest<Idea>(`${DISCOVER_PREFIX}/ideas/${id}/convert-to-work`, { method: "POST", authToken: accessToken });
+  },
   listFeatureRequests(accessToken: string, filters: { workspace_id?: number | null; status?: string; limit?: number } = {}) {
     return apiRequest<FeatureRequest[]>(`${DISCOVER_PREFIX}/feature-requests${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
