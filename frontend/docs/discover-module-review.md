@@ -73,7 +73,8 @@ Discover now exposes the future execution handoff clearly:
 - Idea detail shows Related Documents, Related Work Items, Related Roadmap Items, and Linked Flow Work placeholder sections.
 - `/discover/delivery` shows the product delivery lifecycle: Idea -> Documents -> Work Items -> Sprint -> Release.
 - Roadmap cards expose Idea Count, Document Count, Work Item Count, and Completion % placeholders.
-- Persisted Flow work item creation and link storage are intentionally not automatic yet.
+- Generic lifecycle relationships can now be persisted through Discover relationship endpoints.
+- Persisted Flow work item creation is intentionally not automatic yet.
 
 ## Lifecycle Model
 
@@ -85,7 +86,7 @@ Idea
 -> Sprint
 -> Release
 
-The current implementation makes the lifecycle visible and testable in the UI. Automatic creation and persisted cross-service relationship graphs are future backend integrations.
+The current implementation makes the lifecycle visible and testable in the UI. Relationship storage is available through a generic lifecycle relationship model, while automatic document/work creation remains user-confirmed and manual.
 
 ## RBAC Readiness
 
@@ -106,6 +107,6 @@ The Convert to Flow action marks an idea as `converted_to_work` today. It does n
 
 - Impact scoring is manually captured; automated scoring can come later.
 - Validation notes currently use linked feedback where available; a dedicated validation note UI should be added later.
-- Roadmap links depend on backend `idea_id` relationships being populated.
+- Roadmap links can come from `idea_id` roadmap items or generic lifecycle relationships.
 - AI suggestions are lightweight UI prompts; richer AI workflows can build on existing backend AI endpoints.
-- Cross-module links to Flow, Docs, Desk, and Pulse are placeholders until platform references are persisted.
+- Cross-module links to Docs and Flow can be persisted manually. Search-based pickers and automatic creation remain future work.

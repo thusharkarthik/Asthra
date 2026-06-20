@@ -53,12 +53,19 @@ export default function DiscoverDeliveryPage() {
     enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
+  const relationshipsQuery = useQuery({
+    queryKey: ["discover", "delivery", "relationships", selectedWorkspaceId],
+    queryFn: () => discoverApi.listRelationships(accessToken ?? "", { source_type: "idea", limit: 500 }),
+    enabled: Boolean(accessToken && selectedWorkspaceId),
+    retry: 1
+  });
 
   const ideas = ideasQuery.data ?? [];
   const pages = pagesQuery.data ?? [];
   const workItems = workItemsQuery.data ?? [];
   const sprints = sprintsQuery.data ?? [];
   const releases = releasesQuery.data ?? [];
+  const relationships = relationshipsQuery.data ?? [];
   const convertedIdeas = ideas.filter((idea) => idea.status === "converted_to_work" || idea.status === "approved");
 
   return (
@@ -81,10 +88,17 @@ export default function DiscoverDeliveryPage() {
             </DetailPanel>
           ) : (
             convertedIdeas.slice(0, 8).map((idea) => {
-              const relatedDocs = pages.filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(idea.title.toLowerCase().split(" ")[0] ?? ""));
-              const relatedWork = workItems.filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(idea.title.toLowerCase().split(" ")[0] ?? ""));
-              const relatedSprintIds = new Set(relatedWork.map((item) => item.sprint_id).filter(Boolean));
-              const relatedReleaseIds = new Set(relatedWork.map((item) => item.release_id).filter(Boolean));
+              const ideaRelationships = relationships.filter((relationship) => relationship.source_id === String(idea.id));
+              const linkedDocs = ideaRelationships.filter((relationship) => relationship.target_type === "doc_page");
+              const linkedWork = ideaRelationships.filter((relationship) => relationship.target_type === "work_item");
+              const linkedSprints = ideaRelationships.filter((relationship) => relationship.target_type === "sprint");
+              const linkedReleases = ideaRelationships.filter((relationship) => relationship.target_type === "release");
+              const fallbackDocs = pages.filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(idea.title.toLowerCase().split(" ")[0] ?? ""));
+              const fallbackWork = workItems.filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(idea.title.toLowerCase().split(" ")[0] ?? ""));
+              const relatedDocs = linkedDocs.length > 0 ? linkedDocs : fallbackDocs;
+              const relatedWork = linkedWork.length > 0 ? linkedWork : fallbackWork;
+              const relatedSprintIds = new Set(fallbackWork.map((item) => item.sprint_id).filter(Boolean));
+              const relatedReleaseIds = new Set(fallbackWork.map((item) => item.release_id).filter(Boolean));
               return (
                 <section key={idea.id} className="rounded-lg border bg-card p-4">
                   <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -96,10 +110,10 @@ export default function DiscoverDeliveryPage() {
                   </div>
                   <div className="grid gap-3 md:grid-cols-5">
                     <LifecycleColumn icon={<Lightbulb className="h-4 w-4" />} title="Idea" count={1} items={[idea.title]} />
-                    <LifecycleColumn icon={<FileText className="h-4 w-4" />} title="Documents" count={relatedDocs.length} items={relatedDocs.slice(0, 3).map((page) => page.title)} />
-                    <LifecycleColumn icon={<GitBranch className="h-4 w-4" />} title="Work Items" count={relatedWork.length} items={relatedWork.slice(0, 3).map((item) => item.title)} />
-                    <LifecycleColumn icon={<Timer className="h-4 w-4" />} title="Sprint" count={relatedSprintIds.size} items={sprints.filter((sprint) => relatedSprintIds.has(sprint.id)).map((sprint) => sprint.name)} />
-                    <LifecycleColumn icon={<Package className="h-4 w-4" />} title="Release" count={relatedReleaseIds.size} items={releases.filter((release) => relatedReleaseIds.has(release.id)).map((release) => release.name)} />
+                    <LifecycleColumn icon={<FileText className="h-4 w-4" />} title="Documents" count={relatedDocs.length} items={relatedDocs.slice(0, 3).map((page) => page.title ?? `Document ${"target_id" in page ? page.target_id : page.id}`)} />
+                    <LifecycleColumn icon={<GitBranch className="h-4 w-4" />} title="Work Items" count={relatedWork.length} items={relatedWork.slice(0, 3).map((item) => item.title ?? `Work item ${"target_id" in item ? item.target_id : item.id}`)} />
+                    <LifecycleColumn icon={<Timer className="h-4 w-4" />} title="Sprint" count={linkedSprints.length || relatedSprintIds.size} items={linkedSprints.length > 0 ? linkedSprints.map((sprint) => sprint.title ?? `Sprint ${sprint.target_id}`) : sprints.filter((sprint) => relatedSprintIds.has(sprint.id)).map((sprint) => sprint.name)} />
+                    <LifecycleColumn icon={<Package className="h-4 w-4" />} title="Release" count={linkedReleases.length || relatedReleaseIds.size} items={linkedReleases.length > 0 ? linkedReleases.map((release) => release.title ?? `Release ${release.target_id}`) : releases.filter((release) => relatedReleaseIds.has(release.id)).map((release) => release.name)} />
                   </div>
                 </section>
               );
