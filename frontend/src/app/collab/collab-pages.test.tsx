@@ -69,6 +69,8 @@ describe("Collab frontend screens", () => {
     navigationMock.params = { id: "8" };
     renderWithQuery(<ThreadDetailPage />);
     await waitFor(() => expect(screen.getByText("Ship update posted")).toBeInTheDocument());
+    expect(screen.getByText("Participants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive Thread" })).toBeInTheDocument();
   });
 
   it("renders announcements page", async () => {

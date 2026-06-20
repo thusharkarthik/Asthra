@@ -78,6 +78,7 @@ describe("Pulse frontend screens", () => {
     await waitFor(() => expect(screen.getByText("Gateway requests are slow")).toBeInTheDocument());
     expect(screen.getByText("api-gateway")).toBeInTheDocument();
     expect(screen.getByText("Database latency identified")).toBeInTheDocument();
+    expect(screen.getByText("Linked Resources")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resolve Incident" })).toBeInTheDocument();
   });
 });

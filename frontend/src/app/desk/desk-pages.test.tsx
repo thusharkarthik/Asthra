@@ -89,8 +89,10 @@ describe("Desk frontend screens", () => {
     navigationMock.params = { id: "9" };
     renderWithQuery(<TicketDetailPage />);
 
-    await waitFor(() => expect(screen.getByText("Customer cannot open invoices")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Customer cannot open invoices").length).toBeGreaterThan(0));
     expect(screen.getByText("Need logs")).toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByLabelText("Change ticket priority")).toBeInTheDocument();
   });
 
   it("renders queues page", async () => {

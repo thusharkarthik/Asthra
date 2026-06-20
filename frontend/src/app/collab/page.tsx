@@ -11,7 +11,7 @@ import { collabNavItems } from "@/components/modules/module-navs";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { StatusBadge } from "@/components/modules/status-badge";
-import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
 import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { collabApi } from "@/services/api/collab-api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -53,7 +53,20 @@ export default function CollabPage() {
               <ActivityFeed items={(activityQuery.data ?? []).map((item) => ({ id: item.id, title: item.action, description: item.description, actor: item.actor_user_id ? `User ${item.actor_user_id}` : "System", timestamp: item.created_at }))} />
             </ModuleDashboardCard>
           </div>
-          <AiPlaceholderPanel title="AI Conversation Summary">Future AI can summarize long threads, extract follow-ups, and convert discussions into linked work items.</AiPlaceholderPanel>
+          <ModuleDashboardCard title="Collaboration Workflow">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { title: "Discuss", text: "Create threads scoped to the current workspace or project." },
+                { title: "Broadcast", text: "Publish announcements for workspace-wide communication." },
+                { title: "Coordinate", text: "Use activity and team updates to keep work visible." }
+              ].map((item) => (
+                <div key={item.title} className="rounded-md border p-3">
+                  <div className="text-sm font-medium">{item.title}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </ModuleDashboardCard>
         </>
       )}
     </div>

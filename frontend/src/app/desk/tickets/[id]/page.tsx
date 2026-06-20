@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { CommentList } from "@/components/modules/comment-list";
@@ -10,10 +11,11 @@ import { PriorityBadge } from "@/components/modules/priority-badge";
 import { SeverityBadge } from "@/components/modules/severity-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DeskBackLink, DeskBreadcrumbs } from "@/components/desk/desk-breadcrumbs";
 import { DeskSubnav } from "@/components/desk/desk-subnav";
-import { DESK_TICKET_STATUSES, deskDate, isSlaAtRisk, queueNameFor } from "@/components/desk/desk-utils";
+import { DESK_PRIORITIES, DESK_TICKET_STATUSES, deskDate, isSlaAtRisk, queueNameFor } from "@/components/desk/desk-utils";
 import { deskApi } from "@/services/api/desk-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -25,6 +27,7 @@ export default function TicketDetailPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const ticketQuery = useQuery({ queryKey: ["desk", "ticket", id], queryFn: () => deskApi.getTicket(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const commentsQuery = useQuery({ queryKey: ["desk", "ticket-comments", id], queryFn: () => deskApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: 1 });
@@ -34,9 +37,11 @@ export default function TicketDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof deskApi.updateTicket>[2]) => deskApi.updateTicket(accessToken ?? "", id, payload),
     onSuccess: async () => {
+      setFeedback("Ticket updated.");
       await queryClient.invalidateQueries({ queryKey: ["desk", "ticket", id] });
       await queryClient.invalidateQueries({ queryKey: ["desk", "tickets", selectedWorkspaceId] });
-    }
+    },
+    onError: () => setFeedback("Unable to update ticket.")
   });
   const commentMutation = useMutation({
     mutationFn: (content: string) => deskApi.createComment(accessToken ?? "", id, { content, author_id: currentUser?.id }),
@@ -66,6 +71,7 @@ export default function TicketDetailPage() {
           </div>
         }
       />
+      {feedback ? <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{feedback}</div> : null}
       <div className="grid gap-4 lg:grid-cols-2">
         <DetailPanel title="Overview">
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -75,7 +81,17 @@ export default function TicketDetailPage() {
             <div><dt className="text-muted-foreground">Category</dt><dd className="font-medium">{ticket.category ?? "uncategorized"}</dd></div>
             <div><dt className="text-muted-foreground">Assignee</dt><dd className="font-medium">{ticket.assignee_id ? `User ${ticket.assignee_id}` : "Unassigned"}</dd></div>
           </dl>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3">
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Edit title</span>
+              <Input aria-label="Edit ticket title" defaultValue={ticket.title} onBlur={(event) => event.target.value.trim() && event.target.value !== ticket.title ? updateMutation.mutate({ title: event.target.value }) : undefined} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Edit description</span>
+              <textarea className="min-h-24 w-full rounded-md border bg-background p-3 text-sm" aria-label="Edit ticket description" defaultValue={ticket.description} onBlur={(event) => event.target.value !== ticket.description ? updateMutation.mutate({ description: event.target.value }) : undefined} />
+            </label>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <label className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Change status</span>
               <Select aria-label="Change ticket status" value={ticket.status} onChange={(event) => updateMutation.mutate({ status: event.target.value })}>
@@ -83,8 +99,18 @@ export default function TicketDetailPage() {
               </Select>
             </label>
             <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Priority</span>
+              <Select aria-label="Change ticket priority" value={ticket.priority} onChange={(event) => updateMutation.mutate({ priority: event.target.value })}>
+                {DESK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+              </Select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Category</span>
+              <Input aria-label="Edit ticket category" defaultValue={ticket.category ?? ""} onBlur={(event) => updateMutation.mutate({ category: event.target.value || null })} />
+            </label>
+            <label className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Assign user ID</span>
-              <input className="h-9 w-full rounded-md border bg-background px-3 text-sm" aria-label="Assign ticket user ID" defaultValue={ticket.assignee_id ?? ""} onBlur={(event) => updateMutation.mutate({ assignee_id: event.target.value ? Number(event.target.value) : null, status: event.target.value ? "assigned" : ticket.status })} />
+              <Input aria-label="Assign ticket user ID" defaultValue={ticket.assignee_id ?? ""} onBlur={(event) => updateMutation.mutate({ assignee_id: event.target.value ? Number(event.target.value) : null, status: event.target.value ? "assigned" : ticket.status })} />
             </label>
             <label className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Queue</span>
@@ -143,6 +169,18 @@ export default function TicketDetailPage() {
       </div>
       <DetailPanel title="Linked Resources">
         <p className="text-sm text-muted-foreground">Future links will connect this ticket to Flow work items, Docs pages, and Pulse incidents.</p>
+      </DetailPanel>
+      <DetailPanel title="Activity">
+        <div className="space-y-2 text-sm">
+          <div className="rounded-md border p-3">
+            <div className="font-medium">Ticket created</div>
+            <p className="text-muted-foreground">{deskDate(ticket.created_at)}</p>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="font-medium">Latest update</div>
+            <p className="text-muted-foreground">{deskDate(ticket.updated_at ?? ticket.created_at)}</p>
+          </div>
+        </div>
       </DetailPanel>
       <DetailPanel title="Comments">
         <CommentList comments={(commentsQuery.data ?? []).map((comment) => ({ id: comment.id, content: comment.content, author: comment.author_id ? `User ${comment.author_id}` : "Unknown", created_at: comment.created_at }))} />

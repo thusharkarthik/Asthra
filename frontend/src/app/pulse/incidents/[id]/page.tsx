@@ -75,7 +75,7 @@ export default function PulseIncidentDetailPage() {
           </dl>
         </DetailPanel>
         <DetailPanel title="Incident Controls">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Status</span>
               <Select aria-label="Change incident status" value={incident.status} onChange={(event) => updateMutation.mutate({ status: event.target.value })}>
@@ -92,6 +92,10 @@ export default function PulseIncidentDetailPage() {
               <span className="text-xs font-medium text-muted-foreground">Commander ID</span>
               <Input aria-label="Incident commander ID" defaultValue={incident.incident_commander_id ?? incident.commander_id ?? ""} onBlur={(event) => updateMutation.mutate({ incident_commander_id: event.target.value ? Number(event.target.value) : null, commander_id: event.target.value ? Number(event.target.value) : null })} />
             </label>
+            <label className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Impacted service</span>
+              <Input aria-label="Impacted service" defaultValue={incident.impacted_service ?? ""} onBlur={(event) => updateMutation.mutate({ impacted_service: event.target.value || null })} />
+            </label>
           </div>
         </DetailPanel>
       </div>
@@ -101,6 +105,9 @@ export default function PulseIncidentDetailPage() {
           <Input aria-label="Incident update" placeholder="Add incident update" value={updateContent} onChange={(event) => setUpdateContent(event.target.value)} />
           <Button disabled={timelineMutation.isPending || !updateContent.trim()}>{timelineMutation.isPending ? "Adding..." : "Add Update"}</Button>
         </form>
+      </DetailPanel>
+      <DetailPanel title="Linked Resources">
+        <p className="text-sm text-muted-foreground">Future links will connect this incident to Flow work items, Docs runbooks, and Desk tickets.</p>
       </DetailPanel>
       <DetailPanel title="Postmortem">
         {postmortemQuery.data ? (

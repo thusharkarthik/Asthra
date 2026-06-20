@@ -7,6 +7,7 @@ Pulse now supports the core incident management workflow from the UI:
 - Create incidents with title, description, severity, status, impacted service, commander, and workspace context.
 - Search and filter incidents by status and severity.
 - Open incident detail pages with breadcrumbs, overview metadata, status/severity controls, commander assignment, timeline updates, and postmortem visibility.
+- Edit impacted service from incident detail and view linked resource placeholders for future Flow/Docs/Desk relationships.
 - Resolve or close incidents from the detail page.
 - View service health foundations and operational reports.
 
@@ -25,7 +26,7 @@ Pulse now supports the core incident management workflow from the UI:
 
 ## CRUD Status
 
-- Incidents: create, list, detail, update status/severity/commander, resolve, close.
+- Incidents: create, list, detail, update status/severity/service/commander, resolve, close.
 - Incident timeline: create and list updates.
 - Alerts/status pages/on-call/escalations/postmortems: list/detail foundations from existing APIs.
 

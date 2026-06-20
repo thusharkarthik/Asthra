@@ -7,6 +7,7 @@ Collab now supports a lightweight team communication workflow:
 - Create workspace/project-scoped threads with a topic.
 - Browse and search threads.
 - Open thread details with breadcrumbs, context metadata, messages, and a message composer.
+- View thread overview, participants placeholder, linked resources placeholder, and archive placeholder.
 - Create and list announcements.
 - Review activity stream and team update pages from the existing module navigation.
 
@@ -22,7 +23,7 @@ Collab now supports a lightweight team communication workflow:
 
 ## CRUD Status
 
-- Threads: create, list, detail.
+- Threads: create, list, detail, search.
 - Messages: create and list on thread detail.
 - Announcements: create and list.
 - Activity/team updates/mentions: list foundations.
@@ -45,5 +46,6 @@ Thread detail includes a linked resources section for future Flow work item, Doc
 ## Remaining Gaps
 
 - Thread archive/update UI is not implemented yet.
+- Archive action is visible as a disabled placeholder until backend thread archive support is added.
 - Rich mentions, reactions, and realtime delivery are not implemented.
 - Member names depend on future profile lookup across workspace membership.
