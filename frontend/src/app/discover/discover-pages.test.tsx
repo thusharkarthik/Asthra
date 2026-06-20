@@ -30,6 +30,27 @@ function mockDiscoverFetch() {
     if (url.includes("/ideas/7/mvp-plan")) {
       return new Response(JSON.stringify({ id: 1, idea_id: 7, scope: "Ship a lightweight validation MVP" }), { status: 200 });
     }
+    if (url.includes("/ideas/7/execution-links")) {
+      return new Response(JSON.stringify({
+        idea_id: 7,
+        documents: [{ id: 1, source_type: "idea", source_id: 7, docs_page_id: 5, title: "Customer portal Specification", status: "draft" }],
+        flow_work: [{ id: 2, idea_id: 7, flow_work_item_id: 9, flow_item_type: "epic", title: "Customer portal", status: "1" }]
+      }), { status: 200 });
+    }
+    if (url.includes("/delivery/pipeline")) {
+      return new Response(JSON.stringify({
+        ideas: [{ id: 7, title: "Customer portal", status: "captured" }],
+        specifications: [{ id: 5, source_id: 7, title: "Customer portal Specification", status: "draft" }],
+        epics: [{ id: 9, idea_id: 7, title: "Customer portal", status: "1", type: "epic" }],
+        stories: [],
+        tasks: [],
+        completed: [],
+        counts: { ideas: 1, specifications: 1, epics: 1, stories: 0, tasks: 0, completed: 0 }
+      }), { status: 200 });
+    }
+    if (url.includes("/api/docs/api/v1/spaces")) {
+      return new Response(JSON.stringify([{ id: 1, workspace_id: 2, name: "Product Specs" }]), { status: 200 });
+    }
     if (url.includes("/ideas/7")) {
       return new Response(JSON.stringify({ id: 7, workspace_id: 2, project_id: 3, title: "Customer portal", description: "Let customers track requests", target_users: "Admins", business_value: "Reduce support load", impact_score: 8, confidence_score: 7, effort_score: 4, status: "captured", created_by_id: 1 }), { status: 200 });
     }
@@ -150,18 +171,18 @@ describe("Discover frontend screens", () => {
     expect(screen.getByText("Ship a lightweight validation MVP")).toBeInTheDocument();
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.getByText("Reject")).toBeInTheDocument();
-    expect(screen.getByText("Create Flow Work Item")).toBeInTheDocument();
+    expect(screen.getAllByText("Create Epic").length).toBeGreaterThan(0);
     expect(screen.getByText("Reduce support load")).toBeInTheDocument();
   });
 
-  it("renders idea conversion draft action", async () => {
+  it("renders idea create epic action", async () => {
     navigationMock.params = { id: "7" };
     renderWithQuery(<IdeaDetailPage />);
 
-    await waitFor(() => expect(screen.getByText("Create Flow Work Item")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Create Flow Work Item"));
-    expect(screen.getByText("Flow Work Item Draft")).toBeInTheDocument();
-    expect(screen.getByText("Mark Converted to Work")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Create Epic").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText("Create Epic")[1]);
+    expect(screen.getAllByText("Create Epic").length).toBeGreaterThan(0);
+    expect(screen.getByText(/This creates a real Flow epic/)).toBeInTheDocument();
   });
 
   it("renders idea conversion wizard", async () => {
@@ -178,10 +199,10 @@ describe("Discover frontend screens", () => {
     renderWithQuery(<DiscoverDeliveryPage />);
 
     expect(screen.getByRole("heading", { name: "Delivery View" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText("Self-service billing").length).toBeGreaterThan(0));
-    expect(screen.getByText("Documents")).toBeInTheDocument();
-    expect(screen.getByText("Work Items")).toBeInTheDocument();
-    expect(screen.getByText("Sprint")).toBeInTheDocument();
-    expect(screen.getByText("Release")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Customer portal Specification")).toBeInTheDocument());
+    expect(screen.getByText("Specifications")).toBeInTheDocument();
+    expect(screen.getByText("Epics")).toBeInTheDocument();
+    expect(screen.getByText("Stories")).toBeInTheDocument();
+    expect(screen.getByText("Tasks")).toBeInTheDocument();
   });
 });

@@ -77,9 +77,10 @@ This pass made Docs usable as a knowledge workflow instead of only a browsing su
 
 Docs now exposes the future execution reference flow clearly:
 
-- `Link Flow Work Item` still displays the payload needed for Flow's linked entity endpoint.
+- `Create Epic`, `Create Story`, and `Create Task` create real Flow work items through Docs service.
 - Link Idea, Link Work Item, and Link Release actions can also persist a generic lifecycle relationship when the user enters a known target id and title.
 - Page detail shows Related Ideas, Related Work Items, and Linked Releases.
+- Page detail displays linked work item status, assignee, and priority metadata where available.
 - Docs dashboard shows Pages Linked To Work, Pages Without Work, and Recently Referenced counts.
 - Search-based lookup/selection remains pending.
 
@@ -91,7 +92,7 @@ Idea
 -> Documentation
 -> Execution
 
-Pages can represent requirements, architecture, meeting notes, or research. Flow work items can already persist `doc_page` links through the Flow linked entity endpoint; Docs can also persist generic lifecycle relationships for visible cross-module traceability.
+Pages can represent requirements, architecture, meeting notes, or research. Docs can create Flow work and stores persisted `doc_flow_links`; Flow also stores the source Docs page through its linked entity endpoint.
 
 ## RBAC Readiness
 
@@ -106,9 +107,9 @@ Docs actions are structured around permission-ready operations:
 
 Full enforcement depends on the shared permission helper being adopted across module pages.
 
-## Flow Integration Placeholder
+## Flow Integration
 
-Page detail keeps future Linked Work Items, Tickets, Incidents, and Ideas sections visible. Docs-to-Discover/Flow relationships can be stored manually; richer lookup APIs are still needed across modules.
+Page detail can create linked Flow Epics, Stories, and Tasks. Manual relationship links remain available for existing records until richer lookup APIs are added.
 
 ## Remaining Gaps
 

@@ -67,6 +67,7 @@ services:
       - ./services/docs-service/.env.example
     environment:
       DATABASE_URL: sqlite:////app/data/asthra_docs.db
+      FLOW_SERVICE_URL: http://flow-service:8000
     ports:
       - "8002:8000"
     volumes:
@@ -115,6 +116,8 @@ services:
       - ./services/discover-service/.env.example
     environment:
       DATABASE_URL: sqlite:////app/data/asthra_discover.db
+      DOCS_SERVICE_URL: http://docs-service:8000
+      FLOW_SERVICE_URL: http://flow-service:8000
     ports:
       - "8005:8000"
     volumes:

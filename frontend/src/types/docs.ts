@@ -19,6 +19,7 @@ export type Page = {
   status?: string;
   created_by_id?: number | null;
   updated_by_id?: number | null;
+  discover_idea_id?: number | null;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -38,6 +39,7 @@ export type SpaceCreate = {
   name: string;
   description?: string | null;
   created_by_id: number;
+  discover_idea_id?: number | null;
 };
 
 export type SpaceUpdate = Partial<Pick<SpaceCreate, "project_id" | "name" | "description">>;
@@ -63,6 +65,18 @@ export type PageVersion = {
   content: string;
   created_by_id: number;
   created_at: string;
+};
+
+export type DocFlowLink = {
+  id: number;
+  docs_page_id: number;
+  flow_work_item_id: number;
+  flow_item_type: "epic" | "story" | "task" | string;
+  title: string;
+  status?: string | null;
+  assignee_id?: number | null;
+  priority_id?: number | null;
+  created_at?: string;
 };
 
 export type PageFilters = {

@@ -1,4 +1,6 @@
 from app.models.feature_request import FeatureRequest
+from app.models.discover_doc_link import DiscoverDocLink
+from app.models.discover_flow_link import DiscoverFlowLink
 from app.models.feedback import Feedback
 from app.models.idea import Idea
 from app.models.idea_ai_analysis import IdeaAIAnalysis
@@ -10,6 +12,8 @@ from app.models.validation_note import ValidationNote
 
 __all__ = [
     "FeatureRequest",
+    "DiscoverDocLink",
+    "DiscoverFlowLink",
     "Feedback",
     "Idea",
     "IdeaAIAnalysis",

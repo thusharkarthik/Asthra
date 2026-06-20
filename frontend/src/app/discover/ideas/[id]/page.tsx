@@ -23,6 +23,7 @@ export default function IdeaDetailPage() {
   const id = params.id;
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [isEditing, setEditing] = useState(false);
@@ -37,6 +38,7 @@ export default function IdeaDetailPage() {
   const [linkMode, setLinkMode] = useState<"doc_page" | "work_item" | null>(null);
   const [linkTargetId, setLinkTargetId] = useState("");
   const [linkTargetTitle, setLinkTargetTitle] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const ideaQuery = useQuery({ queryKey: ["discover", "idea", id], queryFn: () => discoverApi.getIdea(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const mvpPlanQuery = useQuery({ queryKey: ["discover", "mvp-plan", id], queryFn: () => discoverApi.getMvpPlan(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: false });
@@ -58,6 +60,12 @@ export default function IdeaDetailPage() {
     enabled: Boolean(accessToken && selectedWorkspaceId),
     retry: 1
   });
+  const docsSpacesQuery = useQuery({
+    queryKey: ["discover", "idea-docs-spaces"],
+    queryFn: () => docsApi.listSpaces(accessToken ?? ""),
+    enabled: Boolean(accessToken && selectedWorkspaceId),
+    retry: 1
+  });
   const workItemsQuery = useQuery({
     queryKey: ["discover", "idea-work-items", selectedProjectId],
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
@@ -70,7 +78,57 @@ export default function IdeaDetailPage() {
     enabled: Boolean(accessToken && id),
     retry: 1
   });
+  const executionLinksQuery = useQuery({
+    queryKey: ["discover", "idea-execution-links", id],
+    queryFn: () => discoverApi.getIdeaExecutionLinks(accessToken ?? "", id),
+    enabled: Boolean(accessToken && id),
+    retry: 1
+  });
   const analysisMutation = useMutation({ mutationFn: () => discoverApi.analyzeIdea(accessToken ?? "", id) });
+  const generateSpecMutation = useMutation({
+    mutationFn: () => {
+      const space = docsSpacesQuery.data?.find((item) => item.workspace_id === idea?.workspace_id) ?? docsSpacesQuery.data?.[0];
+      if (!idea) throw new Error("Idea is not loaded.");
+      if (!space) throw new Error("Create a Docs space before generating a specification.");
+      return discoverApi.generateIdeaSpecification(accessToken ?? "", id, {
+        space_id: space.id,
+        created_by_id: currentUser?.id ?? idea.created_by_id,
+        title: `${idea.title} Specification`,
+        status: "draft"
+      });
+    },
+    onError: (error) => setActionError(error instanceof Error ? error.message : "Unable to generate specification."),
+    onSuccess: async () => {
+      setActionError(null);
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-execution-links", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-lifecycle", id] });
+      await queryClient.invalidateQueries({ queryKey: ["docs"] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "delivery"] });
+    }
+  });
+  const createEpicMutation = useMutation({
+    mutationFn: () => {
+      if (!idea) throw new Error("Idea is not loaded.");
+      const projectId = selectedProjectId ?? idea.project_id;
+      if (!projectId) throw new Error("Select a project before creating an epic.");
+      return discoverApi.createIdeaEpic(accessToken ?? "", id, {
+        project_id: projectId,
+        reporter_id: currentUser?.id ?? idea.created_by_id,
+        title: idea.title
+      });
+    },
+    onError: (error) => setActionError(error instanceof Error ? error.message : "Unable to create epic."),
+    onSuccess: async () => {
+      setActionError(null);
+      setShowFlowDraft(false);
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-execution-links", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-lifecycle", id] });
+      await queryClient.invalidateQueries({ queryKey: ["flow"] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "delivery"] });
+    }
+  });
   const linkMutation = useMutation({
     mutationFn: () => {
       if (!linkMode) throw new Error("Select a link type.");
@@ -137,8 +195,14 @@ export default function IdeaDetailPage() {
   const ideaToken = idea.title.toLowerCase().split(" ")[0] ?? "";
   const persistedDocs = lifecycleGraphQuery.data?.documents ?? [];
   const persistedWorkItems = lifecycleGraphQuery.data?.work_items ?? [];
-  const relatedDocs = persistedDocs.length > 0 ? persistedDocs : (docsPagesQuery.data ?? []).filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(ideaToken)).map((page) => ({ id: page.id, target_id: String(page.id), title: page.title }));
-  const relatedWorkItems = persistedWorkItems.length > 0 ? persistedWorkItems : (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(ideaToken)).map((item) => ({ id: item.id, target_id: String(item.id), title: item.title }));
+  const executionDocs = executionLinksQuery.data?.documents ?? [];
+  const executionWork = executionLinksQuery.data?.flow_work ?? [];
+  const relatedDocs = executionDocs.length > 0
+    ? executionDocs.map((link) => ({ id: link.id, target_id: String(link.docs_page_id), title: link.title, status: link.status, source: "execution" }))
+    : persistedDocs.length > 0 ? persistedDocs : (docsPagesQuery.data ?? []).filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(ideaToken)).map((page) => ({ id: page.id, target_id: String(page.id), title: page.title }));
+  const relatedWorkItems = executionWork.length > 0
+    ? executionWork.map((link) => ({ id: link.id, target_id: String(link.flow_work_item_id), title: link.title, status: link.status, flow_item_type: link.flow_item_type, source: "execution" }))
+    : persistedWorkItems.length > 0 ? persistedWorkItems : (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(ideaToken)).map((item) => ({ id: item.id, target_id: String(item.id), title: item.title }));
   const relatedRoadmapRelationships = lifecycleGraphQuery.data?.roadmap_items ?? [];
 
   function submitEdit(event: FormEvent<HTMLFormElement>) {
@@ -167,12 +231,15 @@ export default function IdeaDetailPage() {
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("approve")} disabled={lifecycleMutation.isPending}>Approve</Button>
             <Button variant="outline" onClick={() => lifecycleMutation.mutate("reject")} disabled={lifecycleMutation.isPending}>Reject</Button>
             <Button variant="outline" onClick={() => { setShowConversionWizard(true); setWizardStep(1); }}>Convert Idea</Button>
-            <Button variant="outline" onClick={() => setShowFlowDraft((value) => !value)}>Create Flow Work Item</Button>
+            <Button variant="outline" onClick={() => createEpicMutation.mutate()} disabled={createEpicMutation.isPending || Boolean(executionWork.find((link) => link.flow_item_type === "epic"))}>
+              {createEpicMutation.isPending ? "Creating Epic..." : "Create Epic"}
+            </Button>
             <Button onClick={() => analysisMutation.mutate()} disabled={analysisMutation.isPending}>{analysisMutation.isPending ? "Analyzing..." : "AI analyze idea"}</Button>
           </div>
         }
       />
       <DiscoverBreadcrumbs items={[{ label: "Ideas", href: "/discover/ideas" }, { label: idea.title }]} />
+      {actionError ? <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{actionError}</div> : null}
       {isEditing ? (
         <DetailPanel title="Edit Idea">
           <form className="space-y-3" onSubmit={submitEdit}>
@@ -189,18 +256,19 @@ export default function IdeaDetailPage() {
         </DetailPanel>
       ) : null}
       {showFlowDraft ? (
-        <DetailPanel title="Flow Work Item Draft">
+        <DetailPanel title="Create Epic">
           <div className="space-y-3 text-sm">
             <p className="text-muted-foreground">
-              Flow work item creation from Discover is not wired yet. Review this draft payload, then mark the idea converted when the Flow item is created manually.
+              This creates a real Flow epic and links it back to this Discover idea.
             </p>
             <pre className="overflow-auto rounded-md border bg-muted p-3 text-xs">
               {JSON.stringify(
                 {
-                  project_id: idea.project_id,
+                  project_id: selectedProjectId ?? idea.project_id,
                   title: idea.title,
                   description: [idea.description, idea.problem_statement ? `Problem: ${idea.problem_statement}` : null, idea.target_users ? `Target users: ${idea.target_users}` : null, idea.business_value ? `Business value: ${idea.business_value}` : null].filter(Boolean).join("\n\n"),
-                  source: "discover_idea",
+                  item_level: "initiative",
+                  linked_source: "discover_idea",
                   source_id: idea.id
                 },
                 null,
@@ -208,8 +276,8 @@ export default function IdeaDetailPage() {
               )}
             </pre>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => lifecycleMutation.mutate("convert")} disabled={lifecycleMutation.isPending || idea.status === "converted_to_work"}>
-                {idea.status === "converted_to_work" ? "Already converted" : "Mark Converted to Work"}
+              <Button variant="outline" onClick={() => createEpicMutation.mutate()} disabled={createEpicMutation.isPending || !((selectedProjectId ?? idea.project_id))}>
+                {createEpicMutation.isPending ? "Creating..." : "Create Epic"}
               </Button>
               <Button variant="outline" onClick={() => setShowFlowDraft(false)}>Close Draft</Button>
             </div>
@@ -320,7 +388,9 @@ export default function IdeaDetailPage() {
             ))}</div>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowConversionWizard(true)}>Create Document</Button>
+            <Button size="sm" variant="outline" onClick={() => generateSpecMutation.mutate()} disabled={generateSpecMutation.isPending || relatedDocs.some((doc) => "source" in doc && doc.source === "execution")}>
+              {generateSpecMutation.isPending ? "Generating..." : "Generate Specification"}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setLinkMode("doc_page")}>Link Existing Document</Button>
           </div>
           {linkMode === "doc_page" ? <ManualLinkForm typeLabel="Document" targetId={linkTargetId} targetTitle={linkTargetTitle} isPending={linkMutation.isPending} onTargetIdChange={setLinkTargetId} onTargetTitleChange={setLinkTargetTitle} onCancel={() => setLinkMode(null)} onSubmit={submitManualLink} /> : null}
@@ -335,7 +405,7 @@ export default function IdeaDetailPage() {
             ))}</div>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowFlowDraft(true)}>Create Work Item</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowFlowDraft(true)}>Create Epic</Button>
             <Button size="sm" variant="outline" onClick={() => setLinkMode("work_item")}>Link Existing Work Item</Button>
           </div>
           {linkMode === "work_item" ? <ManualLinkForm typeLabel="Work Item" targetId={linkTargetId} targetTitle={linkTargetTitle} isPending={linkMutation.isPending} onTargetIdChange={setLinkTargetId} onTargetTitleChange={setLinkTargetTitle} onCancel={() => setLinkMode(null)} onSubmit={submitManualLink} /> : null}
@@ -367,8 +437,8 @@ export default function IdeaDetailPage() {
         </DetailPanel>
         <DetailPanel title="Linked Work Items">
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>{persistedWorkItems.length > 0 ? `${persistedWorkItems.length} Flow work item relationship stored.` : "No persisted Flow work item is linked yet."}</p>
-            <p>Use Create Work Item to review a draft payload, or Link Existing Work Item to persist a manual relationship.</p>
+            <p>{relatedWorkItems.length > 0 ? `${relatedWorkItems.length} Flow work item relationship stored.` : "No persisted Flow work item is linked yet."}</p>
+            <p>Use Create Epic to create Flow execution work, or Link Existing Work Item to persist a manual relationship.</p>
           </div>
         </DetailPanel>
       </div>

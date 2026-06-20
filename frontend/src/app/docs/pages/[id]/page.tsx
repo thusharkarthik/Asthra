@@ -66,6 +66,12 @@ export default function PageDetail() {
     enabled: Boolean(accessToken && id),
     retry: 1
   });
+  const pageFlowLinksQuery = useQuery({
+    queryKey: ["docs", "page-flow-links", id],
+    queryFn: () => docsApi.listPageFlowWorkItems(accessToken ?? "", id),
+    enabled: Boolean(accessToken && id),
+    retry: 1
+  });
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("draft");
@@ -74,6 +80,7 @@ export default function PageDetail() {
   const [linkMode, setLinkMode] = useState<"idea" | "work_item" | "release" | null>(null);
   const [linkTargetId, setLinkTargetId] = useState("");
   const [linkTargetTitle, setLinkTargetTitle] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const updateMutation = useMutation({
     mutationFn: () => docsApi.updatePage(accessToken ?? "", id, { title, content, status, parent_page_id: parentPageId ? Number(parentPageId) : null, updated_by_id: currentUser?.id }),
     onSuccess: () => {
@@ -121,6 +128,25 @@ export default function PageDetail() {
       await queryClient.invalidateQueries({ queryKey: ["docs", "page-relationships-target", id] });
     }
   });
+  const createFlowWorkMutation = useMutation({
+    mutationFn: (work_item_type: "epic" | "story" | "task") => {
+      if (!selectedProjectId) throw new Error("Select a project before creating Flow work from Docs.");
+      return docsApi.createPageFlowWorkItem(accessToken ?? "", id, {
+        project_id: selectedProjectId,
+        work_item_type,
+        reporter_id: currentUser?.id,
+        title: `${work_item_type === "epic" ? "Epic" : work_item_type === "story" ? "Story" : "Task"}: ${page?.title ?? "Docs page"}`
+      });
+    },
+    onError: (error) => setActionError(error instanceof Error ? error.message : "Unable to create Flow work item."),
+    onSuccess: async () => {
+      setActionError(null);
+      await queryClient.invalidateQueries({ queryKey: ["docs", "page-flow-links", id] });
+      await queryClient.invalidateQueries({ queryKey: ["docs", "page-relationships-source", id] });
+      await queryClient.invalidateQueries({ queryKey: ["flow"] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "delivery"] });
+    }
+  });
   const page = pageQuery.data;
   const spaces = spacesQuery.data ?? [];
   const currentSpace = spaces.find((space) => space.id === page?.space_id);
@@ -131,7 +157,10 @@ export default function PageDetail() {
   const persistedReleases = persistedRelationships.filter((relationship) => relationship.source_type === "release" || relationship.target_type === "release");
   const fallbackWorkItems = (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(pageToken));
   const relatedIdeas = persistedIdeas.length > 0 ? persistedIdeas : (ideasQuery.data ?? []).filter((idea) => `${idea.title} ${idea.description}`.toLowerCase().includes(pageToken)).map((idea) => ({ id: idea.id, target_id: String(idea.id), title: idea.title }));
-  const relatedWorkItems = persistedWorkItems.length > 0 ? persistedWorkItems : fallbackWorkItems.map((item) => ({ id: item.id, target_id: String(item.id), title: item.title }));
+  const pageFlowLinks = pageFlowLinksQuery.data ?? [];
+  const relatedWorkItems = pageFlowLinks.length > 0
+    ? pageFlowLinks.map((link) => ({ id: link.id, target_id: String(link.flow_work_item_id), title: link.title, status: link.status, assignee_id: link.assignee_id, priority_id: link.priority_id, source: "doc_flow" }))
+    : persistedWorkItems.length > 0 ? persistedWorkItems : fallbackWorkItems.map((item) => ({ id: item.id, target_id: String(item.id), title: item.title, status: item.status_id ? `Status ${item.status_id}` : "Unknown", assignee_id: item.assignee_id, priority_id: item.priority_id }));
   const linkedReleaseIds = new Set(fallbackWorkItems.map((item) => item.release_id).filter(Boolean));
   const linkedReleases = persistedReleases.length > 0 ? persistedReleases : (releasesQuery.data ?? []).filter((release) => linkedReleaseIds.has(release.id)).map((release) => ({ id: release.id, target_id: String(release.id), title: release.name }));
 
@@ -179,25 +208,32 @@ export default function PageDetail() {
           </div>
         }
       />
+      {actionError ? <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{actionError}</div> : null}
       {showFlowLinkDraft ? (
-        <DetailPanel title="Flow Link Draft">
+        <DetailPanel title="Create Flow Work From Page">
           <div className="space-y-3 text-sm">
             <p className="text-muted-foreground">
-              Flow link creation requires selecting a work item. Lookup is not wired on Docs yet, so this action shows the payload that should be attached to a Flow work item through Flow links.
+              Create a real Flow record from this Docs page and keep it linked to the source page.
             </p>
             <pre className="overflow-auto rounded-md border bg-muted p-3 text-xs">
               {JSON.stringify(
                 {
-                  entity_type: "doc_page",
-                  entity_id: String(page.id),
-                  entity_title: page.title,
-                  entity_url: `/docs/pages/${page.id}`
+                  project_id: selectedProjectId,
+                  source: "doc_page",
+                  source_id: page.id,
+                  title: page.title,
+                  supported_types: ["epic", "story", "task"]
                 },
                 null,
                 2
               )}
             </pre>
-            <Button variant="outline" onClick={() => setShowFlowLinkDraft(false)}>Close Draft</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => createFlowWorkMutation.mutate("epic")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Epic</Button>
+              <Button variant="outline" onClick={() => createFlowWorkMutation.mutate("story")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Story</Button>
+              <Button variant="outline" onClick={() => createFlowWorkMutation.mutate("task")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Task</Button>
+              <Button variant="outline" onClick={() => setShowFlowLinkDraft(false)}>Close</Button>
+            </div>
           </div>
         </DetailPanel>
       ) : null}
@@ -270,8 +306,13 @@ export default function PageDetail() {
               <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Linked Work Items</div>
               {relatedWorkItems.length === 0 ? <p className="mt-1 text-muted-foreground">No Flow work item is linked yet. Use Link Flow Work Item to review the link payload.</p> : (
                 <div className="mt-2 space-y-2">{relatedWorkItems.slice(0, 4).map((item) => (
-                  <div key={`${item.id}-${item.target_id}`} className="flex items-center justify-between gap-2">
-                    <a className="text-primary hover:underline" href={`/flow/work-items/${item.target_id}`}>{item.title ?? `Work item ${item.target_id}`}</a>
+                  <div key={`${item.id}-${item.target_id}`} className="flex items-start justify-between gap-2">
+                    <div>
+                      <a className="text-primary hover:underline" href={`/flow/work-items/${item.target_id}`}>{item.title ?? `Work item ${item.target_id}`}</a>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Status: {"status" in item ? item.status ?? "Unknown" : "Unknown"} · Assignee: {"assignee_id" in item ? item.assignee_id ?? "Unassigned" : "Unassigned"} · Priority: {"priority_id" in item ? item.priority_id ?? "Unset" : "Unset"}
+                      </div>
+                    </div>
                     {"relationship_type" in item ? <Button size="sm" variant="outline" onClick={() => unlinkMutation.mutate(item.id)} disabled={unlinkMutation.isPending}>Unlink</Button> : null}
                   </div>
                 ))}</div>
@@ -301,6 +342,9 @@ export default function PageDetail() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => setLinkMode("idea")}>Link Idea</Button>
+              <Button size="sm" variant="outline" onClick={() => createFlowWorkMutation.mutate("epic")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Epic</Button>
+              <Button size="sm" variant="outline" onClick={() => createFlowWorkMutation.mutate("story")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Story</Button>
+              <Button size="sm" variant="outline" onClick={() => createFlowWorkMutation.mutate("task")} disabled={createFlowWorkMutation.isPending || !selectedProjectId}>Create Task</Button>
               <Button size="sm" variant="outline" onClick={() => setLinkMode("work_item")}>Link Work Item</Button>
               <Button size="sm" variant="outline" onClick={() => setLinkMode("release")}>Link Release</Button>
             </div>

@@ -67,14 +67,15 @@ This pass made the product discovery lifecycle testable end to end:
 
 Discover now exposes the future execution handoff clearly:
 
-- `Create Flow Work Item` displays the intended Flow create payload with project, title, description, and Discover source metadata.
+- `Generate Specification` creates a real Docs page and stores the related Docs pointer.
+- `Create Epic` creates a real Flow work item and stores the related Flow pointer.
 - `Convert Idea` opens a manual four-step wizard: Create Documentation, Create Flow Structure, Review, Execute.
-- `Mark Converted to Work` updates the idea status to `converted_to_work`.
+- Creating an Epic updates the idea status to `converted_to_work`.
 - Idea detail shows Related Documents, Related Work Items, Related Roadmap Items, and Linked Flow Work placeholder sections.
-- `/discover/delivery` shows the product delivery lifecycle: Idea -> Documents -> Work Items -> Sprint -> Release.
+- `/discover/delivery` shows the persisted execution pipeline: Ideas -> Specifications -> Epics -> Stories -> Tasks -> Completed.
 - Roadmap cards expose Idea Count, Document Count, Work Item Count, and Completion % placeholders.
 - Generic lifecycle relationships can now be persisted through Discover relationship endpoints.
-- Persisted Flow work item creation is intentionally not automatic yet.
+- Persisted Flow epic creation is available from Idea detail.
 
 ## Lifecycle Model
 
@@ -86,7 +87,7 @@ Idea
 -> Sprint
 -> Release
 
-The current implementation makes the lifecycle visible and testable in the UI. Relationship storage is available through a generic lifecycle relationship model, while automatic document/work creation remains user-confirmed and manual.
+The current implementation makes the lifecycle visible and testable in the UI. Relationship storage is available through concrete link tables and the generic lifecycle relationship model. Document and work creation is user-confirmed and persisted.
 
 ## RBAC Readiness
 
@@ -99,9 +100,9 @@ Discover actions are structured around permission-ready operations:
 
 Full enforcement depends on the shared permission helper being adopted across module pages.
 
-## Flow Integration Placeholder
+## Flow Integration
 
-The Convert to Flow action marks an idea as `converted_to_work` today. It does not create a Flow work item yet. The next integration step is to call Flow with a mapped title, description, project, and discovery link once cross-module reference creation is finalized.
+Create Epic calls Flow with a mapped title, description, project, and Discover source link. Flow stores the Discover idea through its linked resources endpoint.
 
 ## Remaining Gaps
 
@@ -109,4 +110,4 @@ The Convert to Flow action marks an idea as `converted_to_work` today. It does n
 - Validation notes currently use linked feedback where available; a dedicated validation note UI should be added later.
 - Roadmap links can come from `idea_id` roadmap items or generic lifecycle relationships.
 - AI suggestions are lightweight UI prompts; richer AI workflows can build on existing backend AI endpoints.
-- Cross-module links to Docs and Flow can be persisted manually. Search-based pickers and automatic creation remain future work.
+- Search-based pickers and deeper sprint/release automation remain future work.
