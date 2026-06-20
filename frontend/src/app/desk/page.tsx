@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Brain, Clock, Lightbulb, Route, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
@@ -16,7 +16,6 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
-import { Button } from "@/components/ui/button";
 import { deskApi } from "@/services/api/desk-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -140,22 +139,20 @@ export default function DeskPage() {
                   </div>
                 )}
               </ModuleDashboardCard>
-              <ModuleDashboardCard title="AI Support Suggestions">
+              <ModuleDashboardCard title="Service Workflow">
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
-                    { icon: Brain, title: "Classify ticket", text: "Suggest category, severity, priority, route, and next action." },
-                    { icon: Route, title: "Routing help", text: "Use queue and SLA context to recommend a support path." },
-                    { icon: Clock, title: "SLA risk", text: "Spot high-priority work before it misses response targets." },
-                    { icon: Lightbulb, title: "Duplicate hints", text: "Surface possible repeated customer issues." }
+                    { title: "Capture", text: "Create tickets with requester, category, priority, and queue context." },
+                    { title: "Route", text: "Assign tickets to queues and owners for follow-up." },
+                    { title: "Resolve", text: "Move work through open, assigned, in progress, waiting, resolved, and closed." },
+                    { title: "Review", text: "Use reports and SLA indicators to understand support load." }
                   ].map((item) => (
                     <div key={item.title} className="rounded-md border p-3">
-                      <item.icon className="mb-2 h-4 w-4 text-primary" />
                       <div className="text-sm font-medium">{item.title}</div>
                       <p className="mt-1 text-xs text-muted-foreground">{item.text}</p>
                     </div>
                   ))}
                 </div>
-                <Button className="mt-3" variant="outline" onClick={() => setTicketOpen(true)}>Create ticket for AI classification</Button>
               </ModuleDashboardCard>
             </div>
           )}

@@ -1,6 +1,6 @@
 import type { Queue, Ticket } from "@/types/desk";
 
-export const DESK_TICKET_STATUSES = ["open", "in_progress", "waiting", "resolved", "closed"];
+export const DESK_TICKET_STATUSES = ["open", "assigned", "in_progress", "waiting", "resolved", "closed"];
 export const DESK_PRIORITIES = ["low", "medium", "high", "critical"];
 export const DESK_CHANGE_STATUSES = ["draft", "submitted", "approved", "scheduled", "completed", "rejected"];
 export const DESK_RISK_LEVELS = ["low", "medium", "high", "critical"];

@@ -5,10 +5,14 @@ export type Ticket = {
   queue_id?: number | null;
   title: string;
   description: string;
+  requester_name?: string | null;
+  requester_email?: string | null;
+  category?: string | null;
   status: string;
   priority: string;
   requester_id?: number | null;
   assignee_id?: number | null;
+  created_by?: number | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -19,11 +23,17 @@ export type TicketCreate = {
   queue_id?: number | null;
   title: string;
   description: string;
+  requester_name?: string | null;
+  requester_email?: string | null;
+  category?: string | null;
   status?: string;
   priority?: string;
   requester_id?: number | null;
   assignee_id?: number | null;
+  created_by?: number | null;
 };
+
+export type TicketUpdate = Partial<TicketCreate>;
 
 export type Queue = {
   id: number;

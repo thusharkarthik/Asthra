@@ -1,12 +1,15 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { Archive } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentComposer } from "@/components/modules/comment-composer";
 import { DetailPanel } from "@/components/modules/detail-panel";
 import { EntityDetailHeader } from "@/components/modules/entity-detail-header";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { ThreadMessageList } from "@/components/modules/thread-message-list";
+import { Button } from "@/components/ui/button";
+import { CollabBackLink, CollabBreadcrumbs } from "@/components/collab/collab-breadcrumbs";
 import { collabApi } from "@/services/api/collab-api";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -26,10 +29,29 @@ export default function ThreadDetailPage() {
 
   return (
     <div className="space-y-4">
-      <EntityDetailHeader title={thread.title} meta={<><StatusBadge value={thread.status} /><span className="text-xs text-muted-foreground">Workspace {thread.workspace_id}</span></>} />
+      <CollabBackLink href="/collab/threads" label="Back to Threads" />
+      <CollabBreadcrumbs items={[{ label: "Threads", href: "/collab/threads" }, { label: thread.title }]} />
+      <EntityDetailHeader
+        title={thread.title}
+        meta={<><StatusBadge value={thread.status} /><span className="text-xs text-muted-foreground">Workspace {thread.workspace_id}</span></>}
+        actions={<Button variant="outline" disabled title="Archive support is pending backend update"><Archive className="mr-2 h-4 w-4" />Archive Thread</Button>}
+      />
+      <DetailPanel title="Overview">
+        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          <div><dt className="text-muted-foreground">Topic</dt><dd className="font-medium">{thread.entity_type ?? "General"}</dd></div>
+          <div><dt className="text-muted-foreground">Project</dt><dd className="font-medium">{thread.project_id ?? "Workspace-level"}</dd></div>
+          <div><dt className="text-muted-foreground">Created by</dt><dd className="font-medium">User {thread.created_by_id}</dd></div>
+        </dl>
+      </DetailPanel>
+      <DetailPanel title="Participants">
+        <p className="text-sm text-muted-foreground">Participants will be resolved from workspace membership when the member lookup API is available. Current author: User {thread.created_by_id}.</p>
+      </DetailPanel>
       <DetailPanel title="Messages">
         <ThreadMessageList messages={messagesQuery.data ?? []} />
         <div className="mt-4"><CommentComposer onSubmit={(content) => messageMutation.mutate(content)} isSubmitting={messageMutation.isPending} /></div>
+      </DetailPanel>
+      <DetailPanel title="Linked Resources">
+        <p className="text-sm text-muted-foreground">Future links will connect this discussion to Flow work items, Docs pages, Desk tickets, and Pulse incidents.</p>
       </DetailPanel>
     </div>
   );

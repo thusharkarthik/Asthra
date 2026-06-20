@@ -55,10 +55,12 @@ class AlertRepository(CRUDRepository):
 class IncidentRepository(CRUDRepository):
     model = Incident
 
-    def list(self, *, workspace_id=None, status=None, severity=None, limit=100, offset=0):
+    def list(self, *, workspace_id=None, project_id=None, status=None, severity=None, limit=100, offset=0):
         stmt = select(Incident)
         if workspace_id is not None:
             stmt = stmt.where(Incident.workspace_id == workspace_id)
+        if project_id is not None:
+            stmt = stmt.where(Incident.project_id == project_id)
         if status is not None:
             stmt = stmt.where(Incident.status == status)
         if severity is not None:

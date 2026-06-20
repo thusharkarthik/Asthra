@@ -1,34 +1,53 @@
 from pydantic import BaseModel, Field
+from datetime import datetime
 from app.schemas.base import FullTimestampedRead
 
 
 class IncidentCreate(BaseModel):
     workspace_id: int
+    project_id: int | None = None
     alert_id: int | None = None
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    severity: str = "medium"
-    status: str = "investigating"
+    severity: str = "sev3"
+    status: str = "open"
+    impacted_service: str | None = None
     commander_id: int | None = None
+    incident_commander_id: int | None = None
+    started_at: datetime | None = None
+    resolved_at: datetime | None = None
+    created_by: int | None = None
 
 
 class IncidentUpdate(BaseModel):
     alert_id: int | None = None
+    project_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     severity: str | None = None
     status: str | None = None
+    impacted_service: str | None = None
     commander_id: int | None = None
+    incident_commander_id: int | None = None
+    started_at: datetime | None = None
+    resolved_at: datetime | None = None
+    created_by: int | None = None
 
 
 class IncidentRead(FullTimestampedRead):
     workspace_id: int
+    project_id: int | None = None
     alert_id: int | None = None
     title: str
     description: str | None = None
     severity: str
     status: str
+    impacted_service: str | None = None
     commander_id: int | None = None
+    incident_commander_id: int | None = None
+    started_at: datetime | None = None
+    resolved_at: datetime | None = None
+    created_by: int | None = None
 
 
 class IncidentAISummaryRead(BaseModel):

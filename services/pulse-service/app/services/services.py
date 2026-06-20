@@ -14,9 +14,9 @@ from app.repositories.repositories import (
 from app.schemas.incident import IncidentAISummaryRead, IncidentMemoryDocumentPayload
 from app.services.ai_client import AIClient
 
-SEVERITIES = {"low", "medium", "high", "critical"}
+SEVERITIES = {"low", "medium", "high", "critical", "sev1", "sev2", "sev3", "sev4"}
 ALERT_STATUSES = {"open", "acknowledged", "resolved"}
-INCIDENT_STATUSES = {"investigating", "identified", "monitoring", "resolved"}
+INCIDENT_STATUSES = {"open", "investigating", "identified", "mitigating", "monitoring", "resolved", "closed"}
 
 
 def _not_found(name: str):

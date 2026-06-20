@@ -5,10 +5,12 @@ export const pulseNavItems: ModuleNavItem[] = [
   { href: "/pulse", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pulse/alerts", label: "Alerts", icon: Bell },
   { href: "/pulse/incidents", label: "Incidents", icon: AlertTriangle },
+  { href: "/pulse/services", label: "Services", icon: RadioTower },
   { href: "/pulse/status-pages", label: "Status Pages", icon: RadioTower },
   { href: "/pulse/on-call", label: "On-call", icon: Users },
   { href: "/pulse/escalations", label: "Escalations", icon: Gauge },
-  { href: "/pulse/postmortems", label: "Postmortems", icon: FileText }
+  { href: "/pulse/postmortems", label: "Postmortems", icon: FileText },
+  { href: "/pulse/reports", label: "Reports", icon: BarChart3 }
 ];
 
 export const devNavItems: ModuleNavItem[] = [

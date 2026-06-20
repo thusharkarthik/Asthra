@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import AnnouncementsPage from "@/app/collab/announcements/page";
 import CollabPage from "@/app/collab/page";
 import ThreadDetailPage from "@/app/collab/threads/[id]/page";
 import ThreadsPage from "@/app/collab/threads/page";
@@ -68,5 +69,13 @@ describe("Collab frontend screens", () => {
     navigationMock.params = { id: "8" };
     renderWithQuery(<ThreadDetailPage />);
     await waitFor(() => expect(screen.getByText("Ship update posted")).toBeInTheDocument());
+    expect(screen.getByText("Participants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive Thread" })).toBeInTheDocument();
+  });
+
+  it("renders announcements page", async () => {
+    renderWithQuery(<AnnouncementsPage />);
+    expect(screen.getByRole("heading", { name: "Announcements" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Maintenance window")).toBeInTheDocument());
   });
 });

@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadingState } from "@/components/layout/loading-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateTicketDialog } from "@/components/desk/desk-create-dialogs";
+import { DeskBreadcrumbs } from "@/components/desk/desk-breadcrumbs";
 import { DeskSetupState } from "@/components/desk/desk-setup-state";
 import { DeskSubnav } from "@/components/desk/desk-subnav";
 import { DESK_PRIORITIES, DESK_TICKET_STATUSES, deskDate, isSlaAtRisk, queueNameFor } from "@/components/desk/desk-utils";
@@ -29,6 +30,7 @@ export default function TicketsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
+  const [category, setCategory] = useState("all");
   const [queue, setQueue] = useState("all");
   const [assignee, setAssignee] = useState("all");
 
@@ -45,22 +47,25 @@ export default function TicketsPage() {
   const filteredTickets = useMemo(() => {
     const term = search.trim().toLowerCase();
     return tickets.filter((ticket) => {
-      const matchesSearch = !term || `${ticket.title} ${ticket.description}`.toLowerCase().includes(term);
+      const matchesSearch = !term || `${ticket.title} ${ticket.description} ${ticket.requester_name ?? ""} ${ticket.requester_email ?? ""} ${ticket.category ?? ""}`.toLowerCase().includes(term);
       const matchesStatus = status === "all" || ticket.status === status;
       const matchesPriority = priority === "all" || ticket.priority === priority;
+      const matchesCategory = category === "all" || (ticket.category ?? "uncategorized") === category;
       const matchesQueue = queue === "all" || String(ticket.queue_id ?? "none") === queue;
       const matchesAssignee = assignee === "all" || (assignee === "assigned" ? Boolean(ticket.assignee_id) : !ticket.assignee_id);
-      return matchesSearch && matchesStatus && matchesPriority && matchesQueue && matchesAssignee;
+      return matchesSearch && matchesStatus && matchesPriority && matchesCategory && matchesQueue && matchesAssignee;
     });
-  }, [assignee, priority, queue, search, status, tickets]);
+  }, [assignee, category, priority, queue, search, status, tickets]);
+  const categories = Array.from(new Set(tickets.map((ticket) => ticket.category || "uncategorized")));
 
   return (
     <div className="space-y-6">
       <PageHeader title="Tickets" description="Track, route, and resolve support tickets and service requests." actions={<Button onClick={() => setOpen(true)}>Create ticket</Button>} />
       <DeskSubnav />
+      <DeskBreadcrumbs items={[{ label: "Tickets" }]} />
       {!selectedOrganizationId || !selectedWorkspaceId ? <DeskSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="context" /> : (
         <div className="space-y-4">
-          <div className="grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-[1fr_150px_150px_160px_160px]">
+          <div className="grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-[1fr_150px_150px_150px_160px_160px]">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input aria-label="Search tickets" className="pl-9" placeholder="Search tickets or descriptions" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -72,6 +77,10 @@ export default function TicketsPage() {
             <Select aria-label="Filter ticket priority" value={priority} onChange={(event) => setPriority(event.target.value)}>
               <option value="all">All priorities</option>
               {DESK_PRIORITIES.map((option) => <option key={option} value={option}>{option}</option>)}
+            </Select>
+            <Select aria-label="Filter ticket category" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="all">All categories</option>
+              {categories.map((option) => <option key={option} value={option}>{option}</option>)}
             </Select>
             <Select aria-label="Filter ticket queue" value={queue} onChange={(event) => setQueue(event.target.value)}>
               <option value="all">All queues</option>
@@ -87,14 +96,15 @@ export default function TicketsPage() {
           {ticketsQuery.isLoading ? <LoadingState /> : ticketsQuery.error ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">Unable to load tickets.</div>
           ) : tickets.length === 0 ? <DeskSetupState hasOrganization={Boolean(selectedOrganizationId)} hasWorkspace={Boolean(selectedWorkspaceId)} mode="tickets" /> : filteredTickets.length === 0 ? <EmptyState title="No tickets match the current filters" /> : (
-            <EntityTable columns={["Title", "Status", "Priority", "Queue", "Requester", "Assignee", "SLA", "Updated"]}>
+            <EntityTable columns={["Title", "Status", "Priority", "Category", "Queue", "Requester", "Assignee", "SLA", "Updated"]}>
               {filteredTickets.map((ticket) => (
-                <EntityTableRow key={ticket.id} columns={8}>
+                <EntityTableRow key={ticket.id} columns={9}>
                   <Link className="font-medium text-primary hover:underline" href={`/desk/tickets/${ticket.id}`}>{ticket.title}</Link>
                   <SLABadge value={ticket.status} />
                   <PriorityBadge value={ticket.priority} />
+                  <span>{ticket.category ?? "uncategorized"}</span>
                   <span>{queueNameFor(ticket, queues)}</span>
-                  <span>{ticket.requester_id ? `User ${ticket.requester_id}` : "Unknown"}</span>
+                  <span>{ticket.requester_name || ticket.requester_email || (ticket.requester_id ? `User ${ticket.requester_id}` : "Unknown")}</span>
                   <span>{ticket.assignee_id ? `User ${ticket.assignee_id}` : "Unassigned"}</span>
                   <SLABadge value={isSlaAtRisk(ticket) ? "at risk" : "on track"} />
                   <span className="text-muted-foreground">{deskDate(ticket.updated_at ?? ticket.created_at)}</span>
