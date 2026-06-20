@@ -74,6 +74,12 @@ export default function RoadmapPage() {
                             <RoadmapStatusBadge value={item.status} />
                             <span className="text-xs text-muted-foreground">{item.target_quarter ?? "TBD"}</span>
                           </div>
+                          <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+                            <div className="rounded-md bg-muted p-2"><div className="font-medium">{item.idea_id ? 1 : 0}</div><div className="text-muted-foreground">Ideas</div></div>
+                            <div className="rounded-md bg-muted p-2"><div className="font-medium">0</div><div className="text-muted-foreground">Docs</div></div>
+                            <div className="rounded-md bg-muted p-2"><div className="font-medium">0</div><div className="text-muted-foreground">Work</div></div>
+                            <div className="rounded-md bg-muted p-2"><div className="font-medium">0%</div><div className="text-muted-foreground">Done</div></div>
+                          </div>
                           <Button className="mt-3" size="sm" variant="outline" disabled>Change bucket placeholder</Button>
                         </div>
                       ))}

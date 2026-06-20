@@ -78,7 +78,19 @@ Docs now exposes the future execution reference flow clearly:
 
 - `Link Flow Work Item` displays the payload needed for Flow's linked entity endpoint.
 - The placeholder uses `entity_type=doc_page`, the page id, page title, and page URL.
+- Page detail shows Related Ideas, Related Work Items, and Linked Releases.
+- Docs dashboard shows Pages Linked To Work, Pages Without Work, and Recently Referenced counts.
 - Actual link creation still requires a Flow work item lookup/selector before calling Flow's link endpoint.
+
+## Lifecycle Model
+
+Docs participates in the product lifecycle as the documentation layer between discovery and execution:
+
+Idea
+-> Documentation
+-> Execution
+
+Pages can represent requirements, architecture, meeting notes, or research. Flow work items can already persist `doc_page` links through the Flow linked entity endpoint; Docs currently exposes the payload and relationship UI while a work item lookup/selector remains pending.
 
 ## RBAC Readiness
 

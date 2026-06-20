@@ -16,8 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { docsApi } from "@/services/api/docs-api";
+import { discoverApi } from "@/services/api/discover-api";
+import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export default function PageDetail() {
   const params = useParams<{ id: string }>();
@@ -25,12 +28,32 @@ export default function PageDetail() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const addViewed = useRecentItemsStore((state) => state.addViewed);
   const [isEditing, setEditing] = useState(false);
   const pageQuery = useQuery({ queryKey: ["docs", "page", id], queryFn: () => docsApi.getPage(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken), retry: 1 });
   const commentsQuery = useQuery({ queryKey: ["docs", "comments", id], queryFn: () => docsApi.listComments(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const versionsQuery = useQuery({ queryKey: ["docs", "page-versions", id], queryFn: () => docsApi.listPageVersions(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
+  const ideasQuery = useQuery({
+    queryKey: ["docs", "page-ideas", selectedWorkspaceId],
+    queryFn: () => discoverApi.listIdeas(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
+    enabled: Boolean(accessToken && selectedWorkspaceId),
+    retry: 1
+  });
+  const workItemsQuery = useQuery({
+    queryKey: ["docs", "page-work-items", selectedProjectId],
+    queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
+  const releasesQuery = useQuery({
+    queryKey: ["docs", "page-releases", selectedProjectId],
+    queryFn: () => flowApi.listReleases(accessToken ?? "", { project_id: selectedProjectId, limit: 50 }),
+    enabled: Boolean(accessToken && selectedProjectId),
+    retry: 1
+  });
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState("draft");
@@ -58,6 +81,11 @@ export default function PageDetail() {
   const page = pageQuery.data;
   const spaces = spacesQuery.data ?? [];
   const currentSpace = spaces.find((space) => space.id === page?.space_id);
+  const pageToken = page?.title.toLowerCase().split(" ")[0] ?? "";
+  const relatedIdeas = (ideasQuery.data ?? []).filter((idea) => `${idea.title} ${idea.description}`.toLowerCase().includes(pageToken));
+  const relatedWorkItems = (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(pageToken));
+  const linkedReleaseIds = new Set(relatedWorkItems.map((item) => item.release_id).filter(Boolean));
+  const linkedReleases = (releasesQuery.data ?? []).filter((release) => linkedReleaseIds.has(release.id));
 
   useEffect(() => {
     if (page) {
@@ -187,14 +215,27 @@ export default function PageDetail() {
           <div className="space-y-3 text-sm">
             <div className="rounded-md border border-dashed p-3">
               <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Linked Work Items</div>
-              <p className="mt-1 text-muted-foreground">No Flow work item is linked yet. Use Link Flow Work Item to review the link payload.</p>
+              {relatedWorkItems.length === 0 ? <p className="mt-1 text-muted-foreground">No Flow work item is linked yet. Use Link Flow Work Item to review the link payload.</p> : (
+                <div className="mt-2 space-y-1">{relatedWorkItems.slice(0, 4).map((item) => <a key={item.id} className="block text-primary hover:underline" href={`/flow/work-items/${item.id}`}>{item.title}</a>)}</div>
+              )}
             </div>
-            {["Linked Tickets", "Linked Incidents", "Linked Ideas"].map((label) => (
-              <div key={label} className="rounded-md border border-dashed p-3">
-                <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> {label}</div>
-                <p className="mt-1 text-muted-foreground">Future cross-module references will appear here.</p>
-              </div>
-            ))}
+            <div className="rounded-md border border-dashed p-3">
+              <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Related Ideas</div>
+              {relatedIdeas.length === 0 ? <p className="mt-1 text-muted-foreground">No related idea is linked yet.</p> : (
+                <div className="mt-2 space-y-1">{relatedIdeas.slice(0, 4).map((idea) => <a key={idea.id} className="block text-primary hover:underline" href={`/discover/ideas/${idea.id}`}>{idea.title}</a>)}</div>
+              )}
+            </div>
+            <div className="rounded-md border border-dashed p-3">
+              <div className="flex items-center gap-2 font-medium"><Link2 className="h-4 w-4" /> Linked Releases</div>
+              {linkedReleases.length === 0 ? <p className="mt-1 text-muted-foreground">No release is linked through related Flow work yet.</p> : (
+                <div className="mt-2 space-y-1">{linkedReleases.slice(0, 4).map((release) => <a key={release.id} className="block text-primary hover:underline" href={`/flow/releases/${release.id}`}>{release.name}</a>)}</div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled>Link Idea</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowFlowLinkDraft(true)}>Link Work Item</Button>
+              <Button size="sm" variant="outline" disabled>Link Release</Button>
+            </div>
           </div>
         </DetailPanel>
       </div>

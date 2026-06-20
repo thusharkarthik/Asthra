@@ -44,8 +44,8 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { CustomFieldDefinition, FlowItemLevel, LinkedEntity, LinkedEntityType, WorkItemRelationType } from "@/types/flow";
 
 const LINK_TYPE_OPTIONS: { value: LinkedEntityType; label: string; section: string }[] = [
-  { value: "doc_page", label: "Document", section: "Documents" },
-  { value: "discover_idea", label: "Idea", section: "Ideas" },
+  { value: "doc_page", label: "Document", section: "Related Docs" },
+  { value: "discover_idea", label: "Idea", section: "Origin Idea" },
   { value: "desk_ticket", label: "Ticket", section: "Tickets" },
   { value: "pulse_incident", label: "Incident", section: "Incidents" },
   { value: "dev_release", label: "Release", section: "Releases" },
@@ -715,6 +715,10 @@ export default function WorkItemDetailPage() {
           </DetailPanel>
           <DetailPanel title="Linked Resources">
             <div className="space-y-4 text-sm">
+              <section className="rounded-md border bg-muted/30 p-3">
+                <h3 className="font-medium">Product Delivery Context</h3>
+                <p className="mt-1 text-muted-foreground">Use links to trace this work item back to its origin idea and supporting requirements, architecture, and research docs.</p>
+              </section>
               <form className="grid gap-2 rounded-md border p-3" onSubmit={(event) => { event.preventDefault(); if (linkEntityId.trim() && linkTitle.trim()) linkMutation.mutate(); }}>
                 <div className="grid gap-2 md:grid-cols-[160px_1fr]">
                   <Select aria-label="Link type" value={linkType} onChange={(event) => setLinkType(event.target.value as LinkedEntityType)}>
@@ -748,6 +752,18 @@ export default function WorkItemDetailPage() {
                   </section>
                 );
               })}
+              <section className="rounded-md border p-3">
+                <h3 className="mb-2 font-medium">Requirements Docs</h3>
+                <DocLinkList links={(linksByType.doc_page ?? []).filter((link) => /requirement/i.test(link.entity_title))} />
+              </section>
+              <section className="rounded-md border p-3">
+                <h3 className="mb-2 font-medium">Architecture Docs</h3>
+                <DocLinkList links={(linksByType.doc_page ?? []).filter((link) => /architecture/i.test(link.entity_title))} />
+              </section>
+              <section className="rounded-md border p-3">
+                <h3 className="mb-2 font-medium">Research Docs</h3>
+                <DocLinkList links={(linksByType.doc_page ?? []).filter((link) => /research/i.test(link.entity_title))} />
+              </section>
             </div>
           </DetailPanel>
         </>}
@@ -839,6 +855,20 @@ function groupLinksByType(links: LinkedEntity[]) {
 
 function linkTypeLabel(type: LinkedEntityType) {
   return LINK_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+}
+
+function DocLinkList({ links }: { links: LinkedEntity[] }) {
+  if (links.length === 0) return <p className="text-muted-foreground">No matching docs linked yet.</p>;
+  return (
+    <div className="space-y-2">
+      {links.map((link) => (
+        <div key={link.id} className="rounded-md bg-muted p-2">
+          <div className="font-medium">{link.entity_title}</div>
+          {link.entity_url ? <a className="text-xs text-primary hover:underline" href={link.entity_url}>Open document</a> : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function dependencySentence(sourceTitle: string, targetTitle: string, relationType: WorkItemRelationType) {

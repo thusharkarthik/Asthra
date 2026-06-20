@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardCheck, Compass, Lightbulb, Map, MessageSquare, Sparkles } from "lucide-react";
+import { BarChart3, ClipboardCheck, Compass, GitBranch, Lightbulb, Map, MessageSquare, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { href: "/discover/feature-requests", label: "Feature Requests", icon: ClipboardCheck },
   { href: "/discover/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/discover/roadmap", label: "Roadmap", icon: Map },
+  { href: "/discover/delivery", label: "Delivery View", icon: GitBranch },
   { href: "/discover/validation", label: "Validation", icon: Sparkles },
   { href: "/discover/prioritization", label: "Prioritization", icon: BarChart3 }
 ];

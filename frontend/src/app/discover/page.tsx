@@ -60,6 +60,8 @@ export default function DiscoverPage() {
   const approvedIdeas = ideas.filter((idea) => idea.status === "approved");
   const rejectedIdeas = ideas.filter((idea) => idea.status === "rejected");
   const convertedIdeas = ideas.filter((idea) => idea.status === "converted_to_work");
+  const ideasWaitingDocumentation = approvedIdeas.filter((idea) => !(roadmap.some((item) => item.idea_id === idea.id)));
+  const ideasWaitingExecution = roadmap.filter((item) => item.idea_id && !convertedIdeas.some((idea) => idea.id === item.idea_id));
 
   return (
     <div className="space-y-6">
@@ -165,6 +167,18 @@ export default function DiscoverPage() {
                   <div className="rounded-md border p-3">
                     <div className="text-2xl font-semibold">{roadmap.length}</div>
                     <p className="text-sm text-muted-foreground">Roadmap items planned</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-2xl font-semibold">{ideasWaitingDocumentation.length}</div>
+                    <p className="text-sm text-muted-foreground">Ideas waiting documentation</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-2xl font-semibold">{ideasWaitingExecution.length}</div>
+                    <p className="text-sm text-muted-foreground">Ideas waiting execution</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-2xl font-semibold">{convertedIdeas.length}</div>
+                    <p className="text-sm text-muted-foreground">Ideas in progress</p>
                   </div>
                 </div>
               </ModuleDashboardCard>
