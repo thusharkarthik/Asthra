@@ -35,6 +35,10 @@ def _ensure_operational_columns() -> None:
         statements.append("ALTER TABLE ideas ADD COLUMN confidence_score FLOAT")
     if "effort_score" not in existing:
         statements.append("ALTER TABLE ideas ADD COLUMN effort_score FLOAT")
+    if "docs_page_id" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN docs_page_id INTEGER")
+    if "flow_epic_id" not in existing:
+        statements.append("ALTER TABLE ideas ADD COLUMN flow_epic_id INTEGER")
     if not statements:
         return
     with engine.begin() as connection:

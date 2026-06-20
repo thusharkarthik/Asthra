@@ -49,6 +49,8 @@ class IdeaRead(FullTimestampedRead):
     confidence_score: float | None = None
     effort_score: float | None = None
     status: str
+    docs_page_id: int | None = None
+    flow_epic_id: int | None = None
     created_by_id: int
 
     @model_validator(mode="after")

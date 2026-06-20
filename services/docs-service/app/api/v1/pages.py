@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.page import Page
+from app.schemas.flow_link import DocFlowLinkRead, PageFlowWorkItemCreate
 from app.schemas.page import PageAISummaryRead, PageCreate, PageMemoryDocumentPayload, PageRead, PageUpdate, PageVersionRead
+from app.services.flow_link_service import FlowLinkService
 from app.services.page_service import PageService
 
 router = APIRouter()
@@ -78,6 +80,25 @@ def summarize_page(
     _: None = Depends(auth_placeholder),
 ) -> PageAISummaryRead:
     return PageService(db).ai_summary(page_id)
+
+
+@router.post("/{page_id}/flow-work-items", response_model=DocFlowLinkRead, status_code=status.HTTP_201_CREATED)
+def create_flow_work_item_from_page(
+    page_id: int,
+    data: PageFlowWorkItemCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+):
+    return FlowLinkService(db).create_work_item_from_page(page_id, data)
+
+
+@router.get("/{page_id}/flow-work-items", response_model=list[DocFlowLinkRead])
+def list_page_flow_work_items(
+    page_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(auth_placeholder),
+):
+    return FlowLinkService(db).list_page_work_items(page_id)
 
 
 @router.patch("/{page_id}", response_model=PageRead)

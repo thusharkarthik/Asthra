@@ -16,6 +16,7 @@ class Page(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False)
     created_by_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
     updated_by_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    discover_idea_id: Mapped[int | None] = mapped_column(Integer, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     space = relationship("Space", back_populates="pages")

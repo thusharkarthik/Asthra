@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./asthra_discover.db", alias="DATABASE_URL")
     ai_service_url: str | None = Field(default=None, alias="AI_SERVICE_URL")
     ai_features_enabled: bool = Field(default=False, alias="AI_FEATURES_ENABLED")
+    docs_service_url: str | None = Field(default=None, alias="DOCS_SERVICE_URL")
+    flow_service_url: str | None = Field(default=None, alias="FLOW_SERVICE_URL")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

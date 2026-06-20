@@ -34,6 +34,9 @@ function mockDocsFetch() {
     if (url.includes("/pages/5/versions")) {
       return new Response(JSON.stringify([{ id: 3, page_id: 5, version_number: 1, title: "Frontend Notes", content: "Docs page content", created_by_id: 1, created_at: "2026-06-04T10:00:00.000Z" }]), { status: 200 });
     }
+    if (url.includes("/pages/5/flow-work-items")) {
+      return new Response(JSON.stringify([{ id: 11, docs_page_id: 5, flow_work_item_id: 9, flow_item_type: "story", title: "Story: Frontend Notes", status: "1", assignee_id: null, priority_id: 2 }]), { status: 200 });
+    }
     if (url.includes("/pages/5")) {
       return new Response(JSON.stringify({ id: 5, space_id: 1, title: "Frontend Notes", content: "Docs page content", status: "draft", updated_at: "2026-06-04T10:00:00.000Z" }), { status: 200 });
     }
@@ -150,8 +153,9 @@ describe("Docs frontend screens", () => {
 
     await waitFor(() => expect(screen.getByText("Link Flow Work Item")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Link Flow Work Item"));
-    expect(screen.getByText("Flow Link Draft")).toBeInTheDocument();
-    expect(screen.getByText(/entity_type/)).toBeInTheDocument();
+    expect(screen.getByText("Create Flow Work From Page")).toBeInTheDocument();
+    expect(screen.getByText(/supported_types/)).toBeInTheDocument();
+    expect(screen.getAllByText("Create Story").length).toBeGreaterThan(0);
   });
 
   it("renders favorites page", () => {

@@ -21,6 +21,8 @@ class Idea(Base):
     confidence_score: Mapped[float | None] = mapped_column(Float)
     effort_score: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(50), default="captured", nullable=False, index=True)
+    docs_page_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    flow_epic_id: Mapped[int | None] = mapped_column(Integer, index=True)
     created_by_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

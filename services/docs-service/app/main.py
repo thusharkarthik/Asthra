@@ -27,13 +27,22 @@ async def lifespan(app: FastAPI):
 
 def _ensure_operational_columns() -> None:
     inspector = inspect(engine)
-    if "spaces" not in inspector.get_table_names():
+    tables = inspector.get_table_names()
+    if "spaces" not in tables:
         return
     existing = {column["name"] for column in inspector.get_columns("spaces")}
-    if "project_id" in existing:
+    statements = []
+    if "project_id" not in existing:
+        statements.append("ALTER TABLE spaces ADD COLUMN project_id INTEGER")
+    if "pages" in tables:
+        page_existing = {column["name"] for column in inspector.get_columns("pages")}
+        if "discover_idea_id" not in page_existing:
+            statements.append("ALTER TABLE pages ADD COLUMN discover_idea_id INTEGER")
+    if not statements:
         return
     with engine.begin() as connection:
-        connection.execute(text("ALTER TABLE spaces ADD COLUMN project_id INTEGER"))
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def create_app() -> FastAPI:

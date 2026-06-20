@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { Page, PageComment, PageCreate, PageFilters, PageUpdate, PageVersion, Space, SpaceCreate, SpaceUpdate } from "@/types/docs";
+import type { DocFlowLink, Page, PageComment, PageCreate, PageFilters, PageUpdate, PageVersion, Space, SpaceCreate, SpaceUpdate } from "@/types/docs";
 
 const DOCS_PREFIX = "/api/docs/api/v1";
 
@@ -59,5 +59,11 @@ export const docsApi = {
   },
   searchPages(accessToken: string, query: string) {
     return apiRequest<Page[]>(`${DOCS_PREFIX}/search/pages${toQuery({ q: query })}`, { method: "GET", authToken: accessToken });
+  },
+  listPageFlowWorkItems(accessToken: string, pageId: string | number) {
+    return apiRequest<DocFlowLink[]>(`${DOCS_PREFIX}/pages/${pageId}/flow-work-items`, { method: "GET", authToken: accessToken });
+  },
+  createPageFlowWorkItem(accessToken: string, pageId: string | number, payload: { project_id: number; work_item_type: "epic" | "story" | "task"; reporter_id?: number | null; title?: string | null }) {
+    return apiRequest<DocFlowLink>(`${DOCS_PREFIX}/pages/${pageId}/flow-work-items`, { method: "POST", authToken: accessToken, json: payload });
   }
 };

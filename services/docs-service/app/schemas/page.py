@@ -12,6 +12,7 @@ class PageCreate(BaseModel):
     content: str = ""
     status: str = "draft"
     created_by_id: int
+    discover_idea_id: int | None = None
 
 
 class PageUpdate(BaseModel):
@@ -21,6 +22,7 @@ class PageUpdate(BaseModel):
     status: str | None = None
     updated_by_id: int | None = None
     is_active: bool | None = None
+    discover_idea_id: int | None = None
 
 
 class PageRead(TimestampedRead):
@@ -31,6 +33,7 @@ class PageRead(TimestampedRead):
     status: str
     created_by_id: int
     updated_by_id: int | None = None
+    discover_idea_id: int | None = None
     is_active: bool
 
 

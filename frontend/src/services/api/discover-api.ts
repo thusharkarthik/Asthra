@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, LifecycleGraph, LifecycleRelationship, LifecycleRelationshipCreate, MVPPlan, RoadmapItem } from "@/types/discover";
+import type { DeliveryPipeline, DiscoverDocLink, DiscoverFlowLink, FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, IdeaExecutionLinks, LifecycleGraph, LifecycleRelationship, LifecycleRelationshipCreate, MVPPlan, RoadmapItem } from "@/types/discover";
 
 const DISCOVER_PREFIX = "/api/discover/api/v1";
 
@@ -69,5 +69,20 @@ export const discoverApi = {
   },
   getIdeaLifecycleGraph(accessToken: string, ideaId: string | number) {
     return apiRequest<LifecycleGraph>(`${DISCOVER_PREFIX}/relationships/lifecycle/ideas/${ideaId}`, { method: "GET", authToken: accessToken });
+  },
+  generateIdeaSpecification(accessToken: string, ideaId: string | number, payload: { space_id: number; created_by_id: number; title?: string | null; status?: string }) {
+    return apiRequest<DiscoverDocLink>(`${DISCOVER_PREFIX}/ideas/${ideaId}/generate-specification`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  generateFeatureRequestSpecification(accessToken: string, featureRequestId: string | number, payload: { space_id: number; created_by_id: number; title?: string | null; status?: string }) {
+    return apiRequest<DiscoverDocLink>(`${DISCOVER_PREFIX}/feature-requests/${featureRequestId}/generate-specification`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  createIdeaEpic(accessToken: string, ideaId: string | number, payload: { project_id?: number | null; reporter_id?: number | null; title?: string | null }) {
+    return apiRequest<DiscoverFlowLink>(`${DISCOVER_PREFIX}/ideas/${ideaId}/create-epic`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  getIdeaExecutionLinks(accessToken: string, ideaId: string | number) {
+    return apiRequest<IdeaExecutionLinks>(`${DISCOVER_PREFIX}/ideas/${ideaId}/execution-links`, { method: "GET", authToken: accessToken });
+  },
+  getDeliveryPipeline(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null } = {}) {
+    return apiRequest<DeliveryPipeline>(`${DISCOVER_PREFIX}/delivery/pipeline${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   }
 };

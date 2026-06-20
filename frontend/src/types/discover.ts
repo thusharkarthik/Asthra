@@ -13,6 +13,8 @@ export type Idea = {
   confidence_score?: number | null;
   effort_score?: number | null;
   status: string;
+  docs_page_id?: number | null;
+  flow_epic_id?: number | null;
   created_by_id: number;
   created_at?: string;
   updated_at?: string;
@@ -124,6 +126,42 @@ export type LifecycleGraph = {
   roadmap_items: LifecycleRelationship[];
   sprints: LifecycleRelationship[];
   releases: LifecycleRelationship[];
+};
+
+export type DiscoverDocLink = {
+  id: number;
+  source_type: string;
+  source_id: number;
+  docs_page_id: number;
+  title: string;
+  status?: string | null;
+  created_at?: string;
+};
+
+export type DiscoverFlowLink = {
+  id: number;
+  idea_id: number;
+  flow_work_item_id: number;
+  flow_item_type: string;
+  title: string;
+  status?: string | null;
+  created_at?: string;
+};
+
+export type IdeaExecutionLinks = {
+  idea_id: number;
+  documents: DiscoverDocLink[];
+  flow_work: DiscoverFlowLink[];
+};
+
+export type DeliveryPipeline = {
+  ideas: Array<Record<string, unknown>>;
+  specifications: Array<Record<string, unknown>>;
+  epics: Array<Record<string, unknown>>;
+  stories: Array<Record<string, unknown>>;
+  tasks: Array<Record<string, unknown>>;
+  completed: Array<Record<string, unknown>>;
+  counts: Record<string, number>;
 };
 
 export type FeatureRequestCreate = {
