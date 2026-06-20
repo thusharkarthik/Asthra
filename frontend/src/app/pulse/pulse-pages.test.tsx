@@ -28,10 +28,10 @@ function mockPulseFetch() {
       return new Response(JSON.stringify({ id: 2, incident_id: 4, summary: "Latency was caused by a slow query" }), { status: 200 });
     }
     if (url.includes("/incidents/4")) {
-      return new Response(JSON.stringify({ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "high", status: "investigating" }), { status: 200 });
+      return new Response(JSON.stringify({ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "sev2", status: "investigating", impacted_service: "api-gateway", incident_commander_id: 1 }), { status: 200 });
     }
     if (url.includes("/incidents")) {
-      return new Response(JSON.stringify([{ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "high", status: "investigating" }]), { status: 200 });
+      return new Response(JSON.stringify([{ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "sev2", status: "investigating", impacted_service: "api-gateway", incident_commander_id: 1 }]), { status: 200 });
     }
     if (url.includes("/alerts")) {
       return new Response(JSON.stringify([{ id: 3, workspace_id: 2, title: "Latency alert", severity: "high", status: "open", source: "synthetics" }]), { status: 200 });
@@ -76,6 +76,8 @@ describe("Pulse frontend screens", () => {
     renderWithQuery(<PulseIncidentDetailPage />);
 
     await waitFor(() => expect(screen.getByText("Gateway requests are slow")).toBeInTheDocument());
+    expect(screen.getByText("api-gateway")).toBeInTheDocument();
     expect(screen.getByText("Database latency identified")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resolve Incident" })).toBeInTheDocument();
   });
 });

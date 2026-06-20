@@ -28,6 +28,7 @@ def list_tickets(
     queue_id: int | None = Query(default=None),
     assignee_id: int | None = Query(default=None),
     requester_id: int | None = Query(default=None),
+    category: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -40,6 +41,7 @@ def list_tickets(
         queue_id=queue_id,
         assignee_id=assignee_id,
         requester_id=requester_id,
+        category=category,
         limit=limit,
         offset=offset,
     )

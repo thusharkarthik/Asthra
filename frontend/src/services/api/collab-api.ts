@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { ActivityStreamItem, Announcement, Mention, Reaction, TeamUpdate, Thread, ThreadMessage } from "@/types/collab";
+import type { ActivityStreamItem, Announcement, AnnouncementCreate, Mention, Reaction, TeamUpdate, Thread, ThreadCreate, ThreadMessage } from "@/types/collab";
 
 const COLLAB_PREFIX = "/api/collab/api/v1";
 
@@ -16,7 +16,7 @@ export const collabApi = {
   listThreads(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; entity_type?: string; created_by_id?: number | null; limit?: number } = {}) {
     return apiRequest<Thread[]>(`${COLLAB_PREFIX}/threads${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
-  createThread(accessToken: string, payload: { workspace_id: number; project_id?: number | null; title: string; status?: string; created_by_id: number }) {
+  createThread(accessToken: string, payload: ThreadCreate) {
     return apiRequest<Thread>(`${COLLAB_PREFIX}/threads`, { method: "POST", authToken: accessToken, json: payload });
   },
   getThread(accessToken: string, threadId: string | number) {
@@ -36,6 +36,9 @@ export const collabApi = {
   },
   listAnnouncements(accessToken: string, filters: { workspace_id?: number | null; created_by_id?: number | null; status?: string; limit?: number } = {}) {
     return apiRequest<Announcement[]>(`${COLLAB_PREFIX}/announcements${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createAnnouncement(accessToken: string, payload: AnnouncementCreate) {
+    return apiRequest<Announcement>(`${COLLAB_PREFIX}/announcements`, { method: "POST", authToken: accessToken, json: payload });
   },
   listActivity(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; entity_type?: string; actor_user_id?: number | null; limit?: number } = {}) {
     return apiRequest<ActivityStreamItem[]>(`${COLLAB_PREFIX}/activity-stream${toQuery(filters)}`, { method: "GET", authToken: accessToken });

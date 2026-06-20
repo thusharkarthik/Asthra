@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -17,7 +17,29 @@ from app.db.session import SessionLocal, engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_operational_columns()
     yield
+
+
+def _ensure_operational_columns() -> None:
+    inspector = inspect(engine)
+    if "service_tickets" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("service_tickets")}
+    statements = []
+    if "requester_name" not in existing:
+        statements.append("ALTER TABLE service_tickets ADD COLUMN requester_name VARCHAR(255)")
+    if "requester_email" not in existing:
+        statements.append("ALTER TABLE service_tickets ADD COLUMN requester_email VARCHAR(255)")
+    if "category" not in existing:
+        statements.append("ALTER TABLE service_tickets ADD COLUMN category VARCHAR(100)")
+    if "created_by" not in existing:
+        statements.append("ALTER TABLE service_tickets ADD COLUMN created_by INTEGER")
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def create_app() -> FastAPI:

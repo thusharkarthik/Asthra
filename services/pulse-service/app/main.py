@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import http_exception_handler, unhandled_exception_handler, validation_exception_handler
@@ -16,7 +16,31 @@ from app.db.session import SessionLocal, engine
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_operational_columns()
     yield
+
+
+def _ensure_operational_columns() -> None:
+    inspector = inspect(engine)
+    if "incidents" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("incidents")}
+    statements = []
+    for column, ddl in {
+        "project_id": "ALTER TABLE incidents ADD COLUMN project_id INTEGER",
+        "impacted_service": "ALTER TABLE incidents ADD COLUMN impacted_service VARCHAR(255)",
+        "incident_commander_id": "ALTER TABLE incidents ADD COLUMN incident_commander_id INTEGER",
+        "started_at": "ALTER TABLE incidents ADD COLUMN started_at DATETIME",
+        "resolved_at": "ALTER TABLE incidents ADD COLUMN resolved_at DATETIME",
+        "created_by": "ALTER TABLE incidents ADD COLUMN created_by INTEGER",
+    }.items():
+        if column not in existing:
+            statements.append(ddl)
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def create_app() -> FastAPI:

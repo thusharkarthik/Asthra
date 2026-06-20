@@ -13,25 +13,39 @@ export type Alert = {
 export type PulseIncident = {
   id: number;
   workspace_id: number;
+  project_id?: number | null;
   alert_id?: number | null;
   title: string;
   description?: string | null;
   severity: string;
   status: string;
+  impacted_service?: string | null;
   commander_id?: number | null;
+  incident_commander_id?: number | null;
+  started_at?: string | null;
+  resolved_at?: string | null;
+  created_by?: number | null;
   created_at?: string;
   updated_at?: string;
 };
 
 export type PulseIncidentCreate = {
   workspace_id: number;
+  project_id?: number | null;
   alert_id?: number | null;
   title: string;
   description?: string | null;
   severity?: string;
   status?: string;
+  impacted_service?: string | null;
   commander_id?: number | null;
+  incident_commander_id?: number | null;
+  started_at?: string | null;
+  resolved_at?: string | null;
+  created_by?: number | null;
 };
+
+export type PulseIncidentUpdate = Partial<Omit<PulseIncidentCreate, "workspace_id">>;
 
 export type TimelineEvent = {
   id: number;

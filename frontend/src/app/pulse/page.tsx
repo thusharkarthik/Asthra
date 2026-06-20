@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { pulseNavItems } from "@/components/modules/module-navs";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
-import { AiPlaceholderPanel, ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
+import { ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product-experience";
 import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { SeverityBadge } from "@/components/modules/severity-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
@@ -36,6 +36,10 @@ export default function PulsePage() {
   const statusPagesQuery = useQuery({ queryKey: ["pulse", "status-pages", selectedWorkspaceId], queryFn: () => pulseApi.listStatusPages(accessToken ?? "", { workspace_id: selectedWorkspaceId }), enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId), retry: 1 });
 
   const incidents = incidentsQuery.data ?? [];
+  const activeIncidents = incidents.filter((incident) => !["resolved", "closed"].includes(incident.status));
+  const sevOneTwo = incidents.filter((incident) => ["sev1", "sev2"].includes(incident.severity));
+  const resolvedIncidents = incidents.filter((incident) => ["resolved", "closed"].includes(incident.status));
+  const servicesAtRisk = new Set(activeIncidents.map((incident) => incident.impacted_service).filter(Boolean)).size;
 
   return (
     <div className="space-y-6">
@@ -45,9 +49,10 @@ export default function PulsePage() {
         <>
           <ModuleStatsGrid
             stats={[
-              { title: "Alerts", value: (alertsQuery.data ?? []).length, description: "Recent monitoring signals" },
-              { title: "Incidents", value: incidents.length, description: "Reliability events under management" },
-              { title: "Status Pages", value: (statusPagesQuery.data ?? []).length, description: "Customer-facing service views" }
+              { title: "Active Incidents", value: activeIncidents.length, description: "Incidents still in response" },
+              { title: "SEV1/SEV2", value: sevOneTwo.length, description: "High-severity reliability events" },
+              { title: "Resolved", value: resolvedIncidents.length, description: "Incidents closed or resolved" },
+              { title: "Services At Risk", value: servicesAtRisk, description: "Impacted services on active incidents" }
             ]}
           />
           <ModuleDashboardCard title="Active Incidents">
@@ -63,7 +68,18 @@ export default function PulsePage() {
               </div>
             )}
           </ModuleDashboardCard>
-          <AiPlaceholderPanel title="AI Incident Suggestions">Future AI can summarize incident impact, draft status updates, identify likely causes, and propose postmortem follow-ups.</AiPlaceholderPanel>
+          <ModuleDashboardCard title="Recent Updates">
+            {(alertsQuery.data ?? []).length === 0 ? <EmptyState title="No recent monitoring updates" /> : (
+              <div className="space-y-3">
+                {(alertsQuery.data ?? []).map((alert) => (
+                  <div key={alert.id} className="rounded-md border p-3">
+                    <div className="font-medium">{alert.title}</div>
+                    <div className="mt-2 flex gap-2"><SeverityBadge value={alert.severity} /><SLABadge value={alert.status} /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ModuleDashboardCard>
         </>
       )}
     </div>

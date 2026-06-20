@@ -9,9 +9,12 @@ from .conftest import create_ticket
 
 def test_create_list_get_update_delete_ticket(db):
     ticket = create_ticket(db)
-    tickets = TicketService(db).list(workspace_id=1, project_id=1, status="open", priority="medium", requester_id=10, limit=10, offset=0)
+    tickets = TicketService(db).list(workspace_id=1, project_id=1, status="open", priority="medium", requester_id=10, category="access", limit=10, offset=0)
     assert [item.id for item in tickets] == [ticket.id]
-    assert TicketService(db).get(ticket.id).title == "Login issue"
+    loaded = TicketService(db).get(ticket.id)
+    assert loaded.title == "Login issue"
+    assert loaded.requester_email == "dana@example.com"
+    assert loaded.category == "access"
     assert TicketService(db).update(ticket.id, TicketUpdate(status="resolved")).status == "resolved"
     TicketService(db).delete(ticket.id)
     with pytest.raises(HTTPException):

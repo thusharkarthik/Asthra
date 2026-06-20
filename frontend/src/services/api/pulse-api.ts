@@ -7,6 +7,7 @@ import type {
   Postmortem,
   PulseIncident,
   PulseIncidentCreate,
+  PulseIncidentUpdate,
   StatusPage,
   StatusPageComponent,
   TimelineEvent
@@ -27,7 +28,7 @@ export const pulseApi = {
   listAlerts(accessToken: string, filters: { workspace_id?: number | null; status?: string; severity?: string; limit?: number } = {}) {
     return apiRequest<Alert[]>(`${PULSE_PREFIX}/alerts${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
-  listIncidents(accessToken: string, filters: { workspace_id?: number | null; status?: string; severity?: string; limit?: number } = {}) {
+  listIncidents(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; status?: string; severity?: string; limit?: number } = {}) {
     return apiRequest<PulseIncident[]>(`${PULSE_PREFIX}/incidents${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },
   createIncident(accessToken: string, payload: PulseIncidentCreate) {
@@ -36,8 +37,14 @@ export const pulseApi = {
   getIncident(accessToken: string, id: string | number) {
     return apiRequest<PulseIncident>(`${PULSE_PREFIX}/incidents/${id}`, { method: "GET", authToken: accessToken });
   },
+  updateIncident(accessToken: string, id: string | number, payload: PulseIncidentUpdate) {
+    return apiRequest<PulseIncident>(`${PULSE_PREFIX}/incidents/${id}`, { method: "PATCH", authToken: accessToken, json: payload });
+  },
   listTimeline(accessToken: string, incidentId: string | number) {
     return apiRequest<TimelineEvent[]>(`${PULSE_PREFIX}/incidents/${incidentId}/timeline`, { method: "GET", authToken: accessToken });
+  },
+  createTimelineEvent(accessToken: string, incidentId: string | number, payload: { event_type: string; content: string; created_by_id?: number | null }) {
+    return apiRequest<TimelineEvent>(`${PULSE_PREFIX}/incidents/${incidentId}/timeline`, { method: "POST", authToken: accessToken, json: payload });
   },
   listOnCallSchedules(accessToken: string) {
     return apiRequest<OnCallSchedule[]>(`${PULSE_PREFIX}/on-call-schedules`, { method: "GET", authToken: accessToken });

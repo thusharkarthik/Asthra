@@ -12,8 +12,8 @@ router = APIRouter()
 def create_incident(data: IncidentCreate, db: Session = Depends(get_db)): return IncidentService(db).create(data)
 
 @router.get("", response_model=list[IncidentRead])
-def list_incidents(workspace_id: int | None = None, status: str | None = None, severity: str | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
-    return IncidentService(db).list(workspace_id=workspace_id, status=status, severity=severity, limit=limit, offset=offset)
+def list_incidents(workspace_id: int | None = None, project_id: int | None = None, status: str | None = None, severity: str | None = None, limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+    return IncidentService(db).list(workspace_id=workspace_id, project_id=project_id, status=status, severity=severity, limit=limit, offset=offset)
 
 @router.get("/{incident_id}", response_model=IncidentRead)
 def get_incident(incident_id: int, db: Session = Depends(get_db)): return IncidentService(db).get(incident_id)

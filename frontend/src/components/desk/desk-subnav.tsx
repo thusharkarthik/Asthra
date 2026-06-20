@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, ClipboardCheck, Gauge, Inbox, LayoutDashboard, ListChecks, Ticket } from "lucide-react";
+import { AlertTriangle, BarChart3, ClipboardCheck, Gauge, Inbox, LayoutDashboard, ListChecks, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -12,7 +12,8 @@ const items = [
   { href: "/desk/slas", label: "SLAs", icon: Gauge },
   { href: "/desk/approvals", label: "Approvals", icon: ClipboardCheck },
   { href: "/desk/incidents", label: "Incidents", icon: AlertTriangle },
-  { href: "/desk/change-requests", label: "Change Requests", icon: ListChecks }
+  { href: "/desk/change-requests", label: "Change Requests", icon: ListChecks },
+  { href: "/desk/reports", label: "Reports", icon: BarChart3 }
 ];
 
 export function DeskSubnav() {

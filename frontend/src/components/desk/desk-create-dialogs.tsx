@@ -23,6 +23,9 @@ export function CreateTicketDialog({ open, onOpenChange }: { open: boolean; onOp
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [requesterName, setRequesterName] = useState("");
+  const [requesterEmail, setRequesterEmail] = useState("");
+  const [category, setCategory] = useState("support");
   const [priority, setPriority] = useState("medium");
   const [status, setStatus] = useState("open");
 
@@ -32,13 +35,20 @@ export function CreateTicketDialog({ open, onOpenChange }: { open: boolean; onOp
       project_id: selectedProjectId,
       title,
       description,
+      requester_name: requesterName || currentUser?.full_name || null,
+      requester_email: requesterEmail || currentUser?.email || null,
+      category,
       priority,
       status,
-      requester_id: currentUser?.id
+      requester_id: currentUser?.id,
+      created_by: currentUser?.id
     }),
     onSuccess: () => {
       setTitle("");
       setDescription("");
+      setRequesterName("");
+      setRequesterEmail("");
+      setCategory("support");
       setPriority("medium");
       setStatus("open");
       onOpenChange(false);
@@ -57,6 +67,11 @@ export function CreateTicketDialog({ open, onOpenChange }: { open: boolean; onOp
       <form className="space-y-3" onSubmit={handleSubmit}>
         <Input aria-label="Ticket title" placeholder="Ticket title" value={title} onChange={(event) => setTitle(event.target.value)} />
         <DeskTextarea aria-label="Ticket description" placeholder="Describe the support request" value={description} onChange={(event) => setDescription(event.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Input aria-label="Requester name" placeholder="Requester name" value={requesterName} onChange={(event) => setRequesterName(event.target.value)} />
+          <Input aria-label="Requester email" type="email" placeholder="requester@example.com" value={requesterEmail} onChange={(event) => setRequesterEmail(event.target.value)} />
+          <Input aria-label="Ticket category" placeholder="Category" value={category} onChange={(event) => setCategory(event.target.value)} />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Select aria-label="Ticket priority" value={priority} onChange={(event) => setPriority(event.target.value)}>
             {DESK_PRIORITIES.map((option) => <option key={option} value={option}>{option}</option>)}

@@ -37,4 +37,15 @@ def create_alert(db: Session):
 
 def create_incident(db: Session):
     alert = create_alert(db)
-    return IncidentService(db).create(IncidentCreate(workspace_id=1, alert_id=alert.id, title="API degraded", severity="high"))
+    return IncidentService(db).create(
+        IncidentCreate(
+            workspace_id=1,
+            project_id=2,
+            alert_id=alert.id,
+            title="API degraded",
+            severity="sev2",
+            status="open",
+            impacted_service="api-gateway",
+            incident_commander_id=7,
+        )
+    )

@@ -5,6 +5,7 @@ import ApprovalsPage from "@/app/desk/approvals/page";
 import ChangeRequestsPage from "@/app/desk/change-requests/page";
 import DeskPage from "@/app/desk/page";
 import QueuesPage from "@/app/desk/queues/page";
+import DeskReportsPage from "@/app/desk/reports/page";
 import SlasPage from "@/app/desk/slas/page";
 import TicketDetailPage from "@/app/desk/tickets/[id]/page";
 import TicketsPage from "@/app/desk/tickets/page";
@@ -118,6 +119,13 @@ describe("Desk frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Change Requests" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Patch billing config")).toBeInTheDocument());
+  });
+
+  it("renders reports page", async () => {
+    renderWithQuery(<DeskReportsPage />);
+
+    expect(screen.getByRole("heading", { name: "Desk Reports" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Open Tickets")).toBeInTheDocument());
   });
 
   it("opens create ticket dialog", async () => {

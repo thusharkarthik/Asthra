@@ -16,7 +16,7 @@ class TicketRepository:
         self.db.refresh(item)
         return item
 
-    def list(self, *, workspace_id=None, project_id=None, status=None, priority=None, queue_id=None, assignee_id=None, requester_id=None, limit=100, offset=0):
+    def list(self, *, workspace_id=None, project_id=None, status=None, priority=None, queue_id=None, assignee_id=None, requester_id=None, category=None, limit=100, offset=0):
         stmt = select(ServiceTicket)
         for field, value in {
             "workspace_id": workspace_id,
@@ -26,6 +26,7 @@ class TicketRepository:
             "queue_id": queue_id,
             "assignee_id": assignee_id,
             "requester_id": requester_id,
+            "category": category,
         }.items():
             if value is not None:
                 stmt = stmt.where(getattr(ServiceTicket, field) == value)
