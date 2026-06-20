@@ -34,6 +34,9 @@ export default function IdeaDetailPage() {
   const [showFlowDraft, setShowFlowDraft] = useState(false);
   const [showConversionWizard, setShowConversionWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
+  const [linkMode, setLinkMode] = useState<"doc_page" | "work_item" | null>(null);
+  const [linkTargetId, setLinkTargetId] = useState("");
+  const [linkTargetTitle, setLinkTargetTitle] = useState("");
 
   const ideaQuery = useQuery({ queryKey: ["discover", "idea", id], queryFn: () => discoverApi.getIdea(accessToken ?? "", id), enabled: Boolean(accessToken && id) });
   const mvpPlanQuery = useQuery({ queryKey: ["discover", "mvp-plan", id], queryFn: () => discoverApi.getMvpPlan(accessToken ?? "", id), enabled: Boolean(accessToken && id), retry: false });
@@ -61,7 +64,41 @@ export default function IdeaDetailPage() {
     enabled: Boolean(accessToken && selectedProjectId),
     retry: 1
   });
+  const lifecycleGraphQuery = useQuery({
+    queryKey: ["discover", "idea-lifecycle", id],
+    queryFn: () => discoverApi.getIdeaLifecycleGraph(accessToken ?? "", id),
+    enabled: Boolean(accessToken && id),
+    retry: 1
+  });
   const analysisMutation = useMutation({ mutationFn: () => discoverApi.analyzeIdea(accessToken ?? "", id) });
+  const linkMutation = useMutation({
+    mutationFn: () => {
+      if (!linkMode) throw new Error("Select a link type.");
+      return discoverApi.createRelationship(accessToken ?? "", {
+        source_type: "idea",
+        source_id: String(id),
+        target_type: linkMode,
+        target_id: linkTargetId,
+        relationship_type: linkMode === "doc_page" ? "documents" : "executes",
+        title: linkTargetTitle || `${linkMode === "doc_page" ? "Document" : "Work item"} ${linkTargetId}`,
+        label: linkMode === "doc_page" ? "Related document" : "Related work item"
+      });
+    },
+    onSuccess: async () => {
+      setLinkMode(null);
+      setLinkTargetId("");
+      setLinkTargetTitle("");
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-lifecycle", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "delivery"] });
+    }
+  });
+  const unlinkMutation = useMutation({
+    mutationFn: (relationshipId: number) => discoverApi.deleteRelationship(accessToken ?? "", relationshipId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["discover", "idea-lifecycle", id] });
+      await queryClient.invalidateQueries({ queryKey: ["discover", "delivery"] });
+    }
+  });
   const updateMutation = useMutation({
     mutationFn: () => discoverApi.updateIdea(accessToken ?? "", id, { title, description, problem_statement: problemStatement || null, target_users: targetUsers || null, business_value: businessValue || null }),
     onSuccess: async () => {
@@ -98,13 +135,22 @@ export default function IdeaDetailPage() {
   const relatedRoadmap = (roadmapQuery.data ?? []).filter((item) => item.idea_id === idea.id);
   const relatedFeedback = (feedbackQuery.data ?? []).filter((feedback) => feedback.idea_id === idea.id);
   const ideaToken = idea.title.toLowerCase().split(" ")[0] ?? "";
-  const relatedDocs = (docsPagesQuery.data ?? []).filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(ideaToken));
-  const relatedWorkItems = (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(ideaToken));
+  const persistedDocs = lifecycleGraphQuery.data?.documents ?? [];
+  const persistedWorkItems = lifecycleGraphQuery.data?.work_items ?? [];
+  const relatedDocs = persistedDocs.length > 0 ? persistedDocs : (docsPagesQuery.data ?? []).filter((page) => `${page.title} ${page.content}`.toLowerCase().includes(ideaToken)).map((page) => ({ id: page.id, target_id: String(page.id), title: page.title }));
+  const relatedWorkItems = persistedWorkItems.length > 0 ? persistedWorkItems : (workItemsQuery.data ?? []).filter((item) => `${item.title} ${item.description ?? ""}`.toLowerCase().includes(ideaToken)).map((item) => ({ id: item.id, target_id: String(item.id), title: item.title }));
+  const relatedRoadmapRelationships = lifecycleGraphQuery.data?.roadmap_items ?? [];
 
   function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !description.trim()) return;
     updateMutation.mutate();
+  }
+
+  function submitManualLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!linkTargetId.trim()) return;
+    linkMutation.mutate();
   }
 
   return (
@@ -266,29 +312,50 @@ export default function IdeaDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <DetailPanel title="Related Documents">
           {relatedDocs.length === 0 ? <p className="text-sm text-muted-foreground">No related documents found. Create Requirements, Architecture, Meeting Notes, or Research docs for this idea.</p> : (
-            <div className="space-y-2">{relatedDocs.slice(0, 4).map((page) => <a key={page.id} className="block rounded-md border p-3 text-sm text-primary hover:bg-muted" href={`/docs/pages/${page.id}`}>{page.title}</a>)}</div>
+            <div className="space-y-2">{relatedDocs.slice(0, 4).map((page) => (
+              <div key={`${page.id}-${page.target_id}`} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                <a className="text-primary hover:underline" href={`/docs/pages/${page.target_id}`}>{page.title ?? `Document ${page.target_id}`}</a>
+                {"relationship_type" in page ? <Button size="sm" variant="outline" onClick={() => unlinkMutation.mutate(page.id)} disabled={unlinkMutation.isPending}>Unlink</Button> : null}
+              </div>
+            ))}</div>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => setShowConversionWizard(true)}>Create Document</Button>
-            <Button size="sm" variant="outline" disabled>Link Existing Document</Button>
+            <Button size="sm" variant="outline" onClick={() => setLinkMode("doc_page")}>Link Existing Document</Button>
           </div>
+          {linkMode === "doc_page" ? <ManualLinkForm typeLabel="Document" targetId={linkTargetId} targetTitle={linkTargetTitle} isPending={linkMutation.isPending} onTargetIdChange={setLinkTargetId} onTargetTitleChange={setLinkTargetTitle} onCancel={() => setLinkMode(null)} onSubmit={submitManualLink} /> : null}
         </DetailPanel>
         <DetailPanel title="Related Work Items">
           {relatedWorkItems.length === 0 ? <p className="text-sm text-muted-foreground">No related Flow work items found yet.</p> : (
-            <div className="space-y-2">{relatedWorkItems.slice(0, 4).map((item) => <a key={item.id} className="block rounded-md border p-3 text-sm text-primary hover:bg-muted" href={`/flow/work-items/${item.id}`}>{item.title}</a>)}</div>
+            <div className="space-y-2">{relatedWorkItems.slice(0, 4).map((item) => (
+              <div key={`${item.id}-${item.target_id}`} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                <a className="text-primary hover:underline" href={`/flow/work-items/${item.target_id}`}>{item.title ?? `Work item ${item.target_id}`}</a>
+                {"relationship_type" in item ? <Button size="sm" variant="outline" onClick={() => unlinkMutation.mutate(item.id)} disabled={unlinkMutation.isPending}>Unlink</Button> : null}
+              </div>
+            ))}</div>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => setShowFlowDraft(true)}>Create Work Item</Button>
-            <Button size="sm" variant="outline" disabled>Link Existing Work Item</Button>
+            <Button size="sm" variant="outline" onClick={() => setLinkMode("work_item")}>Link Existing Work Item</Button>
           </div>
+          {linkMode === "work_item" ? <ManualLinkForm typeLabel="Work Item" targetId={linkTargetId} targetTitle={linkTargetTitle} isPending={linkMutation.isPending} onTargetIdChange={setLinkTargetId} onTargetTitleChange={setLinkTargetTitle} onCancel={() => setLinkMode(null)} onSubmit={submitManualLink} /> : null}
         </DetailPanel>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <DetailPanel title="Roadmap Links">
-          {relatedRoadmap.length === 0 ? (
+          {relatedRoadmap.length === 0 && relatedRoadmapRelationships.length === 0 ? (
             <p className="text-sm text-muted-foreground">This idea is not linked to a roadmap item yet.</p>
           ) : (
             <div className="space-y-2">
+              {relatedRoadmapRelationships.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                  <div>
+                    <div className="font-medium">{item.title ?? `Roadmap item ${item.target_id}`}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Persisted lifecycle relationship</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => unlinkMutation.mutate(item.id)} disabled={unlinkMutation.isPending}>Unlink</Button>
+                </div>
+              ))}
               {relatedRoadmap.map((item) => (
                 <div key={item.id} className="rounded-md border p-3">
                   <div className="font-medium">{item.title}</div>
@@ -300,8 +367,8 @@ export default function IdeaDetailPage() {
         </DetailPanel>
         <DetailPanel title="Linked Work Items">
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>No Flow work item is linked yet.</p>
-            <p>Use Create Flow Work Item to review a draft payload. Automatic creation and persisted cross-module references are still pending.</p>
+            <p>{persistedWorkItems.length > 0 ? `${persistedWorkItems.length} Flow work item relationship stored.` : "No persisted Flow work item is linked yet."}</p>
+            <p>Use Create Work Item to review a draft payload, or Link Existing Work Item to persist a manual relationship.</p>
           </div>
         </DetailPanel>
       </div>
@@ -319,5 +386,39 @@ export default function IdeaDetailPage() {
         )}
       </DetailPanel>
     </div>
+  );
+}
+
+function ManualLinkForm({
+  typeLabel,
+  targetId,
+  targetTitle,
+  isPending,
+  onTargetIdChange,
+  onTargetTitleChange,
+  onCancel,
+  onSubmit
+}: {
+  typeLabel: string;
+  targetId: string;
+  targetTitle: string;
+  isPending: boolean;
+  onTargetIdChange: (value: string) => void;
+  onTargetTitleChange: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form className="mt-3 space-y-3 rounded-md border border-dashed p-3" onSubmit={onSubmit}>
+      <p className="text-xs text-muted-foreground">Search lookup is not available yet. Enter a known {typeLabel.toLowerCase()} ID and title to persist the relationship.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input aria-label={`${typeLabel} ID`} placeholder={`${typeLabel} ID`} value={targetId} onChange={(event) => onTargetIdChange(event.target.value)} />
+        <Input aria-label={`${typeLabel} title`} placeholder={`${typeLabel} title`} value={targetTitle} onChange={(event) => onTargetTitleChange(event.target.value)} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" disabled={isPending || !targetId.trim()}>{isPending ? "Linking..." : `Link ${typeLabel}`}</Button>
+        <Button size="sm" type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }

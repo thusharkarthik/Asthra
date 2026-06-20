@@ -43,6 +43,7 @@ This pass made Docs usable as a knowledge workflow instead of only a browsing su
 - Page detail includes breadcrumbs, a back link, edit mode, status editing, parent page editing, publish, and archive actions.
 - Page detail breadcrumbs follow `Docs > Spaces > Space Name > Page Title`.
 - Page detail includes a Link Flow Work Item action that shows the Flow linked-entity payload.
+- Page detail can persist manual relationships to Ideas, Flow work items, and Releases through the Discover lifecycle relationship API.
 - Page version history is visible on page detail when versions exist.
 - Backend page endpoints now support publish, archive, and version listing.
 - Existing databases are upgraded safely at service startup for the new `spaces.project_id` column.
@@ -76,11 +77,11 @@ This pass made Docs usable as a knowledge workflow instead of only a browsing su
 
 Docs now exposes the future execution reference flow clearly:
 
-- `Link Flow Work Item` displays the payload needed for Flow's linked entity endpoint.
-- The placeholder uses `entity_type=doc_page`, the page id, page title, and page URL.
+- `Link Flow Work Item` still displays the payload needed for Flow's linked entity endpoint.
+- Link Idea, Link Work Item, and Link Release actions can also persist a generic lifecycle relationship when the user enters a known target id and title.
 - Page detail shows Related Ideas, Related Work Items, and Linked Releases.
 - Docs dashboard shows Pages Linked To Work, Pages Without Work, and Recently Referenced counts.
-- Actual link creation still requires a Flow work item lookup/selector before calling Flow's link endpoint.
+- Search-based lookup/selection remains pending.
 
 ## Lifecycle Model
 
@@ -90,7 +91,7 @@ Idea
 -> Documentation
 -> Execution
 
-Pages can represent requirements, architecture, meeting notes, or research. Flow work items can already persist `doc_page` links through the Flow linked entity endpoint; Docs currently exposes the payload and relationship UI while a work item lookup/selector remains pending.
+Pages can represent requirements, architecture, meeting notes, or research. Flow work items can already persist `doc_page` links through the Flow linked entity endpoint; Docs can also persist generic lifecycle relationships for visible cross-module traceability.
 
 ## RBAC Readiness
 
@@ -107,7 +108,7 @@ Full enforcement depends on the shared permission helper being adopted across mo
 
 ## Flow Integration Placeholder
 
-Page detail keeps future Linked Work Items, Tickets, Incidents, and Ideas sections visible. These are placeholders until platform references and lookup APIs are wired across Flow, Discover, Desk, and Pulse.
+Page detail keeps future Linked Work Items, Tickets, Incidents, and Ideas sections visible. Docs-to-Discover/Flow relationships can be stored manually; richer lookup APIs are still needed across modules.
 
 ## Remaining Gaps
 

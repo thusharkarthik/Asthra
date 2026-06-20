@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, MVPPlan, RoadmapItem } from "@/types/discover";
+import type { FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, LifecycleGraph, LifecycleRelationship, LifecycleRelationshipCreate, MVPPlan, RoadmapItem } from "@/types/discover";
 
 const DISCOVER_PREFIX = "/api/discover/api/v1";
 
@@ -57,5 +57,17 @@ export const discoverApi = {
   },
   analyzeIdea(accessToken: string, ideaId: string | number) {
     return apiRequest<IdeaAIAnalysis>(`${DISCOVER_PREFIX}/ideas/${ideaId}/ai-analysis`, { method: "POST", authToken: accessToken });
+  },
+  listRelationships(accessToken: string, filters: { source_type?: string; source_id?: string | number; target_type?: string; target_id?: string | number; relationship_type?: string; limit?: number; offset?: number } = {}) {
+    return apiRequest<LifecycleRelationship[]>(`${DISCOVER_PREFIX}/relationships${toQuery(filters)}`, { method: "GET", authToken: accessToken });
+  },
+  createRelationship(accessToken: string, payload: LifecycleRelationshipCreate) {
+    return apiRequest<LifecycleRelationship>(`${DISCOVER_PREFIX}/relationships`, { method: "POST", authToken: accessToken, json: payload });
+  },
+  deleteRelationship(accessToken: string, relationshipId: string | number) {
+    return apiRequest<void>(`${DISCOVER_PREFIX}/relationships/${relationshipId}`, { method: "DELETE", authToken: accessToken });
+  },
+  getIdeaLifecycleGraph(accessToken: string, ideaId: string | number) {
+    return apiRequest<LifecycleGraph>(`${DISCOVER_PREFIX}/relationships/lifecycle/ideas/${ideaId}`, { method: "GET", authToken: accessToken });
   }
 };

@@ -92,6 +92,40 @@ export type IdeaAIAnalysis = {
   raw_response?: string | null;
 };
 
+export type LifecycleRelationship = {
+  id: number;
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  relationship_type: string;
+  title?: string | null;
+  label?: string | null;
+  metadata_json?: string | null;
+  created_at?: string;
+};
+
+export type LifecycleRelationshipCreate = {
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  relationship_type: string;
+  title?: string | null;
+  label?: string | null;
+  metadata_json?: string | null;
+};
+
+export type LifecycleGraph = {
+  idea_id: string;
+  relationships: LifecycleRelationship[];
+  documents: LifecycleRelationship[];
+  work_items: LifecycleRelationship[];
+  roadmap_items: LifecycleRelationship[];
+  sprints: LifecycleRelationship[];
+  releases: LifecycleRelationship[];
+};
+
 export type FeatureRequestCreate = {
   idea_id?: number | null;
   workspace_id: number;
