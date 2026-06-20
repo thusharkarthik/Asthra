@@ -36,6 +36,7 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { apiConfig } from "@/services/api/config";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -658,6 +659,7 @@ export default function WorkItemDetailPage() {
               <div><div className="font-medium">Completion Checklist</div><p className="mt-1 whitespace-pre-wrap text-muted-foreground">{item.definition_of_done || "No completion checklist yet."}</p></div>
             </div>
           </DetailPanel>
+          <LinkedResourcesPanel title="Platform Links" entityType="flow_work_item" entityId={item.id} entityTitle={item.title} />
         </>}
         metadata={<EntityMetadataPanel>
           <div className="grid gap-3 text-sm">

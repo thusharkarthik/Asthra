@@ -11,6 +11,9 @@ def test_platform_routes_exist(app):
     assert "/api/platform/recent-items" in paths
     assert "/api/platform/favorites" in paths
     assert "/api/platform/relationships" in paths
+    assert "/api/platform/relationships/entity/{entity_type}/{entity_id}" in paths
+    assert "/api/platform/relationships/{relationship_id}" in paths
+    assert "/api/platform/search" in paths
     assert "/api/platform/dashboard" in paths
     assert "/platform/health" in paths
 
@@ -44,13 +47,25 @@ def test_favorites_add_and_remove():
 
 def test_relationships_add():
     relationship = platform.add_relationship({
-        "from": {"source": "discover", "entity_type": "idea", "entity_id": "1", "title": "Idea", "href": "/discover/ideas/1"},
-        "to": {"source": "flow", "entity_type": "work_item", "entity_id": "2", "title": "Task", "href": "/flow/work-items/2"},
-        "relation": "idea_to_work_item",
+        "source_type": "discover_idea",
+        "source_id": "1",
+        "target_type": "flow_work_item",
+        "target_id": "2",
+        "relationship_type": "originates_from",
+        "source_title": "Idea",
+        "target_title": "Task",
     })
 
-    assert relationship["relation"] == "idea_to_work_item"
-    assert relationship["from"]["title"] == "Idea"
+    assert relationship["relationship_type"] == "originates_from"
+    assert relationship["source"]["title"] == "Idea"
+    assert platform.list_relationships(entity_type="discover_idea", entity_id="1")
+    assert platform.delete_relationship(relationship["id"]) is True
+
+
+def test_platform_search_entities():
+    results = platform.search_entities("gateway", module="flow")
+
+    assert any(item["title"] == "API gateway routing" for item in results)
 
 
 def test_dashboard_summary():

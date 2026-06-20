@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { PulseBackLink, PulseBreadcrumbs } from "@/components/pulse/pulse-breadcrumbs";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { pulseApi } from "@/services/api/pulse-api";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -106,9 +107,7 @@ export default function PulseIncidentDetailPage() {
           <Button disabled={timelineMutation.isPending || !updateContent.trim()}>{timelineMutation.isPending ? "Adding..." : "Add Update"}</Button>
         </form>
       </DetailPanel>
-      <DetailPanel title="Linked Resources">
-        <p className="text-sm text-muted-foreground">Future links will connect this incident to Flow work items, Docs runbooks, and Desk tickets.</p>
-      </DetailPanel>
+      <LinkedResourcesPanel entityType="pulse_incident" entityId={incident.id} entityTitle={incident.title} />
       <DetailPanel title="Postmortem">
         {postmortemQuery.data ? (
           <div className="space-y-2 text-sm">

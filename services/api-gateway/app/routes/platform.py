@@ -27,6 +27,17 @@ class RelationshipCreate(BaseModel):
     relation: str
 
 
+class GenericRelationshipCreate(BaseModel):
+    source_type: str
+    source_id: str | int
+    target_type: str
+    target_id: str | int
+    relationship_type: str
+    source_title: str | None = None
+    target_title: str | None = None
+    created_by: str | int | None = None
+
+
 @router.get("/activity")
 def activity_feed(request: Request) -> dict:
     return success_response(data={"items": platform.list_activity()}, request_id=getattr(request.state, "request_id", None))
@@ -77,14 +88,41 @@ def remove_favorite(source: str, entity_type: str, entity_id: str, request: Requ
 
 
 @router.get("/relationships")
-def relationships(request: Request) -> dict:
-    return success_response(data={"items": platform.list_relationships()}, request_id=getattr(request.state, "request_id", None))
+def relationships(
+    request: Request,
+    source_type: str | None = None,
+    source_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    relationship_type: str | None = None,
+) -> dict:
+    return success_response(data={"items": platform.list_relationships(source_type=source_type, source_id=source_id, target_type=target_type, target_id=target_id, relationship_type=relationship_type)}, request_id=getattr(request.state, "request_id", None))
+
+
+@router.get("/relationships/entity/{entity_type}/{entity_id}")
+def relationships_by_entity(entity_type: str, entity_id: str, request: Request) -> dict:
+    return success_response(data={"items": platform.list_relationships(entity_type=entity_type, entity_id=entity_id)}, request_id=getattr(request.state, "request_id", None))
 
 
 @router.post("/relationships")
-def add_relationship(payload: RelationshipCreate, request: Request) -> dict:
-    data = payload.model_dump(by_alias=True)
-    return success_response(data=platform.add_relationship(data), request_id=getattr(request.state, "request_id", None))
+def add_relationship(payload: GenericRelationshipCreate | RelationshipCreate, request: Request) -> dict:
+    try:
+        data = payload.model_dump(by_alias=True)
+        return success_response(data=platform.add_relationship(data), request_id=getattr(request.state, "request_id", None))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/relationships/{relationship_id}")
+def delete_relationship(relationship_id: str, request: Request) -> dict:
+    if not platform.delete_relationship(relationship_id):
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    return success_response(data={"deleted": True}, request_id=getattr(request.state, "request_id", None))
+
+
+@router.get("/search")
+def search(request: Request, q: str = "", module: str | None = None, entity_type: str | None = None) -> dict:
+    return success_response(data={"items": platform.search_entities(q, module=module, entity_type=entity_type)}, request_id=getattr(request.state, "request_id", None))
 
 
 @router.get("/dashboard")

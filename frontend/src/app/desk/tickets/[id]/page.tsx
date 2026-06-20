@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { DeskBackLink, DeskBreadcrumbs } from "@/components/desk/desk-breadcrumbs";
 import { DeskSubnav } from "@/components/desk/desk-subnav";
 import { DESK_PRIORITIES, DESK_TICKET_STATUSES, deskDate, isSlaAtRisk, queueNameFor } from "@/components/desk/desk-utils";
+import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { deskApi } from "@/services/api/desk-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -167,9 +168,7 @@ export default function TicketDetailPage() {
           )}
         </DetailPanel>
       </div>
-      <DetailPanel title="Linked Resources">
-        <p className="text-sm text-muted-foreground">Future links will connect this ticket to Flow work items, Docs pages, and Pulse incidents.</p>
-      </DetailPanel>
+      <LinkedResourcesPanel entityType="desk_ticket" entityId={ticket.id} entityTitle={ticket.title} />
       <DetailPanel title="Activity">
         <div className="space-y-2 text-sm">
           <div className="rounded-md border p-3">
