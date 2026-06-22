@@ -10,6 +10,7 @@ import DocsSearchPage from "@/app/docs/search/page";
 import SpaceDetailPage from "@/app/docs/spaces/[id]/page";
 import SpacesPage from "@/app/docs/spaces/page";
 import { QueryProvider } from "@/providers/query-provider";
+import { PlatformContextProvider } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
 import { useFavoritesStore } from "@/stores/favorites-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
@@ -22,12 +23,27 @@ const navigationMock = (
 ).__asthraNavigationMock;
 
 function renderWithQuery(ui: React.ReactNode) {
-  return render(<QueryProvider>{ui}</QueryProvider>);
+  return render(<QueryProvider><PlatformContextProvider>{ui}</PlatformContextProvider></QueryProvider>);
 }
 
 function mockDocsFetch() {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
+    if (url.includes("/api/core/api/v1/auth/me")) {
+      return new Response(JSON.stringify({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true }), { status: 200 });
+    }
+    if (url.includes("/api/core/api/v1/me/permissions")) {
+      return new Response(JSON.stringify({ permission_codes: ["docs.page.create"], roles: [], scope: { scope_type: "workspace", scope_id: 2 } }), { status: 200 });
+    }
+    if (url.includes("/api/core/api/v1/organizations")) {
+      return new Response(JSON.stringify([{ id: 1, name: "Acme", is_active: true }]), { status: 200 });
+    }
+    if (url.includes("/api/core/api/v1/workspaces")) {
+      return new Response(JSON.stringify([{ id: 2, organization_id: 1, name: "Workspace", is_active: true }]), { status: 200 });
+    }
+    if (url.includes("/api/core/api/v1/projects")) {
+      return new Response(JSON.stringify([{ id: 3, workspace_id: 2, name: "Frontend", status: "active", is_active: true }]), { status: 200 });
+    }
     if (url.includes("/pages/5/comments")) {
       return new Response(JSON.stringify([{ id: 1, page_id: 5, user_id: 1, content: "Helpful page" }]), { status: 200 });
     }

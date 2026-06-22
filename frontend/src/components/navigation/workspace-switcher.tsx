@@ -1,16 +1,10 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { useWorkspaces } from "@/hooks/use-smart-context-cache";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 
 export function WorkspaceSwitcher() {
-  const { workspaces: cachedWorkspaces, selectedOrganizationId, selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
-  const workspacesQuery = useWorkspaces(selectedOrganizationId);
-  const workspaces = workspacesQuery.data ?? cachedWorkspaces;
-  const visibleWorkspaces = selectedOrganizationId
-    ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
-    : workspaces;
+  const { workspaces: visibleWorkspaces, currentScope, setSelectedWorkspace } = usePlatformContext();
 
   if (visibleWorkspaces.length === 0) {
     return (
@@ -23,7 +17,7 @@ export function WorkspaceSwitcher() {
   return (
     <Select
       aria-label="Workspace"
-      value={selectedWorkspaceId ?? ""}
+      value={currentScope.workspaceId ?? ""}
       onChange={(event) => setSelectedWorkspace(Number(event.target.value))}
     >
       {visibleWorkspaces.map((workspace) => (

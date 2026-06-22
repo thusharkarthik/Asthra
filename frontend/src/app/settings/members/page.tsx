@@ -1,10 +1,9 @@
 "use client";
 
 import { MembersView } from "@/components/settings/settings-admin-views";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useCurrentScope } from "@/context/platformContext";
 
 export default function MembersSettingsPage() {
-  const workspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
-  const organizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
+  const { workspaceId, organizationId } = useCurrentScope();
   return <MembersView workspaceId={workspaceId ?? undefined} organizationId={workspaceId ? undefined : organizationId ?? undefined} />;
 }

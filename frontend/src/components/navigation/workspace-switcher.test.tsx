@@ -1,14 +1,58 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { ProjectSwitcher } from "@/components/navigation/project-switcher";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
+import { PlatformContextProvider } from "@/context/platformContext";
 import { QueryProvider } from "@/providers/query-provider";
+import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+vi.mock("@/services/api/core-api", () => ({
+  coreApi: {
+    currentUser: vi.fn(async () => ({ id: 1, email: "admin@example.com", full_name: "Admin", is_active: true })),
+    listOrganizations: vi.fn(async () => [
+      { id: 1, name: "Asthra" },
+      { id: 2, name: "Labs" }
+    ])
+  }
+}));
+
+vi.mock("@/services/api/workspace-api", () => ({
+  workspaceApi: {
+    listWorkspaces: vi.fn(async (token: string, organizationId?: number | null) => [
+      { id: 10, organization_id: 1, name: "Platform" },
+      { id: 11, organization_id: 1, name: "Research" },
+      { id: 12, organization_id: 2, name: "Labs Workspace" }
+    ].filter((workspace) => organizationId ? workspace.organization_id === organizationId : true))
+  }
+}));
+
+vi.mock("@/services/api/project-api", () => ({
+  projectApi: {
+    listProjects: vi.fn(async (token: string, workspaceId?: number | null) => [
+      { id: 20, workspace_id: 10, name: "Frontend" },
+      { id: 21, workspace_id: 10, name: "Gateway" },
+      { id: 22, workspace_id: 12, name: "Labs Project" }
+    ].filter((project) => workspaceId ? project.workspace_id === workspaceId : true))
+  }
+}));
+
+vi.mock("@/services/api/settings-api", () => ({
+  settingsApi: {
+    getCurrentPermissions: vi.fn(async () => ({ permission_codes: [], roles: [], scope: { scope_type: "project", scope_id: 20 } }))
+  }
+}));
 
 describe("workspace context selectors", () => {
   beforeEach(() => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "admin@example.com", full_name: "Admin", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
     useWorkspaceStore.setState({
       organizations: [
         { id: 1, name: "Asthra" },
@@ -33,9 +77,11 @@ describe("workspace context selectors", () => {
   it("renders and updates organization, workspace, and project selectors", () => {
     render(
       <QueryProvider>
-        <OrganizationSwitcher />
-        <WorkspaceSwitcher />
-        <ProjectSwitcher />
+        <PlatformContextProvider>
+          <OrganizationSwitcher />
+          <WorkspaceSwitcher />
+          <ProjectSwitcher />
+        </PlatformContextProvider>
       </QueryProvider>
     );
 
