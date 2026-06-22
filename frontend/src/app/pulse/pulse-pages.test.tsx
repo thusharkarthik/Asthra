@@ -30,6 +30,9 @@ function mockPulseFetch() {
     if (url.includes("/incidents/4")) {
       return new Response(JSON.stringify({ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "sev2", status: "investigating", impacted_service: "api-gateway", incident_commander_id: 1 }), { status: 200 });
     }
+    if (url.includes("/dashboard/summary")) {
+      return new Response(JSON.stringify({ workspace_id: 2, active_incidents: 4, sev1_count: 1, sev2_count: 2, resolved_incidents: 9 }), { status: 200 });
+    }
     if (url.includes("/incidents")) {
       return new Response(JSON.stringify([{ id: 4, workspace_id: 2, title: "API latency", description: "Gateway requests are slow", severity: "sev2", status: "investigating", impacted_service: "api-gateway", incident_commander_id: 1 }]), { status: 200 });
     }
@@ -62,6 +65,7 @@ describe("Pulse frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Pulse" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("API latency")).toBeInTheDocument());
+    expect(screen.getByText("9")).toBeInTheDocument();
   });
 
   it("renders incidents page", async () => {

@@ -38,6 +38,9 @@ function mockDeskFetch() {
     if (url.includes("/tickets/9")) {
       return new Response(JSON.stringify({ id: 9, workspace_id: 2, project_id: 3, queue_id: 1, title: "Cannot access billing", description: "Customer cannot open invoices", status: "open", priority: "high", requester_id: 1, assignee_id: 1 }), { status: 200 });
     }
+    if (url.includes("/dashboard/summary")) {
+      return new Response(JSON.stringify({ workspace_id: 2, open_tickets: 6, assigned_tickets: 3, in_progress_tickets: 2, resolved_tickets: 8 }), { status: 200 });
+    }
     if (url.includes("/tickets")) {
       return new Response(JSON.stringify([{ id: 9, workspace_id: 2, project_id: 3, queue_id: 1, title: "Cannot access billing", description: "Customer cannot open invoices", status: "open", priority: "high", requester_id: 1, assignee_id: 1 }]), { status: 200 });
     }
@@ -76,6 +79,7 @@ describe("Desk frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Desk" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Cannot access billing").length).toBeGreaterThan(0));
+    expect(screen.getByText("8")).toBeInTheDocument();
   });
 
   it("renders tickets page", async () => {

@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/queryKeys";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
@@ -35,6 +36,12 @@ export default function DocsPage() {
 
   const spacesQuery = useQuery({ queryKey: ["docs", "spaces"], queryFn: () => docsApi.listSpaces(accessToken ?? ""), enabled: Boolean(accessToken) && hasWorkspace, retry: 1 });
   const pagesQuery = useQuery({ queryKey: ["docs", "pages"], queryFn: () => docsApi.listPages(accessToken ?? "", { limit: 100 }), enabled: Boolean(accessToken) && hasWorkspace, retry: 1 });
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.docs.dashboardSummary(selectedWorkspaceId),
+    queryFn: () => docsApi.getDashboardSummary(accessToken ?? "", selectedWorkspaceId ?? 0),
+    enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
+    retry: 1
+  });
   const spaces = spacesQuery.data ?? [];
   const pages = pagesQuery.data ?? [];
   const recentPages = sortedDocsPages(pages).slice(0, 6);
@@ -66,10 +73,10 @@ export default function DocsPage() {
       ) : (
         <div className="space-y-5">
           <div className="grid gap-4 md:grid-cols-4">
-            <ModuleDashboardCard title="Total Spaces" value={spaces.length} />
-            <ModuleDashboardCard title="Total Pages" value={pages.length} />
-            <ModuleDashboardCard title="Draft Pages" value={draftPages.length} />
-            <ModuleDashboardCard title="Published Pages" value={publishedPages.length} />
+            <ModuleDashboardCard title="Total Spaces" value={summaryQuery.data?.total_spaces ?? spaces.length} />
+            <ModuleDashboardCard title="Total Pages" value={summaryQuery.data?.total_pages ?? pages.length} />
+            <ModuleDashboardCard title="Draft Pages" value={summaryQuery.data?.draft_pages ?? draftPages.length} />
+            <ModuleDashboardCard title="Published Pages" value={summaryQuery.data?.published_pages ?? publishedPages.length} />
             <ModuleDashboardCard title="Recently Updated" value={recentPages.length} />
             <ModuleDashboardCard title="Pages Linked To Work" value={pagesLinkedToWork.length} />
             <ModuleDashboardCard title="Pages Without Work" value={pagesWithoutWork.length} />

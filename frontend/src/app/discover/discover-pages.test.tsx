@@ -43,6 +43,9 @@ function mockDiscoverFetch() {
     if (url.includes("/api/core/api/v1/projects")) {
       return new Response(JSON.stringify([{ id: 3, workspace_id: 2, name: "Frontend", status: "active", is_active: true }]), { status: 200 });
     }
+    if (url.includes("/dashboard/summary")) {
+      return new Response(JSON.stringify({ workspace_id: 2, total_ideas: 14, reviewing: 3, validating: 2, approved: 5, rejected: 1, converted_to_work: 4 }), { status: 200 });
+    }
     if (url.includes("/ideas/7/mvp-plan")) {
       return new Response(JSON.stringify({ id: 1, idea_id: 7, scope: "Ship a lightweight validation MVP" }), { status: 200 });
     }
@@ -120,6 +123,7 @@ describe("Discover frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Discover" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Customer portal").length).toBeGreaterThan(0));
+    expect(screen.getByText("14")).toBeInTheDocument();
   });
 
   it("renders ideas page", async () => {

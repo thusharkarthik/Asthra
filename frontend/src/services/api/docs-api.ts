@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { DocFlowLink, Page, PageComment, PageCreate, PageFilters, PageUpdate, PageVersion, Space, SpaceCreate, SpaceUpdate } from "@/types/docs";
+import type { DocFlowLink, DocsDashboardSummary, Page, PageComment, PageCreate, PageFilters, PageUpdate, PageVersion, Space, SpaceCreate, SpaceUpdate } from "@/types/docs";
 
 const DOCS_PREFIX = "/api/docs/api/v1";
 
@@ -15,6 +15,9 @@ function toQuery(params: Record<string, string | number | null | undefined>) {
 }
 
 export const docsApi = {
+  getDashboardSummary(accessToken: string, workspaceId: number) {
+    return apiRequest<DocsDashboardSummary>(`${DOCS_PREFIX}/dashboard/summary${toQuery({ workspace_id: workspaceId })}`, { method: "GET", authToken: accessToken });
+  },
   listSpaces(accessToken: string) {
     return apiRequest<Space[]>(`${DOCS_PREFIX}/spaces`, { method: "GET", authToken: accessToken });
   },

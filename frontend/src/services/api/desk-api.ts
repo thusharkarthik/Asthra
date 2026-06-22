@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { Approval, ChangeRequest, ChangeRequestCreate, DeskIncident, Queue, QueueCreate, SLA, SLACreate, Ticket, TicketAIClassification, TicketComment, TicketCreate, TicketUpdate } from "@/types/desk";
+import type { Approval, ChangeRequest, ChangeRequestCreate, DeskDashboardSummary, DeskIncident, Queue, QueueCreate, SLA, SLACreate, Ticket, TicketAIClassification, TicketComment, TicketCreate, TicketUpdate } from "@/types/desk";
 
 const DESK_PREFIX = "/api/desk/api/v1";
 
@@ -13,6 +13,9 @@ function toQuery(params: Record<string, string | number | null | undefined>) {
 }
 
 export const deskApi = {
+  getDashboardSummary(accessToken: string, workspaceId: number) {
+    return apiRequest<DeskDashboardSummary>(`${DESK_PREFIX}/dashboard/summary${toQuery({ workspace_id: workspaceId })}`, { method: "GET", authToken: accessToken });
+  },
   listTickets(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; status?: string; priority?: string; category?: string | null; queue_id?: number | null; assignee_id?: number | null; requester_id?: number | null; limit?: number } = {}) {
     return apiRequest<Ticket[]>(`${DESK_PREFIX}/tickets${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },

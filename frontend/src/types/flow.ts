@@ -26,6 +26,19 @@ export type WorkItem = {
   updated_at?: string;
 };
 
+export type FlowDashboardSummary = {
+  id: number;
+  project_id: number;
+  open_work_items: number;
+  in_progress_items: number;
+  blocked_items: number;
+  completed_items: number;
+  active_sprints: number;
+  active_releases: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type WorkItemCreate = {
   project_id: number;
   parent_id?: number | null;

@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { DeliveryPipeline, DiscoverDocLink, DiscoverFlowLink, FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, IdeaExecutionLinks, LifecycleGraph, LifecycleRelationship, LifecycleRelationshipCreate, MVPPlan, RoadmapItem } from "@/types/discover";
+import type { DeliveryPipeline, DiscoverDashboardSummary, DiscoverDocLink, DiscoverFlowLink, FeatureRequest, FeatureRequestCreate, Feedback, FeedbackCreate, Idea, IdeaAIAnalysis, IdeaCreate, IdeaExecutionLinks, LifecycleGraph, LifecycleRelationship, LifecycleRelationshipCreate, MVPPlan, RoadmapItem } from "@/types/discover";
 
 const DISCOVER_PREFIX = "/api/discover/api/v1";
 
@@ -13,6 +13,9 @@ function toQuery(params: Record<string, string | number | null | undefined>) {
 }
 
 export const discoverApi = {
+  getDashboardSummary(accessToken: string, workspaceId: number) {
+    return apiRequest<DiscoverDashboardSummary>(`${DISCOVER_PREFIX}/dashboard/summary${toQuery({ workspace_id: workspaceId })}`, { method: "GET", authToken: accessToken });
+  },
   listIdeas(accessToken: string, filters: { workspace_id?: number | null; project_id?: number | null; status?: string; limit?: number } = {}) {
     return apiRequest<Idea[]>(`${DISCOVER_PREFIX}/ideas${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },

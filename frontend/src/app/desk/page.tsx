@@ -16,6 +16,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
+import { queryKeys } from "@/lib/queryKeys";
 import { deskApi } from "@/services/api/desk-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -31,8 +32,14 @@ export default function DeskPage() {
   const [changeOpen, setChangeOpen] = useState(false);
 
   const ticketsQuery = useQuery({
-    queryKey: ["desk", "tickets", selectedWorkspaceId],
+    queryKey: queryKeys.desk.tickets(selectedWorkspaceId),
     queryFn: () => deskApi.listTickets(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
+    retry: 1
+  });
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.desk.dashboardSummary(selectedWorkspaceId),
+    queryFn: () => deskApi.getDashboardSummary(accessToken ?? "", selectedWorkspaceId ?? 0),
     enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
     retry: 1
   });
@@ -65,10 +72,13 @@ export default function DeskPage() {
         <>
           <ModuleStatsGrid
             stats={[
-              { title: "Open Tickets", value: openTickets.length, description: "Active service requests" },
+              { title: "Open Tickets", value: summaryQuery.data?.open_tickets ?? openTickets.length, description: "Active service requests" },
               { title: "High Priority Tickets", value: highPriority.length, description: "High or critical priority" },
               { title: "SLA At Risk", value: slaAtRisk.length, description: "Priority tickets needing attention" },
               { title: "Pending Approvals", value: "Review", description: "Approval queue foundation" },
+              { title: "Assigned Tickets", value: summaryQuery.data?.assigned_tickets ?? myTickets.length, description: "Assigned service requests" },
+              { title: "In Progress", value: summaryQuery.data?.in_progress_tickets ?? tickets.filter((ticket) => ticket.status === "in_progress").length, description: "Work currently underway" },
+              { title: "Resolved Tickets", value: summaryQuery.data?.resolved_tickets ?? tickets.filter((ticket) => ["resolved", "closed"].includes(ticket.status)).length, description: "Closed or resolved requests" },
               { title: "Active Incidents", value: incidents.filter((incident) => incident.status !== "resolved").length, description: "Linked operational incidents" },
               { title: "Change Requests", value: changes.length, description: "Operational change pipeline" }
             ]}

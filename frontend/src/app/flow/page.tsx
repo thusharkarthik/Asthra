@@ -24,6 +24,7 @@ import { ModuleDashboardCard } from "@/components/modules/module-dashboard-card"
 import { PriorityBadge } from "@/components/modules/priority-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/queryKeys";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePlatformContext } from "@/context/platformContext";
@@ -42,8 +43,14 @@ export default function FlowPage() {
   const hasProject = Boolean(selectedProjectId) || projects.length > 0;
 
   const workItemsQuery = useQuery({
-    queryKey: ["flow", "work-items", selectedProjectId],
+    queryKey: queryKeys.flow.workItems(selectedProjectId),
     queryFn: () => flowApi.listWorkItems(accessToken ?? "", { project_id: selectedProjectId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedProjectId),
+    retry: 1
+  });
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.flow.dashboardSummary(selectedProjectId),
+    queryFn: () => flowApi.getDashboardSummary(accessToken ?? "", selectedProjectId ?? 0),
     enabled: Boolean(accessToken) && Boolean(selectedProjectId),
     retry: 1
   });
@@ -71,10 +78,10 @@ export default function FlowPage() {
   const workLogs = workLogsQuery.data ?? [];
   const recentItems = sortedByUpdatedAt(items).slice(0, 6);
   const assignedToMe = items.filter((item) => item.assignee_id === currentUser?.id).slice(0, 5);
-  const openCount = items.filter(isOpenWorkItem).length;
-  const inProgressCount = items.filter(isInProgressWorkItem).length;
-  const blockedCount = items.filter(isBlockedWorkItem).length;
-  const completedCount = items.filter(isCompletedWorkItem).length;
+  const openCount = summaryQuery.data?.open_work_items ?? items.filter(isOpenWorkItem).length;
+  const inProgressCount = summaryQuery.data?.in_progress_items ?? items.filter(isInProgressWorkItem).length;
+  const blockedCount = summaryQuery.data?.blocked_items ?? items.filter(isBlockedWorkItem).length;
+  const completedCount = summaryQuery.data?.completed_items ?? items.filter(isCompletedWorkItem).length;
   const upcomingReleases = releases.filter((release) => release.status === "planned").slice(0, 3);
   const activeReleases = releases.filter((release) => release.status === "active");
   const releaseProgress = releases.length ? Math.round(releases.reduce((sum, release) => sum + release.completion_percentage, 0) / releases.length) : 0;

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ApiError } from "@/services/api/client";
 import { flowApi } from "@/services/api/flow-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -149,6 +150,7 @@ export function WorkItemCreateDialog({ open, onOpenChange, initialItemLevel = "w
       resetForm();
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["flow"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.flow.dashboardSummary(selectedProjectId) });
       addToast({ type: "success", title: "Work item created", message: "Flow was updated with the new work item." });
     },
     onError: (error) => {

@@ -18,6 +18,7 @@ import { ModuleStatsGrid } from "@/components/modules/module-stats-grid";
 import { RoadmapStatusBadge } from "@/components/modules/roadmap-status-badge";
 import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/queryKeys";
 import { discoverApi } from "@/services/api/discover-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePlatformContext } from "@/context/platformContext";
@@ -33,8 +34,14 @@ export default function DiscoverPage() {
   const [roadmapOpen, setRoadmapOpen] = useState(false);
 
   const ideasQuery = useQuery({
-    queryKey: ["discover", "ideas", selectedWorkspaceId],
+    queryKey: queryKeys.discover.ideas(selectedWorkspaceId),
     queryFn: () => discoverApi.listIdeas(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 100 }),
+    enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
+    retry: 1
+  });
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.discover.dashboardSummary(selectedWorkspaceId),
+    queryFn: () => discoverApi.getDashboardSummary(accessToken ?? "", selectedWorkspaceId ?? 0),
     enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
     retry: 1
   });
@@ -86,12 +93,12 @@ export default function DiscoverPage() {
         <>
           <ModuleStatsGrid
             stats={[
-              { title: "Total Ideas", value: ideas.length, description: "Captured opportunities" },
-              { title: "Reviewing", value: reviewingIdeas.length, description: "Being triaged" },
-              { title: "Validating", value: validatingIdeas.length, description: "Needs evidence" },
-              { title: "Approved", value: approvedIdeas.length, description: "Ready for planning" },
-              { title: "Rejected", value: rejectedIdeas.length, description: "Not moving forward" },
-              { title: "Converted to Work", value: convertedIdeas.length, description: "Sent toward execution" }
+              { title: "Total Ideas", value: summaryQuery.data?.total_ideas ?? ideas.length, description: "Captured opportunities" },
+              { title: "Reviewing", value: summaryQuery.data?.reviewing ?? reviewingIdeas.length, description: "Being triaged" },
+              { title: "Validating", value: summaryQuery.data?.validating ?? validatingIdeas.length, description: "Needs evidence" },
+              { title: "Approved", value: summaryQuery.data?.approved ?? approvedIdeas.length, description: "Ready for planning" },
+              { title: "Rejected", value: summaryQuery.data?.rejected ?? rejectedIdeas.length, description: "Not moving forward" },
+              { title: "Converted to Work", value: summaryQuery.data?.converted_to_work ?? convertedIdeas.length, description: "Sent toward execution" }
             ]}
           />
           {ideasQuery.isLoading || roadmapQuery.isLoading || featureRequestsQuery.isLoading ? <LoadingState /> : ideas.length === 0 ? (
