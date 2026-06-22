@@ -24,6 +24,11 @@ import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
 const publicPaths = new Set(["/login", "/register"]);
+const AUTH_LOGOUT_TRANSITION_MS = 1450;
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 function WorkspaceContextLoader() {
   useWorkspaceContextQueries();
@@ -38,6 +43,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const logout = useAuthStore((state) => state.logout);
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
+  const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const unreadNotifications = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -96,9 +102,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setUserMenuOpen(false);
+    setAuthTransition("logout");
+    await wait(AUTH_LOGOUT_TRANSITION_MS);
     logout();
     router.push("/login");
+    window.setTimeout(() => setAuthTransition(null), 250);
   };
 
   return (
