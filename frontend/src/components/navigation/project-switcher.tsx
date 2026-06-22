@@ -1,10 +1,13 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { useProjects } from "@/hooks/use-smart-context-cache";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function ProjectSwitcher() {
-  const { projects, selectedWorkspaceId, selectedProjectId, setSelectedProject } = useWorkspaceStore();
+  const { projects: cachedProjects, selectedWorkspaceId, selectedProjectId, setSelectedProject } = useWorkspaceStore();
+  const projectsQuery = useProjects(selectedWorkspaceId);
+  const projects = projectsQuery.data ?? cachedProjects;
   const visibleProjects = selectedWorkspaceId
     ? projects.filter((project) => project.workspace_id === selectedWorkspaceId)
     : projects;

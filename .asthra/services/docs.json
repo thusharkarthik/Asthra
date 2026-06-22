@@ -1,0 +1,8 @@
+{
+  "serviceName": "docs",
+  "purpose": "Knowledge Management.",
+  "ownership": ["Spaces", "Pages", "Versions", "Comments"],
+  "relationships": ["Consumes validated ideas", "Produces specifications and runbooks for Flow, Desk, and Pulse"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["AI Summaries", "Semantic Search", "RAG", "Knowledge Graph"]
+}

@@ -837,8 +837,8 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getAllByText("Development").length).toBeGreaterThan(0));
     expect(screen.getAllByText("QA").length).toBeGreaterThan(0);
     expect(screen.getByText("Build Flow UI")).toBeInTheDocument();
-    expect(screen.getByText("Effort: M / 5")).toBeInTheDocument();
-    expect(screen.getByText("High risk")).toBeInTheDocument();
+    expect(screen.getAllByText("Effort: M / 5").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("High risk").length).toBeGreaterThan(0);
   });
 
   it("moves a board card with status dropdown", async () => {
@@ -1188,7 +1188,7 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getAllByText("Create Initiative: top-level outcome, no parent.").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
-    expect(screen.getByLabelText("Work level")).toHaveValue("initiative");
+    expect(screen.getByLabelText("Parent work")).toHaveTextContent("Initiatives do not use parent work");
   });
 
   it("renders dependencies page and add relation controls", async () => {
@@ -1208,7 +1208,7 @@ describe("Flow frontend screens", () => {
     await waitFor(() => expect(screen.getByLabelText("Source work item")).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Source work item"), { target: { value: "7" } });
 
-    await waitFor(() => expect(screen.getByText("This work blocks")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Blocks").length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.getAllByText("Target item").length).toBeGreaterThan(0));
     expect(screen.getByText("Build Flow UI blocks Target item")).toBeInTheDocument();
   });

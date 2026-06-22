@@ -1,0 +1,8 @@
+{
+  "serviceName": "dev",
+  "purpose": "Engineering Operations.",
+  "ownership": ["Repositories", "Deployments", "Builds", "Pipelines"],
+  "relationships": ["Consumes Flow delivery plans", "Produces deployment and release signals for Pulse and Insights"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Git Integrations", "Release Tracking", "Environment Management"]
+}

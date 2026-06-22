@@ -1,10 +1,13 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { useWorkspaces } from "@/hooks/use-smart-context-cache";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function WorkspaceSwitcher() {
-  const { workspaces, selectedOrganizationId, selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
+  const { workspaces: cachedWorkspaces, selectedOrganizationId, selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
+  const workspacesQuery = useWorkspaces(selectedOrganizationId);
+  const workspaces = workspacesQuery.data ?? cachedWorkspaces;
   const visibleWorkspaces = selectedOrganizationId
     ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
     : workspaces;

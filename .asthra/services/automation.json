@@ -1,0 +1,8 @@
+{
+  "serviceName": "automation",
+  "purpose": "Workflow Automation.",
+  "ownership": ["Rules", "Triggers", "Actions", "Workflow Runs"],
+  "relationships": ["Consumes future platform events", "Triggers configured actions across modules with permission checks"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Visual Workflow Builder", "Generated Workflows", "Workflow Marketplace"]
+}

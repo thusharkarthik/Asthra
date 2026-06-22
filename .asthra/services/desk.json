@@ -1,0 +1,8 @@
+{
+  "serviceName": "desk",
+  "purpose": "Service Management.",
+  "ownership": ["Tickets", "Incidents", "Requests", "SLAs"],
+  "relationships": ["Consumes operational context", "Can link tickets to Flow work, Docs pages, and Pulse incidents"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Escalation Rules", "Incident Collaboration Spaces", "Major Incident Management"]
+}

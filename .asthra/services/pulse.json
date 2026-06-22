@@ -1,0 +1,8 @@
+{
+  "serviceName": "pulse",
+  "purpose": "Operational Health.",
+  "ownership": ["Team Health", "Capacity", "Metrics", "Objectives"],
+  "relationships": ["Consumes Dev and Desk operational signals", "Produces health and risk signals for Insights"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Predictive Risk Analysis", "Team Health Scoring", "Operational Forecasting"]
+}

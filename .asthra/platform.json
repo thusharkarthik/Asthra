@@ -1,0 +1,20 @@
+{
+  "name": "Asthra",
+  "description": "Asthra is an Execution Operating System that connects opportunity discovery, knowledge, planning, delivery, operations, health, automation, governance, and analytics.",
+  "hierarchy": ["platform", "organization", "workspace", "project", "team", "member"],
+  "lifecycle": ["discover", "docs", "flow", "dev", "desk", "pulse", "insights"],
+  "architecture": {
+    "frontend": ["React", "TypeScript", "TanStack Router", "TanStack Query"],
+    "backend": ["FastAPI Microservices"],
+    "infrastructure": ["API Gateway", "PostgreSQL", "Redis future", "Event Bus future"]
+  },
+  "rules": [
+    "Core owns identity, membership, scope, roles, and permissions.",
+    "No service owns users except Core.",
+    "No direct database sharing.",
+    "Services communicate through APIs.",
+    "Future cross-service coordination uses events.",
+    "Ownership boundaries must be respected."
+  ],
+  "currentPriority": ["Flow Maturity", "Discover Maturity", "Docs Maturity", "Desk", "Pulse", "Dev"]
+}

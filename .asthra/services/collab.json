@@ -1,0 +1,8 @@
+{
+  "serviceName": "collab",
+  "purpose": "Team Communication Layer.",
+  "ownership": ["Discussions", "Mentions", "Reactions", "Notifications"],
+  "relationships": ["Supports conversations around records from all modules", "Produces communication activity"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Channels", "Threads", "Activity Streams"]
+}

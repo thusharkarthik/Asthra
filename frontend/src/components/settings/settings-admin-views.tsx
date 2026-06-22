@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { settingsApi } from "@/services/api/settings-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { normalizeRole } from "@/lib/rbac";
 import { can as hasPermission } from "@/lib/permissions";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
@@ -108,6 +109,13 @@ function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: n
 
 function getFormValue(form: HTMLFormElement, name: string) {
   return String(new FormData(form).get(name) ?? "").trim();
+}
+
+function invalidateSettingsAndContext(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.settings.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.context.all })
+  ]);
 }
 
 function formatDate(value?: string | null) {
@@ -463,7 +471,7 @@ export function OrganizationsView() {
       setOpen(false);
       setFormError(null);
       setSelectedOrganization(organization.id);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Organization created", message: `${organization.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create organization.")
@@ -532,7 +540,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       setOpen(false);
       setFormError(null);
       setSelectedWorkspace(workspace.id);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Workspace created", message: `${workspace.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create workspace.")
@@ -649,7 +657,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       setOpen(false);
       setFormError(null);
       setSelectedProject(project.id);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Project created", message: `${project.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create project.")
@@ -761,7 +769,7 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
     onSuccess: async (updatedOrganization) => {
       setEditOpen(false);
       setFormError(null);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Organization updated", message: `${updatedOrganization.name} was saved.` });
     },
     onError: (error) => {
@@ -929,6 +937,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     onSuccess: async () => {
       setOwnerOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Project owner updated" });
     },
     onError: (error) => addToast({ type: "error", title: "Owner update failed", message: error instanceof Error ? error.message : "Unable to update owner." })
@@ -939,6 +948,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       setMemberOpen(false);
       setMemberFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "project-members", projectId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Project member added" });
     },
     onError: (error) => {
@@ -951,6 +961,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     mutationFn: (membershipId: number) => settingsApi.removeProjectMember(accessToken ?? "", projectId, membershipId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "project-members", projectId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Project member removed" });
     },
     onError: (error) => addToast({ type: "error", title: "Project member remove failed", message: error instanceof Error ? error.message : "Unable to remove project member." })
@@ -1130,7 +1141,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     onSuccess: async (invitation) => {
       setInviteOpen(false);
       setFormError(null);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "invitations"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Invitation created", message: `${invitation.email} was invited.` });
     },
     onError: (error) => {
@@ -1146,10 +1158,10 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       if (organizationId) return settingsApi.updateOrganizationMember(accessToken ?? "", organizationId, payload.userId, updatePayload);
       return settingsApi.updateWorkspaceMember(accessToken ?? "", workspaceId ?? 0, payload.userId, updatePayload);
     },
-	    onSuccess: async () => {
-	      setRoleOpen(null);
-	      setRoleFormError(null);
-	      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+    onSuccess: async () => {
+      setRoleOpen(null);
+      setRoleFormError(null);
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
@@ -1160,7 +1172,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       return settingsApi.removeWorkspaceMember(accessToken ?? "", workspaceId ?? 0, userId);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Member removed" });
     },
     onError: (error) => addToast({ type: "error", title: "Remove member failed", message: error instanceof Error ? error.message : "Unable to remove member." })
@@ -1168,7 +1180,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const resendMutation = useMutation({
     mutationFn: (invitationId: number) => settingsApi.resendInvitation(accessToken ?? "", invitationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "invitations"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Invitation resent" });
     },
     onError: (error) => addToast({ type: "error", title: "Resend failed", message: error instanceof Error ? error.message : "Unable to resend invitation." })
@@ -1176,7 +1189,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const cancelInviteMutation = useMutation({
     mutationFn: (invitationId: number) => settingsApi.revokeInvitation(accessToken ?? "", invitationId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "invitations"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Invitation cancelled" });
     },
     onError: (error) => addToast({ type: "error", title: "Cancel invite failed", message: error instanceof Error ? error.message : "Unable to cancel invitation." })
@@ -1647,8 +1661,8 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
     onSuccess: async () => {
       setOpen(false);
       setFormError(null);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "teams"] });
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.teams });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Team created" });
     },
     onError: (error) => {
@@ -1920,7 +1934,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     mutationFn: (payload: { name: string; description?: string; scope: string }) => settingsApi.createRole(accessToken ?? "", { ...payload, is_system: false, is_editable: true }),
     onSuccess: async () => {
       setRoleCreateOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.roles });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Custom role created" });
     },
     onError: (error) => addToast({ type: "error", title: "Role create failed", message: error instanceof Error ? error.message : "Unable to create role." })
@@ -1929,7 +1944,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     mutationFn: (payload: { code: string; name: string; description?: string; module: string; scope: string; status: string }) => settingsApi.createPermission(accessToken ?? "", payload),
     onSuccess: async () => {
       setPermissionCreateOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.permissions });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Permission created" });
     },
     onError: (error) => addToast({ type: "error", title: "Permission create failed", message: error instanceof Error ? error.message : "Unable to create permission." })
@@ -1940,6 +1956,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       setAssignmentCreateOpen(false);
       setAssignmentFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role assignment created" });
     },
     onError: (error) => {
@@ -1952,6 +1969,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
     mutationFn: (assignmentId: number) => settingsApi.deleteRoleAssignment(accessToken ?? "", assignmentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments"] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role assignment revoked" });
     },
     onError: (error) => addToast({ type: "error", title: "Assignment revoke failed", message: error instanceof Error ? error.message : "Unable to revoke assignment." })
@@ -2193,7 +2211,8 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
     mutationFn: (payload: { name: string; description?: string; organization_id?: number; scope?: string }) => settingsApi.createRole(accessToken ?? "", payload),
     onSuccess: async () => {
       setOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.roles });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role created" });
     },
     onError: (error) => addToast({ type: "error", title: "Role create failed", message: error instanceof Error ? error.message : "Unable to create role." })
@@ -2201,7 +2220,8 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
   const deleteMutation = useMutation({
     mutationFn: (roleId: number) => settingsApi.deleteRole(accessToken ?? "", roleId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.roles });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role archived" });
     },
     onError: (error) => addToast({ type: "error", title: "Role archive failed", message: error instanceof Error ? error.message : "Unable to archive role." })
@@ -2276,7 +2296,8 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
     mutationFn: (payload: { code: string; name: string; description?: string }) => settingsApi.createPermission(accessToken ?? "", payload),
     onSuccess: async () => {
       setOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.permissions });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Permission created" });
     },
     onError: (error) => addToast({ type: "error", title: "Permission create failed", message: error instanceof Error ? error.message : "Unable to create permission." })
@@ -2284,7 +2305,8 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
   const deleteMutation = useMutation({
     mutationFn: (permissionId: number) => settingsApi.deletePermission(accessToken ?? "", permissionId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.permissions });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Permission archived" });
     },
     onError: (error) => addToast({ type: "error", title: "Permission archive failed", message: error instanceof Error ? error.message : "Unable to archive permission." })
@@ -2372,6 +2394,7 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
     mutationFn: (permissionId: number) => settingsApi.addRolePermission(accessToken ?? "", roleId, permissionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Permission assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Permission assignment failed", message: error instanceof Error ? error.message : "Unable to assign permission." })
@@ -2380,6 +2403,7 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
     mutationFn: (permissionId: number) => settingsApi.removeRolePermission(accessToken ?? "", roleId, permissionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Permission removed" });
     },
     onError: (error) => addToast({ type: "error", title: "Permission removal failed", message: error instanceof Error ? error.message : "Unable to remove permission." })

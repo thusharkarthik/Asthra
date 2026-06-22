@@ -1,0 +1,8 @@
+{
+  "serviceName": "media",
+  "purpose": "Central File Storage.",
+  "ownership": ["Attachments", "Images", "Documents", "File Metadata"],
+  "relationships": ["Provides file metadata and storage for records owned by other modules"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["CDN", "Media Processing", "Versioned Files"]
+}

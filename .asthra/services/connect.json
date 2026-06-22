@@ -1,0 +1,8 @@
+{
+  "serviceName": "connect",
+  "purpose": "External Integrations.",
+  "ownership": ["Connectors", "OAuth Connections", "Webhooks"],
+  "relationships": ["Connects Asthra to external systems", "Provides integration signals to Automation"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Marketplace", "Integration Templates"]
+}

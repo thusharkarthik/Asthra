@@ -1,0 +1,8 @@
+{
+  "serviceName": "core",
+  "purpose": "Identity, scope, membership, and access control.",
+  "ownership": ["Users", "Organizations", "Workspaces", "Projects", "Teams", "Roles", "Permissions", "Memberships"],
+  "relationships": ["Provides identity and scope to all services", "Provides permissions for platform access"],
+  "scope": ["platform", "organization", "workspace", "project", "team"],
+  "futureRoadmap": ["Scoped permission enforcement", "Invitation lifecycle", "Audit views", "Policy controls"]
+}
