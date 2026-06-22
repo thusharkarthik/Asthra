@@ -19,17 +19,16 @@ import { Button } from "@/components/ui/button";
 import { docsApi } from "@/services/api/docs-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 import type { Page, Space } from "@/types/docs";
 
 export default function DocsPage() {
   const [isCreateSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [isCreatePageOpen, setCreatePageOpen] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
-  const organizations = useWorkspaceStore((state) => state.organizations);
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
-  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const { organizations, workspaces, currentScope } = usePlatformContext();
+  const selectedOrganizationId = currentScope.organizationId;
+  const selectedWorkspaceId = currentScope.workspaceId;
   const recentViewed = useRecentItemsStore((state) => state.viewed).filter((item) => item.source === "docs");
   const hasOrganization = Boolean(selectedOrganizationId) || organizations.length > 0;
   const hasWorkspace = Boolean(selectedWorkspaceId) || workspaces.length > 0;

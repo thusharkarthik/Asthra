@@ -1,13 +1,10 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { useOrganizations } from "@/hooks/use-smart-context-cache";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 
 export function OrganizationSwitcher() {
-  const organizationsQuery = useOrganizations();
-  const { organizations: cachedOrganizations, selectedOrganizationId, setSelectedOrganization } = useWorkspaceStore();
-  const organizations = organizationsQuery.data ?? cachedOrganizations;
+  const { organizations, currentScope, setSelectedOrganization } = usePlatformContext();
 
   if (organizations.length === 0) {
     return (
@@ -20,7 +17,7 @@ export function OrganizationSwitcher() {
   return (
     <Select
       aria-label="Organization"
-      value={selectedOrganizationId ?? ""}
+      value={currentScope.organizationId ?? ""}
       onChange={(event) => setSelectedOrganization(Number(event.target.value))}
     >
       {organizations.map((organization) => (

@@ -26,19 +26,16 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { flowApi } from "@/services/api/flow-api";
 import { useAuthStore } from "@/stores/auth-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 
 export default function FlowPage() {
   const [isCreateOpen, setCreateOpen] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
-  const organizations = useWorkspaceStore((state) => state.organizations);
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const projects = useWorkspaceStore((state) => state.projects);
-  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
-  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
-  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
-  const selectedProject = projects.find((project) => project.id === selectedProjectId);
+  const { organizations, workspaces, projects, selectedProject, currentScope } = usePlatformContext();
+  const selectedOrganizationId = currentScope.organizationId;
+  const selectedWorkspaceId = currentScope.workspaceId;
+  const selectedProjectId = currentScope.projectId;
 
   const hasOrganization = Boolean(selectedOrganizationId) || organizations.length > 0;
   const hasWorkspace = Boolean(selectedWorkspaceId) || workspaces.length > 0;

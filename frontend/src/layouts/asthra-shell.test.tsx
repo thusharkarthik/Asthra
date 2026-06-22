@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AsthraShell } from "@/layouts/asthra-shell";
+import { PlatformContextProvider } from "@/context/platformContext";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
@@ -14,8 +15,39 @@ const navigationMock = (
   }
 ).__asthraNavigationMock;
 
+vi.mock("@/services/api/core-api", () => ({
+  coreApi: {
+    currentUser: vi.fn(async () => ({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true })),
+    listOrganizations: vi.fn(async () => [{ id: 1, name: "Asthra" }])
+  }
+}));
+
+vi.mock("@/services/api/workspace-api", () => ({
+  workspaceApi: {
+    listWorkspaces: vi.fn(async () => [{ id: 2, organization_id: 1, name: "Platform" }])
+  }
+}));
+
+vi.mock("@/services/api/project-api", () => ({
+  projectApi: {
+    listProjects: vi.fn(async () => [{ id: 3, workspace_id: 2, name: "Frontend" }])
+  }
+}));
+
+vi.mock("@/services/api/settings-api", () => ({
+  settingsApi: {
+    getCurrentPermissions: vi.fn(async () => ({ permission_codes: [], roles: [], scope: { scope_type: "project", scope_id: 3 } }))
+  }
+}));
+
 function renderShell(children: React.ReactNode) {
-  return render(<QueryProvider><AsthraShell>{children}</AsthraShell></QueryProvider>);
+  return render(
+    <QueryProvider>
+      <PlatformContextProvider>
+        <AsthraShell>{children}</AsthraShell>
+      </PlatformContextProvider>
+    </QueryProvider>
+  );
 }
 
 describe("AsthraShell", () => {

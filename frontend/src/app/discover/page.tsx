@@ -20,12 +20,13 @@ import { StatusBadge } from "@/components/modules/status-badge";
 import { Button } from "@/components/ui/button";
 import { discoverApi } from "@/services/api/discover-api";
 import { useAuthStore } from "@/stores/auth-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 
 export default function DiscoverPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
-  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const { currentScope } = usePlatformContext();
+  const selectedOrganizationId = currentScope.organizationId;
+  const selectedWorkspaceId = currentScope.workspaceId;
   const [ideaOpen, setIdeaOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
