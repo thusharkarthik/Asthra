@@ -6,6 +6,7 @@ import { EntityCreateDialog, EntityEditDialog, FormActions, FormField } from "@/
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { docsApi } from "@/services/api/docs-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -27,6 +28,7 @@ export function CreateSpaceDialog({ open, onOpenChange }: { open: boolean; onOpe
       setDescription("");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["docs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.docs.dashboardSummary(selectedWorkspaceId) });
       addToast({ type: "success", title: "Space created", message: "Docs was updated with the new space." });
     },
     onError: () => {
@@ -61,6 +63,7 @@ export function CreatePageDialog({ open, onOpenChange, spaces }: { open: boolean
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const [spaceId, setSpaceId] = useState<number | null>(spaces[0]?.id ?? null);
   const [parentPageId, setParentPageId] = useState("");
   const [status, setStatus] = useState("draft");
@@ -78,6 +81,7 @@ export function CreatePageDialog({ open, onOpenChange, spaces }: { open: boolean
       setStatus("draft");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["docs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.docs.dashboardSummary(selectedWorkspaceId) });
       addToast({ type: "success", title: "Page created", message: "Docs was updated with the new page." });
     },
     onError: () => {
@@ -126,6 +130,7 @@ export function EditSpaceDialog({ open, onOpenChange, space }: { open: boolean; 
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
+  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const [name, setName] = useState(space.name);
   const [description, setDescription] = useState(space.description ?? "");
 
@@ -139,6 +144,7 @@ export function EditSpaceDialog({ open, onOpenChange, space }: { open: boolean; 
     onSuccess: () => {
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["docs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.docs.dashboardSummary(selectedWorkspaceId) });
       addToast({ type: "success", title: "Space updated", message: "Space metadata was saved." });
     },
     onError: () => {

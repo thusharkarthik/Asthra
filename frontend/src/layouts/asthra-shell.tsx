@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
+import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { CommandPalette } from "@/components/navigation/command-palette";
 import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { SidebarNav } from "@/components/navigation/sidebar-nav";
@@ -86,8 +87,11 @@ export function AsthraShell({ children }: { children: ReactNode }) {
 
   if (!hasHydrated || !isAuthenticated) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Loading Asthra...
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <AsthraLogo markClassName="h-12 w-12 rounded-2xl" />
+          <span>Loading Asthra...</span>
+        </div>
       </main>
     );
   }
@@ -118,11 +122,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       >
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
             <div className="flex shrink-0 items-center gap-2 pr-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">A</div>
-              <div className="hidden leading-tight sm:block">
-                <div className="text-sm font-semibold">Asthra</div>
-                <div className="text-[11px] text-muted-foreground dark:text-white/55">Platform</div>
-              </div>
+              <AsthraLogo showWordmark subtitle="Platform" />
               <Button
                 size="icon"
                 variant="ghost"

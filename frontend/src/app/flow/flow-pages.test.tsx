@@ -96,6 +96,17 @@ function mockFlowFetch() {
     if (url.includes("/workflows")) {
       return new Response(JSON.stringify([workflowPayload]), { status: 200 });
     }
+    if (url.includes("/dashboard/summary")) {
+      return new Response(JSON.stringify({
+        project_id: 3,
+        open_work_items: 11,
+        in_progress_items: 5,
+        blocked_items: 2,
+        completed_items: 8,
+        active_sprints: 1,
+        active_releases: 1
+      }), { status: 200 });
+    }
     const customFieldPayload = [
       { id: 60, project_id: 3, name: "Customer Tier", field_type: "select", required: true, options: ["Free", "Pro"], created_at: "2026-01-01T00:00:00Z" },
       { id: 61, project_id: 3, name: "Needs Security Review", field_type: "checkbox", required: false, options: null, created_at: "2026-01-01T00:00:00Z" }
@@ -396,6 +407,7 @@ describe("Flow frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Flow" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Open Work Items")).toBeInTheDocument());
+    expect(screen.getByText("11")).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Build Flow UI").length).toBeGreaterThan(0));
   });
 

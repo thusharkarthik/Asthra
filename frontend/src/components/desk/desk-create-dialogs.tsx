@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DESK_CHANGE_STATUSES, DESK_PRIORITIES, DESK_RISK_LEVELS, DESK_TICKET_STATUSES } from "@/components/desk/desk-utils";
 import { deskApi } from "@/services/api/desk-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -53,6 +54,7 @@ export function CreateTicketDialog({ open, onOpenChange }: { open: boolean; onOp
       setStatus("open");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["desk", "tickets", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.desk.dashboardSummary(selectedWorkspaceId) });
     }
   });
 

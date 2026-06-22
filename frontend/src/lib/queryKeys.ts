@@ -49,26 +49,31 @@ export const queryKeys = {
   },
   flow: {
     all: ["flow"] as const,
+    dashboardSummary: (projectId?: number | null) => ["flow", "dashboard-summary", projectId ?? null] as const,
     workItems: (projectId?: number | null) => ["flow", "work-items", projectId ?? null] as const,
     sprints: (projectId?: number | null) => ["flow", "sprints", projectId ?? null] as const,
     releases: (projectId?: number | null) => ["flow", "releases", projectId ?? null] as const
   },
   docs: {
     all: ["docs"] as const,
+    dashboardSummary: (workspaceId?: number | null) => ["docs", "dashboard-summary", workspaceId ?? null] as const,
     spaces: (workspaceId?: number | null) => ["docs", "spaces", workspaceId ?? null] as const,
     pages: (workspaceId?: number | null, spaceId?: number | null) => ["docs", "pages", workspaceId ?? null, spaceId ?? null] as const
   },
   discover: {
     all: ["discover"] as const,
+    dashboardSummary: (workspaceId?: number | null) => ["discover", "dashboard-summary", workspaceId ?? null] as const,
     ideas: (workspaceId?: number | null) => ["discover", "ideas", workspaceId ?? null] as const,
     roadmap: (workspaceId?: number | null) => ["discover", "roadmap", workspaceId ?? null] as const
   },
   desk: {
     all: ["desk"] as const,
+    dashboardSummary: (workspaceId?: number | null) => ["desk", "dashboard-summary", workspaceId ?? null] as const,
     tickets: (workspaceId?: number | null) => ["desk", "tickets", workspaceId ?? null] as const
   },
   pulse: {
     all: ["pulse"] as const,
+    dashboardSummary: (workspaceId?: number | null) => ["pulse", "dashboard-summary", workspaceId ?? null] as const,
     incidents: (workspaceId?: number | null) => ["pulse", "incidents", workspaceId ?? null] as const
   },
   dev: {

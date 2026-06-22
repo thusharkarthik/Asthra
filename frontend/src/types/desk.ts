@@ -132,3 +132,11 @@ export type ChangeRequestCreate = {
   status?: string;
   requested_by_id?: number | null;
 };
+export type DeskDashboardSummary = {
+  id: number;
+  workspace_id: number;
+  open_tickets: number;
+  assigned_tickets: number;
+  in_progress_tickets: number;
+  resolved_tickets: number;
+};

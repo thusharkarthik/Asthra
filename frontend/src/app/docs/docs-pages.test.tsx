@@ -44,6 +44,9 @@ function mockDocsFetch() {
     if (url.includes("/api/core/api/v1/projects")) {
       return new Response(JSON.stringify([{ id: 3, workspace_id: 2, name: "Frontend", status: "active", is_active: true }]), { status: 200 });
     }
+    if (url.includes("/dashboard/summary")) {
+      return new Response(JSON.stringify({ workspace_id: 2, total_spaces: 3, total_pages: 12, draft_pages: 4, published_pages: 8 }), { status: 200 });
+    }
     if (url.includes("/pages/5/comments")) {
       return new Response(JSON.stringify([{ id: 1, page_id: 5, user_id: 1, content: "Helpful page" }]), { status: 200 });
     }
@@ -114,6 +117,7 @@ describe("Docs frontend screens", () => {
 
     expect(screen.getByRole("heading", { name: "Docs" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Total Spaces")).toBeInTheDocument());
+    expect(screen.getByText("12")).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText("Frontend Notes").length).toBeGreaterThan(0));
     expect(screen.getByText("Docs Explorer")).toBeInTheDocument();
   });

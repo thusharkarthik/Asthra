@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DISCOVER_IDEA_STATUSES, DISCOVER_REQUEST_STATUSES, DISCOVER_SENTIMENTS } from "@/components/discover/discover-utils";
 import { discoverApi } from "@/services/api/discover-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -59,6 +60,7 @@ export function CreateIdeaDialog({ open, onOpenChange }: { open: boolean; onOpen
       setStatus("captured");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["discover"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.discover.dashboardSummary(selectedWorkspaceId) });
     }
   });
 
@@ -121,6 +123,7 @@ export function CreateFeatureRequestDialog({ open, onOpenChange }: { open: boole
       setStatus("new");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["discover"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.discover.dashboardSummary(selectedWorkspaceId) });
     }
   });
 
@@ -174,6 +177,7 @@ export function CreateFeedbackDialog({ open, onOpenChange }: { open: boolean; on
       setSentiment("neutral");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["discover"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.discover.dashboardSummary(selectedWorkspaceId) });
     }
   });
 
@@ -226,6 +230,7 @@ export function CreateRoadmapItemDialog({ open, onOpenChange }: { open: boolean;
       setStatus("planned");
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["discover"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.discover.dashboardSummary(selectedWorkspaceId) });
     }
   });
 

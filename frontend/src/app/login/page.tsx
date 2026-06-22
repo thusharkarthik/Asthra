@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
@@ -43,9 +44,7 @@ export default function LoginPage() {
   return (
     <section className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="mb-6">
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-          A
-        </div>
+        <AsthraLogo className="mb-3" markClassName="h-10 w-10 rounded-md" />
         <h1 className="text-2xl font-semibold">Sign in</h1>
         <p className="mt-1 text-sm text-muted-foreground">Use your Asthra account to continue.</p>
       </div>

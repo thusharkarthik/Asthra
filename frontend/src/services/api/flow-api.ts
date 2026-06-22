@@ -13,6 +13,7 @@ import type {
   FlowAutomationRuleCreate,
   FlowAutomationRuleTestResult,
   FlowAutomationRuleUpdate,
+  FlowDashboardSummary,
   LinkedEntity,
   LinkedEntityCreate,
   ProjectHierarchy,
@@ -65,6 +66,9 @@ function toQuery(params: Record<string, string | number | boolean | null | undef
 }
 
 export const flowApi = {
+  getDashboardSummary(accessToken: string, projectId: number) {
+    return apiRequest<FlowDashboardSummary>(`${FLOW_PREFIX}/dashboard/summary${toQuery({ project_id: projectId })}`, { method: "GET", authToken: accessToken });
+  },
   listWorkItems(accessToken: string, filters: WorkItemFilters = {}) {
     return apiRequest<WorkItem[]>(`${FLOW_PREFIX}/work-items${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },

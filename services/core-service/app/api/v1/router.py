@@ -5,6 +5,7 @@ from app.api.v1 import (
     api_keys,
     auth,
     context,
+    dashboard,
     invitations,
     me,
     notifications,
@@ -42,5 +43,6 @@ api_router.include_router(role_templates.router, prefix="/role-templates", tags=
 api_router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
 api_router.include_router(context.router, prefix="/context", tags=["context"])
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(activity.router, prefix="/activity", tags=["activity"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])

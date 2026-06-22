@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { PulseBackLink, PulseBreadcrumbs } from "@/components/pulse/pulse-breadcrumbs";
 import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { pulseApi } from "@/services/api/pulse-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 
 export default function PulseIncidentDetailPage() {
@@ -31,6 +32,7 @@ export default function PulseIncidentDetailPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pulse", "incident", id] });
       await queryClient.invalidateQueries({ queryKey: ["pulse", "incidents"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.pulse.dashboardSummary(incidentQuery.data?.workspace_id) });
     }
   });
   const timelineMutation = useMutation({

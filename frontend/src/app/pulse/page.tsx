@@ -13,6 +13,7 @@ import { ModulePrimaryActions, ModuleSubnav } from "@/components/modules/product
 import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { SeverityBadge } from "@/components/modules/severity-badge";
 import { SLABadge } from "@/components/modules/sla-badge";
+import { queryKeys } from "@/lib/queryKeys";
 import { pulseApi } from "@/services/api/pulse-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -28,8 +29,14 @@ export default function PulsePage() {
     retry: 1
   });
   const incidentsQuery = useQuery({
-    queryKey: ["pulse", "incidents", selectedWorkspaceId],
+    queryKey: queryKeys.pulse.incidents(selectedWorkspaceId),
     queryFn: () => pulseApi.listIncidents(accessToken ?? "", { workspace_id: selectedWorkspaceId, limit: 5 }),
+    enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
+    retry: 1
+  });
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.pulse.dashboardSummary(selectedWorkspaceId),
+    queryFn: () => pulseApi.getDashboardSummary(accessToken ?? "", selectedWorkspaceId ?? 0),
     enabled: Boolean(accessToken) && Boolean(selectedWorkspaceId),
     retry: 1
   });
@@ -40,6 +47,7 @@ export default function PulsePage() {
   const sevOneTwo = incidents.filter((incident) => ["sev1", "sev2"].includes(incident.severity));
   const resolvedIncidents = incidents.filter((incident) => ["resolved", "closed"].includes(incident.status));
   const servicesAtRisk = new Set(activeIncidents.map((incident) => incident.impacted_service).filter(Boolean)).size;
+  const summary = summaryQuery.data && !Array.isArray(summaryQuery.data) ? summaryQuery.data : null;
 
   return (
     <div className="space-y-6">
@@ -49,9 +57,9 @@ export default function PulsePage() {
         <>
           <ModuleStatsGrid
             stats={[
-              { title: "Active Incidents", value: activeIncidents.length, description: "Incidents still in response" },
-              { title: "SEV1/SEV2", value: sevOneTwo.length, description: "High-severity reliability events" },
-              { title: "Resolved", value: resolvedIncidents.length, description: "Incidents closed or resolved" },
+              { title: "Active Incidents", value: summary?.active_incidents ?? activeIncidents.length, description: "Incidents still in response" },
+              { title: "SEV1/SEV2", value: summary ? summary.sev1_count + summary.sev2_count : sevOneTwo.length, description: "High-severity reliability events" },
+              { title: "Resolved", value: summary?.resolved_incidents ?? resolvedIncidents.length, description: "Incidents closed or resolved" },
               { title: "Services At Risk", value: servicesAtRisk, description: "Impacted services on active incidents" }
             ]}
           />

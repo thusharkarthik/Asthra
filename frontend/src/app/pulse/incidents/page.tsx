@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { PulseBreadcrumbs } from "@/components/pulse/pulse-breadcrumbs";
 import { pulseApi } from "@/services/api/pulse-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -63,6 +64,7 @@ export default function IncidentsPage() {
       setImpactedService("");
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["pulse", "incidents", selectedWorkspaceId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pulse.dashboardSummary(selectedWorkspaceId) });
     }
   });
 

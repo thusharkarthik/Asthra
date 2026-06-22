@@ -5,7 +5,11 @@ import { AppProviders } from "@/providers/app-providers";
 
 export const metadata: Metadata = {
   title: "Asthra",
-  description: "AI-native work platform"
+  description: "AI-native work platform",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

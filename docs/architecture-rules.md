@@ -44,6 +44,16 @@ Core owns platform context versions for organizations, workspaces, projects, and
 
 Future Redis or event-bus infrastructure can replace polling with pushed version changes.
 
+## Dashboard Read Models
+
+Dashboards should load summary cards from module summary/read-model endpoints instead of aggregating multiple live list queries in the frontend.
+
+- Services own their dashboard summary tables.
+- Summary endpoints return small scoped count payloads.
+- Mutations should invalidate affected list queries and affected dashboard summary queries.
+- Current refresh can be synchronous and service-local.
+- Future refresh should move to events without changing frontend endpoint contracts.
+
 ## API Gateway
 
 Frontend traffic should go through the API Gateway. The gateway routes requests but does not own service business logic.

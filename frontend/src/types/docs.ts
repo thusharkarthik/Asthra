@@ -10,6 +10,17 @@ export type Space = {
   updated_at?: string;
 };
 
+export type DocsDashboardSummary = {
+  id: number;
+  workspace_id: number;
+  total_spaces: number;
+  total_pages: number;
+  draft_pages: number;
+  published_pages: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Page = {
   id: number;
   space_id: number;

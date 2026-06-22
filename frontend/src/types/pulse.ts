@@ -106,3 +106,11 @@ export type IncidentAISummary = {
   customer_facing_update_draft?: string | null;
   raw_response?: string | null;
 };
+export type PulseDashboardSummary = {
+  id: number;
+  workspace_id: number;
+  active_incidents: number;
+  sev1_count: number;
+  sev2_count: number;
+  resolved_incidents: number;
+};

@@ -1,5 +1,6 @@
 from app.db.base_class import Base
 
+from app.models.dashboard_summary import DiscoverDashboardSummary  # noqa: E402,F401
 from app.models.feature_request import FeatureRequest  # noqa: E402,F401
 from app.models.discover_doc_link import DiscoverDocLink  # noqa: E402,F401
 from app.models.discover_flow_link import DiscoverFlowLink  # noqa: E402,F401

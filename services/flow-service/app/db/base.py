@@ -4,6 +4,7 @@ from app.models.audit_event import AuditEvent  # noqa: E402,F401
 from app.models.automation_rule import FlowAutomationRule  # noqa: E402,F401
 from app.models.board import Board, BoardColumn  # noqa: E402,F401
 from app.models.custom_field import CustomFieldDefinition, CustomFieldValue  # noqa: E402,F401
+from app.models.dashboard_summary import FlowDashboardSummary  # noqa: E402,F401
 from app.models.flow_activity import FlowActivity  # noqa: E402,F401
 from app.models.flow_notification import FlowNotification  # noqa: E402,F401
 from app.models.linked_entity import LinkedEntity  # noqa: E402,F401

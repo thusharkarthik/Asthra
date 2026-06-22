@@ -18,6 +18,7 @@ import { DeskSubnav } from "@/components/desk/desk-subnav";
 import { DESK_PRIORITIES, DESK_TICKET_STATUSES, deskDate, isSlaAtRisk, queueNameFor } from "@/components/desk/desk-utils";
 import { LinkedResourcesPanel } from "@/components/platform/linked-resources-panel";
 import { deskApi } from "@/services/api/desk-api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -41,6 +42,7 @@ export default function TicketDetailPage() {
       setFeedback("Ticket updated.");
       await queryClient.invalidateQueries({ queryKey: ["desk", "ticket", id] });
       await queryClient.invalidateQueries({ queryKey: ["desk", "tickets", selectedWorkspaceId] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.desk.dashboardSummary(selectedWorkspaceId) });
     },
     onError: () => setFeedback("Unable to update ticket.")
   });

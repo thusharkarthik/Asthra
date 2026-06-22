@@ -5,6 +5,7 @@ import type {
   IncidentAISummary,
   OnCallSchedule,
   Postmortem,
+  PulseDashboardSummary,
   PulseIncident,
   PulseIncidentCreate,
   PulseIncidentUpdate,
@@ -25,6 +26,9 @@ function toQuery(params: Record<string, string | number | boolean | null | undef
 }
 
 export const pulseApi = {
+  getDashboardSummary(accessToken: string, workspaceId: number) {
+    return apiRequest<PulseDashboardSummary>(`${PULSE_PREFIX}/dashboard/summary${toQuery({ workspace_id: workspaceId })}`, { method: "GET", authToken: accessToken });
+  },
   listAlerts(accessToken: string, filters: { workspace_id?: number | null; status?: string; severity?: string; limit?: number } = {}) {
     return apiRequest<Alert[]>(`${PULSE_PREFIX}/alerts${toQuery(filters)}`, { method: "GET", authToken: accessToken });
   },

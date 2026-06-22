@@ -183,3 +183,13 @@ export type FeedbackCreate = {
   content: string;
   sentiment?: string | null;
 };
+export type DiscoverDashboardSummary = {
+  id: number;
+  workspace_id: number;
+  total_ideas: number;
+  reviewing: number;
+  validating: number;
+  approved: number;
+  rejected: number;
+  converted_to_work: number;
+};
