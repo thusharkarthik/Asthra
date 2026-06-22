@@ -7,6 +7,13 @@ import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
+
+const AUTH_LOGIN_TRANSITION_MS = 1850;
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,15 +21,17 @@ export default function LoginPage() {
   const isLoading = useAuthStore((state) => state.isLoading);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const storeError = useAuthStore((state) => state.error);
+  const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isTransitioning) {
       router.replace("/");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isTransitioning, router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,9 +43,15 @@ export default function LoginPage() {
     }
 
     try {
+      setIsTransitioning(true);
       await login({ email: email.trim(), password });
+      setAuthTransition("login");
+      await wait(AUTH_LOGIN_TRANSITION_MS);
+      setAuthTransition(null);
       router.replace("/");
     } catch {
+      setIsTransitioning(false);
+      setAuthTransition(null);
       setFormError(null);
     }
   };
