@@ -30,7 +30,8 @@ vi.mock("@/services/api/settings-api", () => ({
         "settings.member.invite",
         "settings.member.remove",
         "settings.role.manage",
-        "settings.permission.manage"
+        "settings.permission.manage",
+        "settings.team.manage"
       ],
       roles: [{ id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", source_scope_type: "workspace", source_scope_id: 2 }],
       scope: { scope_type: "workspace", scope_id: 2 }
@@ -87,10 +88,16 @@ vi.mock("@/services/api/settings-api", () => ({
     })),
     listRolePermissions: vi.fn(async (_token: string, roleId: number) => roleId === 4 ? [{ id: 15, role_id: 4, permission_id: 5 }] : roleId === 8 ? [{ id: 16, role_id: 8, permission_id: 6 }, { id: 17, role_id: 8, permission_id: 7 }] : []),
     createOrganization: vi.fn(),
+    updateOrganization: vi.fn(async (_token: string, organizationId: number, payload: { name?: string; description?: string; is_active?: boolean }) => ({
+      id: organizationId,
+      name: payload.name ?? "Asthra",
+      description: payload.description ?? "Updated org",
+      is_active: payload.is_active ?? true
+    })),
     createWorkspace: vi.fn(),
     createProject: vi.fn(),
     createInvitation: vi.fn(),
-    createTeam: vi.fn(),
+    createTeam: vi.fn(async (_token: string, payload: { workspace_id: number; name: string; description?: string }) => ({ id: 9, workspace_id: payload.workspace_id, name: payload.name, description: payload.description, created_by_id: 1, is_active: true })),
     deleteTeam: vi.fn(),
     createRole: vi.fn(),
     deleteRole: vi.fn(),
@@ -200,6 +207,28 @@ describe("Settings frontend screens", () => {
     expect(screen.getAllByText("Permissions").length).toBeGreaterThan(0);
     expect(screen.getByText("Back to Organizations")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Organizations.*Asthra/);
+    expect(screen.getByRole("button", { name: "Edit Organization" })).toBeInTheDocument();
+  });
+
+  it("edits organization details", async () => {
+    renderWithQuery(<OrganizationDetailView organizationId={1} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Organization" }));
+    fireEvent.change(screen.getByDisplayValue("Asthra"), { target: { value: "Asthra Labs" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Organization" }));
+    await waitFor(() => expect(settingsApi.updateOrganization).toHaveBeenCalledWith("token", 1, expect.objectContaining({ name: "Asthra Labs" })));
+  });
+
+  it("hides organization edit for auditor permissions", async () => {
+    vi.mocked(settingsApi.getCurrentPermissions).mockResolvedValueOnce({
+      permission_codes: ["settings.organization.view"],
+      roles: [{ id: 10, name: "Organization Auditor", key: "organization_auditor", scope: "organization", source_scope_type: "organization", source_scope_id: 1 }],
+      scope: { scope_type: "organization", scope_id: 1 }
+    });
+    renderWithQuery(<OrganizationDetailView organizationId={1} />);
+
+    expect(await screen.findByText("View only")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit Organization" })).not.toBeInTheDocument();
   });
 
   it("renders workspace tabs", async () => {
@@ -300,6 +329,10 @@ describe("Settings frontend screens", () => {
   it("renders teams and team detail", async () => {
     renderWithQuery(<TeamsSettingsPage />);
     expect(await screen.findByText("Engineering")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create Team" }));
+    fireEvent.change(screen.getByPlaceholderText("Engineering"), { target: { value: "Platform Team" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Team" })[1]);
+    await waitFor(() => expect(settingsApi.createTeam).toHaveBeenCalledWith("token", expect.objectContaining({ workspace_id: 2, name: "Platform Team" })));
     renderWithQuery(<TeamDetailView teamId={6} />);
     expect(await screen.findByText("Assign Member")).toBeInTheDocument();
   });

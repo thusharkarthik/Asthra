@@ -10,17 +10,19 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.team_repository import TeamRepository
 from app.schemas.team import TeamCreate, TeamMemberCreate, TeamUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.notification_service import NotificationService
 
 
 class TeamService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.team_repository = TeamRepository(db)
 
     def create(self, team_create: TeamCreate, current_user: User) -> Team:
         self._ensure_active_user(current_user)
         workspace = self._get_active_workspace(team_create.workspace_id)
-        self._ensure_workspace_access(workspace, current_user)
+        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", workspace.id)
 
         slug = self._build_unique_slug(workspace_id=workspace.id, name=team_create.name)
         return self.team_repository.create_with_owner(
@@ -45,15 +47,17 @@ class TeamService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Team not found.",
             )
-        self._ensure_workspace_access(team.workspace, current_user)
+        self._ensure_team_view_access(team, current_user)
         return team
 
     def update(self, team_id: int, team_update: TeamUpdate, current_user: User) -> Team:
         team = self.get(team_id, current_user)
+        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
         return self.team_repository.update(team, team_update)
 
     def delete(self, team_id: int, current_user: User) -> None:
         team = self.get(team_id, current_user)
+        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
         self.team_repository.update(team, TeamUpdate(is_active=False))
 
     def add_member(
@@ -63,6 +67,7 @@ class TeamService:
         current_user: User,
     ) -> TeamMember:
         team = self.get(team_id, current_user)
+        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
         target_user = self.team_repository.get_user(member_create.user_id)
         if target_user is None or not target_user.is_active:
             raise HTTPException(
@@ -105,6 +110,7 @@ class TeamService:
 
     def remove_member(self, team_id: int, user_id: int, current_user: User) -> None:
         team = self.get(team_id, current_user)
+        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
         member = self.team_repository.get_member(team.id, user_id)
         if member is None:
             raise HTTPException(
@@ -138,10 +144,22 @@ class TeamService:
             return
         if self.team_repository.is_workspace_member(workspace.id, user.id):
             return
+        access = AccessControlService(self.db)
+        if access.can(user.id, "settings.workspace.view", "workspace", workspace.id) or access.can(user.id, "settings.team.view", "workspace", workspace.id):
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this workspace.",
         )
+
+    def _ensure_team_view_access(self, team: Team, user: User) -> None:
+        try:
+            AccessControlService(self.db).require(user, "settings.team.view", "workspace", team.workspace_id)
+            return
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_403_FORBIDDEN:
+                raise
+        self._ensure_workspace_access(team.workspace, user)
 
     def _build_unique_slug(self, *, workspace_id: int, name: str) -> str:
         base_slug = self._slugify(name)

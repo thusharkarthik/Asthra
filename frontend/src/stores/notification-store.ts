@@ -13,6 +13,7 @@ type NotificationState = {
   markRead: (id: string) => void;
   markAllRead: () => void;
   addNotification: (notification: NotificationItem) => void;
+  dismissNotification: (id: string) => void;
 };
 
 export const useNotificationStore = create<NotificationState>()(
@@ -21,7 +22,8 @@ export const useNotificationStore = create<NotificationState>()(
       notifications: seedNotifications,
       markRead: (id) => set((state) => ({ notifications: state.notifications.map((item) => item.id === id ? { ...item, unread: false } : item) })),
       markAllRead: () => set((state) => ({ notifications: state.notifications.map((item) => ({ ...item, unread: false })) })),
-      addNotification: (notification) => set((state) => ({ notifications: [notification, ...state.notifications] }))
+      addNotification: (notification) => set((state) => ({ notifications: [notification, ...state.notifications] })),
+      dismissNotification: (id) => set((state) => ({ notifications: state.notifications.filter((item) => item.id !== id) }))
     }),
     {
       name: "asthra-notifications",

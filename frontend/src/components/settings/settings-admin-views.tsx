@@ -747,12 +747,47 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
 }
 
 export function OrganizationDetailView({ organizationId }: { organizationId: number }) {
-  const { organizations, workspaces } = useSettingsData();
+  const { accessToken, organizations, workspaces } = useSettingsData();
+  const [editOpen, setEditOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const organization = organizations.find((item) => item.id === organizationId);
   const scopedWorkspaces = workspaces.filter((workspace) => workspace.organization_id === organizationId);
+  const permissions = useCurrentPermissions({ orgId: organizationId });
+  const canEditOrganization = permissions.can("settings.organization.manage");
+  const updateMutation = useMutation({
+    mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateOrganization(accessToken ?? "", organizationId, payload),
+    onSuccess: async (updatedOrganization) => {
+      setEditOpen(false);
+      setFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      addToast({ type: "success", title: "Organization updated", message: `${updatedOrganization.name} was saved.` });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to update organization.";
+      setFormError(message);
+      addToast({ type: "error", title: "Organization update failed", message });
+    }
+  });
 
   if (!organization) {
     return <SettingsEmptyState title="Organization not found" description="Refresh the page or open the organizations list." action={<SettingsLinkButton href="/settings/organizations">Organizations</SettingsLinkButton>} />;
+  }
+
+  function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = getFormValue(form, "name");
+    if (!name) {
+      setFormError("Organization name is required.");
+      return;
+    }
+    updateMutation.mutate({
+      name,
+      description: getFormValue(form, "description") || undefined,
+      is_active: getFormValue(form, "is_active") === "true"
+    });
   }
 
   return (
@@ -767,7 +802,12 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         meta: `Status: ${organization.is_active === false ? "Inactive" : "Active"}`
       }}
     >
-      <SettingsSectionHeader title={organization.name} description={organization.description ?? "Organization administration and setup."} />
+      <SettingsSectionHeader
+        title={organization.name}
+        description={organization.description ?? "Organization administration and setup."}
+        actions={canEditOrganization ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Organization</Button> : undefined}
+      />
+      {!canEditOrganization ? <SettingsCard title="View only" description="You can view this organization, but do not have settings.organization.manage for edit actions." /> : null}
       <AdminTabs
         tabs={[
           { label: "Overview", href: `/settings/organizations/${organizationId}`, active: true },
@@ -791,6 +831,22 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         emptyMessage="No workspaces in this organization"
       />
       <SettingsDangerZone description="Organization deletion and ownership transfer are intentionally deferred for the operational foundation." />
+      <SettingsCreateDialog title="Edit organization" open={editOpen} onOpenChange={setEditOpen} onSubmit={submitEdit} error={formError}>
+        <FormField label="Name" required>
+          <Input name="name" defaultValue={organization.name} />
+        </FormField>
+        <FormField label="Description">
+          <Input name="description" defaultValue={organization.description ?? ""} />
+        </FormField>
+        <FormField label="Status">
+          <select name="is_active" defaultValue={String(organization.is_active !== false)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </FormField>
+        <p className="text-xs text-muted-foreground">Domain editing is not available because core-service does not store an organization domain field yet.</p>
+        <FormActions submitLabel="Save Organization" isSubmitting={updateMutation.isPending} onCancel={() => setEditOpen(false)} />
+      </SettingsCreateDialog>
     </SettingsLayout>
   );
 }
@@ -1025,6 +1081,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const membersQuery = useQuery<Array<{ user_id: number; role_id?: number | null; member_role: string }>>({
@@ -1089,9 +1146,10 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       if (organizationId) return settingsApi.updateOrganizationMember(accessToken ?? "", organizationId, payload.userId, updatePayload);
       return settingsApi.updateWorkspaceMember(accessToken ?? "", workspaceId ?? 0, payload.userId, updatePayload);
     },
-    onSuccess: async () => {
-      setRoleOpen(null);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+	    onSuccess: async () => {
+	      setRoleOpen(null);
+	      setRoleFormError(null);
+	      await queryClient.invalidateQueries({ queryKey: ["settings"] });
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
@@ -1272,7 +1330,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             "Not tracked yet",
             <div key={row.userId} className="flex flex-wrap gap-2">
               <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
-              {canChangeRoles ? <Button type="button" size="sm" variant="outline" onClick={() => setRoleOpen(row.userId)}>Change Role</Button> : null}
+	      {canChangeRoles ? <Button type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</Button> : null}
               {canRemoveMembers ? (
                 <ConfirmActionButton
                   label="Remove"
@@ -1297,11 +1355,15 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         </FormField>
         <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => setInviteOpen(false)} />
       </SettingsCreateDialog>
-      <SettingsCreateDialog title="Change role" open={roleOpen !== null} onOpenChange={(open) => setRoleOpen(open ? roleOpen : null)} onSubmit={(event) => {
+      <SettingsCreateDialog title="Change role" open={roleOpen !== null} onOpenChange={(open) => { setRoleOpen(open ? roleOpen : null); if (!open) setRoleFormError(null); }} onSubmit={(event) => {
         event.preventDefault();
         const roleId = Number(getFormValue(event.currentTarget, "role_id"));
+        if (!roleId) {
+          setRoleFormError("Select a role.");
+          return;
+        }
         if (roleOpen && roleId) roleMutation.mutate({ userId: roleOpen, roleId });
-      }}>
+      }} error={roleFormError}>
         <FormField label="Role" required>
           <select name="role_id" aria-label="Change member role" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
             <RoleSelectOptions groupedRoles={groupedInviteRoles} includeDefault={false} />
@@ -1566,17 +1628,27 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
+  const visibleWorkspaces = workspaceId
+    ? workspaces.filter((workspace) => workspace.id === workspaceId)
+    : selectedOrganizationId
+      ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
+      : workspaces;
+  const targetWorkspaceId = workspaceId ?? selectedWorkspaceId ?? visibleWorkspaces[0]?.id;
+  const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
+  const canCreateTeam = permissions.can("settings.team.manage");
   const teamsQuery = useQuery({ queryKey: ["settings", "teams"], queryFn: () => settingsApi.listTeams(accessToken ?? ""), enabled: Boolean(accessToken) });
   const teams = (teamsQuery.data ?? [])
-    .filter((team: TeamRecord) => (workspaceId ? team.workspace_id === workspaceId : true))
+    .filter((team: TeamRecord) => visibleWorkspaces.some((workspace) => workspace.id === team.workspace_id))
     .filter((team: TeamRecord) => `${team.name} ${team.description ?? ""}`.toLowerCase().includes(search.toLowerCase()));
-  const targetWorkspaceId = workspaceId ?? selectedWorkspaceId ?? workspaces[0]?.id;
   const mutation = useMutation({
     mutationFn: (payload: { workspace_id: number; name: string; description?: string }) => settingsApi.createTeam(accessToken ?? "", payload),
     onSuccess: async () => {
       setOpen(false);
+      setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "teams"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
       addToast({ type: "success", title: "Team created" });
     },
     onError: (error) => {
@@ -1595,12 +1667,13 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
   });
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const workspace_id = Number(getFormValue(event.currentTarget, "workspace_id") || targetWorkspaceId);
     const name = getFormValue(event.currentTarget, "name");
-    if (!targetWorkspaceId || !name) {
+    if (!workspace_id || !name) {
       setFormError("Workspace and team name are required.");
       return;
     }
-    mutation.mutate({ workspace_id: targetWorkspaceId, name, description: getFormValue(event.currentTarget, "description") || undefined });
+    mutation.mutate({ workspace_id, name, description: getFormValue(event.currentTarget, "description") || undefined });
   }
   return (
     <SettingsLayout
@@ -1628,7 +1701,8 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Teams" description="Create lightweight workspace teams for future ownership and permissions." actions={<QuickCreateButton onClick={() => setOpen(true)}>Create Team</QuickCreateButton>} />
+      <SettingsSectionHeader title="Teams" description="Create lightweight workspace teams for future ownership and permissions." actions={canCreateTeam ? <QuickCreateButton onClick={() => setOpen(true)}>Create Team</QuickCreateButton> : undefined} />
+      {!canCreateTeam ? <SettingsCard title="Limited access" description="You need settings.team.manage to create teams in this workspace scope." /> : null}
       <SearchBox value={search} onChange={setSearch} placeholder="Search teams" />
       <SettingsDataTable
         columns={["Name", "Description", "Members Count", "Lead", "Status", "Actions"]}
@@ -1647,6 +1721,11 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
         emptyMessage="No teams yet"
       />
       <SettingsCreateDialog title="Create team" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
+        <FormField label="Workspace" required>
+          <select name="workspace_id" defaultValue={targetWorkspaceId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm" disabled={Boolean(workspaceId)}>
+            {visibleWorkspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+          </select>
+        </FormField>
         <FormField label="Name" required><Input name="name" placeholder="Engineering" /></FormField>
         <FormField label="Description"><Input name="description" placeholder="Build and operations team" /></FormField>
         <FormActions submitLabel="Create Team" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />

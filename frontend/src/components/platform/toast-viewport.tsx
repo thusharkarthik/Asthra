@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToastStore } from "@/stores/toast-store";
@@ -8,6 +9,12 @@ import { cn } from "@/lib/utils";
 export function ToastViewport() {
   const toasts = useToastStore((state) => state.toasts);
   const removeToast = useToastStore((state) => state.removeToast);
+
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timers = toasts.map((toast) => window.setTimeout(() => removeToast(toast.id), 4000));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [removeToast, toasts]);
 
   if (toasts.length === 0) return null;
 

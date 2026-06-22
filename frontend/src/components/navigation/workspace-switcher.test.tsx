@@ -15,11 +15,13 @@ describe("workspace context selectors", () => {
       ],
       workspaces: [
         { id: 10, organization_id: 1, name: "Platform" },
-        { id: 11, organization_id: 1, name: "Research" }
+        { id: 11, organization_id: 1, name: "Research" },
+        { id: 12, organization_id: 2, name: "Labs Workspace" }
       ],
       projects: [
         { id: 20, workspace_id: 10, name: "Frontend" },
-        { id: 21, workspace_id: 10, name: "Gateway" }
+        { id: 21, workspace_id: 10, name: "Gateway" },
+        { id: 22, workspace_id: 12, name: "Labs Project" }
       ],
       selectedOrganizationId: 1,
       selectedWorkspaceId: 10,
@@ -40,17 +42,15 @@ describe("workspace context selectors", () => {
     expect(useWorkspaceStore.getState().selectedOrganizationId).toBe(2);
     expect(useWorkspaceStore.getState().selectedWorkspaceId).toBeNull();
 
-    act(() => {
-      useWorkspaceStore.setState({ selectedWorkspaceId: 10, selectedProjectId: 20 });
-    });
-    fireEvent.change(screen.getByLabelText("Workspace"), { target: { value: "11" } });
-    expect(useWorkspaceStore.getState().selectedWorkspaceId).toBe(11);
+    expect(screen.queryByText("Platform")).not.toBeInTheDocument();
+    expect(screen.getByText("Labs Workspace")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Workspace"), { target: { value: "12" } });
+    expect(useWorkspaceStore.getState().selectedWorkspaceId).toBe(12);
     expect(useWorkspaceStore.getState().selectedProjectId).toBeNull();
 
-    act(() => {
-      useWorkspaceStore.setState({ selectedProjectId: 20 });
-    });
-    fireEvent.change(screen.getByLabelText("Project"), { target: { value: "21" } });
-    expect(useWorkspaceStore.getState().selectedProjectId).toBe(21);
+    expect(screen.queryByText("Frontend")).not.toBeInTheDocument();
+    expect(screen.getByText("Labs Project")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Project"), { target: { value: "22" } });
+    expect(useWorkspaceStore.getState().selectedProjectId).toBe(22);
   });
 });

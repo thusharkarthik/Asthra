@@ -237,6 +237,12 @@ export const settingsApi = {
   markNotificationRead(token: string, notificationId: number) {
     return apiRequest<CoreNotificationRecord>(`${CORE_PREFIX}/notifications/${notificationId}/read`, { method: "PATCH", authToken: token });
   },
+  markAllNotificationsRead(token: string) {
+    return apiRequest<{ updated: number }>(`${CORE_PREFIX}/notifications/read-all`, { method: "PATCH", authToken: token });
+  },
+  deleteNotification(token: string, notificationId: number) {
+    return apiRequest<void>(`${CORE_PREFIX}/notifications/${notificationId}`, { method: "DELETE", authToken: token });
+  },
   getUser(token: string, userId: number) {
     return apiRequest<CoreUser>(`${CORE_PREFIX}/users/${userId}`, { method: "GET", authToken: token });
   },

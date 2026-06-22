@@ -6,7 +6,7 @@ from app.schemas.base import TimestampedRead
 
 
 class TeamCreate(BaseModel):
-    workspace_id: int
+    workspace_id: int = Field(gt=0)
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
 

@@ -32,18 +32,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const selectedOrganizationId = organizations.some((organization) => organization.id === current)
           ? current
           : organizations[0]?.id ?? null;
-        set({ organizations, selectedOrganizationId });
+        const selectedWorkspace = get().workspaces.find((workspace) => workspace.id === get().selectedWorkspaceId);
+        const nextWorkspaceId = selectedWorkspace?.organization_id === selectedOrganizationId ? selectedWorkspace.id : null;
+        const selectedProject = get().projects.find((project) => project.id === get().selectedProjectId);
+        set({
+          organizations,
+          selectedOrganizationId,
+          selectedWorkspaceId: nextWorkspaceId,
+          selectedProjectId: selectedProject?.workspace_id === nextWorkspaceId ? selectedProject.id : null
+        });
       },
       setWorkspaces: (workspaces) => {
+        const selectedOrganizationId = get().selectedOrganizationId;
+        const scopedWorkspaces = selectedOrganizationId ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId) : workspaces;
         const current = get().selectedWorkspaceId;
-        const selectedWorkspaceId = workspaces.some((workspace) => workspace.id === current)
+        const selectedWorkspaceId = scopedWorkspaces.some((workspace) => workspace.id === current)
           ? current
-          : workspaces[0]?.id ?? null;
-        set({ workspaces, selectedWorkspaceId });
+          : scopedWorkspaces[0]?.id ?? null;
+        const selectedProject = get().projects.find((project) => project.id === get().selectedProjectId);
+        set({
+          workspaces,
+          selectedWorkspaceId,
+          selectedProjectId: selectedProject?.workspace_id === selectedWorkspaceId ? selectedProject.id : null
+        });
       },
       setProjects: (projects) => {
+        const selectedWorkspaceId = get().selectedWorkspaceId;
+        const scopedProjects = selectedWorkspaceId ? projects.filter((project) => project.workspace_id === selectedWorkspaceId) : projects;
         const current = get().selectedProjectId;
-        const selectedProjectId = projects.some((project) => project.id === current) ? current : projects[0]?.id ?? null;
+        const selectedProjectId = scopedProjects.some((project) => project.id === current) ? current : scopedProjects[0]?.id ?? null;
         set({ projects, selectedProjectId });
       },
       setSelectedOrganization: (organizationId) =>
