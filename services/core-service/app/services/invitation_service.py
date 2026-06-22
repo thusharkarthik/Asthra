@@ -11,6 +11,7 @@ from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.invitation import InvitationAccept, InvitationCreate
 from app.services.access_control_service import AccessControlService
 from app.services.activity_service import ActivityService
+from app.services.context_version_service import ContextVersionService
 from app.services.notification_service import NotificationService
 
 
@@ -107,6 +108,8 @@ class InvitationService:
                 entity_type="invitation",
                 entity_id=str(invitation.id),
             )
+        ContextVersionService(self.db).bump_access(permission_scope_type, permission_scope_id)
+        self.db.commit()
         return invitation
 
     def list(self, current_user: User) -> list[Invitation]:
@@ -163,6 +166,11 @@ class InvitationService:
             entity_type="invitation",
             entity_id=str(invitation.id),
         )
+        ContextVersionService(self.db).bump_access(
+            "workspace" if invitation.workspace_id is not None else "organization",
+            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
+        )
+        self.db.commit()
         return invitation
 
     def revoke(self, invitation_id: int, current_user: User) -> Invitation:
@@ -180,6 +188,11 @@ class InvitationService:
             action="invitation.cancelled",
             description=f"Invitation for {invitation.email} was cancelled.",
         )
+        ContextVersionService(self.db).bump_access(
+            "workspace" if invitation.workspace_id is not None else "organization",
+            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
+        )
+        self.db.commit()
         return invitation
 
     def resend(self, invitation_id: int, current_user: User) -> Invitation:

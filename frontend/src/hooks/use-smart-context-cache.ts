@@ -12,6 +12,8 @@ import {
   useProjects,
   useWorkspaces
 } from "@/hooks/use-platform-queries";
+import { useContextVersion } from "@/hooks/use-context-version";
+import { useContextVersionStore } from "@/stores/context-version-store";
 
 export { useCan, useCurrentPermissions, useCurrentUser, useOrganizations, useProjects, useWorkspaces };
 
@@ -39,6 +41,11 @@ export function useSmartContextCache() {
   const workspacesQuery = useWorkspaces(scope.organizationId);
   const projectsQuery = useProjects(scope.workspaceId);
   const permissionsQuery = useCurrentPermissions();
+  const contextVersionQuery = useContextVersion({
+    organizationId: scope.organizationId,
+    workspaceId: scope.workspaceId,
+    projectId: scope.projectId
+  });
 
   return {
     scope,
@@ -46,16 +53,19 @@ export function useSmartContextCache() {
     workspacesQuery,
     projectsQuery,
     permissionsQuery,
+    contextVersionQuery,
     isLoading: organizationsQuery.isLoading || workspacesQuery.isLoading || projectsQuery.isLoading || permissionsQuery.isLoading,
-    error: organizationsQuery.error ?? workspacesQuery.error ?? projectsQuery.error ?? permissionsQuery.error
+    error: organizationsQuery.error ?? workspacesQuery.error ?? projectsQuery.error ?? permissionsQuery.error ?? contextVersionQuery.error
   };
 }
 
 export function useClearContextCache() {
   const queryClient = useQueryClient();
   const resetContext = useWorkspaceStore((state) => state.resetContext);
+  const clearVersionSnapshot = useContextVersionStore((state) => state.clearSnapshot);
   return () => {
     resetContext();
+    clearVersionSnapshot();
     queryClient.removeQueries({ queryKey: queryKeys.context.all });
     queryClient.removeQueries({ queryKey: queryKeys.organizations.all });
     queryClient.removeQueries({ queryKey: queryKeys.workspaces.all });

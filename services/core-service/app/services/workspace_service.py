@@ -10,6 +10,7 @@ from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 
 
@@ -52,6 +53,9 @@ class WorkspaceService:
             entity_type="workspace",
             entity_id=str(workspace.id),
         )
+        ContextVersionService(self.db).bump_organization_context(workspace.organization_id)
+        self.db.commit()
+        self.db.refresh(workspace)
         return workspace
 
     def list(self, current_user: User) -> list[Workspace]:
@@ -89,7 +93,11 @@ class WorkspaceService:
             "workspace",
             workspace.id,
         )
-        return self.workspace_repository.update(workspace, workspace_update)
+        workspace = self.workspace_repository.update(workspace, workspace_update)
+        ContextVersionService(self.db).bump_workspace_context(workspace.id)
+        self.db.commit()
+        self.db.refresh(workspace)
+        return workspace
 
     def delete(self, workspace_id: int, current_user: User) -> None:
         workspace = self.get(workspace_id, current_user)
@@ -100,6 +108,8 @@ class WorkspaceService:
             workspace.id,
         )
         self.workspace_repository.update(workspace, WorkspaceUpdate(is_active=False))
+        ContextVersionService(self.db).bump_workspace_context(workspace.id)
+        self.db.commit()
 
     def list_members(self, workspace_id: int, current_user: User) -> list[WorkspaceMember]:
         self.get(workspace_id, current_user)

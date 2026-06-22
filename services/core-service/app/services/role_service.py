@@ -11,6 +11,7 @@ from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
 from app.schemas.role import RoleCreate, RolePermissionCreate, RolePermissionsReplace, RoleUpdate, UserRoleCreate
 from app.services.activity_service import ActivityService
+from app.services.context_version_service import ContextVersionService
 from app.services.notification_service import NotificationService
 
 
@@ -219,6 +220,8 @@ class RoleService:
             action="role.created",
             description=f"Role '{role.name}' was created.",
         )
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
         return role
 
     def list(self, current_user: User) -> list[Role]:
@@ -264,7 +267,11 @@ class RoleService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A role with this name already exists in this scope.",
             )
-        return self.role_repository.update(role, role_update)
+        role = self.role_repository.update(role, role_update)
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
+        self.db.refresh(role)
+        return role
 
     def delete(self, role_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
@@ -272,6 +279,8 @@ class RoleService:
         if not role.is_editable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         self.role_repository.update(role, RoleUpdate(is_active=False))
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
 
     def link_permission(
         self,
@@ -291,7 +300,11 @@ class RoleService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Permission is already linked to this role.",
             )
-        return self.role_repository.link_permission(role.id, permission.id)
+        role_permission = self.role_repository.link_permission(role.id, permission.id)
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
+        self.db.refresh(role_permission)
+        return role_permission
 
     def list_permissions(self, role_id: int, current_user: User) -> list[RolePermission]:
         role = self.get(role_id, current_user)
@@ -312,7 +325,10 @@ class RoleService:
             permission = self.permission_repository.get_by_id(permission_id)
             if permission is None or not permission.is_active:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Permission {permission_id} not found.")
-        return self.role_repository.replace_permissions(role.id, permission_ids)
+        role_permissions = self.role_repository.replace_permissions(role.id, permission_ids)
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
+        return role_permissions
 
     def unlink_permission(self, role_id: int, permission_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
@@ -326,6 +342,8 @@ class RoleService:
                 detail="Role permission link not found.",
             )
         self.role_repository.unlink_permission(role_permission)
+        ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        self.db.commit()
 
     def assign_user_role(
         self,
@@ -356,6 +374,8 @@ class RoleService:
             entity_type="role",
             entity_id=str(role.id),
         )
+        ContextVersionService(self.db).bump_access("platform", None)
+        self.db.commit()
         return user_role
 
     def list_user_roles(self, user_id: int, current_user: User) -> list[UserRole]:
@@ -375,6 +395,8 @@ class RoleService:
         if user_role is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found.")
         self.role_repository.remove_user_role(user_role)
+        ContextVersionService(self.db).bump_access("platform", None)
+        self.db.commit()
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:

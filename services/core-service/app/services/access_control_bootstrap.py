@@ -17,24 +17,33 @@ def initialize_access_control(engine: Engine, db: Session) -> None:
 def _ensure_rbac_columns(engine: Engine) -> None:
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
-    if "permissions" not in table_names or "roles" not in table_names:
-        return
-
-    permission_columns = {column["name"] for column in inspector.get_columns("permissions")}
-    role_columns = {column["name"] for column in inspector.get_columns("roles")}
     dialect = engine.dialect.name
 
     with engine.begin() as connection:
-        if "module" not in permission_columns:
-            connection.execute(text("ALTER TABLE permissions ADD COLUMN module VARCHAR(100)"))
-        if "scope" not in permission_columns:
-            connection.execute(text("ALTER TABLE permissions ADD COLUMN scope VARCHAR(50) DEFAULT 'workspace' NOT NULL"))
-        if "status" not in permission_columns:
-            connection.execute(text("ALTER TABLE permissions ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL"))
-
         false_default = "0" if dialect == "sqlite" else "false"
         true_default = "1" if dialect == "sqlite" else "true"
-        if "is_system" not in role_columns:
-            connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_system BOOLEAN DEFAULT {false_default} NOT NULL"))
-        if "is_editable" not in role_columns:
-            connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_editable BOOLEAN DEFAULT {true_default} NOT NULL"))
+
+        if "permissions" in table_names:
+            permission_columns = {column["name"] for column in inspector.get_columns("permissions")}
+            if "module" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN module VARCHAR(100)"))
+            if "scope" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN scope VARCHAR(50) DEFAULT 'workspace' NOT NULL"))
+            if "status" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL"))
+
+        if "roles" in table_names:
+            role_columns = {column["name"] for column in inspector.get_columns("roles")}
+            if "is_system" not in role_columns:
+                connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_system BOOLEAN DEFAULT {false_default} NOT NULL"))
+            if "is_editable" not in role_columns:
+                connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_editable BOOLEAN DEFAULT {true_default} NOT NULL"))
+
+        for table_name in ("organizations", "workspaces", "projects"):
+            if table_name not in table_names:
+                continue
+            columns = {column["name"] for column in inspector.get_columns(table_name)}
+            if "context_version" not in columns:
+                connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN context_version INTEGER DEFAULT 1 NOT NULL"))
+            if "access_version" not in columns:
+                connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN access_version INTEGER DEFAULT 1 NOT NULL"))
