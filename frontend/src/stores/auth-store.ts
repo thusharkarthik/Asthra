@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { authApi, type LoginPayload, type RegisterPayload } from "@/services/api/auth-api";
+import { useContextVersionStore } from "@/stores/context-version-store";
 import type { CoreUser } from "@/types/core";
 
 type AuthState = {
@@ -32,6 +33,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const token = await authApi.login(payload);
           const user = await authApi.me(token.access_token);
+          useContextVersionStore.getState().clearSnapshot();
           set({
             accessToken: token.access_token,
             currentUser: user,
@@ -53,6 +55,7 @@ export const useAuthStore = create<AuthState>()(
           await authApi.register(payload);
           const token = await authApi.login({ email: payload.email, password: payload.password });
           const user = await authApi.me(token.access_token);
+          useContextVersionStore.getState().clearSnapshot();
           set({
             accessToken: token.access_token,
             currentUser: user,
@@ -68,14 +71,16 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
       },
-      logout: () =>
+      logout: () => {
+        useContextVersionStore.getState().clearSnapshot();
         set({
           accessToken: null,
           currentUser: null,
           isAuthenticated: false,
           isLoading: false,
           error: null
-        }),
+        });
+      },
       loadCurrentUser: async () => {
         const token = get().accessToken;
         if (!token) {
@@ -94,6 +99,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: "Session expired. Please sign in again."
           });
+          useContextVersionStore.getState().clearSnapshot();
           throw error;
         }
       }

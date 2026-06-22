@@ -13,6 +13,17 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 vi.mock("@/services/api/core-api", () => ({
   coreApi: {
     currentUser: vi.fn(async () => ({ id: 1, email: "admin@example.com", full_name: "Admin", is_active: true })),
+    getContextVersion: vi.fn(async (_token: string, params: { organization_id?: number | null; workspace_id?: number | null; project_id?: number | null }) => ({
+      user_id: 1,
+      organization_id: params.organization_id ?? 1,
+      organization_version: 1,
+      workspace_id: params.workspace_id ?? 10,
+      workspace_version: 1,
+      project_id: params.project_id ?? 20,
+      project_version: params.project_id === 22 ? 2 : 1,
+      access_version: params.project_id === 22 ? 2 : 1,
+      generated_at: "2026-06-22T00:00:00Z"
+    })),
     listOrganizations: vi.fn(async () => [
       { id: 1, name: "Asthra" },
       { id: 2, name: "Labs" }
@@ -101,6 +112,7 @@ describe("PlatformContextProvider", () => {
     await waitFor(() => expect(screen.getByText("project:Frontend")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("canInvite:true")).toBeInTheDocument());
     expect(coreApi.listOrganizations).toHaveBeenCalledTimes(1);
+    expect(coreApi.getContextVersion).toHaveBeenCalled();
     expect(workspaceApi.listWorkspaces).toHaveBeenCalledTimes(1);
     expect(projectApi.listProjects).toHaveBeenCalledTimes(1);
   });

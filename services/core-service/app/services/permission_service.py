@@ -6,6 +6,7 @@ from app.models.user import User
 from app.repositories.permission_repository import PermissionRepository
 from app.schemas.role import PermissionCreate, PermissionUpdate
 from app.services.activity_service import ActivityService
+from app.services.context_version_service import ContextVersionService
 
 VALID_PERMISSION_STATUSES = {"active", "inactive", "deprecated"}
 
@@ -91,6 +92,8 @@ class PermissionService:
             action="permission.created",
             description=f"Permission '{permission.code}' was created.",
         )
+        ContextVersionService(self.db).bump_access("platform", None)
+        self.db.commit()
         return permission
 
     def list(self, current_user: User) -> list[Permission]:
@@ -125,12 +128,18 @@ class PermissionService:
             permission_update.name = permission_update.name.strip()
         if permission_update.status is not None:
             self._validate_status(permission_update.status)
-        return self.permission_repository.update(permission, permission_update)
+        permission = self.permission_repository.update(permission, permission_update)
+        ContextVersionService(self.db).bump_access("platform", None)
+        self.db.commit()
+        self.db.refresh(permission)
+        return permission
 
     def delete(self, permission_id: int, current_user: User) -> None:
         permission = self.get(permission_id, current_user)
         self._require_permission_manage(current_user)
         self.permission_repository.update(permission, PermissionUpdate(status="inactive", is_active=False))
+        ContextVersionService(self.db).bump_access("platform", None)
+        self.db.commit()
 
     def ensure_permission_catalog(self) -> None:
         for code, name, description, module, scope in CORE_PERMISSION_CATALOG:

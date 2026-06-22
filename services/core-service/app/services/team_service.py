@@ -11,6 +11,7 @@ from app.models.workspace import Workspace
 from app.repositories.team_repository import TeamRepository
 from app.schemas.team import TeamCreate, TeamMemberCreate, TeamUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.context_version_service import ContextVersionService
 from app.services.notification_service import NotificationService
 
 
@@ -25,13 +26,18 @@ class TeamService:
         AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", workspace.id)
 
         slug = self._build_unique_slug(workspace_id=workspace.id, name=team_create.name)
-        return self.team_repository.create_with_owner(
+        team = self.team_repository.create_with_owner(
             workspace=workspace,
             name=team_create.name.strip(),
             slug=slug,
             description=team_create.description,
             created_by_id=current_user.id,
         )
+        ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
+        ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        self.db.commit()
+        self.db.refresh(team)
+        return team
 
     def list(self, current_user: User) -> list[Team]:
         self._ensure_active_user(current_user)
@@ -53,12 +59,18 @@ class TeamService:
     def update(self, team_id: int, team_update: TeamUpdate, current_user: User) -> Team:
         team = self.get(team_id, current_user)
         AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
-        return self.team_repository.update(team, team_update)
+        team = self.team_repository.update(team, team_update)
+        ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
+        self.db.commit()
+        self.db.refresh(team)
+        return team
 
     def delete(self, team_id: int, current_user: User) -> None:
         team = self.get(team_id, current_user)
         AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
         self.team_repository.update(team, TeamUpdate(is_active=False))
+        ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
+        self.db.commit()
 
     def add_member(
         self,
@@ -102,6 +114,8 @@ class TeamService:
             entity_type="team",
             entity_id=str(team.id),
         )
+        ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        self.db.commit()
         return member
 
     def list_members(self, team_id: int, current_user: User) -> list[TeamMember]:
@@ -122,6 +136,8 @@ class TeamService:
             member=member,
             actor_user_id=current_user.id,
         )
+        ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        self.db.commit()
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:

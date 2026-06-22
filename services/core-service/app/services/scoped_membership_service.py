@@ -20,6 +20,7 @@ from app.schemas.scoped_membership import (
 )
 from app.schemas.team import TeamMemberUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.context_version_service import ContextVersionService
 
 
 class ScopedMembershipService:
@@ -91,6 +92,8 @@ class ScopedMembershipService:
             self.db.commit()
             self.db.refresh(assignment)
         self._log("role.assigned", current_user.id, assignment.scope_type, assignment.scope_id, "role_assignment", assignment.id)
+        ContextVersionService(self.db).bump_access(assignment.scope_type, assignment.scope_id)
+        self.db.commit()
         return assignment
 
     def update_role_assignment(
@@ -110,6 +113,8 @@ class ScopedMembershipService:
         self.db.commit()
         self.db.refresh(assignment)
         self._log("role.changed", current_user.id, assignment.scope_type, assignment.scope_id, "role_assignment", assignment.id)
+        ContextVersionService(self.db).bump_access(assignment.scope_type, assignment.scope_id)
+        self.db.commit()
         return assignment
 
     def delete_role_assignment(self, assignment_id: int, current_user: User) -> None:
@@ -119,6 +124,8 @@ class ScopedMembershipService:
         assignment.revoked_at = datetime.now(timezone.utc)
         self.db.commit()
         self._log("role.revoked", current_user.id, assignment.scope_type, assignment.scope_id, "role_assignment", assignment.id)
+        ContextVersionService(self.db).bump_access(assignment.scope_type, assignment.scope_id)
+        self.db.commit()
 
     def list_project_members(self, project_id: int, current_user: User) -> list[ProjectMembership]:
         project = self._get_project(project_id)
@@ -161,6 +168,8 @@ class ScopedMembershipService:
         self.db.commit()
         self.db.refresh(member)
         self._log("project.member_added", current_user.id, "project", project.id, "project_membership", member.id)
+        ContextVersionService(self.db).bump_access("project", project.id)
+        self.db.commit()
         return member
 
     def update_project_member(
@@ -186,6 +195,8 @@ class ScopedMembershipService:
         self.db.commit()
         self.db.refresh(member)
         self._log("project.member_changed", current_user.id, "project", project.id, "project_membership", member.id)
+        ContextVersionService(self.db).bump_access("project", project.id)
+        self.db.commit()
         return member
 
     def remove_project_member(self, project_id: int, membership_id: int, current_user: User) -> None:
@@ -195,6 +206,8 @@ class ScopedMembershipService:
         member.status = "inactive"
         self.db.commit()
         self._log("project.member_removed", current_user.id, "project", project.id, "project_membership", member.id)
+        ContextVersionService(self.db).bump_access("project", project.id)
+        self.db.commit()
 
     def update_team_member(self, team_id: int, membership_id: int, member_update: TeamMemberUpdate, current_user: User) -> TeamMember:
         team = self._get_team(team_id)
@@ -210,6 +223,8 @@ class ScopedMembershipService:
         self.db.commit()
         self.db.refresh(member)
         self._log("team.member_changed", current_user.id, "team", team.id, "team_member", member.id)
+        ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        self.db.commit()
         return member
 
     def remove_team_member_by_id(self, team_id: int, membership_id: int, current_user: User) -> None:
@@ -219,6 +234,8 @@ class ScopedMembershipService:
         member.status = "inactive"
         self.db.commit()
         self._log("team.member_removed", current_user.id, "team", team.id, "team_member", member.id)
+        ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        self.db.commit()
 
     def effective_permissions(self, user_id: int, scope_type: str, scope_id: int | None) -> dict:
         user = self._get_active_user(user_id)

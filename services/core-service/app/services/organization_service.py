@@ -10,6 +10,7 @@ from app.models.user import User
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 
 
@@ -71,7 +72,11 @@ class OrganizationService:
             "organization",
             organization.id,
         )
-        return self.organization_repository.update(organization, organization_update)
+        organization = self.organization_repository.update(organization, organization_update)
+        ContextVersionService(self.db).bump_organization_context(organization.id)
+        self.db.commit()
+        self.db.refresh(organization)
+        return organization
 
     def delete(self, organization_id: int, current_user: User) -> None:
         organization = self.get(organization_id, current_user)
@@ -82,6 +87,8 @@ class OrganizationService:
             organization.id,
         )
         self.organization_repository.update(organization, OrganizationUpdate(is_active=False))
+        ContextVersionService(self.db).bump_organization_context(organization.id)
+        self.db.commit()
 
     def list_members(
         self,

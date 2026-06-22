@@ -9,8 +9,10 @@ import {
   useProjects,
   useWorkspaces
 } from "@/hooks/use-platform-queries";
+import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import type { ContextVersionSnapshot } from "@/types/core";
 
 type CurrentScope = {
   organizationId: number | null;
@@ -31,6 +33,7 @@ type PlatformContextValue = {
   selectedProject: ProjectRecord | null;
   permissions: CurrentUserPermissions | null;
   permissionCodes: string[];
+  contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
   isFetching: boolean;
@@ -64,6 +67,11 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const projectsQuery = useProjects(selectedWorkspaceId);
   const permissionsQuery = useCurrentPermissionsQuery({
     orgId: selectedOrganizationId,
+    workspaceId: selectedWorkspaceId,
+    projectId: selectedProjectId
+  });
+  const contextVersionQuery = useContextVersion({
+    organizationId: selectedOrganizationId,
     workspaceId: selectedWorkspaceId,
     projectId: selectedProjectId
   });
@@ -101,6 +109,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     selectedProject,
     permissions: permissionsQuery.data ?? null,
     permissionCodes,
+    contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
     isFetching,
@@ -123,6 +132,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     }
   }), [
     currentUserQuery.data,
+    contextVersionQuery.data,
+    contextVersionQuery.snapshot,
     error,
     isError,
     isFetching,

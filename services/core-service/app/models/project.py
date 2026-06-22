@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -21,6 +21,8 @@ class Project(TimestampMixin, Base):
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    context_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    access_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     workspace = relationship("Workspace", back_populates="projects")
     team = relationship("Team", back_populates="projects")

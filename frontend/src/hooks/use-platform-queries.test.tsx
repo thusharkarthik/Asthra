@@ -10,6 +10,7 @@ import { coreApi } from "@/services/api/core-api";
 vi.mock("@/services/api/core-api", () => ({
   coreApi: {
     currentUser: vi.fn(),
+    getContextVersion: vi.fn(),
     listOrganizations: vi.fn(async () => [{ id: 1, name: "Asthra Labs", is_active: true }])
   }
 }));

@@ -148,6 +148,18 @@ export type CurrentUserPermissions = {
   scope: CurrentUserPermissionScope;
 };
 
+export type ContextVersionSnapshot = {
+  user_id: number;
+  organization_id?: number | null;
+  organization_version: number;
+  workspace_id?: number | null;
+  workspace_version: number;
+  project_id?: number | null;
+  project_version: number;
+  access_version: number;
+  generated_at: string;
+};
+
 export type ApiKeyRecord = {
   id: number;
   user_id: number;

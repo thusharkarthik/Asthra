@@ -11,6 +11,7 @@ from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectTeamCreate, ProjectUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
 
@@ -62,6 +63,9 @@ class ProjectService:
             entity_type="project",
             entity_id=str(project.id),
         )
+        ContextVersionService(self.db).bump_workspace_context(project.workspace_id)
+        self.db.commit()
+        self.db.refresh(project)
         return project
 
     def list(self, current_user: User) -> list[Project]:
@@ -88,7 +92,11 @@ class ProjectService:
         )
         if project_update.owner_id is not None:
             self._resolve_owner_id(project_update.owner_id, project.workspace_id)
-        return self.project_repository.update(project, project_update)
+        project = self.project_repository.update(project, project_update)
+        ContextVersionService(self.db).bump_project_context(project.id)
+        self.db.commit()
+        self.db.refresh(project)
+        return project
 
     def delete(self, project_id: int, current_user: User) -> None:
         project = self.get(project_id, current_user)
@@ -99,6 +107,8 @@ class ProjectService:
             project.id,
         )
         self.project_repository.update(project, ProjectUpdate(is_active=False))
+        ContextVersionService(self.db).bump_project_context(project.id)
+        self.db.commit()
 
     def link_team(
         self,

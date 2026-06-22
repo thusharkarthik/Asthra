@@ -16,6 +16,7 @@ It stores:
 - Projects scoped to selected workspace
 - Selected project
 - Current effective permissions
+- Current context version snapshot
 - `loadedAt`
 
 TanStack Query remains the server-state source of truth. The context provider reads from query hooks and the persisted selected-scope store; it does not call APIs directly.
@@ -46,6 +47,8 @@ Rules:
 
 Selected scope IDs are persisted through the existing `asthra-workspace-context` localStorage entry.
 
+Context versions are persisted separately in `asthra-context-versions`.
+
 Persisted values:
 
 - `selectedOrganizationId`
@@ -66,6 +69,21 @@ Permissions refresh when scope changes because the query key includes the select
 
 Permissions also refresh after role, member, invitation, and permission mutations through targeted query invalidation.
 
+## Version Validation
+
+`useContextVersion()` calls the lightweight Core endpoint:
+
+`GET /api/v1/context/version`
+
+The hook compares:
+
+- `organization_version`
+- `workspace_version`
+- `project_version`
+- `access_version`
+
+Matching versions keep cached context payloads. Changed versions invalidate only affected query keys.
+
 ## Hooks
 
 Use these hooks for platform context:
@@ -77,12 +95,13 @@ Use these hooks for platform context:
 - `useSelectedProject()`
 - `useCurrentPermissions()`
 - `useCan(permissionCode)`
+- `useContextVersion(scope)`
 
 The older Smart Context Cache hooks remain as compatibility wrappers for existing code.
 
 ## Invalidation Rules
 
-Refresh context after:
+Trigger context version validation after:
 
 - Organization created or updated
 - Workspace created or updated
@@ -92,6 +111,8 @@ Refresh context after:
 - Permission changed
 - Login
 - Logout
+
+The version check decides which full payload queries need invalidation.
 
 Logout clears:
 
@@ -120,4 +141,5 @@ Other modules should migrate gradually.
 - Multiple consumers share the same cached result.
 - The bottom selector does not independently fetch its own data.
 - Permissions use scoped query keys to avoid stale cross-scope access checks.
+- Version checks prevent full context refetches when data has not changed.
 - Module pages should read selected scope from context instead of reloading organization/workspace/project data.

@@ -77,6 +77,9 @@ export const queryKeys = {
   },
   context: {
     all: ["context"] as const,
+    versionRoot: ["context", "version"] as const,
+    version: (organizationId?: number | null, workspaceId?: number | null, projectId?: number | null) =>
+      ["context", "version", organizationId ?? null, workspaceId ?? null, projectId ?? null] as const,
     organizations: ["organizations", "list"] as const,
     workspaces: (organizationId?: number | null) => ["workspaces", "list", organizationId ?? null] as const,
     projects: (workspaceId?: number | null) => ["projects", "list", workspaceId ?? null] as const,

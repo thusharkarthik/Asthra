@@ -12,6 +12,17 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 vi.mock("@/services/api/core-api", () => ({
   coreApi: {
     currentUser: vi.fn(async () => ({ id: 1, email: "admin@example.com", full_name: "Admin", is_active: true })),
+    getContextVersion: vi.fn(async () => ({
+      user_id: 1,
+      organization_id: 1,
+      organization_version: 1,
+      workspace_id: 10,
+      workspace_version: 1,
+      project_id: 20,
+      project_version: 1,
+      access_version: 1,
+      generated_at: "2026-06-22T00:00:00Z"
+    })),
     listOrganizations: vi.fn(async () => [
       { id: 1, name: "Asthra" },
       { id: 2, name: "Labs" }

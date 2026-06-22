@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePlatformContext } from "@/context/platformContext";
 import { settingsApi } from "@/services/api/settings-api";
 import { queryKeys } from "@/lib/queryKeys";
 import { normalizeRole } from "@/lib/rbac";
@@ -1896,6 +1897,7 @@ function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapp
 export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" | "assignments" }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
+  const platformContext = usePlatformContext();
   const canManageRoleMappings = currentPermissions.can("settings.role.manage");
   const canCreatePermission = currentPermissions.can("settings.permission.manage");
   const [search, setSearch] = useState("");
@@ -2067,6 +2069,17 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
             </div>
           </div>
         </div>
+        {process.env.NODE_ENV !== "production" ? (
+          <div className="mt-4 border-t pt-4 text-sm">
+            <div className="font-medium">Current Context Versions</div>
+            <div className="mt-2 grid gap-2 text-muted-foreground sm:grid-cols-4">
+              <div>Organization: {platformContext.contextVersions?.organization_version ?? "n/a"}</div>
+              <div>Workspace: {platformContext.contextVersions?.workspace_version ?? "n/a"}</div>
+              <div>Project: {platformContext.contextVersions?.project_version ?? "n/a"}</div>
+              <div>Access: {platformContext.contextVersions?.access_version ?? "n/a"}</div>
+            </div>
+          </div>
+        ) : null}
       </SettingsCard>
       {section === "roles" ? (
         <SettingsCard title="Roles" description="System roles are locked templates. Custom roles can be added later without assigning permissions directly to users.">
