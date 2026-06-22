@@ -18,6 +18,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!hasHydrated || accessToken) return;
     resetContext();
     queryClient.removeQueries({ queryKey: queryKeys.context.all });
+    queryClient.removeQueries({ queryKey: queryKeys.organizations.all });
+    queryClient.removeQueries({ queryKey: queryKeys.workspaces.all });
+    queryClient.removeQueries({ queryKey: queryKeys.projects.all });
+    queryClient.removeQueries({ queryKey: queryKeys.permissions.all });
     queryClient.removeQueries({ queryKey: queryKeys.auth.currentUser });
     queryClient.removeQueries({ queryKey: queryKeys.settings.all });
   }, [accessToken, hasHydrated, queryClient, resetContext]);

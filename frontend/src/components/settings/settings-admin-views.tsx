@@ -47,17 +47,17 @@ function useSettingsData() {
   const setProjects = useWorkspaceStore((state) => state.setProjects);
 
   const organizationsQuery = useQuery({
-    queryKey: ["settings", "organizations"],
+    queryKey: queryKeys.organizations.list,
     queryFn: () => settingsApi.listOrganizations(accessToken ?? ""),
     enabled: Boolean(accessToken)
   });
   const workspacesQuery = useQuery({
-    queryKey: ["settings", "workspaces"],
+    queryKey: queryKeys.workspaces.list(null),
     queryFn: () => settingsApi.listWorkspaces(accessToken ?? ""),
     enabled: Boolean(accessToken)
   });
   const projectsQuery = useQuery({
-    queryKey: ["settings", "projects"],
+    queryKey: queryKeys.projects.list(null),
     queryFn: () => settingsApi.listProjects(accessToken ?? ""),
     enabled: Boolean(accessToken)
   });
@@ -91,7 +91,7 @@ function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: n
   const workspaceId = scopeOverride?.workspaceId ?? selectedWorkspaceId ?? undefined;
   const projectId = scopeOverride?.projectId ?? selectedProjectId ?? undefined;
   const query = useQuery<CurrentUserPermissions>({
-    queryKey: ["settings", "me-permissions", orgId ?? null, workspaceId ?? null, projectId ?? null],
+    queryKey: queryKeys.permissions.current(orgId, workspaceId, projectId),
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {
       org_id: orgId,
       workspace_id: workspaceId,
@@ -113,8 +113,14 @@ function getFormValue(form: HTMLFormElement, name: string) {
 
 function invalidateSettingsAndContext(queryClient: QueryClient) {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: queryKeys.settings.all }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.context.all })
+    queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.members.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.roles.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.teams.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all })
   ]);
 }
 
