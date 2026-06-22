@@ -3,7 +3,7 @@
 import { Bell, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
 import { CommandPalette } from "@/components/navigation/command-palette";
@@ -41,6 +41,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const isPublicPath = publicPaths.has(pathname);
 
   useEffect(() => {
@@ -51,6 +53,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setUserMenuOpen(false);
+        setNotificationsOpen(false);
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandPaletteOpen(true);
@@ -59,6 +65,16 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [setCommandPaletteOpen]);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) setUserMenuOpen(false);
+      if (notificationsOpen && notificationsRef.current && !notificationsRef.current.contains(target)) setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [notificationsOpen, userMenuOpen]);
 
   if (isPublicPath) {
     return (
@@ -126,7 +142,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
               </div>
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              <div className="relative">
+              <div className="relative" ref={notificationsRef}>
                 <Button size="icon" variant="ghost" className="dark:text-white dark:hover:bg-white/10" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}>
                   <Bell className="h-4 w-4" />
                   {unreadNotifications > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">{unreadNotifications}</span> : null}
@@ -141,7 +157,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
                 <div className="truncate font-medium text-foreground dark:text-white">{currentUser?.full_name ?? currentUser?.email}</div>
                 <div className="truncate">{currentUser?.email}</div>
               </div>
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <Button size="icon" variant="ghost" className="dark:text-white dark:hover:bg-white/10" aria-label="User menu" title={currentUser?.email ?? "User"} onClick={() => setUserMenuOpen((value) => !value)}>
                   <UserCircle className="h-5 w-5" />
                 </Button>

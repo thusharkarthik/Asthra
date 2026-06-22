@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
   const notifications = useNotificationStore((state) => state.notifications);
   const markRead = useNotificationStore((state) => state.markRead);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
+  const dismissNotification = useNotificationStore((state) => state.dismissNotification);
+  const panelRef = useRef<HTMLDivElement>(null);
   const coreNotificationsQuery = useQuery({
     queryKey: ["core", "notifications"],
     queryFn: () => settingsApi.listNotifications(accessToken ?? ""),
@@ -22,6 +25,17 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
   });
   const markCoreReadMutation = useMutation({
     mutationFn: (notificationId: number) => settingsApi.markNotificationRead(accessToken ?? "", notificationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["core", "notifications"] })
+  });
+  const markAllCoreReadMutation = useMutation({
+    mutationFn: () => settingsApi.markAllNotificationsRead(accessToken ?? ""),
+    onSuccess: () => {
+      markAllRead();
+      queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
+    }
+  });
+  const deleteCoreMutation = useMutation({
+    mutationFn: (notificationId: number) => settingsApi.deleteNotification(accessToken ?? "", notificationId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["core", "notifications"] })
   });
   const coreNotifications = (coreNotificationsQuery.data ?? []).map((item) => ({
@@ -36,10 +50,22 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
   }));
   const allNotifications = [...coreNotifications, ...notifications];
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
   if (!open) return null;
 
   return (
     <div
+      ref={panelRef}
       className={cn("absolute right-0 z-40 w-80 rounded-md border bg-card p-3 shadow-lg", placement === "bottom" ? "bottom-11" : "top-11")}
       role="dialog"
       aria-label="Notification center"
@@ -48,7 +74,7 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
         <div className="flex items-center gap-2 text-sm font-semibold"><Bell className="h-4 w-4" />Notifications</div>
         <Button size="icon" variant="ghost" aria-label="Close notifications" onClick={onClose}><X className="h-4 w-4" /></Button>
       </div>
-      <div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={markAllRead}>Mark all read</Button></div>
+      <div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => { markAllRead(); if (accessToken) markAllCoreReadMutation.mutate(); }}>Mark all read</Button></div>
       <div className="max-h-80 space-y-2 overflow-y-auto">
         {allNotifications.map((item) => (
           <div key={item.id} className="block rounded-md border p-3 hover:bg-muted" onClick={() => {
@@ -57,7 +83,23 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
           }}>
             <div className="flex items-start justify-between gap-2">
               <div className="text-sm font-medium">{item.title}</div>
-              {item.unread ? <span className="mt-1 h-2 w-2 rounded-full bg-primary" aria-label="Unread" /> : null}
+              <div className="flex shrink-0 items-center gap-1">
+                {item.unread ? <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread" /> : null}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Dismiss notification"
+                  className="h-6 w-6"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if ("coreId" in item && typeof item.coreId === "number") deleteCoreMutation.mutate(item.coreId);
+                    else dismissNotification(item.id);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{item.message}</p>
             {item.type === "invitation.pending" ? (

@@ -4,9 +4,12 @@ import { Select } from "@/components/ui/select";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function WorkspaceSwitcher() {
-  const { workspaces, selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
+  const { workspaces, selectedOrganizationId, selectedWorkspaceId, setSelectedWorkspace } = useWorkspaceStore();
+  const visibleWorkspaces = selectedOrganizationId
+    ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
+    : workspaces;
 
-  if (workspaces.length === 0) {
+  if (visibleWorkspaces.length === 0) {
     return (
       <Select aria-label="Workspace" disabled>
         <option>No workspaces</option>
@@ -20,7 +23,7 @@ export function WorkspaceSwitcher() {
       value={selectedWorkspaceId ?? ""}
       onChange={(event) => setSelectedWorkspace(Number(event.target.value))}
     >
-      {workspaces.map((workspace) => (
+      {visibleWorkspaces.map((workspace) => (
         <option key={workspace.id} value={workspace.id}>
           {workspace.name}
         </option>
