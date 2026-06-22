@@ -1,0 +1,8 @@
+{
+  "serviceName": "flow",
+  "purpose": "Execution and delivery management.",
+  "ownership": ["Work Items", "Hierarchy", "Backlog", "Sprints", "Boards", "Releases", "Dependencies", "Capacity"],
+  "relationships": ["Consumes Docs specifications", "Consumes Discover opportunities", "Produces delivery status"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Sprint Planning", "Release Readiness", "Workflow Engine", "Advanced Reporting"]
+}

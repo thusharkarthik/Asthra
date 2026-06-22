@@ -1,0 +1,8 @@
+{
+  "serviceName": "discover",
+  "purpose": "Convert opportunities into executable work.",
+  "ownership": ["Ideas", "Feature Requests", "Feedback", "Validation", "Prioritization", "Roadmaps"],
+  "relationships": ["Produces opportunities for Docs and Flow", "Consumes execution status from Flow in future"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["AI Opportunity Discovery", "Customer Signal Analysis", "Idea Scoring", "Opportunity Intelligence"]
+}

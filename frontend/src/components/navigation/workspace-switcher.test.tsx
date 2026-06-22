@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { OrganizationSwitcher } from "@/components/navigation/organization-switcher";
 import { ProjectSwitcher } from "@/components/navigation/project-switcher";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
+import { QueryProvider } from "@/providers/query-provider";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 describe("workspace context selectors", () => {
@@ -31,11 +32,11 @@ describe("workspace context selectors", () => {
 
   it("renders and updates organization, workspace, and project selectors", () => {
     render(
-      <div>
+      <QueryProvider>
         <OrganizationSwitcher />
         <WorkspaceSwitcher />
         <ProjectSwitcher />
-      </div>
+      </QueryProvider>
     );
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "2" } });

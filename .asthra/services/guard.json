@@ -1,0 +1,8 @@
+{
+  "serviceName": "guard",
+  "purpose": "Governance and Security.",
+  "ownership": ["Audit Logs", "Security Events", "Compliance Controls"],
+  "relationships": ["Consumes future audit events from all modules", "Produces governance and security visibility"],
+  "scope": ["platform", "organization", "workspace", "project"],
+  "futureRoadmap": ["Risk Engine", "Compliance Reporting"]
+}

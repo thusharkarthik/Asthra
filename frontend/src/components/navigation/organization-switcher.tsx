@@ -1,10 +1,13 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { useOrganizations } from "@/hooks/use-smart-context-cache";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function OrganizationSwitcher() {
-  const { organizations, selectedOrganizationId, setSelectedOrganization } = useWorkspaceStore();
+  const organizationsQuery = useOrganizations();
+  const { organizations: cachedOrganizations, selectedOrganizationId, setSelectedOrganization } = useWorkspaceStore();
+  const organizations = organizationsQuery.data ?? cachedOrganizations;
 
   if (organizations.length === 0) {
     return (

@@ -1,0 +1,8 @@
+{
+  "serviceName": "insights",
+  "purpose": "Reporting and Analytics.",
+  "ownership": ["Dashboards", "Reports", "KPIs"],
+  "relationships": ["Consumes lifecycle data from Discover, Docs, Flow, Dev, Desk, and Pulse", "Produces analytics and reports"],
+  "scope": ["organization", "workspace", "project"],
+  "futureRoadmap": ["Executive Dashboards", "Forecasting", "Trend Analysis"]
+}
