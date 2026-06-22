@@ -1,78 +1,19 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { coreApi } from "@/services/api/core-api";
-import { projectApi } from "@/services/api/project-api";
-import { settingsApi } from "@/services/api/settings-api";
-import { workspaceApi } from "@/services/api/workspace-api";
+import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
-import { can as hasPermission } from "@/lib/permissions";
-import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import {
+  useCan,
+  useCurrentPermissions,
+  useCurrentUser,
+  useOrganizations,
+  useProjects,
+  useWorkspaces
+} from "@/hooks/use-platform-queries";
 
-export function useCurrentUser() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const currentUser = useAuthStore((state) => state.currentUser);
-  return useQuery({
-    queryKey: queryKeys.auth.currentUser,
-    queryFn: () => coreApi.currentUser(accessToken ?? ""),
-    enabled: Boolean(accessToken),
-    initialData: currentUser ?? undefined,
-    staleTime: 2 * 60_000
-  });
-}
-
-export function useOrganizations() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const setOrganizations = useWorkspaceStore((state) => state.setOrganizations);
-  const query = useQuery({
-    queryKey: queryKeys.context.organizations,
-    queryFn: () => coreApi.listOrganizations(accessToken ?? ""),
-    enabled: Boolean(accessToken),
-    staleTime: 2 * 60_000
-  });
-
-  useEffect(() => {
-    if (query.data) setOrganizations(query.data);
-  }, [query.data, setOrganizations]);
-
-  return query;
-}
-
-export function useWorkspaces(organizationId?: number | null) {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
-  const query = useQuery({
-    queryKey: queryKeys.context.workspaces(organizationId),
-    queryFn: () => workspaceApi.listWorkspaces(accessToken ?? "", organizationId),
-    enabled: Boolean(accessToken && organizationId),
-    staleTime: 2 * 60_000
-  });
-
-  useEffect(() => {
-    if (query.data) setWorkspaces(query.data);
-  }, [query.data, setWorkspaces]);
-
-  return query;
-}
-
-export function useProjects(workspaceId?: number | null) {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const setProjects = useWorkspaceStore((state) => state.setProjects);
-  const query = useQuery({
-    queryKey: queryKeys.context.projects(workspaceId),
-    queryFn: () => projectApi.listProjects(accessToken ?? "", workspaceId),
-    enabled: Boolean(accessToken && workspaceId),
-    staleTime: 2 * 60_000
-  });
-
-  useEffect(() => {
-    if (query.data) setProjects(query.data);
-  }, [query.data, setProjects]);
-
-  return query;
-}
+export { useCan, useCurrentPermissions, useCurrentUser, useOrganizations, useProjects, useWorkspaces };
 
 export function useCurrentScope() {
   const organizations = useWorkspaceStore((state) => state.organizations);
@@ -90,26 +31,6 @@ export function useCurrentScope() {
     workspace: workspaces.find((item) => item.id === selectedWorkspaceId) ?? null,
     project: projects.find((item) => item.id === selectedProjectId) ?? null
   }), [organizations, projects, selectedOrganizationId, selectedProjectId, selectedWorkspaceId, workspaces]);
-}
-
-export function useCurrentPermissions() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const scope = useCurrentScope();
-  return useQuery({
-    queryKey: queryKeys.context.permissions(scope.organizationId, scope.workspaceId, scope.projectId),
-    queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {
-      org_id: scope.organizationId,
-      workspace_id: scope.workspaceId,
-      project_id: scope.projectId
-    }),
-    enabled: Boolean(accessToken),
-    staleTime: 60_000
-  });
-}
-
-export function useCan(permissionCode: string) {
-  const permissionsQuery = useCurrentPermissions();
-  return hasPermission(permissionsQuery.data?.permission_codes ?? [], permissionCode);
 }
 
 export function useSmartContextCache() {
@@ -136,6 +57,10 @@ export function useClearContextCache() {
   return () => {
     resetContext();
     queryClient.removeQueries({ queryKey: queryKeys.context.all });
+    queryClient.removeQueries({ queryKey: queryKeys.organizations.all });
+    queryClient.removeQueries({ queryKey: queryKeys.workspaces.all });
+    queryClient.removeQueries({ queryKey: queryKeys.projects.all });
+    queryClient.removeQueries({ queryKey: queryKeys.permissions.all });
     queryClient.removeQueries({ queryKey: queryKeys.auth.currentUser });
     queryClient.removeQueries({ queryKey: queryKeys.settings.all });
   };
