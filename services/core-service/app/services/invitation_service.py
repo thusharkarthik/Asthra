@@ -186,7 +186,7 @@ class InvitationService:
 
     def revoke(self, invitation_id: int, current_user: User) -> Invitation:
         invitation = self.get(invitation_id, current_user)
-        self._require_invitation_manage(invitation, current_user)
+        self._require_invitation_manage(invitation, current_user, "settings.member.cancel")
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be revoked.")
         stale_cancelled = self.repository.get_duplicate_by_status(
@@ -217,7 +217,7 @@ class InvitationService:
 
     def resend(self, invitation_id: int, current_user: User) -> Invitation:
         invitation = self.get(invitation_id, current_user)
-        self._require_invitation_manage(invitation, current_user)
+        self._require_invitation_manage(invitation, current_user, "settings.member.resend")
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be resent.")
         invitation.token = token_urlsafe(32)
@@ -259,6 +259,8 @@ class InvitationService:
             return
         if self.repository.is_organization_member(organization_id, user.id):
             return
+        if AccessControlService(self.db).can_access_scope(user.id, "organization", organization_id):
+            return
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation access.")
 
     def _ensure_workspace_access(self, workspace_id: int, user: User) -> None:
@@ -268,6 +270,8 @@ class InvitationService:
         if user.is_superuser or workspace.created_by_id == user.id:
             return
         if self.repository.is_workspace_member(workspace_id, user.id):
+            return
+        if AccessControlService(self.db).can_access_scope(user.id, "workspace", workspace_id):
             return
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation access.")
 
@@ -297,18 +301,18 @@ class InvitationService:
         if platform_assignment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only platform owners or admins can assign platform roles.")
 
-    def _require_invitation_manage(self, invitation: Invitation, current_user: User) -> None:
+    def _require_invitation_manage(self, invitation: Invitation, current_user: User, permission_code: str) -> None:
         if invitation.workspace_id is not None:
             AccessControlService(self.db).require(
                 current_user,
-                "settings.member.invite",
+                permission_code,
                 "workspace",
                 invitation.workspace_id,
             )
             return
         AccessControlService(self.db).require(
             current_user,
-            "settings.member.invite",
+            permission_code,
             "organization",
             invitation.organization_id,
         )

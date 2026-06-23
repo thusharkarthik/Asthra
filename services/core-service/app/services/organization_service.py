@@ -81,7 +81,7 @@ class OrganizationService:
         organization = self.get(organization_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.organization.manage",
+            self._permission_for_organization_update(organization, organization_update),
             "organization",
             organization.id,
         )
@@ -95,7 +95,7 @@ class OrganizationService:
         organization = self.get(organization_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.organization.manage",
+            "settings.organization.archive",
             "organization",
             organization.id,
         )
@@ -123,10 +123,21 @@ class OrganizationService:
             return
         if self.organization_repository.is_member(organization.id, user.id):
             return
+        if AccessControlService(self.db).can_access_scope(user.id, "organization", organization.id):
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this organization.",
         )
+
+    def _permission_for_organization_update(self, organization: Organization, organization_update: OrganizationUpdate) -> str:
+        restoring = organization.is_active is False and organization_update.is_active is True
+        archiving = organization_update.is_active is False
+        if restoring:
+            return "settings.organization.restore"
+        if archiving:
+            return "settings.organization.archive"
+        return "settings.organization.edit"
 
     def _build_unique_slug(self, name: str) -> str:
         base_slug = self._slugify(name)

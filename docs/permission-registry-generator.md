@@ -112,6 +112,26 @@ Access Control includes:
 
 The UI confirms before applying registry sync and explains that role mappings are not auto-applied.
 
+## Enforcement Contract
+
+Every managed action should define the same contract in the UI and backend:
+
+- action key
+- permission code
+- scope type
+- scope id
+
+Example:
+
+```text
+actionKey = settings.project.restore
+permissionCode = settings.project.restore
+scopeType = project
+scopeId = project.id
+```
+
+The backend resolver decides whether inherited roles provide the permission at that scope. The frontend only uses the permission code to show or hide actions.
+
 ## Adding a New Permission
 
 1. Add the resource/action to the registry.

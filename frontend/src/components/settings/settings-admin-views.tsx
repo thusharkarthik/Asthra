@@ -108,6 +108,32 @@ function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: n
   };
 }
 
+const SETTINGS_ACTIONS = {
+  organizationCreate: { actionKey: "settings.organization.create", permissionCode: "settings.organization.create", scopeType: "organization" },
+  organizationEdit: { actionKey: "settings.organization.edit", permissionCode: "settings.organization.edit", scopeType: "organization" },
+  organizationArchive: { actionKey: "settings.organization.archive", permissionCode: "settings.organization.archive", scopeType: "organization" },
+  organizationRestore: { actionKey: "settings.organization.restore", permissionCode: "settings.organization.restore", scopeType: "organization" },
+  workspaceCreate: { actionKey: "settings.workspace.create", permissionCode: "settings.workspace.create", scopeType: "organization" },
+  workspaceEdit: { actionKey: "settings.workspace.edit", permissionCode: "settings.workspace.edit", scopeType: "workspace" },
+  workspaceArchive: { actionKey: "settings.workspace.archive", permissionCode: "settings.workspace.archive", scopeType: "workspace" },
+  workspaceRestore: { actionKey: "settings.workspace.restore", permissionCode: "settings.workspace.restore", scopeType: "workspace" },
+  projectCreate: { actionKey: "settings.project.create", permissionCode: "settings.project.create", scopeType: "workspace" },
+  projectEdit: { actionKey: "settings.project.edit", permissionCode: "settings.project.edit", scopeType: "project" },
+  projectArchive: { actionKey: "settings.project.archive", permissionCode: "settings.project.archive", scopeType: "project" },
+  projectRestore: { actionKey: "settings.project.restore", permissionCode: "settings.project.restore", scopeType: "project" },
+  teamCreate: { actionKey: "settings.team.create", permissionCode: "settings.team.create", scopeType: "workspace" },
+  teamEdit: { actionKey: "settings.team.edit", permissionCode: "settings.team.edit", scopeType: "workspace" },
+  teamDelete: { actionKey: "settings.team.delete", permissionCode: "settings.team.delete", scopeType: "workspace" },
+  teamMemberAdd: { actionKey: "settings.team.member.add", permissionCode: "settings.team.member.add", scopeType: "workspace" },
+  teamMemberRemove: { actionKey: "settings.team.member.remove", permissionCode: "settings.team.member.remove", scopeType: "workspace" },
+  memberInvite: { actionKey: "settings.member.invite", permissionCode: "settings.member.invite", scopeType: "workspace" },
+  memberRemove: { actionKey: "settings.member.remove", permissionCode: "settings.member.remove", scopeType: "workspace" },
+  memberResend: { actionKey: "settings.member.resend", permissionCode: "settings.member.resend", scopeType: "workspace" },
+  memberCancel: { actionKey: "settings.member.cancel", permissionCode: "settings.member.cancel", scopeType: "workspace" },
+  roleManage: { actionKey: "settings.role.manage", permissionCode: "settings.role.manage", scopeType: "organization" },
+  permissionManage: { actionKey: "settings.permission.manage", permissionCode: "settings.permission.manage", scopeType: "organization" }
+} as const;
+
 function getFormValue(form: HTMLFormElement, name: string) {
   return String(new FormData(form).get(name) ?? "").trim();
 }
@@ -337,9 +363,9 @@ function SetupSummary() {
 export function SettingsHomeView() {
   const { organizations, workspaces, projects } = useSettingsData();
   const permissions = useCurrentPermissions();
-  const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
-  const canCreateWorkspace = permissions.can("settings.workspace.manage");
-  const canCreateProject = permissions.can("settings.project.create");
+  const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
+  const canCreateWorkspace = permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode);
+  const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
   const cards = [
     { title: "Administration", value: "Open", href: "/settings/administration" },
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
@@ -466,7 +492,7 @@ export function OrganizationsView() {
   const { accessToken, organizations } = useSettingsData();
   const permissions = useCurrentPermissions();
   const [statusFilter, setStatusFilter] = useState("active");
-  const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
+  const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
   const showLimitedAccess = !permissions.isLoading && !permissions.isFetching && !canCreateOrganization;
   const visibleOrganizations = organizations.filter((organization) => {
     if (statusFilter === "all") return true;
@@ -515,7 +541,7 @@ export function OrganizationsView() {
           <span className="ml-2">Loading permissions for this Settings scope.</span>
         </div>
       ) : null}
-      {showLimitedAccess ? <SettingsCard title="Limited access" description="You need settings.organization.manage to create organizations." /> : null}
+      {showLimitedAccess ? <SettingsCard title="Limited access" description="You need settings.organization.create to create organizations." /> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <label className="text-sm font-medium" htmlFor="organization-status-filter">Status</label>
         <select
@@ -566,7 +592,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   const targetOrganizationId = organizationId ?? selectedOrganizationId ?? organizations[0]?.id;
   const targetOrganization = organizations.find((organization) => organization.id === targetOrganizationId);
   const permissions = useCurrentPermissions({ orgId: targetOrganizationId ?? undefined });
-  const canCreateWorkspace = permissions.can("settings.workspace.manage");
+  const canCreateWorkspace = permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode);
   const visibleWorkspaces = organizationId ? workspaces.filter((workspace) => workspace.organization_id === organizationId) : workspaces;
 
   const mutation = useMutation({
@@ -634,7 +660,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
         description="Workspaces connect teams, projects, and module data under an organization."
         actions={canCreateWorkspace ? <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton> : undefined}
       />
-      {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.manage to create workspaces in this scope." /> : null}
+      {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.create to create workspaces in this scope." /> : null}
       {!organizations.length ? (
         <SettingsEmptyState title="Create an organization first" description="A workspace must belong to an organization." action={<SettingsLinkButton href="/settings/organizations">Create Organization</SettingsLinkButton>} />
       ) : (
@@ -698,7 +724,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
-  const canCreateProject = permissions.can("settings.project.create");
+  const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
   const visibleProjects = (targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects).filter((project) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
@@ -834,7 +860,10 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
   const organization = organizations.find((item) => item.id === organizationId);
   const scopedWorkspaces = workspaces.filter((workspace) => workspace.organization_id === organizationId);
   const permissions = useCurrentPermissions({ orgId: organizationId });
-  const canEditOrganization = permissions.can("settings.organization.manage");
+  const canEditOrganization =
+    permissions.can(SETTINGS_ACTIONS.organizationEdit.permissionCode) ||
+    permissions.can(SETTINGS_ACTIONS.organizationArchive.permissionCode) ||
+    permissions.can(SETTINGS_ACTIONS.organizationRestore.permissionCode);
   const updateMutation = useMutation({
     mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateOrganization(accessToken ?? "", organizationId, payload),
     onSuccess: async (updatedOrganization) => {
@@ -892,7 +921,7 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         description={organization.description ?? "Organization administration and setup."}
         actions={canEditOrganization ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Organization</Button> : undefined}
       />
-      {!canEditOrganization ? <SettingsCard title="View only" description="You can view this organization, but do not have settings.organization.manage for edit actions." /> : null}
+      {!canEditOrganization ? <SettingsCard title="View only" description="You can view this organization, but do not have settings.organization.edit for edit actions." /> : null}
       <AdminTabs
         tabs={[
           { label: "Overview", href: `/settings/organizations/${organizationId}`, active: true },
@@ -945,7 +974,10 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const scopedProjects = projects.filter((project) => project.workspace_id === workspaceId);
   const permissions = useCurrentPermissions({ workspaceId });
-  const canEditWorkspace = permissions.can("settings.workspace.manage");
+  const canEditWorkspace =
+    permissions.can(SETTINGS_ACTIONS.workspaceEdit.permissionCode) ||
+    permissions.can(SETTINGS_ACTIONS.workspaceArchive.permissionCode) ||
+    permissions.can(SETTINGS_ACTIONS.workspaceRestore.permissionCode);
   const updateMutation = useMutation({
     mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateWorkspace(accessToken ?? "", workspaceId, payload),
     onSuccess: async (updatedWorkspace) => {
@@ -1057,9 +1089,9 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
   const projectWorkspace = project ? workspaces.find((workspace) => workspace.id === project.workspace_id) : undefined;
   const projectOrganizationId = project?.organization_id ?? projectWorkspace?.organization_id;
   const permissions = useCurrentPermissions({ orgId: projectOrganizationId, workspaceId: project?.workspace_id, projectId });
-  const canEditProject = permissions.can("settings.project.edit");
-  const canArchiveProject = permissions.can("settings.project.archive");
-  const canRestoreProject = permissions.can("settings.project.restore");
+  const canEditProject = permissions.can(SETTINGS_ACTIONS.projectEdit.permissionCode);
+  const canArchiveProject = permissions.can(SETTINGS_ACTIONS.projectArchive.permissionCode);
+  const canRestoreProject = permissions.can(SETTINGS_ACTIONS.projectRestore.permissionCode);
   const workspaceMembersQuery = useQuery({
     queryKey: ["settings", "project-owner-members", project?.workspace_id],
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", project?.workspace_id ?? 0),
@@ -1338,9 +1370,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
   const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
-  const canInvite = permissions.can("settings.member.invite");
-  const canChangeRoles = permissions.can("settings.role.manage");
-  const canRemoveMembers = permissions.can("settings.member.remove");
+  const canInvite = permissions.can(SETTINGS_ACTIONS.memberInvite.permissionCode);
+  const canChangeRoles = permissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
+  const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(roles, inviteScope, false);
   const scopedInvitations = (invitationsQuery.data ?? [])
@@ -1887,7 +1919,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
-  const canCreateTeam = permissions.can("settings.team.create");
+  const canCreateTeam = permissions.can(SETTINGS_ACTIONS.teamCreate.permissionCode);
   const teamsQuery = useQuery({ queryKey: ["settings", "teams"], queryFn: () => settingsApi.listTeams(accessToken ?? ""), enabled: Boolean(accessToken) });
   const teams = (teamsQuery.data ?? [])
     .filter((team: TeamRecord) => visibleWorkspaces.some((workspace) => workspace.id === team.workspace_id))
@@ -2002,9 +2034,9 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   const teamQuery = useQuery({ queryKey: ["settings", "team", teamId], queryFn: () => settingsApi.getTeam(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const team = teamQuery.data;
   const permissions = useCurrentPermissions({ workspaceId: team?.workspace_id });
-  const canEditTeam = permissions.can("settings.team.edit");
-  const canAddTeamMember = permissions.can("settings.team.member.add");
-  const canRemoveTeamMember = permissions.can("settings.team.member.remove");
+  const canEditTeam = permissions.can(SETTINGS_ACTIONS.teamEdit.permissionCode);
+  const canAddTeamMember = permissions.can(SETTINGS_ACTIONS.teamMemberAdd.permissionCode);
+  const canRemoveTeamMember = permissions.can(SETTINGS_ACTIONS.teamMemberRemove.permissionCode);
   const membersQuery = useQuery({ queryKey: ["settings", "team-members", teamId], queryFn: () => settingsApi.listTeamMembers(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const workspaceMembersQuery = useQuery({
@@ -2194,8 +2226,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
   const platformContext = usePlatformContext();
-  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
-  const canCreatePermission = currentPermissions.can("settings.permission.manage");
+  const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
+  const canCreatePermission = currentPermissions.can(SETTINGS_ACTIONS.permissionManage.permissionCode);
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [resourceFilter, setResourceFilter] = useState("");
@@ -2415,6 +2447,21 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               <div>Workspace: {platformContext.contextVersions?.workspace_version ?? "n/a"}</div>
               <div>Project: {platformContext.contextVersions?.project_version ?? "n/a"}</div>
               <div>Access: {platformContext.contextVersions?.access_version ?? "n/a"}</div>
+            </div>
+            <div className="mt-4 font-medium">Critical can(action) results</div>
+            <div className="mt-2 grid gap-2 text-muted-foreground sm:grid-cols-3">
+              {[
+                SETTINGS_ACTIONS.organizationEdit,
+                SETTINGS_ACTIONS.workspaceEdit,
+                SETTINGS_ACTIONS.projectArchive,
+                SETTINGS_ACTIONS.projectRestore,
+                SETTINGS_ACTIONS.teamCreate,
+                SETTINGS_ACTIONS.teamEdit,
+                SETTINGS_ACTIONS.memberInvite,
+                SETTINGS_ACTIONS.memberRemove
+              ].map((action) => (
+                <div key={action.actionKey}>{action.actionKey}: {currentPermissions.can(action.permissionCode) ? "yes" : "no"}</div>
+              ))}
             </div>
           </div>
         ) : null}
@@ -2698,7 +2745,7 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
   if (!organizationId) return <AccessControlView section="roles" />;
   const { accessToken, organizations } = useSettingsData();
   const currentPermissions = useCurrentPermissions({ orgId: organizationId });
-  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
+  const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -2785,7 +2832,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
   if (!organizationId) return <AccessControlView section="permissions" />;
   const { accessToken, organizations } = useSettingsData();
   const currentPermissions = useCurrentPermissions({ orgId: organizationId });
-  const canManagePermissions = currentPermissions.can("settings.permission.manage");
+  const canManagePermissions = currentPermissions.can(SETTINGS_ACTIONS.permissionManage.permissionCode);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
@@ -2884,7 +2931,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
 export function RoleDetailView({ roleId }: { roleId: number }) {
   const { accessToken } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
-  const canManageRoleMappings = currentPermissions.can("settings.role.manage");
+  const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });

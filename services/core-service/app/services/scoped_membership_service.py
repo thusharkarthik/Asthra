@@ -53,7 +53,7 @@ class ScopedMembershipService:
 
     def create_role_assignment(self, assignment_create: RoleAssignmentCreate, current_user: User) -> RoleAssignment:
         self._ensure_active_user(current_user)
-        self._require_scope_manage(current_user, assignment_create.scope_type, assignment_create.scope_id)
+        self._require_role_assignment_manage(current_user, assignment_create.scope_type, assignment_create.scope_id)
         target_user = self._get_active_user(assignment_create.user_id)
         role = self._get_active_role(assignment_create.role_id)
         self._ensure_scope_exists(assignment_create.scope_type, assignment_create.scope_id)
@@ -103,7 +103,7 @@ class ScopedMembershipService:
         current_user: User,
     ) -> RoleAssignment:
         assignment = self._get_assignment(assignment_id)
-        self._require_scope_manage(current_user, assignment.scope_type, assignment.scope_id)
+        self._require_role_assignment_manage(current_user, assignment.scope_type, assignment.scope_id)
         if assignment_update.role_id is not None:
             self._get_active_role(assignment_update.role_id)
             assignment.role_id = assignment_update.role_id
@@ -119,7 +119,7 @@ class ScopedMembershipService:
 
     def delete_role_assignment(self, assignment_id: int, current_user: User) -> None:
         assignment = self._get_assignment(assignment_id)
-        self._require_scope_manage(current_user, assignment.scope_type, assignment.scope_id)
+        self._require_role_assignment_manage(current_user, assignment.scope_type, assignment.scope_id)
         assignment.status = "revoked"
         assignment.revoked_at = datetime.now(timezone.utc)
         self._ensure_default_role_after_revocation(assignment, current_user)
@@ -271,7 +271,7 @@ class ScopedMembershipService:
 
     def _get_project(self, project_id: int) -> Project:
         project = self.db.get(Project, project_id)
-        if project is None or not project.is_active:
+        if project is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         return project
 
@@ -309,13 +309,18 @@ class ScopedMembershipService:
             "platform": "settings.role.manage",
             "organization": "settings.role.manage",
             "workspace": "settings.member.invite",
-            "project": "settings.project.manage",
-            "team": "settings.team.manage",
+            "project": "settings.project.edit",
+            "team": "settings.team.edit",
         }
         AccessControlService(self.db).require(user, permission_by_scope[scope_type], scope_type, scope_id)
 
+    def _require_role_assignment_manage(self, user: User, scope_type: str, scope_id: int | None) -> None:
+        AccessControlService(self.db).require(user, "settings.role.manage", scope_type, scope_id)
+
     def _ensure_project_access(self, project: Project, user: User) -> None:
         if user.is_superuser or self._is_workspace_member(project.workspace_id, user.id):
+            return
+        if AccessControlService(self.db).can_access_scope(user.id, "project", project.id):
             return
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this project.")
 
