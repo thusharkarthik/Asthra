@@ -44,6 +44,7 @@ export type WorkspaceRecord = {
 export type ProjectRecord = {
   id: number;
   workspace_id: number;
+  organization_id?: number | null;
   team_id?: number | null;
   name: string;
   key?: string;

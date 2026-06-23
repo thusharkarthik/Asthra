@@ -18,6 +18,56 @@ def test_create_team(client):
     assert payload["name"] == "Platform Team"
 
 
+def test_create_team_invalid_payload_returns_validation_error(client):
+    headers = create_auth_headers(client)
+
+    response = client.post(
+        "/api/v1/teams",
+        json={"name": "Missing Workspace"},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_team(client):
+    headers = create_auth_headers(client)
+    organization = create_test_organization(client, headers)
+    workspace = create_test_workspace(client, headers, organization["id"])
+    create_response = client.post(
+        "/api/v1/teams",
+        json={"workspace_id": workspace["id"], "name": "Backend Team", "description": "Initial description"},
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    team_id = create_response.json()["id"]
+
+    response = client.patch(
+        f"/api/v1/teams/{team_id}",
+        json={"name": "Backend Platform Team", "description": "Owns backend delivery", "is_active": True},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["id"] == team_id
+    assert payload["name"] == "Backend Platform Team"
+    assert payload["description"] == "Owns backend delivery"
+    assert payload["is_active"] is True
+
+
+def test_update_team_invalid_id_returns_not_found(client):
+    headers = create_auth_headers(client)
+
+    response = client.patch(
+        "/api/v1/teams/999999",
+        json={"name": "Missing Team"},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+
+
 def test_organization_auditor_cannot_create_team(client):
     owner_headers = create_auth_headers(client)
     organization = create_test_organization(client, owner_headers)

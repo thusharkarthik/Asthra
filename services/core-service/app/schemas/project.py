@@ -39,6 +39,7 @@ class ProjectUpdate(BaseModel):
 
 class ProjectRead(TimestampedRead):
     workspace_id: int
+    organization_id: int | None = None
     team_id: int | None = None
     name: str
     key: str

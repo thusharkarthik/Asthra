@@ -101,16 +101,12 @@ class TeamRepository:
                 summary=f"Team '{team.name}' was created.",
             )
         )
-        self.db.commit()
-        self.db.refresh(team)
         return team
 
     def update(self, team: Team, team_update: TeamUpdate) -> Team:
         update_data = team_update.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(team, field, value)
-        self.db.commit()
-        self.db.refresh(team)
         return team
 
     def add_member(

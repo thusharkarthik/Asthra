@@ -31,6 +31,10 @@ class Project(TimestampMixin, Base):
     project_teams = relationship("ProjectTeam", back_populates="project")
     members = relationship("ProjectMembership", back_populates="project")
 
+    @property
+    def organization_id(self) -> int | None:
+        return self.workspace.organization_id if self.workspace else None
+
 
 class ProjectTeam(TimestampMixin, Base):
     __tablename__ = "project_teams"
