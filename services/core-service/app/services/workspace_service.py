@@ -58,21 +58,32 @@ class WorkspaceService:
         self.db.refresh(workspace)
         return workspace
 
-    def list(self, current_user: User) -> list[Workspace]:
+    def list(
+        self,
+        current_user: User,
+        *,
+        organization_id: int | None = None,
+        status_filter: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[Workspace]:
         self._ensure_active_user(current_user)
+        include_all = include_inactive or status_filter in {"all", "inactive", "archived"}
         if current_user.is_superuser:
-            return self.workspace_repository.list_all()
-        return self.workspace_repository.list_for_user(current_user.id)
+            workspaces = self.workspace_repository.list_all(include_inactive=include_all)
+        else:
+            workspaces = self.workspace_repository.list_for_user(current_user.id, include_inactive=include_all)
+        if organization_id is not None:
+            workspaces = [workspace for workspace in workspaces if workspace.organization_id == organization_id]
+        if status_filter == "inactive":
+            return [workspace for workspace in workspaces if not workspace.is_active]
+        if status_filter == "active":
+            return [workspace for workspace in workspaces if workspace.is_active]
+        return workspaces
 
     def get(self, workspace_id: int, current_user: User) -> Workspace:
         self._ensure_active_user(current_user)
         workspace = self.workspace_repository.get_by_id(workspace_id)
         if workspace is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workspace not found.",
-            )
-        if not workspace.is_active:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Workspace not found.",

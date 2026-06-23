@@ -48,29 +48,29 @@ function useSettingsData() {
   const setProjects = useWorkspaceStore((state) => state.setProjects);
 
   const organizationsQuery = useQuery({
-    queryKey: queryKeys.organizations.list,
-    queryFn: () => settingsApi.listOrganizations(accessToken ?? ""),
+    queryKey: [...queryKeys.organizations.list, "settings-all"],
+    queryFn: () => settingsApi.listOrganizations(accessToken ?? "", { include_inactive: true }),
     enabled: Boolean(accessToken)
   });
   const workspacesQuery = useQuery({
-    queryKey: queryKeys.workspaces.list(null),
-    queryFn: () => settingsApi.listWorkspaces(accessToken ?? ""),
+    queryKey: [...queryKeys.workspaces.list(null), "settings-all"],
+    queryFn: () => settingsApi.listWorkspaces(accessToken ?? "", { include_inactive: true }),
     enabled: Boolean(accessToken)
   });
   const projectsQuery = useQuery({
-    queryKey: queryKeys.projects.list(null),
-    queryFn: () => settingsApi.listProjects(accessToken ?? ""),
+    queryKey: [...queryKeys.projects.list(null), "settings-all"],
+    queryFn: () => settingsApi.listProjects(accessToken ?? "", { include_inactive: true }),
     enabled: Boolean(accessToken)
   });
 
   useEffect(() => {
-    if (organizationsQuery.data) setOrganizations(organizationsQuery.data);
+    if (organizationsQuery.data) setOrganizations(organizationsQuery.data.filter((organization) => organization.is_active !== false));
   }, [organizationsQuery.data, setOrganizations]);
   useEffect(() => {
-    if (workspacesQuery.data) setWorkspaces(workspacesQuery.data);
+    if (workspacesQuery.data) setWorkspaces(workspacesQuery.data.filter((workspace) => workspace.is_active !== false));
   }, [setWorkspaces, workspacesQuery.data]);
   useEffect(() => {
-    if (projectsQuery.data) setProjects(projectsQuery.data);
+    if (projectsQuery.data) setProjects(projectsQuery.data.filter((project) => project.is_active !== false));
   }, [projectsQuery.data, setProjects]);
 
   return {
@@ -465,7 +465,14 @@ export function AdministrationDashboardView() {
 export function OrganizationsView() {
   const { accessToken, organizations } = useSettingsData();
   const permissions = useCurrentPermissions();
+  const [statusFilter, setStatusFilter] = useState("active");
   const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
+  const showLimitedAccess = !permissions.isLoading && !permissions.isFetching && !canCreateOrganization;
+  const visibleOrganizations = organizations.filter((organization) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "inactive") return organization.is_active === false;
+    return organization.is_active !== false;
+  });
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -502,10 +509,25 @@ export function OrganizationsView() {
         description="Create and manage the top-level homes for Asthra work."
         actions={canCreateOrganization ? <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton> : undefined}
       />
-      {!canCreateOrganization ? <SettingsCard title="Limited access" description="You need settings.organization.manage to create organizations." /> : null}
+      {permissions.isLoading || permissions.isFetching ? <SettingsCard title="Checking access" description="Loading permissions for this Settings scope." /> : null}
+      {showLimitedAccess ? <SettingsCard title="Limited access" description="You need settings.organization.manage to create organizations." /> : null}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <label className="text-sm font-medium" htmlFor="organization-status-filter">Status</label>
+        <select
+          id="organization-status-filter"
+          aria-label="Organization status filter"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="all">All</option>
+        </select>
+      </div>
       <SettingsDataTable
         columns={["Name", "Description", "Status", "Actions"]}
-        rows={organizations.map((organization) => [
+        rows={visibleOrganizations.map((organization) => [
           organization.name,
           organization.description ?? "No description",
           organization.is_active === false ? "Inactive" : "Active",
@@ -656,6 +678,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
 export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const { accessToken, organizations, workspaces, projects } = useSettingsData();
   const [open, setOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("active");
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
@@ -671,7 +694,11 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
   const canCreateProject = permissions.can("settings.project.manage");
-  const visibleProjects = targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects;
+  const visibleProjects = (targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects).filter((project) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
+    return project.is_active !== false && project.status !== "archived";
+  });
 
   const mutation = useMutation({
     mutationFn: (payload: { workspace_id: number; name: string; description?: string; status?: string }) => settingsApi.createProject(accessToken ?? "", payload),
@@ -741,18 +768,28 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
       ) : (
-        <SettingsDataTable
-          columns={["Name", "Workspace", "Status", "Actions"]}
-          rows={visibleProjects.map((project) => [
-            project.name,
-            workspaces.find((workspace) => workspace.id === project.workspace_id)?.name ?? project.workspace_id,
-            project.status ?? "active",
-            <Link key={project.id} className="text-primary hover:underline" href={`/settings/projects/${project.id}`}>
-              Open
-            </Link>
-          ])}
-          emptyMessage="No projects yet"
-        />
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <label className="text-sm font-medium" htmlFor="project-status-filter">Status</label>
+            <select id="project-status-filter" aria-label="Project status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="active">Active</option>
+              <option value="archived">Archived / Inactive</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <SettingsDataTable
+            columns={["Name", "Workspace", "Status", "Actions"]}
+            rows={visibleProjects.map((project) => [
+              project.name,
+              workspaces.find((workspace) => workspace.id === project.workspace_id)?.name ?? project.workspace_id,
+              project.is_active === false ? "archived" : project.status ?? "active",
+              <Link key={project.id} className="text-primary hover:underline" href={`/settings/projects/${project.id}`}>
+                Open
+              </Link>
+            ])}
+            emptyMessage="No projects yet"
+          />
+        </>
       )}
       <SettingsCreateDialog title="Create project" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Workspace" required>
@@ -799,7 +836,13 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
       setEditOpen(false);
       setFormError(null);
       await invalidateSettingsAndContext(queryClient);
-      addToast({ type: "success", title: "Organization updated", message: `${updatedOrganization.name} was saved.` });
+      addToast({
+        type: "success",
+        title: "Organization updated",
+        message: updatedOrganization.is_active === false
+          ? "Organization moved to Inactive. Use status filter to view it."
+          : `${updatedOrganization.name} was saved.`
+      });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "Unable to update organization.";
@@ -889,9 +932,29 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
 }
 
 export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
-  const { organizations, workspaces, projects } = useSettingsData();
+  const { accessToken, organizations, workspaces, projects } = useSettingsData();
+  const [editOpen, setEditOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const scopedProjects = projects.filter((project) => project.workspace_id === workspaceId);
+  const permissions = useCurrentPermissions({ workspaceId });
+  const canEditWorkspace = permissions.can("settings.workspace.manage");
+  const updateMutation = useMutation({
+    mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateWorkspace(accessToken ?? "", workspaceId, payload),
+    onSuccess: async (updatedWorkspace) => {
+      setEditOpen(false);
+      setFormError(null);
+      await invalidateSettingsAndContext(queryClient);
+      addToast({ type: "success", title: "Workspace updated", message: `${updatedWorkspace.name} was saved.` });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to update workspace.";
+      setFormError(message);
+      addToast({ type: "error", title: "Workspace update failed", message });
+    }
+  });
 
   if (!workspace) {
     return <SettingsEmptyState title="Workspace not found" description="Refresh the page or open the workspaces list." action={<SettingsLinkButton href="/settings/workspaces">Workspaces</SettingsLinkButton>} />;
@@ -909,7 +972,11 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
         meta: `Organization: ${getOrganizationNameForWorkspace(organizations, workspaces, workspaceId)}`
       }}
     >
-      <SettingsSectionHeader title={workspace.name} description={workspace.description ?? "Workspace administration and project setup."} />
+      <SettingsSectionHeader
+        title={workspace.name}
+        description={workspace.description ?? "Workspace administration and project setup."}
+        actions={canEditWorkspace ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Workspace</Button> : undefined}
+      />
       <AdminTabs
         tabs={[
           { label: "Overview", href: `/settings/workspaces/${workspaceId}`, active: true },
@@ -932,6 +999,34 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
         emptyMessage="No projects in this workspace"
       />
       <SettingsDangerZone description="Workspace archive and permanent deletion are placeholders until audit and retention policies are added." />
+      <SettingsCreateDialog title="Edit workspace" open={editOpen} onOpenChange={setEditOpen} onSubmit={(event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const name = getFormValue(form, "name");
+        if (!name) {
+          setFormError("Workspace name is required.");
+          return;
+        }
+        updateMutation.mutate({
+          name,
+          description: getFormValue(form, "description") || undefined,
+          is_active: getFormValue(form, "is_active") === "true"
+        });
+      }} error={formError}>
+        <FormField label="Name" required>
+          <Input name="name" defaultValue={workspace.name} />
+        </FormField>
+        <FormField label="Description">
+          <Input name="description" defaultValue={workspace.description ?? ""} />
+        </FormField>
+        <FormField label="Status">
+          <select name="is_active" defaultValue={String(workspace.is_active !== false)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </FormField>
+        <FormActions submitLabel="Save Workspace" isSubmitting={updateMutation.isPending} onCancel={() => setEditOpen(false)} />
+      </SettingsCreateDialog>
     </SettingsLayout>
   );
 }
@@ -940,10 +1035,14 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
   const { accessToken, projects, workspaces } = useSettingsData();
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
   const [memberFormError, setMemberFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const project = projects.find((item) => item.id === projectId);
+  const permissions = useCurrentPermissions({ projectId });
+  const canManageProject = permissions.can("settings.project.manage");
   const workspaceMembersQuery = useQuery({
     queryKey: ["settings", "project-owner-members", project?.workspace_id],
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", project?.workspace_id ?? 0),
@@ -970,6 +1069,30 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       addToast({ type: "success", title: "Project owner updated" });
     },
     onError: (error) => addToast({ type: "error", title: "Owner update failed", message: error instanceof Error ? error.message : "Unable to update owner." })
+  });
+  const updateProjectMutation = useMutation({
+    mutationFn: (payload: { name?: string; description?: string; status?: string; is_active?: boolean }) => settingsApi.updateProject(accessToken ?? "", projectId, payload),
+    onSuccess: async (updatedProject) => {
+      setEditOpen(false);
+      setEditFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
+      await invalidateSettingsAndContext(queryClient);
+      addToast({ type: "success", title: "Project updated", message: `${updatedProject.name} was saved.` });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to update project.";
+      setEditFormError(message);
+      addToast({ type: "error", title: "Project update failed", message });
+    }
+  });
+  const archiveProjectMutation = useMutation({
+    mutationFn: () => settingsApi.updateProject(accessToken ?? "", projectId, { status: "archived", is_active: false }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
+      await invalidateSettingsAndContext(queryClient);
+      addToast({ type: "success", title: "Project archived", message: "Use the Archived / All filter to view it." });
+    },
+    onError: (error) => addToast({ type: "error", title: "Project archive failed", message: error instanceof Error ? error.message : "Unable to archive project." })
   });
   const addProjectMemberMutation = useMutation({
     mutationFn: (payload: { user_id: number; role_id?: number | null }) => settingsApi.addProjectMember(accessToken ?? "", projectId, payload),
@@ -1025,7 +1148,11 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       <SettingsSectionHeader
         title={project.name}
         description={project.description ?? "Project settings and operational metadata."}
-        actions={<><Button type="button" onClick={() => setOwnerOpen(true)}>Assign Owner</Button><SettingsLinkButton href="/flow">Open Flow</SettingsLinkButton></>}
+        actions={<>
+          {canManageProject ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Project</Button> : null}
+          {canManageProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</Button> : null}
+          <SettingsLinkButton href="/flow">Open Flow</SettingsLinkButton>
+        </>}
       />
       <SettingsCard title="Project metadata">
         <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -1071,7 +1198,42 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           emptyMessage="No project members"
         />
       </SettingsCard>
-      <SettingsDangerZone description="Project archive is a placeholder for the usability pass. Project records remain managed by core-service." />
+      {canManageProject ? (
+        <SettingsDangerZone
+          description="Archive this project without permanently deleting it. Archived projects remain recoverable from the Projects filter."
+          actions={<ConfirmActionButton label="Archive Project" message={`Archive project ${project.name}?`} onConfirm={() => archiveProjectMutation.mutate()} />}
+        />
+      ) : null}
+      <SettingsCreateDialog title="Edit project" open={editOpen} onOpenChange={setEditOpen} onSubmit={(event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const name = getFormValue(form, "name");
+        if (!name) {
+          setEditFormError("Project name is required.");
+          return;
+        }
+        const status = getFormValue(form, "status") || "active";
+        updateProjectMutation.mutate({
+          name,
+          description: getFormValue(form, "description") || undefined,
+          status,
+          is_active: status !== "archived"
+        });
+      }} error={editFormError}>
+        <FormField label="Name" required>
+          <Input name="name" defaultValue={project.name} />
+        </FormField>
+        <FormField label="Description">
+          <Input name="description" defaultValue={project.description ?? ""} />
+        </FormField>
+        <FormField label="Status">
+          <select name="status" defaultValue={project.is_active === false ? "archived" : project.status ?? "active"} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+        </FormField>
+        <FormActions submitLabel="Save Project" isSubmitting={updateProjectMutation.isPending} onCancel={() => setEditOpen(false)} />
+      </SettingsCreateDialog>
       <SettingsCreateDialog title="Assign project owner" open={ownerOpen} onOpenChange={setOwnerOpen} onSubmit={(event) => {
         event.preventDefault();
         const ownerId = Number(getFormValue(event.currentTarget, "owner_id"));

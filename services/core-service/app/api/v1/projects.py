@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -30,10 +30,13 @@ def create_project(
 
 @router.get("", response_model=list[ProjectRead])
 def list_projects(
+    workspace_id: int | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    include_inactive: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Project]:
-    return ProjectService(db).list(current_user)
+    return ProjectService(db).list(current_user, workspace_id=workspace_id, status_filter=status_filter, include_inactive=include_inactive)
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
