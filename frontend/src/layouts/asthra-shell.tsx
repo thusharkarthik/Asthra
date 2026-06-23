@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
 import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { CommandPalette } from "@/components/navigation/command-palette";
@@ -49,9 +50,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const isFetching = useIsFetching();
+  const isMutating = useIsMutating();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const isPublicPath = publicPaths.has(pathname);
+  const showBottomProgress = routeLoading || isFetching > 0 || isMutating > 0;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated && !isPublicPath) {
@@ -83,6 +88,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [notificationsOpen, userMenuOpen]);
+
+  useEffect(() => {
+    if (isPublicPath) return;
+    setRouteLoading(true);
+    const timer = window.setTimeout(() => setRouteLoading(false), 450);
+    return () => window.clearTimeout(timer);
+  }, [isPublicPath, pathname]);
 
   if (isPublicPath) {
     return (
@@ -129,9 +141,19 @@ export function AsthraShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <footer
-        className="shrink-0 border-t border-border bg-card px-3 py-2 text-card-foreground shadow-sm dark:border-white/10 dark:bg-zinc-950 dark:text-white"
+        className="relative shrink-0 border-t border-border bg-card px-3 py-2 text-card-foreground shadow-sm dark:border-white/10 dark:bg-zinc-950 dark:text-white"
         aria-label="Workspace bottom dock"
       >
+          <div
+            aria-hidden="true"
+            data-testid="bottom-dock-progress"
+            className={cn(
+              "pointer-events-none absolute left-0 top-0 h-0.5 w-full overflow-hidden transition-opacity duration-200",
+              showBottomProgress ? "opacity-100" : "opacity-0"
+            )}
+          >
+            <div className="h-full w-1/3 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.65)] animate-bottom-dock-progress" />
+          </div>
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
             <div className="flex shrink-0 items-center gap-2 pr-2">
               <AsthraLogo showWordmark subtitle="Platform" />

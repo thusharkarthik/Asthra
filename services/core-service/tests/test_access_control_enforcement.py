@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.workspace import WorkspaceMember
 from app.schemas.invitation import InvitationCreate
 from app.schemas.organization import OrganizationCreate
-from app.schemas.project import ProjectCreate
+from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.schemas.workspace import WorkspaceCreate
 from app.services.access_control_service import AccessControlService
 from app.services.invitation_service import InvitationService
@@ -49,6 +49,28 @@ def test_organization_owner_inherits_workspace_and_project_permissions():
         assert "settings.project.manage" in project_permissions["permission_codes"]
         assert any(role["key"] == "organization_owner" for role in project_permissions["roles"])
         assert access.can(user.id, "settings.member.invite", "workspace", workspace.id) is True
+    finally:
+        db.close()
+
+
+def test_organization_owner_can_manage_archived_project_after_refresh_scope():
+    db = SessionLocal()
+    try:
+        user = _create_user(db, "archive-owner@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Archived Scope Org"), user)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), user)
+        project = ProjectService(db).create(ProjectCreate(workspace_id=workspace.id, name="Archived Platform"), user)
+        archived_project = ProjectService(db).update(project.id, ProjectUpdate(status="archived", is_active=False), user)
+
+        access = AccessControlService(db)
+        permissions = access.get_user_permissions(user.id, "project", archived_project.id)
+
+        assert archived_project.workspace.organization_id == organization.id
+        assert "settings.project.manage" in permissions["permission_codes"]
+        assert any(role["key"] == "organization_owner" for role in permissions["roles"])
+        restored_project = ProjectService(db).update(archived_project.id, ProjectUpdate(status="active", is_active=True), user)
+        assert restored_project.is_active is True
+        assert restored_project.status == "active"
     finally:
         db.close()
 

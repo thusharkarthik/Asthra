@@ -47,3 +47,10 @@ def _ensure_rbac_columns(engine: Engine) -> None:
                 connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN context_version INTEGER DEFAULT 1 NOT NULL"))
             if "access_version" not in columns:
                 connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN access_version INTEGER DEFAULT 1 NOT NULL"))
+
+        if "team_members" in table_names:
+            team_member_columns = {column["name"] for column in inspector.get_columns("team_members")}
+            if "status" not in team_member_columns:
+                connection.execute(text("ALTER TABLE team_members ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL"))
+            if "joined_at" not in team_member_columns:
+                connection.execute(text("ALTER TABLE team_members ADD COLUMN joined_at DATETIME"))

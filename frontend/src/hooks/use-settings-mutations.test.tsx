@@ -49,7 +49,8 @@ describe("settings mutation hooks", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
 
     await waitFor(() => expect(settingsApi.createOrganization).toHaveBeenCalledWith("token", { name: "Asthra Labs" }));
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.organizations.list }));
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.context.versionRoot }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.settings.all });
   });
 
   it("invalidates member and invitation cache after inviting a member", async () => {

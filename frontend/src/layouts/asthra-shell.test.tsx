@@ -105,6 +105,22 @@ describe("AsthraShell", () => {
     expect(screen.getByLabelText("User menu")).toBeInTheDocument();
   });
 
+  it("renders the bottom dock progress indicator without shifting layout", () => {
+    useAuthStore.setState({
+      accessToken: "token",
+      currentUser: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true },
+      isAuthenticated: true,
+      hasHydrated: true
+    });
+
+    renderShell(<div>Test content</div>);
+
+    const progress = screen.getByTestId("bottom-dock-progress");
+    expect(progress).toHaveClass("absolute");
+    expect(progress.querySelector(".animate-bottom-dock-progress")).toBeInTheDocument();
+    expect(screen.getByRole("contentinfo", { name: /workspace bottom dock/i })).toHaveClass("relative");
+  });
+
   it("toggles the floating assistant drawer", () => {
     useAuthStore.setState({
       accessToken: "token",

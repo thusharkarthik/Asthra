@@ -144,8 +144,19 @@ vi.mock("@/services/api/settings-api", () => ({
     })),
     createWorkspace: vi.fn(),
     createProject: vi.fn(),
+    getProject: vi.fn(async (_token: string, projectId: number) => projectId === 7
+      ? { id: 7, workspace_id: 2, organization_id: 1, name: "Unowned Project", status: "active", owner_id: null, is_active: true }
+      : { id: 3, workspace_id: 2, organization_id: 1, name: "Frontend", status: "active", owner_id: 1, is_active: true }),
     createInvitation: vi.fn(),
     createTeam: vi.fn(async (_token: string, payload: { workspace_id: number; name: string; description?: string }) => ({ id: 9, workspace_id: payload.workspace_id, name: payload.name, description: payload.description, created_by_id: 1, is_active: true })),
+    updateTeam: vi.fn(async (_token: string, teamId: number, payload: { name?: string; description?: string; is_active?: boolean }) => ({
+      id: teamId,
+      workspace_id: 2,
+      name: payload.name ?? "Engineering",
+      description: payload.description ?? "Build team",
+      created_by_id: 1,
+      is_active: payload.is_active ?? true
+    })),
     deleteTeam: vi.fn(),
     createRole: vi.fn(),
     deleteRole: vi.fn(),
@@ -225,7 +236,31 @@ describe("Settings frontend screens", () => {
   it("renders organizations settings", async () => {
     renderWithQuery(<OrganizationsSettingsPage />);
     expect(screen.getByRole("heading", { name: "Organizations" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Organization status filter")).toBeInTheDocument();
     expect(await screen.findByText("Asthra")).toBeInTheDocument();
+  });
+
+  it("shows organization access loading instead of a limited access flash", () => {
+    vi.mocked(settingsApi.getCurrentPermissions).mockReturnValueOnce(new Promise(() => undefined));
+
+    renderWithQuery(<OrganizationsSettingsPage />);
+
+    expect(screen.getByText("Checking access")).toBeInTheDocument();
+    expect(screen.queryByText("Limited access")).not.toBeInTheDocument();
+  });
+
+  it("can reveal inactive organizations through the status filter", async () => {
+    vi.mocked(settingsApi.listOrganizations).mockResolvedValueOnce([
+      { id: 1, name: "Asthra", description: "Platform org", is_active: true },
+      { id: 5, name: "Acme Corp", description: "Inactive customer org", is_active: false }
+    ]);
+
+    renderWithQuery(<OrganizationsSettingsPage />);
+
+    expect(await screen.findByText("Asthra")).toBeInTheDocument();
+    expect(screen.queryByText("Acme Corp")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Organization status filter"), { target: { value: "inactive" } });
+    expect(await screen.findByText("Acme Corp")).toBeInTheDocument();
   });
 
   it("renders API key settings", async () => {
@@ -430,6 +465,21 @@ describe("Settings frontend screens", () => {
     expect(await screen.findByText("Assign Member")).toBeInTheDocument();
   });
 
+  it("edits a team from team detail", async () => {
+    renderWithQuery(<TeamDetailView teamId={6} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Team" }));
+    fireEvent.change(screen.getByDisplayValue("Engineering"), { target: { value: "Backend Team" } });
+    fireEvent.change(screen.getByDisplayValue("Build team"), { target: { value: "Backend delivery" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Team" }));
+
+    await waitFor(() => expect(settingsApi.updateTeam).toHaveBeenCalledWith("token", 6, expect.objectContaining({
+      name: "Backend Team",
+      description: "Backend delivery",
+      is_active: true
+    })));
+  });
+
   it("renders project ownership", async () => {
     renderWithQuery(<ProjectDetailView projectId={3} />);
     expect(await screen.findByText("Owner Email")).toBeInTheDocument();
@@ -444,6 +494,26 @@ describe("Settings frontend screens", () => {
     expect(screen.getAllByText("Owners should be selected from workspace members.").length).toBeGreaterThan(0);
     expect(screen.getByText("Back to Projects")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Projects.*Unowned Project/);
+  });
+
+  it("restores archived projects from the project detail edit dialog", async () => {
+    vi.mocked(settingsApi.getProject).mockResolvedValueOnce({ id: 7, workspace_id: 2, organization_id: 1, name: "Archived Project", status: "archived", owner_id: null, is_active: false });
+    vi.mocked(settingsApi.updateProject).mockResolvedValueOnce({
+      id: 7,
+      workspace_id: 2,
+      name: "Archived Project",
+      status: "active",
+      owner_id: null,
+      is_active: true
+    });
+
+    renderWithQuery(<ProjectDetailView projectId={7} />);
+
+    expect(await screen.findByRole("button", { name: "Restore Project" })).toBeInTheDocument();
+    await waitFor(() => expect(settingsApi.getCurrentPermissions).toHaveBeenCalledWith("token", expect.objectContaining({ org_id: 1, workspace_id: 2, project_id: 7 })));
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole("button", { name: "Restore Project" }));
+    await waitFor(() => expect(settingsApi.updateProject).toHaveBeenCalledWith("token", 7, expect.objectContaining({ status: "active", is_active: true })));
   });
 
   it("renders roles and permissions", async () => {

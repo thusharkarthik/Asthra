@@ -177,6 +177,18 @@ body {
   }
 }
 
+@keyframes bottom-dock-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  55% {
+    transform: translateX(65%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
 .animate-auth-overlay-in {
   animation: auth-overlay-in 1850ms ease-in-out both;
 }
@@ -209,6 +221,10 @@ body {
   animation: auth-text-out 1450ms ease-in-out both;
 }
 
+.animate-bottom-dock-progress {
+  animation: bottom-dock-progress 1150ms ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-auth-overlay-in,
   .animate-auth-overlay-out,
@@ -217,7 +233,8 @@ body {
   .animate-auth-logo-in,
   .animate-auth-logo-out,
   .animate-auth-text-in,
-  .animate-auth-text-out {
+  .animate-auth-text-out,
+  .animate-bottom-dock-progress {
     animation-duration: 1ms;
   }
 }
