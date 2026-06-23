@@ -106,46 +106,42 @@ class PermissionService:
         self.db.commit()
 
     def ensure_permission_catalog(self) -> None:
-        self.normalize_permission_metadata()
+        self.sync_registry_permissions(dry_run=False)
+
+    def sync_registry_permissions(self, *, dry_run: bool = False) -> dict:
         registry_items = iter_registry_permissions()
         registry_codes = {item.code for item in registry_items}
+        existing_permissions = self.permission_repository.list(include_inactive=True)
+        permissions_by_code = {permission.code: permission for permission in existing_permissions}
+        result = {
+            "created_count": 0,
+            "updated_count": 0,
+            "deprecated_count": 0,
+            "skipped_custom_count": 0,
+            "errors": [],
+            "created": [],
+            "updated": [],
+            "deprecated": [],
+            "skipped_custom": [],
+            "total_registry_permissions": len(registry_items),
+        }
+
         for item in registry_items:
-            existing = self.permission_repository.get_by_code(item.code)
+            existing = permissions_by_code.get(item.code)
             if existing is not None:
-                changed = False
-                if existing.name != item.name:
-                    existing.name = item.name
-                    changed = True
-                if existing.description != item.description:
-                    existing.description = item.description
-                    changed = True
-                if existing.module != item.module:
-                    existing.module = item.module
-                    changed = True
-                if existing.resource != item.resource:
-                    existing.resource = item.resource
-                    changed = True
-                if existing.action != item.action:
-                    existing.action = item.action
-                    changed = True
-                if existing.scope != item.scope:
-                    existing.scope = item.scope
-                    changed = True
-                if existing.risk_level != item.risk_level:
-                    existing.risk_level = item.risk_level
-                    changed = True
-                if existing.source != "registry":
-                    existing.source = "registry"
-                    changed = True
-                if not existing.is_system:
-                    existing.is_system = True
-                    changed = True
-                if existing.status != "active":
-                    existing.status = "active"
-                    existing.is_active = True
-                    changed = True
+                update_data = self._registry_update_data(existing, item)
+                changed = bool(update_data)
                 if changed:
-                    self.db.commit()
+                    result["updated_count"] += 1
+                    result["updated"].append(item.code)
+                    if not dry_run:
+                        for field, value in update_data.items():
+                            setattr(existing, field, value)
+                        self.db.commit()
+                continue
+            result["created_count"] += 1
+            result["created"].append(item.code)
+            if dry_run:
                 continue
             self.permission_repository.create(
                 code=item.code,
@@ -160,6 +156,21 @@ class PermissionService:
                 status="active",
                 is_system=True,
             )
+        for permission in existing_permissions:
+            if permission.source == "custom":
+                result["skipped_custom_count"] += 1
+                result["skipped_custom"].append(permission.code)
+                continue
+            if permission.source == "registry" and permission.code not in registry_codes and permission.status != "deprecated":
+                result["deprecated_count"] += 1
+                result["deprecated"].append(permission.code)
+                if not dry_run:
+                    permission.status = "deprecated"
+                    permission.is_active = False
+                    self.db.commit()
+        if not dry_run:
+            self.normalize_permission_metadata()
+        return result
 
     def normalize_permission_metadata(self) -> None:
         registry_by_code = {item.code: item for item in iter_registry_permissions()}
@@ -187,6 +198,26 @@ class PermissionService:
                 changed = True
             if changed:
                 self.db.commit()
+
+    def _registry_update_data(self, permission: Permission, item: PermissionRegistryItem) -> dict:
+        expected = {
+            "name": item.name,
+            "description": item.description,
+            "module": item.module,
+            "resource": item.resource,
+            "action": item.action,
+            "scope": item.scope,
+            "risk_level": item.risk_level,
+            "source": "registry",
+            "status": "active",
+            "is_active": True,
+            "is_system": True,
+        }
+        return {
+            field: value
+            for field, value in expected.items()
+            if getattr(permission, field) != value
+        }
 
     def registry_status(self) -> list[dict]:
         self.ensure_permission_catalog()
@@ -283,6 +314,58 @@ class PermissionService:
             },
         }
 
+    def role_mapping_suggestions(self) -> list[dict]:
+        self.ensure_permission_catalog()
+        permissions = self.permission_repository.list(include_inactive=True)
+        active_codes = sorted(permission.code for permission in permissions if permission.is_active and permission.status == "active")
+        suggestion_patterns = {
+            "organization_owner": [
+                "settings.organization.*",
+                "settings.workspace.*",
+                "settings.project.*",
+                "settings.team.*",
+                "settings.member.*",
+                "settings.role.*",
+                "settings.permission.*",
+                "docs.*.view",
+                "flow.*.view",
+                "discover.*.view",
+                "desk.*.view",
+                "pulse.*.view",
+                "collab.*.view",
+            ],
+            "workspace_admin": [
+                "settings.workspace.*",
+                "settings.project.*",
+                "settings.team.*",
+                "settings.member.*",
+                "docs.*",
+                "discover.*",
+                "desk.ticket.*",
+                "pulse.incident.*",
+                "collab.*",
+                "flow.*.view",
+            ],
+            "project_admin": ["settings.project.*", "flow.*", "docs.page.view", "discover.idea.view"],
+            "project_manager": ["flow.work_item.*", "flow.sprint.*", "flow.release.*", "flow.report.view"],
+            "project_contributor": ["flow.work_item.view", "flow.work_item.create", "flow.work_item.edit", "flow.comment.*", "flow.attachment.*", "flow.board.view"],
+            "workspace_viewer": ["*.view"],
+            "project_viewer": ["settings.project.view", "flow.*.view", "docs.page.view", "discover.idea.view"],
+            "organization_auditor": ["*.view", "settings.audit.view", "flow.report.view", "desk.report.view", "pulse.report.view"],
+        }
+        suggestions: list[dict] = []
+        for role_key, patterns in suggestion_patterns.items():
+            matched_codes = [code for code in active_codes if self._permission_matches_any_pattern(code, patterns)]
+            suggestions.append({
+                "role_key": role_key,
+                "permission_patterns": patterns,
+                "suggested_permissions": matched_codes,
+                "suggested_count": len(matched_codes),
+                "high_risk_count": sum(1 for permission in permissions if permission.code in matched_codes and permission.risk_level == "high"),
+                "note": "Suggestion only. Permissions are not automatically applied.",
+            })
+        return suggestions
+
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:
             raise HTTPException(
@@ -306,8 +389,8 @@ class PermissionService:
     def _metadata_from_code(self, code: str) -> PermissionRegistryItem:
         parts = code.split(".")
         module = parts[0] if len(parts) >= 1 and parts[0] else "unknown"
-        resource = parts[1] if len(parts) >= 2 and parts[1] else "unknown"
-        action = parts[2] if len(parts) >= 3 and parts[2] else "manage"
+        resource = ".".join(parts[1:-1]) if len(parts) >= 3 else (parts[1] if len(parts) >= 2 and parts[1] else "unknown")
+        action = parts[-1] if len(parts) >= 3 and parts[-1] else "manage"
         return PermissionRegistryItem(
             module=module,
             resource=resource,
@@ -324,7 +407,7 @@ class PermissionService:
 
     def _is_valid_permission_code(self, code: str) -> bool:
         parts = code.split(".")
-        return len(parts) == 3 and all(part.strip() for part in parts)
+        return len(parts) >= 3 and all(part.strip() for part in parts)
 
     def _role_usage_by_permission_id(self) -> dict[int, list[str]]:
         rows = (
@@ -350,6 +433,22 @@ class PermissionService:
             value = str(getattr(permission, field, None) or "unknown")
             counts[value] = counts.get(value, 0) + 1
         return dict(sorted(counts.items()))
+
+    def _permission_matches_any_pattern(self, permission_code: str, patterns: list[str]) -> bool:
+        parts = permission_code.split(".")
+        for pattern in patterns:
+            if pattern == "*":
+                return True
+            if pattern.startswith("*.") and permission_code.endswith(pattern[1:]):
+                return True
+            if pattern.endswith(".*") and permission_code.startswith(pattern[:-1]):
+                return True
+            pattern_parts = pattern.split(".")
+            if len(pattern_parts) != len(parts):
+                continue
+            if all(pattern_part == "*" or pattern_part == code_part for pattern_part, code_part in zip(pattern_parts, parts)):
+                return True
+        return False
 
     def _validate_status(self, value: str) -> None:
         if value not in VALID_PERMISSION_STATUSES:

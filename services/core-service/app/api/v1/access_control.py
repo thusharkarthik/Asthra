@@ -25,3 +25,27 @@ def get_permission_gaps(
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
     return PermissionService(db).permission_gaps()
+
+
+@router.get("/permission-registry/sync-preview")
+def preview_permission_registry_sync(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return PermissionService(db).sync_registry_permissions(dry_run=True)
+
+
+@router.post("/permission-registry/sync")
+def sync_permission_registry(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return PermissionService(db).sync_registry_permissions(dry_run=False)
+
+
+@router.get("/role-mapping-suggestions")
+def get_role_mapping_suggestions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    return PermissionService(db).role_mapping_suggestions()

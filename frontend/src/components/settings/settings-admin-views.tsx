@@ -2215,6 +2215,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const permissionRegistryQuery = useQuery({ queryKey: ["settings", "permission-registry"], queryFn: () => settingsApi.listPermissionRegistry(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionGapsQuery = useQuery({ queryKey: ["settings", "permission-gaps"], queryFn: () => settingsApi.listPermissionGaps(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionInventoryQuery = useQuery({ queryKey: ["settings", "permission-inventory"], queryFn: () => settingsApi.getPermissionInventory(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const syncPreviewQuery = useQuery({ queryKey: ["settings", "permission-registry-sync-preview"], queryFn: () => settingsApi.previewPermissionRegistrySync(accessToken ?? ""), enabled: Boolean(accessToken && section === "registry") });
+  const roleMappingSuggestionsQuery = useQuery({ queryKey: ["settings", "role-mapping-suggestions"], queryFn: () => settingsApi.listRoleMappingSuggestions(accessToken ?? ""), enabled: Boolean(accessToken && section === "mapping") });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleAssignmentsQuery = useQuery({ queryKey: ["settings", "role-assignments"], queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roles = rolesQuery.data ?? [];
@@ -2302,6 +2304,21 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       addToast({ type: "success", title: "Role assignment revoked" });
     },
     onError: (error) => addToast({ type: "error", title: "Assignment revoke failed", message: error instanceof Error ? error.message : "Unable to revoke assignment." })
+  });
+  const syncRegistryMutation = useMutation({
+    mutationFn: () => settingsApi.syncPermissionRegistry(accessToken ?? ""),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] }),
+        queryClient.invalidateQueries({ queryKey: ["settings", "permission-registry"] }),
+        queryClient.invalidateQueries({ queryKey: ["settings", "permission-gaps"] }),
+        queryClient.invalidateQueries({ queryKey: ["settings", "permission-inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["settings", "permission-registry-sync-preview"] }),
+        invalidateSettingsAndContext(queryClient)
+      ]);
+      addToast({ type: "success", title: "Permission registry synced", message: `${result.created_count} created, ${result.updated_count} updated, ${result.deprecated_count} deprecated.` });
+    },
+    onError: (error) => addToast({ type: "error", title: "Permission sync failed", message: error instanceof Error ? error.message : "Unable to sync permissions." })
   });
 
   function submitCustomRole(event: FormEvent<HTMLFormElement>) {
@@ -2489,6 +2506,19 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               ))}
             </div>
           </SettingsCard>
+          <SettingsCard title="Role Mapping Suggestions" description="Suggested permission bundles are read-only. They are not auto-applied to roles.">
+            <SettingsDataTable
+              columns={["Role", "Suggested Permissions", "High Risk", "Patterns", "Note"]}
+              rows={(roleMappingSuggestionsQuery.data ?? []).map((suggestion) => [
+                roleDisplayName(suggestion.role_key),
+                String(suggestion.suggested_count),
+                String(suggestion.high_risk_count),
+                suggestion.permission_patterns.join(", "),
+                suggestion.note
+              ])}
+              emptyMessage="No role mapping suggestions"
+            />
+          </SettingsCard>
           <SettingsCard title="Manage Role Permissions" description="Open a role to view or change its permission assignments. System roles are view-only.">
             <SettingsDataTable
               columns={["Role", "Scope", "System Role", "Permissions Count", "Action"]}
@@ -2538,11 +2568,32 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       ) : null}
       {section === "registry" ? (
         <div className="space-y-4">
-          <SettingsCard title="Registry Summary" description="Phase A registry baseline for critical resources only. Missing permissions are safe to review before Phase B generation.">
-            <div className="grid gap-3 text-sm md:grid-cols-3">
+          <SettingsCard title="Registry Summary" description="Structured module/resource/action registry with safe preview and explicit sync. Role mappings are not auto-applied.">
+            <div className="grid gap-3 text-sm md:grid-cols-4">
               <div><div className="text-muted-foreground">Expected permissions</div><div className="text-2xl font-semibold">{registryItems.length}</div></div>
               <div><div className="text-muted-foreground">Missing or inactive</div><div className="text-2xl font-semibold">{missingRegistryCount}</div></div>
               <div><div className="text-muted-foreground">Current catalog</div><div className="text-2xl font-semibold">{inventory?.total_permissions ?? permissions.length}</div></div>
+              <div><div className="text-muted-foreground">Preview created</div><div className="text-2xl font-semibold">{syncPreviewQuery.data?.created_count ?? 0}</div></div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => syncPreviewQuery.refetch()} disabled={syncPreviewQuery.isFetching}>Sync Preview</Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Sync registry permissions? Custom permissions will be preserved and role mappings will not be auto-applied.")) {
+                    syncRegistryMutation.mutate();
+                  }
+                }}
+                disabled={syncRegistryMutation.isPending}
+              >
+                Sync Permissions
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+              <div><span className="text-muted-foreground">Updated preview:</span> {syncPreviewQuery.data?.updated_count ?? 0}</div>
+              <div><span className="text-muted-foreground">Deprecated preview:</span> {syncPreviewQuery.data?.deprecated_count ?? 0}</div>
+              <div><span className="text-muted-foreground">Custom skipped:</span> {syncPreviewQuery.data?.skipped_custom_count ?? 0}</div>
+              <div><span className="text-muted-foreground">Errors:</span> {syncPreviewQuery.data?.errors.length ?? 0}</div>
             </div>
           </SettingsCard>
           {registryModules.map((module) => {
@@ -2568,7 +2619,24 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         </div>
       ) : null}
       {section === "gaps" ? (
-        <SettingsCard title="Permission Gaps" description="Registry permissions that are missing, inactive, or deprecated. These are the action keys that need catalog attention before UI or backend enforcement can rely on them.">
+        <SettingsCard
+          title="Permission Gaps"
+          description="Registry permissions that are missing, inactive, or deprecated. These are the action keys that need catalog attention before UI or backend enforcement can rely on them."
+          actions={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (window.confirm("Generate missing registry permissions? This will not map permissions to roles automatically.")) {
+                  syncRegistryMutation.mutate();
+                }
+              }}
+              disabled={syncRegistryMutation.isPending}
+            >
+              Generate Missing Permissions
+            </Button>
+          }
+        >
           <SettingsDataTable
             columns={["Module", "Resource", "Action", "Expected Code", "Status", "Suggested Fix"]}
             rows={(permissionGapsQuery.data ?? []).map((gap) => [

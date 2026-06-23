@@ -142,6 +142,33 @@ vi.mock("@/services/api/settings-api", () => ({
       existing_not_in_registry_baseline: ["automation.rule.manage"],
       roles_using_each_permission: { "settings.workspace.manage": ["Workspace Admin"] }
     })),
+    previewPermissionRegistrySync: vi.fn(async () => ({
+      created_count: 2,
+      updated_count: 1,
+      deprecated_count: 0,
+      skipped_custom_count: 1,
+      errors: [],
+      created: ["settings.project.restore", "settings.team.edit"],
+      updated: ["settings.workspace.manage"],
+      deprecated: [],
+      skipped_custom: ["automation.rule.manage"],
+      total_registry_permissions: 2
+    })),
+    syncPermissionRegistry: vi.fn(async () => ({
+      created_count: 2,
+      updated_count: 1,
+      deprecated_count: 0,
+      skipped_custom_count: 1,
+      errors: [],
+      created: ["settings.project.restore", "settings.team.edit"],
+      updated: ["settings.workspace.manage"],
+      deprecated: [],
+      skipped_custom: ["automation.rule.manage"],
+      total_registry_permissions: 2
+    })),
+    listRoleMappingSuggestions: vi.fn(async () => [
+      { role_key: "organization_owner", permission_patterns: ["settings.organization.*", "settings.project.*"], suggested_permissions: ["settings.project.restore"], suggested_count: 1, high_risk_count: 1, note: "Suggestion only. Permissions are not automatically applied." }
+    ]),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
     listProjectMembers: vi.fn(async () => [{ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active", joined_at: "2026-01-02T00:00:00Z" }]),
@@ -578,6 +605,8 @@ describe("Settings frontend screens", () => {
     renderWithQuery(<AccessControlMappingPage />);
     expect(await screen.findByText("Role Mapping Matrix")).toBeInTheDocument();
     expect(await screen.findByText("Role Mapping Insights")).toBeInTheDocument();
+    expect(await screen.findByText("Role Mapping Suggestions")).toBeInTheDocument();
+    expect((await screen.findAllByText("Organization Owner")).length).toBeGreaterThan(0);
     expect(await screen.findByText("View work items")).toBeInTheDocument();
     expect(await screen.findByText("Manage Role Permissions")).toBeInTheDocument();
     expect(screen.getAllByText("Manage Permissions").length).toBeGreaterThan(0);
@@ -593,12 +622,15 @@ describe("Settings frontend screens", () => {
     cleanup();
     renderWithQuery(<AccessControlRegistryPage />);
     expect(await screen.findByText("Registry Summary")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Sync Preview" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Sync Permissions" })).toBeInTheDocument();
     expect(await screen.findByText("Settings Registry")).toBeInTheDocument();
     expect(await screen.findByText("settings.project.restore")).toBeInTheDocument();
 
     cleanup();
     renderWithQuery(<AccessControlGapsPage />);
     expect((await screen.findAllByText("Permission Gaps")).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("button", { name: "Generate Missing Permissions" })).toBeInTheDocument();
     expect(await screen.findByText("No permission gaps")).toBeInTheDocument();
   });
 });

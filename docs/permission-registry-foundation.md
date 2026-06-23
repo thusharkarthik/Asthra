@@ -1,10 +1,10 @@
 # Permission Registry Foundation
 
-Phase A provides a registry baseline, inventory endpoint, and gap detection without mass-generating every possible permission.
+Phase A provides a registry baseline, inventory endpoint, and gap detection. Phase B builds on it with a safe generator and sync process.
 
-## Baseline Resources
+## Registry Resources
 
-Current baseline covers:
+The registry now covers:
 
 - `settings.organization`
 - `settings.workspace`
@@ -15,13 +15,39 @@ Current baseline covers:
 - `settings.role`
 - `settings.permission`
 - `flow.work_item`
+- `flow.board`
+- `flow.backlog`
 - `flow.sprint`
 - `flow.release`
 - `flow.workflow`
+- `flow.custom_field`
+- `flow.dependency`
+- `flow.comment`
+- `flow.attachment`
+- `flow.report`
 - `docs.space`
 - `docs.page`
+- `docs.comment`
+- `docs.version`
+- `docs.link`
 - `discover.idea`
+- `discover.feature_request`
+- `discover.feedback`
 - `discover.roadmap`
+- `discover.validation`
+- `discover.delivery`
+- `desk.ticket`
+- `desk.queue`
+- `desk.comment`
+- `desk.report`
+- `pulse.incident`
+- `pulse.service`
+- `pulse.update`
+- `pulse.postmortem`
+- `pulse.report`
+- `collab.thread`
+- `collab.message`
+- `collab.announcement`
 
 ## Inventory Endpoint
 
@@ -55,6 +81,33 @@ Returns:
 - malformed permission codes
 - broad permissions that may need splitting
 
+## Sync Endpoints
+
+`GET /api/v1/access-control/permission-registry/sync-preview`
+
+Returns the permissions that would be created, updated, deprecated, or skipped without modifying the database.
+
+`POST /api/v1/access-control/permission-registry/sync`
+
+Applies the registry sync.
+
+The sync:
+
+- creates missing registry permissions
+- updates registry permission metadata
+- preserves custom permissions
+- deprecates stale registry permissions
+- does not delete permissions
+- does not apply role mapping suggestions
+
+## Role Mapping Suggestions
+
+`GET /api/v1/access-control/role-mapping-suggestions`
+
+Returns suggested permission bundles for system roles such as Organization Owner, Workspace Admin, Project Manager, Contributor, Viewer, and Auditor.
+
+Suggestions are review-only. Administrators must explicitly apply any mapping changes.
+
 ## Critical Permissions Added
 
 Phase A safely adds:
@@ -78,6 +131,8 @@ Phase A safely adds:
 
 1. Add the expected action to the registry baseline.
 2. Run the inventory and gap endpoints.
-3. Add backend enforcement using the exact permission code.
-4. Add frontend visibility using the same permission code.
-5. Confirm role templates grant it to the right system roles.
+3. Run sync preview.
+4. Sync registry permissions if the preview is correct.
+5. Add backend enforcement using the exact permission code.
+6. Add frontend visibility using the same permission code.
+7. Review role mapping suggestions and explicitly update roles if needed.
