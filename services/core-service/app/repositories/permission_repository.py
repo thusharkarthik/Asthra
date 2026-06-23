@@ -35,6 +35,7 @@ class PermissionRepository:
         risk_level: str = "low",
         source: str = "custom",
         status: str = "active",
+        is_system: bool = False,
     ) -> Permission:
         permission = Permission(
             code=code,
@@ -48,6 +49,7 @@ class PermissionRepository:
             risk_level=risk_level,
             source=source,
             status=status,
+            is_system=is_system,
             is_active=status == "active",
         )
         self.db.add(permission)

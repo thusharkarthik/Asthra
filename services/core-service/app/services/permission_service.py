@@ -2,12 +2,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.permission import Permission
+from app.models.role import Role, RolePermission
 from app.models.user import User
 from app.repositories.permission_repository import PermissionRepository
 from app.schemas.role import PermissionCreate, PermissionUpdate
 from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
-from app.services.permission_registry import iter_registry_permissions
+from app.services.permission_registry import PermissionRegistryItem, iter_registry_permissions
 
 VALID_PERMISSION_STATUSES = {"active", "inactive", "deprecated"}
 VALID_PERMISSION_RISK_LEVELS = {"low", "medium", "high"}
@@ -42,6 +43,7 @@ class PermissionService:
             risk_level=permission_create.risk_level,
             source=permission_create.source,
             status=permission_create.status,
+            is_system=permission_create.is_system,
         )
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
@@ -104,6 +106,7 @@ class PermissionService:
         self.db.commit()
 
     def ensure_permission_catalog(self) -> None:
+        self.normalize_permission_metadata()
         registry_items = iter_registry_permissions()
         registry_codes = {item.code for item in registry_items}
         for item in registry_items:
@@ -134,6 +137,9 @@ class PermissionService:
                 if existing.source != "registry":
                     existing.source = "registry"
                     changed = True
+                if not existing.is_system:
+                    existing.is_system = True
+                    changed = True
                 if existing.status != "active":
                     existing.status = "active"
                     existing.is_active = True
@@ -152,13 +158,34 @@ class PermissionService:
                 risk_level=item.risk_level,
                 source="registry",
                 status="active",
+                is_system=True,
             )
+
+    def normalize_permission_metadata(self) -> None:
+        registry_by_code = {item.code: item for item in iter_registry_permissions()}
         for permission in self.permission_repository.list(include_inactive=True):
-            if permission.source != "registry" or permission.code in registry_codes:
-                continue
-            if permission.status != "deprecated" or permission.is_active:
-                permission.status = "deprecated"
-                permission.is_active = False
+            metadata = registry_by_code.get(permission.code) or self._metadata_from_code(permission.code)
+            changed = False
+            for field in ("module", "resource", "action", "scope", "risk_level"):
+                value = getattr(metadata, field)
+                if getattr(permission, field) != value:
+                    setattr(permission, field, value)
+                    changed = True
+            if not permission.description:
+                permission.description = metadata.description
+                changed = True
+            if not permission.name:
+                permission.name = metadata.name
+                changed = True
+            expected_source = "registry" if permission.code in registry_by_code else (permission.source or "custom")
+            if permission.source != expected_source:
+                permission.source = expected_source
+                changed = True
+            expected_system = permission.code in registry_by_code
+            if permission.is_system != expected_system and expected_system:
+                permission.is_system = True
+                changed = True
+            if changed:
                 self.db.commit()
 
     def registry_status(self) -> list[dict]:
@@ -182,6 +209,7 @@ class PermissionService:
         return rows
 
     def permission_gaps(self) -> list[dict]:
+        self.normalize_permission_metadata()
         permissions_by_code = {permission.code: permission for permission in self.permission_repository.list(include_inactive=True)}
         gaps: list[dict] = []
         registry_codes = {item.code for item in iter_registry_permissions()}
@@ -197,16 +225,63 @@ class PermissionService:
                     "suggested_fix": "Run the permission registry sync on startup or reactivate the registry permission.",
                 })
         for permission in permissions_by_code.values():
-            if permission.source == "registry" and permission.code not in registry_codes:
+            if not self._is_valid_permission_code(permission.code):
+                gaps.append({
+                    "module": permission.module or "unknown",
+                    "resource": permission.resource or "unknown",
+                    "action": permission.action or "unknown",
+                    "expected_permission_code": permission.code,
+                    "status": "malformed",
+                    "suggested_fix": "Normalize the code to module.resource.action.",
+                })
+                continue
+            if permission.action == "manage":
+                gaps.append({
+                    "module": permission.module or permission.code.split(".")[0],
+                    "resource": permission.resource or "unknown",
+                    "action": permission.action or "manage",
+                    "expected_permission_code": permission.code,
+                    "status": "broad",
+                    "suggested_fix": "Review whether this broad manage permission should be split into precise action permissions.",
+                })
+            if permission.code not in registry_codes:
                 gaps.append({
                     "module": permission.module or permission.code.split(".")[0],
                     "resource": permission.resource or "unknown",
                     "action": permission.action or "unknown",
                     "expected_permission_code": permission.code,
-                    "status": "deprecated",
-                    "suggested_fix": "Review this registry permission and keep it deprecated unless a screen or endpoint still uses it.",
+                    "status": "unmapped",
+                    "suggested_fix": "Review whether this existing permission should be added to the Phase A registry baseline.",
                 })
         return gaps
+
+    def inventory(self) -> dict:
+        self.ensure_permission_catalog()
+        permissions = self.permission_repository.list(include_inactive=True)
+        role_usage = self._role_usage_by_permission_id()
+        registry_codes = {item.code for item in iter_registry_permissions()}
+        malformed = [permission.code for permission in permissions if not self._is_valid_permission_code(permission.code)]
+        duplicate_like = self._duplicate_like_permissions(permissions)
+        unmapped = [permission.code for permission in permissions if not role_usage.get(permission.id)]
+
+        return {
+            "total_permissions": len(permissions),
+            "by_module": self._count_by(permissions, "module"),
+            "by_resource": self._count_by(permissions, "resource"),
+            "by_action": self._count_by(permissions, "action"),
+            "by_risk": self._count_by(permissions, "risk_level"),
+            "by_scope": self._count_by(permissions, "scope"),
+            "deprecated_permissions": [permission.code for permission in permissions if permission.status == "deprecated"],
+            "malformed_permissions": malformed,
+            "duplicate_like_permissions": duplicate_like,
+            "unmapped_permissions": unmapped,
+            "broad_permissions": [permission.code for permission in permissions if permission.action == "manage"],
+            "existing_not_in_registry_baseline": [permission.code for permission in permissions if permission.code not in registry_codes],
+            "roles_using_each_permission": {
+                permission.code: role_usage.get(permission.id, [])
+                for permission in permissions
+            },
+        }
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:
@@ -227,6 +302,54 @@ class PermissionService:
 
     def _normalize_code(self, code: str) -> str:
         return code.strip().lower()
+
+    def _metadata_from_code(self, code: str) -> PermissionRegistryItem:
+        parts = code.split(".")
+        module = parts[0] if len(parts) >= 1 and parts[0] else "unknown"
+        resource = parts[1] if len(parts) >= 2 and parts[1] else "unknown"
+        action = parts[2] if len(parts) >= 3 and parts[2] else "manage"
+        return PermissionRegistryItem(
+            module=module,
+            resource=resource,
+            action=action,
+            scope=self._default_scope_for_module(module),
+        )
+
+    def _default_scope_for_module(self, module: str) -> str:
+        if module in {"settings", "guard"}:
+            return "organization"
+        if module == "flow":
+            return "project"
+        return "workspace"
+
+    def _is_valid_permission_code(self, code: str) -> bool:
+        parts = code.split(".")
+        return len(parts) == 3 and all(part.strip() for part in parts)
+
+    def _role_usage_by_permission_id(self) -> dict[int, list[str]]:
+        rows = (
+            self.db.query(RolePermission.permission_id, Role.name)
+            .join(Role, Role.id == RolePermission.role_id)
+            .all()
+        )
+        usage: dict[int, list[str]] = {}
+        for permission_id, role_name in rows:
+            usage.setdefault(permission_id, []).append(role_name)
+        return usage
+
+    def _duplicate_like_permissions(self, permissions: list[Permission]) -> list[list[str]]:
+        groups: dict[tuple[str | None, str | None, str | None], list[str]] = {}
+        for permission in permissions:
+            key = (permission.module, permission.resource, permission.action)
+            groups.setdefault(key, []).append(permission.code)
+        return [codes for codes in groups.values() if len(codes) > 1]
+
+    def _count_by(self, permissions: list[Permission], field: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for permission in permissions:
+            value = str(getattr(permission, field, None) or "unknown")
+            counts[value] = counts.get(value, 0) + 1
+        return dict(sorted(counts.items()))
 
     def _validate_status(self, value: str) -> None:
         if value not in VALID_PERMISSION_STATUSES:

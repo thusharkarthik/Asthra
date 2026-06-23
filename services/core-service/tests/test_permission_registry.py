@@ -1,6 +1,7 @@
 from app.db.session import SessionLocal
 from app.models.permission import Permission
 from app.services.permission_service import PermissionService
+from tests.conftest import create_auth_headers
 
 
 def test_permission_registry_generates_action_permissions():
@@ -68,3 +69,24 @@ def test_permission_gaps_report_inactive_registry_permission():
         assert any(gap["expected_permission_code"] == "settings.project.restore" and gap["status"] == "inactive" for gap in gaps)
     finally:
         db.close()
+
+
+def test_permission_inventory_endpoint_returns_summary(client):
+    headers = create_auth_headers(client)
+
+    response = client.get("/api/v1/access-control/permission-inventory", headers=headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_permissions"] >= 1
+    assert "settings" in payload["by_module"]
+    assert "roles_using_each_permission" in payload
+
+
+def test_permission_gaps_endpoint_returns_gap_categories(client):
+    headers = create_auth_headers(client)
+
+    response = client.get("/api/v1/access-control/permission-gaps", headers=headers)
+
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)

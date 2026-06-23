@@ -116,17 +116,32 @@ vi.mock("@/services/api/settings-api", () => ({
       { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.work_item.*"], is_system: true, is_editable: false }
     ]),
     listPermissions: vi.fn(async () => [
-      { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", resource: "workspace", action: "manage", scope: "workspace", risk_level: "high", source: "registry", status: "active", is_active: true },
-      { id: 6, code: "flow.work_item.view", name: "View work items", module: "flow", resource: "work_item", action: "view", scope: "project", risk_level: "low", source: "registry", status: "active", is_active: true },
-      { id: 7, code: "flow.work_item.create", name: "Create work items", module: "flow", resource: "work_item", action: "create", scope: "project", risk_level: "medium", source: "registry", status: "active", is_active: true },
-      { id: 8, code: "docs.page.edit", name: "Edit Docs pages", module: "docs", resource: "page", action: "edit", scope: "workspace", risk_level: "medium", source: "registry", status: "active", is_active: true },
-      { id: 9, code: "automation.rule.manage", name: "Manage automation rules", module: "automation", resource: "rule", action: "manage", scope: "workspace", risk_level: "high", source: "registry", status: "active", is_active: true }
+      { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", resource: "workspace", action: "manage", scope: "workspace", risk_level: "high", source: "registry", status: "active", is_system: true, is_active: true },
+      { id: 6, code: "flow.work_item.view", name: "View work items", module: "flow", resource: "work_item", action: "view", scope: "project", risk_level: "low", source: "registry", status: "active", is_system: true, is_active: true },
+      { id: 7, code: "flow.work_item.create", name: "Create work items", module: "flow", resource: "work_item", action: "create", scope: "project", risk_level: "medium", source: "registry", status: "active", is_system: true, is_active: true },
+      { id: 8, code: "docs.page.edit", name: "Edit Docs pages", module: "docs", resource: "page", action: "edit", scope: "workspace", risk_level: "medium", source: "registry", status: "active", is_system: true, is_active: true },
+      { id: 9, code: "automation.rule.manage", name: "Manage automation rules", module: "automation", resource: "rule", action: "manage", scope: "workspace", risk_level: "high", source: "custom", status: "active", is_system: false, is_active: true }
     ]),
     listPermissionRegistry: vi.fn(async () => [
       { code: "settings.project.restore", name: "Restore Project", description: "Allows restore access for project.", module: "settings", resource: "project", action: "restore", scope: "project", risk_level: "high", exists: true, status: "active" },
       { code: "settings.team.edit", name: "Edit Team", description: "Allows edit access for team.", module: "settings", resource: "team", action: "edit", scope: "workspace", risk_level: "medium", exists: true, status: "active" }
     ]),
     listPermissionGaps: vi.fn(async () => []),
+    getPermissionInventory: vi.fn(async () => ({
+      total_permissions: 5,
+      by_module: { settings: 1, flow: 2, docs: 1, automation: 1 },
+      by_resource: { workspace: 1, work_item: 2, page: 1, rule: 1 },
+      by_action: { manage: 2, view: 1, create: 1, edit: 1 },
+      by_risk: { low: 1, medium: 2, high: 2 },
+      by_scope: { workspace: 3, project: 2 },
+      deprecated_permissions: [],
+      malformed_permissions: [],
+      duplicate_like_permissions: [],
+      unmapped_permissions: ["automation.rule.manage"],
+      broad_permissions: ["settings.workspace.manage", "automation.rule.manage"],
+      existing_not_in_registry_baseline: ["automation.rule.manage"],
+      roles_using_each_permission: { "settings.workspace.manage": ["Workspace Admin"] }
+    })),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
     listProjectMembers: vi.fn(async () => [{ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active", joined_at: "2026-01-02T00:00:00Z" }]),
@@ -562,6 +577,7 @@ describe("Settings frontend screens", () => {
     cleanup();
     renderWithQuery(<AccessControlMappingPage />);
     expect(await screen.findByText("Role Mapping Matrix")).toBeInTheDocument();
+    expect(await screen.findByText("Role Mapping Insights")).toBeInTheDocument();
     expect(await screen.findByText("View work items")).toBeInTheDocument();
     expect(await screen.findByText("Manage Role Permissions")).toBeInTheDocument();
     expect(screen.getAllByText("Manage Permissions").length).toBeGreaterThan(0);
@@ -576,6 +592,7 @@ describe("Settings frontend screens", () => {
 
     cleanup();
     renderWithQuery(<AccessControlRegistryPage />);
+    expect(await screen.findByText("Registry Summary")).toBeInTheDocument();
     expect(await screen.findByText("Settings Registry")).toBeInTheDocument();
     expect(await screen.findByText("settings.project.restore")).toBeInTheDocument();
 

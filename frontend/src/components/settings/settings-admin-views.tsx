@@ -2214,6 +2214,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionRegistryQuery = useQuery({ queryKey: ["settings", "permission-registry"], queryFn: () => settingsApi.listPermissionRegistry(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionGapsQuery = useQuery({ queryKey: ["settings", "permission-gaps"], queryFn: () => settingsApi.listPermissionGaps(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const permissionInventoryQuery = useQuery({ queryKey: ["settings", "permission-inventory"], queryFn: () => settingsApi.getPermissionInventory(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleAssignmentsQuery = useQuery({ queryKey: ["settings", "role-assignments"], queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roles = rolesQuery.data ?? [];
@@ -2256,6 +2257,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const statuses = Array.from(new Set(permissions.map((permission) => permission.status ?? (permission.is_active === false ? "inactive" : "active")))).sort();
   const registryItems = permissionRegistryQuery.data ?? [];
   const registryModules = Array.from(new Set(registryItems.map((item) => item.module))).sort();
+  const missingRegistryCount = registryItems.filter((item) => !item.exists || item.status !== "active").length;
+  const inventory = permissionInventoryQuery.data;
   const createRoleMutation = useMutation({
     mutationFn: (payload: { name: string; description?: string; scope: string }) => settingsApi.createRole(accessToken ?? "", { ...payload, is_system: false, is_editable: true }),
     onSuccess: async () => {
@@ -2473,6 +2476,19 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       ) : null}
       {section === "mapping" ? (
         <div className="space-y-4">
+          <SettingsCard title="Role Mapping Insights" description="Inventory summary for current role-permission mappings. This is diagnostic only; mappings are not auto-changed in Phase A.">
+            <div className="grid gap-3 text-sm md:grid-cols-4">
+              <div><div className="text-muted-foreground">Total permissions</div><div className="text-2xl font-semibold">{inventory?.total_permissions ?? permissions.length}</div></div>
+              <div><div className="text-muted-foreground">High risk</div><div className="text-2xl font-semibold">{inventory?.by_risk?.high ?? permissions.filter((permission) => permission.risk_level === "high").length}</div></div>
+              <div><div className="text-muted-foreground">Unmapped</div><div className="text-2xl font-semibold">{inventory?.unmapped_permissions?.length ?? 0}</div></div>
+              <div><div className="text-muted-foreground">Broad manage</div><div className="text-2xl font-semibold">{inventory?.broad_permissions?.length ?? permissions.filter((permission) => permission.action === "manage").length}</div></div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              {Object.entries(inventory?.by_module ?? {}).map(([module, count]) => (
+                <span key={module} className="rounded-full border px-2 py-1">{moduleLabel(module)}: {count}</span>
+              ))}
+            </div>
+          </SettingsCard>
           <SettingsCard title="Manage Role Permissions" description="Open a role to view or change its permission assignments. System roles are view-only.">
             <SettingsDataTable
               columns={["Role", "Scope", "System Role", "Permissions Count", "Action"]}
@@ -2522,6 +2538,13 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       ) : null}
       {section === "registry" ? (
         <div className="space-y-4">
+          <SettingsCard title="Registry Summary" description="Phase A registry baseline for critical resources only. Missing permissions are safe to review before Phase B generation.">
+            <div className="grid gap-3 text-sm md:grid-cols-3">
+              <div><div className="text-muted-foreground">Expected permissions</div><div className="text-2xl font-semibold">{registryItems.length}</div></div>
+              <div><div className="text-muted-foreground">Missing or inactive</div><div className="text-2xl font-semibold">{missingRegistryCount}</div></div>
+              <div><div className="text-muted-foreground">Current catalog</div><div className="text-2xl font-semibold">{inventory?.total_permissions ?? permissions.length}</div></div>
+            </div>
+          </SettingsCard>
           {registryModules.map((module) => {
             const moduleItems = registryItems.filter((item) => item.module === module);
             return (
