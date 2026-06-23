@@ -5,7 +5,7 @@ from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.permission import Permission
 from app.models.user import User
-from app.schemas.role import PermissionCreate, PermissionRead, PermissionUpdate
+from app.schemas.role import PermissionCreate, PermissionGapRead, PermissionRead, PermissionRegistryItemRead, PermissionUpdate
 from app.services.permission_service import PermissionService
 
 
@@ -27,6 +27,22 @@ def list_permissions(
     current_user: User = Depends(get_current_user),
 ) -> list[Permission]:
     return PermissionService(db).list(current_user)
+
+
+@router.get("/registry", response_model=list[PermissionRegistryItemRead])
+def list_permission_registry(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    return PermissionService(db).registry_status()
+
+
+@router.get("/gaps", response_model=list[PermissionGapRead])
+def list_permission_gaps(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    return PermissionService(db).permission_gaps()
 
 
 @router.get("/{permission_id}", response_model=PermissionRead)

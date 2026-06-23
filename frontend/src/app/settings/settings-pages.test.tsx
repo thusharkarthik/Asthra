@@ -14,8 +14,10 @@ import TeamsSettingsPage from "@/app/settings/teams/page";
 import WorkspaceSettingsPage from "@/app/settings/workspace/page";
 import AccessControlPage from "@/app/settings/access-control/page";
 import AccessControlAssignmentsPage from "@/app/settings/access-control/assignments/page";
+import AccessControlGapsPage from "@/app/settings/access-control/gaps/page";
 import AccessControlMappingPage from "@/app/settings/access-control/mapping/page";
 import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
+import AccessControlRegistryPage from "@/app/settings/access-control/registry/page";
 import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, ProjectsView, TeamDetailView, TeamsView, WorkspaceDetailView, WorkspacesView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -75,11 +77,20 @@ vi.mock("@/services/api/settings-api", () => ({
         "settings.organization.manage",
         "settings.workspace.manage",
         "settings.project.manage",
+        "settings.project.create",
+        "settings.project.edit",
+        "settings.project.archive",
+        "settings.project.restore",
         "settings.member.invite",
         "settings.member.remove",
         "settings.role.manage",
         "settings.permission.manage",
-        "settings.team.manage"
+        "settings.team.manage",
+        "settings.team.create",
+        "settings.team.edit",
+        "settings.team.delete",
+        "settings.team.member.add",
+        "settings.team.member.remove"
       ],
       roles: [{ id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", source_scope_type: "workspace", source_scope_id: 2 }],
       scope: { scope_type: "workspace", scope_id: 2 }
@@ -105,12 +116,17 @@ vi.mock("@/services/api/settings-api", () => ({
       { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.work_item.*"], is_system: true, is_editable: false }
     ]),
     listPermissions: vi.fn(async () => [
-      { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", scope: "workspace", status: "active", is_active: true },
-      { id: 6, code: "flow.work_item.view", name: "View work items", module: "flow", scope: "project", status: "active", is_active: true },
-      { id: 7, code: "flow.work_item.create", name: "Create work items", module: "flow", scope: "project", status: "active", is_active: true },
-      { id: 8, code: "docs.page.edit", name: "Edit Docs pages", module: "docs", scope: "workspace", status: "active", is_active: true },
-      { id: 9, code: "automation.rule.manage", name: "Manage automation rules", module: "automation", scope: "workspace", status: "active", is_active: true }
+      { id: 5, code: "settings.workspace.manage", name: "Manage workspace", module: "settings", resource: "workspace", action: "manage", scope: "workspace", risk_level: "high", source: "registry", status: "active", is_active: true },
+      { id: 6, code: "flow.work_item.view", name: "View work items", module: "flow", resource: "work_item", action: "view", scope: "project", risk_level: "low", source: "registry", status: "active", is_active: true },
+      { id: 7, code: "flow.work_item.create", name: "Create work items", module: "flow", resource: "work_item", action: "create", scope: "project", risk_level: "medium", source: "registry", status: "active", is_active: true },
+      { id: 8, code: "docs.page.edit", name: "Edit Docs pages", module: "docs", resource: "page", action: "edit", scope: "workspace", risk_level: "medium", source: "registry", status: "active", is_active: true },
+      { id: 9, code: "automation.rule.manage", name: "Manage automation rules", module: "automation", resource: "rule", action: "manage", scope: "workspace", risk_level: "high", source: "registry", status: "active", is_active: true }
     ]),
+    listPermissionRegistry: vi.fn(async () => [
+      { code: "settings.project.restore", name: "Restore Project", description: "Allows restore access for project.", module: "settings", resource: "project", action: "restore", scope: "project", risk_level: "high", exists: true, status: "active" },
+      { code: "settings.team.edit", name: "Edit Team", description: "Allows edit access for team.", module: "settings", resource: "team", action: "edit", scope: "workspace", risk_level: "medium", exists: true, status: "active" }
+    ]),
+    listPermissionGaps: vi.fn(async () => []),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
     listProjectMembers: vi.fn(async () => [{ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active", joined_at: "2026-01-02T00:00:00Z" }]),
@@ -557,5 +573,15 @@ describe("Settings frontend screens", () => {
     expect(await screen.findByText("Scoped Role Assignments")).toBeInTheDocument();
     expect(await screen.findByText("Assign Role")).toBeInTheDocument();
     expect(await screen.findByText("Project 3")).toBeInTheDocument();
+
+    cleanup();
+    renderWithQuery(<AccessControlRegistryPage />);
+    expect(await screen.findByText("Settings Registry")).toBeInTheDocument();
+    expect(await screen.findByText("settings.project.restore")).toBeInTheDocument();
+
+    cleanup();
+    renderWithQuery(<AccessControlGapsPage />);
+    expect((await screen.findAllByText("Permission Gaps")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("No permission gaps")).toBeInTheDocument();
   });
 });

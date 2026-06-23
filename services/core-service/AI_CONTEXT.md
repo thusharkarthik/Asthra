@@ -39,6 +39,8 @@ Identity, scope, membership, and access control.
 - Notifications
 - Roles
 - Permissions
+- Permission Registry
+- Permission Gaps
 - Role assignments
 - Effective permissions
 
@@ -63,6 +65,8 @@ Identity, scope, membership, and access control.
 - Users never receive permissions directly.
 - Users receive roles at platform, organization, workspace, project, or team scope.
 - Effective permissions are resolved from scoped roles.
+- Permissions are generated from the Core permission registry using `module.resource.action`.
+- User-facing actions should use precise permission codes such as `settings.project.restore` and `settings.team.edit`.
 
 ## UI Screens
 

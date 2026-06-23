@@ -60,7 +60,11 @@ class PermissionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     module: str | None = Field(default=None, max_length=100)
+    resource: str | None = Field(default=None, max_length=100)
+    action: str | None = Field(default=None, max_length=100)
     scope: str = "workspace"
+    risk_level: str = "low"
+    source: str = "custom"
     status: str = "active"
 
     @field_validator("code")
@@ -71,7 +75,7 @@ class PermissionCreate(BaseModel):
             raise ValueError("Permission code is required.")
         return code
 
-    @field_validator("module", "scope", "status")
+    @field_validator("module", "resource", "action", "scope", "risk_level", "source", "status")
     @classmethod
     def normalize_optional_permission_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -87,7 +91,11 @@ class PermissionUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     module: str | None = Field(default=None, max_length=100)
+    resource: str | None = Field(default=None, max_length=100)
+    action: str | None = Field(default=None, max_length=100)
     scope: str | None = None
+    risk_level: str | None = None
+    source: str | None = None
     status: str | None = None
     is_active: bool | None = None
 
@@ -101,7 +109,7 @@ class PermissionUpdate(BaseModel):
             raise ValueError("Permission code is required.")
         return code
 
-    @field_validator("module", "scope", "status")
+    @field_validator("module", "resource", "action", "scope", "risk_level", "source", "status")
     @classmethod
     def normalize_optional_permission_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -119,9 +127,35 @@ class PermissionRead(TimestampedRead):
     name: str
     description: str | None = None
     module: str | None = None
+    resource: str | None = None
+    action: str | None = None
     scope: str = "workspace"
+    risk_level: str = "low"
+    source: str = "custom"
     status: str = "active"
     is_active: bool
+
+
+class PermissionRegistryItemRead(BaseModel):
+    code: str
+    name: str
+    description: str
+    module: str
+    resource: str
+    action: str
+    scope: str
+    risk_level: str
+    exists: bool
+    status: str = "missing"
+
+
+class PermissionGapRead(BaseModel):
+    module: str
+    resource: str
+    action: str
+    expected_permission_code: str
+    status: str
+    suggested_fix: str
 
 
 class RolePermissionCreate(BaseModel):

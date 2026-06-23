@@ -122,11 +122,37 @@ export type PermissionRecord = {
   name: string;
   description?: string | null;
   module?: string | null;
+  resource?: string | null;
+  action?: string | null;
   scope?: string;
+  risk_level?: string;
+  source?: string;
   status?: string;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type PermissionRegistryItem = {
+  code: string;
+  name: string;
+  description: string;
+  module: string;
+  resource: string;
+  action: string;
+  scope: string;
+  risk_level: string;
+  exists: boolean;
+  status: string;
+};
+
+export type PermissionGapRecord = {
+  module: string;
+  resource: string;
+  action: string;
+  expected_permission_code: string;
+  status: string;
+  suggested_fix: string;
 };
 
 export type CurrentUserPermissionScope = {

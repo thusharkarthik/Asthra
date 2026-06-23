@@ -27,7 +27,7 @@ class ProjectService:
         self._ensure_workspace_access(workspace, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.project.manage",
+            "settings.project.create",
             "workspace",
             workspace.id,
         )
@@ -100,9 +100,10 @@ class ProjectService:
 
     def update(self, project_id: int, project_update: ProjectUpdate, current_user: User) -> Project:
         project = self.get(project_id, current_user)
+        permission_code = self._permission_for_project_update(project, project_update)
         AccessControlService(self.db).require(
             current_user,
-            "settings.project.manage",
+            permission_code,
             "project",
             project.id,
         )
@@ -118,7 +119,7 @@ class ProjectService:
         project = self.get(project_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.project.manage",
+            "settings.project.archive",
             "project",
             project.id,
         )
@@ -135,7 +136,7 @@ class ProjectService:
         project = self.get(project_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.project.manage",
+            "settings.project.edit",
             "project",
             project.id,
         )
@@ -166,7 +167,7 @@ class ProjectService:
         project = self.get(project_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.project.manage",
+            "settings.project.edit",
             "project",
             project.id,
         )
@@ -226,6 +227,24 @@ class ProjectService:
             key = f"{base_key}-{suffix}"
             suffix += 1
         return key
+
+    def _permission_for_project_update(self, project: Project, project_update: ProjectUpdate) -> str:
+        restoring = (
+            project.is_active is False
+            and (
+                project_update.is_active is True
+                or project_update.status == "active"
+            )
+        )
+        archiving = (
+            project_update.is_active is False
+            or project_update.status in {"inactive", "archived"}
+        )
+        if restoring:
+            return "settings.project.restore"
+        if archiving:
+            return "settings.project.archive"
+        return "settings.project.edit"
 
     def _keyify(self, value: str) -> str:
         key = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")

@@ -31,6 +31,10 @@ Services may store IDs from other services when needed for relationships or scop
 - Roles contain permissions.
 - Permissions drive access.
 - Services must not assign permissions directly to users.
+- Permissions are generated from the Core permission registry.
+- Permission codes use `module.resource.action`.
+- Backend endpoints and frontend actions should use the same permission code.
+- Prefer precise action permissions, such as `settings.project.restore`, over broad `manage` permissions for user-facing actions.
 
 ## Context Versioning
 

@@ -45,8 +45,10 @@ def test_organization_owner_inherits_workspace_and_project_permissions():
         project_permissions = access.get_user_permissions(user.id, "project", project.id)
 
         assert "settings.workspace.manage" in org_permissions["permission_codes"]
-        assert "settings.project.manage" in workspace_permissions["permission_codes"]
-        assert "settings.project.manage" in project_permissions["permission_codes"]
+        assert "settings.project.create" in workspace_permissions["permission_codes"]
+        assert "settings.project.edit" in project_permissions["permission_codes"]
+        assert "settings.project.restore" in project_permissions["permission_codes"]
+        assert "settings.team.edit" in workspace_permissions["permission_codes"]
         assert any(role["key"] == "organization_owner" for role in project_permissions["roles"])
         assert access.can(user.id, "settings.member.invite", "workspace", workspace.id) is True
     finally:
@@ -66,7 +68,7 @@ def test_organization_owner_can_manage_archived_project_after_refresh_scope():
         permissions = access.get_user_permissions(user.id, "project", archived_project.id)
 
         assert archived_project.workspace.organization_id == organization.id
-        assert "settings.project.manage" in permissions["permission_codes"]
+        assert "settings.project.restore" in permissions["permission_codes"]
         assert any(role["key"] == "organization_owner" for role in permissions["roles"])
         restored_project = ProjectService(db).update(archived_project.id, ProjectUpdate(status="active", is_active=True), user)
         assert restored_project.is_active is True
