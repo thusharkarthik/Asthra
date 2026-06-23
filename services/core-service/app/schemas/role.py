@@ -66,6 +66,7 @@ class PermissionCreate(BaseModel):
     risk_level: str = "low"
     source: str = "custom"
     status: str = "active"
+    is_system: bool = False
 
     @field_validator("code")
     @classmethod
@@ -97,6 +98,7 @@ class PermissionUpdate(BaseModel):
     risk_level: str | None = None
     source: str | None = None
     status: str | None = None
+    is_system: bool | None = None
     is_active: bool | None = None
 
     @field_validator("code")
@@ -133,6 +135,7 @@ class PermissionRead(TimestampedRead):
     risk_level: str = "low"
     source: str = "custom"
     status: str = "active"
+    is_system: bool = False
     is_active: bool
 
 

@@ -39,6 +39,8 @@ def _ensure_rbac_columns(engine: Engine) -> None:
                 connection.execute(text("ALTER TABLE permissions ADD COLUMN source VARCHAR(50) DEFAULT 'custom' NOT NULL"))
             if "status" not in permission_columns:
                 connection.execute(text("ALTER TABLE permissions ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL"))
+            if "is_system" not in permission_columns:
+                connection.execute(text(f"ALTER TABLE permissions ADD COLUMN is_system BOOLEAN DEFAULT {false_default} NOT NULL"))
 
         if "roles" in table_names:
             role_columns = {column["name"] for column in inspector.get_columns("roles")}

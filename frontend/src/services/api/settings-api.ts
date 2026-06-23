@@ -7,6 +7,7 @@ import type {
   EffectivePermissionsRecord,
   InvitationRecord,
   PermissionGapRecord,
+  PermissionInventoryRecord,
   Organization,
   OrganizationMember,
   PermissionRecord,
@@ -220,6 +221,9 @@ export const settingsApi = {
   },
   listPermissionGaps(token: string) {
     return apiRequest<PermissionGapRecord[]>(`${CORE_PREFIX}/permissions/gaps`, { method: "GET", authToken: token });
+  },
+  getPermissionInventory(token: string) {
+    return apiRequest<PermissionInventoryRecord>(`${CORE_PREFIX}/access-control/permission-inventory`, { method: "GET", authToken: token });
   },
   createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });

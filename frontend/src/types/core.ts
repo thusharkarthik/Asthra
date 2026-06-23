@@ -128,6 +128,7 @@ export type PermissionRecord = {
   risk_level?: string;
   source?: string;
   status?: string;
+  is_system?: boolean;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -153,6 +154,22 @@ export type PermissionGapRecord = {
   expected_permission_code: string;
   status: string;
   suggested_fix: string;
+};
+
+export type PermissionInventoryRecord = {
+  total_permissions: number;
+  by_module: Record<string, number>;
+  by_resource: Record<string, number>;
+  by_action: Record<string, number>;
+  by_risk: Record<string, number>;
+  by_scope: Record<string, number>;
+  deprecated_permissions: string[];
+  malformed_permissions: string[];
+  duplicate_like_permissions: string[][];
+  unmapped_permissions: string[];
+  broad_permissions: string[];
+  existing_not_in_registry_baseline: string[];
+  roles_using_each_permission: Record<string, string[]>;
 };
 
 export type CurrentUserPermissionScope = {

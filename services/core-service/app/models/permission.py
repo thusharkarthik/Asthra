@@ -25,6 +25,7 @@ class Permission(TimestampMixin, Base):
     risk_level: Mapped[str] = mapped_column(String(50), default="low", nullable=False)
     source: Mapped[str] = mapped_column(String(50), default="custom", nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     role = relationship("Role", back_populates="permissions")
