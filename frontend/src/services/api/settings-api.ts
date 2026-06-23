@@ -15,13 +15,15 @@ import type {
   ProjectMembershipRecord,
   ProjectRecord,
   RoleAssignmentRecord,
+  RoleMappingSuggestion,
   RoleRecord,
   RoleTemplateRecord,
   TeamMemberRecord,
   TeamRecord,
   UserRoleRecord,
   WorkspaceMember,
-  WorkspaceRecord
+  WorkspaceRecord,
+  PermissionRegistrySyncResult
 } from "@/types/core";
 
 const CORE_PREFIX = "/api/core/api/v1";
@@ -224,6 +226,15 @@ export const settingsApi = {
   },
   getPermissionInventory(token: string) {
     return apiRequest<PermissionInventoryRecord>(`${CORE_PREFIX}/access-control/permission-inventory`, { method: "GET", authToken: token });
+  },
+  previewPermissionRegistrySync(token: string) {
+    return apiRequest<PermissionRegistrySyncResult>(`${CORE_PREFIX}/access-control/permission-registry/sync-preview`, { method: "GET", authToken: token });
+  },
+  syncPermissionRegistry(token: string) {
+    return apiRequest<PermissionRegistrySyncResult>(`${CORE_PREFIX}/access-control/permission-registry/sync`, { method: "POST", authToken: token });
+  },
+  listRoleMappingSuggestions(token: string) {
+    return apiRequest<RoleMappingSuggestion[]>(`${CORE_PREFIX}/access-control/role-mapping-suggestions`, { method: "GET", authToken: token });
   },
   createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });

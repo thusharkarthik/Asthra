@@ -172,6 +172,28 @@ export type PermissionInventoryRecord = {
   roles_using_each_permission: Record<string, string[]>;
 };
 
+export type PermissionRegistrySyncResult = {
+  created_count: number;
+  updated_count: number;
+  deprecated_count: number;
+  skipped_custom_count: number;
+  errors: string[];
+  created: string[];
+  updated: string[];
+  deprecated: string[];
+  skipped_custom: string[];
+  total_registry_permissions: number;
+};
+
+export type RoleMappingSuggestion = {
+  role_key: string;
+  permission_patterns: string[];
+  suggested_permissions: string[];
+  suggested_count: number;
+  high_risk_count: number;
+  note: string;
+};
+
 export type CurrentUserPermissionScope = {
   scope_type: string;
   scope_id?: number | null;
