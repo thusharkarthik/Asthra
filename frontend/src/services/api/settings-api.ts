@@ -37,8 +37,12 @@ export const settingsApi = {
     const query = search.toString();
     return apiRequest<CurrentUserPermissions>(`${CORE_PREFIX}/me/permissions${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   },
-  listOrganizations(token: string) {
-    return apiRequest<Organization[]>(`${CORE_PREFIX}/organizations`, { method: "GET", authToken: token });
+  listOrganizations(token: string, params: { status?: string; include_inactive?: boolean } = {}) {
+    const search = new URLSearchParams();
+    if (params.status) search.set("status", params.status);
+    if (params.include_inactive) search.set("include_inactive", "true");
+    const query = search.toString();
+    return apiRequest<Organization[]>(`${CORE_PREFIX}/organizations${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   },
   createOrganization(token: string, payload: NamedCreatePayload) {
     return apiRequest<Organization>(`${CORE_PREFIX}/organizations`, { method: "POST", authToken: token, json: payload });
@@ -62,8 +66,13 @@ export const settingsApi = {
     return apiRequest<void>(`${CORE_PREFIX}/organizations/${organizationId}/members/${userId}`, { method: "DELETE", authToken: token });
   },
 
-  listWorkspaces(token: string) {
-    return apiRequest<WorkspaceRecord[]>(`${CORE_PREFIX}/workspaces`, { method: "GET", authToken: token });
+  listWorkspaces(token: string, params: { organization_id?: number | null; status?: string; include_inactive?: boolean } = {}) {
+    const search = new URLSearchParams();
+    if (params.organization_id) search.set("organization_id", String(params.organization_id));
+    if (params.status) search.set("status", params.status);
+    if (params.include_inactive) search.set("include_inactive", "true");
+    const query = search.toString();
+    return apiRequest<WorkspaceRecord[]>(`${CORE_PREFIX}/workspaces${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   },
   createWorkspace(token: string, payload: NamedCreatePayload & { organization_id: number }) {
     return apiRequest<WorkspaceRecord>(`${CORE_PREFIX}/workspaces`, { method: "POST", authToken: token, json: payload });
@@ -87,8 +96,13 @@ export const settingsApi = {
     return apiRequest<void>(`${CORE_PREFIX}/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE", authToken: token });
   },
 
-  listProjects(token: string) {
-    return apiRequest<ProjectRecord[]>(`${CORE_PREFIX}/projects`, { method: "GET", authToken: token });
+  listProjects(token: string, params: { workspace_id?: number | null; status?: string; include_inactive?: boolean } = {}) {
+    const search = new URLSearchParams();
+    if (params.workspace_id) search.set("workspace_id", String(params.workspace_id));
+    if (params.status) search.set("status", params.status);
+    if (params.include_inactive) search.set("include_inactive", "true");
+    const query = search.toString();
+    return apiRequest<ProjectRecord[]>(`${CORE_PREFIX}/projects${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   },
   createProject(token: string, payload: NamedCreatePayload & { workspace_id: number; status?: string }) {
     return apiRequest<ProjectRecord>(`${CORE_PREFIX}/projects`, { method: "POST", authToken: token, json: payload });

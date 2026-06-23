@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -31,10 +31,12 @@ def create_organization(
 
 @router.get("", response_model=list[OrganizationRead])
 def list_organizations(
+    status_filter: str | None = Query(default=None, alias="status"),
+    include_inactive: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[Organization]:
-    return OrganizationService(db).list(current_user)
+    return OrganizationService(db).list(current_user, status_filter=status_filter, include_inactive=include_inactive)
 
 
 @router.get("/{organization_id}", response_model=OrganizationRead)

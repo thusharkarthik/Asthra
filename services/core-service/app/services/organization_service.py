@@ -42,16 +42,29 @@ class OrganizationService:
         )
         return organization
 
-    def list(self, current_user: User) -> list[Organization]:
+    def list(
+        self,
+        current_user: User,
+        *,
+        status_filter: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[Organization]:
         self._ensure_active_user(current_user)
+        include_all = include_inactive or status_filter in {"all", "inactive", "archived"}
         if current_user.is_superuser:
-            return self.organization_repository.list_all()
-        return self.organization_repository.list_for_user(current_user.id)
+            organizations = self.organization_repository.list_all(include_inactive=include_all)
+        else:
+            organizations = self.organization_repository.list_for_user(current_user.id, include_inactive=include_all)
+        if status_filter == "inactive":
+            return [organization for organization in organizations if not organization.is_active]
+        if status_filter == "active":
+            return [organization for organization in organizations if organization.is_active]
+        return organizations
 
     def get(self, organization_id: int, current_user: User) -> Organization:
         self._ensure_active_user(current_user)
         organization = self.organization_repository.get_by_id(organization_id)
-        if organization is None or not organization.is_active:
+        if organization is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Organization not found.",

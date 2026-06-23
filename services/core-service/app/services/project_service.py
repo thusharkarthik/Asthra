@@ -68,16 +68,32 @@ class ProjectService:
         self.db.refresh(project)
         return project
 
-    def list(self, current_user: User) -> list[Project]:
+    def list(
+        self,
+        current_user: User,
+        *,
+        workspace_id: int | None = None,
+        status_filter: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[Project]:
         self._ensure_active_user(current_user)
+        include_all = include_inactive or status_filter in {"all", "inactive", "archived"}
         if current_user.is_superuser:
-            return self.project_repository.list_all()
-        return self.project_repository.list_for_user(current_user.id)
+            projects = self.project_repository.list_all(include_inactive=include_all)
+        else:
+            projects = self.project_repository.list_for_user(current_user.id, include_inactive=include_all)
+        if workspace_id is not None:
+            projects = [project for project in projects if project.workspace_id == workspace_id]
+        if status_filter in {"inactive", "archived"}:
+            return [project for project in projects if not project.is_active or project.status in {"inactive", "archived"}]
+        if status_filter == "active":
+            return [project for project in projects if project.is_active and project.status not in {"inactive", "archived"}]
+        return projects
 
     def get(self, project_id: int, current_user: User) -> Project:
         self._ensure_active_user(current_user)
         project = self.project_repository.get_by_id(project_id)
-        if project is None or not project.is_active:
+        if project is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         self._ensure_workspace_access(project.workspace, current_user)
         return project

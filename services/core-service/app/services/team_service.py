@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.team import Team, TeamMember
@@ -26,13 +27,20 @@ class TeamService:
         AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", workspace.id)
 
         slug = self._build_unique_slug(workspace_id=workspace.id, name=team_create.name)
-        team = self.team_repository.create_with_owner(
-            workspace=workspace,
-            name=team_create.name.strip(),
-            slug=slug,
-            description=team_create.description,
-            created_by_id=current_user.id,
-        )
+        try:
+            team = self.team_repository.create_with_owner(
+                workspace=workspace,
+                name=team_create.name.strip(),
+                slug=slug,
+                description=team_create.description,
+                created_by_id=current_user.id,
+            )
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Team could not be created because a conflicting team or membership already exists in this workspace.",
+            ) from exc
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
         ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
         self.db.commit()

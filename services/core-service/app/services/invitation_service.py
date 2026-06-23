@@ -50,15 +50,18 @@ class InvitationService:
             permission_scope_id,
         )
 
-        if self.repository.get_pending_duplicate(
+        pending_duplicate = self.repository.get_pending_duplicate(
             email=email,
             organization_id=invitation_create.organization_id,
             workspace_id=invitation_create.workspace_id,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A pending invitation already exists for this email and scope.",
-            )
+        )
+        if pending_duplicate is not None:
+            pending_duplicate.token = token_urlsafe(32)
+            pending_duplicate.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+            ContextVersionService(self.db).bump_access(permission_scope_type, permission_scope_id)
+            self.db.commit()
+            self.db.refresh(pending_duplicate)
+            return pending_duplicate
 
         invited_user = self.repository.get_user_by_email(email)
         self._ensure_role_allowed(invitation_create.role_id, current_user)
@@ -73,6 +76,14 @@ class InvitationService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="User is already an active member for this scope.",
                 )
+            stale_accepted = self.repository.get_duplicate_by_status(
+                email=email,
+                organization_id=invitation_create.organization_id,
+                workspace_id=invitation_create.workspace_id,
+                status="accepted",
+            )
+            if stale_accepted is not None:
+                self.repository.delete(stale_accepted)
 
         invitation = self.repository.create(
             email=email,

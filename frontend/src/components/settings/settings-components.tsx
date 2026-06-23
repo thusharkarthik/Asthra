@@ -192,15 +192,18 @@ export function QuickCreateButton({ children, onClick }: { children: ReactNode; 
   );
 }
 
-export function SettingsDangerZone({ title = "Danger zone", description }: { title?: string; description: string }) {
+export function SettingsDangerZone({ title = "Danger zone", description, actions }: { title?: string; description: string; actions?: ReactNode }) {
   return (
     <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-      <div className="flex gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
         <div>
           <h2 className="font-semibold text-destructive">{title}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
+        </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
     </section>
   );
