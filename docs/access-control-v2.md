@@ -117,3 +117,38 @@ Critical Settings actions now use precise permission codes:
 - `settings.member.cancel`
 
 Frontend visibility uses the same permission codes through `can(permissionCode)`.
+
+## Phase D UI Visibility
+
+Phase D adds a frontend action registry and permission-aware UI primitives.
+
+Frontend action definitions live in:
+
+- `frontend/src/access/actionRegistry.ts`
+
+Reusable components live in:
+
+- `frontend/src/access/permission-components.tsx`
+
+Supported primitives:
+
+- `useActionAccess(actionKey, scope)`
+- `Can`
+- `PermissionAction`
+- `PermissionButton`
+- `PermissionMenuItem`
+
+Managed Settings actions should render through action keys such as:
+
+- `settings.project.restore`
+- `settings.team.edit`
+- `settings.member.invite`
+- `settings.permission.manage`
+
+The UI must not check role names for action visibility. It should check permission codes or action keys only.
+
+The QA route is:
+
+- `/settings/access-control/qa-matrix`
+
+It shows the current user's allowed/denied result for registered actions and is intended for role-by-role QA.

@@ -13,6 +13,8 @@ import { settingsApi } from "@/services/api/settings-api";
 import { queryKeys } from "@/lib/queryKeys";
 import { normalizeRole } from "@/lib/rbac";
 import { can as hasPermission } from "@/lib/permissions";
+import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
+import { PermissionAction, PermissionButton } from "@/access/permission-components";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
@@ -108,31 +110,12 @@ function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: n
   };
 }
 
-const SETTINGS_ACTIONS = {
-  organizationCreate: { actionKey: "settings.organization.create", permissionCode: "settings.organization.create", scopeType: "organization" },
-  organizationEdit: { actionKey: "settings.organization.edit", permissionCode: "settings.organization.edit", scopeType: "organization" },
-  organizationArchive: { actionKey: "settings.organization.archive", permissionCode: "settings.organization.archive", scopeType: "organization" },
-  organizationRestore: { actionKey: "settings.organization.restore", permissionCode: "settings.organization.restore", scopeType: "organization" },
-  workspaceCreate: { actionKey: "settings.workspace.create", permissionCode: "settings.workspace.create", scopeType: "organization" },
-  workspaceEdit: { actionKey: "settings.workspace.edit", permissionCode: "settings.workspace.edit", scopeType: "workspace" },
-  workspaceArchive: { actionKey: "settings.workspace.archive", permissionCode: "settings.workspace.archive", scopeType: "workspace" },
-  workspaceRestore: { actionKey: "settings.workspace.restore", permissionCode: "settings.workspace.restore", scopeType: "workspace" },
-  projectCreate: { actionKey: "settings.project.create", permissionCode: "settings.project.create", scopeType: "workspace" },
-  projectEdit: { actionKey: "settings.project.edit", permissionCode: "settings.project.edit", scopeType: "project" },
-  projectArchive: { actionKey: "settings.project.archive", permissionCode: "settings.project.archive", scopeType: "project" },
-  projectRestore: { actionKey: "settings.project.restore", permissionCode: "settings.project.restore", scopeType: "project" },
-  teamCreate: { actionKey: "settings.team.create", permissionCode: "settings.team.create", scopeType: "workspace" },
-  teamEdit: { actionKey: "settings.team.edit", permissionCode: "settings.team.edit", scopeType: "workspace" },
-  teamDelete: { actionKey: "settings.team.delete", permissionCode: "settings.team.delete", scopeType: "workspace" },
-  teamMemberAdd: { actionKey: "settings.team.member.add", permissionCode: "settings.team.member.add", scopeType: "workspace" },
-  teamMemberRemove: { actionKey: "settings.team.member.remove", permissionCode: "settings.team.member.remove", scopeType: "workspace" },
-  memberInvite: { actionKey: "settings.member.invite", permissionCode: "settings.member.invite", scopeType: "workspace" },
-  memberRemove: { actionKey: "settings.member.remove", permissionCode: "settings.member.remove", scopeType: "workspace" },
-  memberResend: { actionKey: "settings.member.resend", permissionCode: "settings.member.resend", scopeType: "workspace" },
-  memberCancel: { actionKey: "settings.member.cancel", permissionCode: "settings.member.cancel", scopeType: "workspace" },
-  roleManage: { actionKey: "settings.role.manage", permissionCode: "settings.role.manage", scopeType: "organization" },
-  permissionManage: { actionKey: "settings.permission.manage", permissionCode: "settings.permission.manage", scopeType: "organization" }
-} as const;
+function permissionActionScope(permissions: ReturnType<typeof useCurrentPermissions>) {
+  return {
+    permissionCodes: permissions.permissionCodes,
+    isLoading: permissions.isLoading || permissions.isFetching
+  };
+}
 
 function getFormValue(form: HTMLFormElement, name: string) {
   return String(new FormData(form).get(name) ?? "").trim();
@@ -493,6 +476,7 @@ export function OrganizationsView() {
   const permissions = useCurrentPermissions();
   const [statusFilter, setStatusFilter] = useState("active");
   const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
+  const createOrganizationScope = permissionActionScope(permissions);
   const showLimitedAccess = !permissions.isLoading && !permissions.isFetching && !canCreateOrganization;
   const visibleOrganizations = organizations.filter((organization) => {
     if (statusFilter === "all") return true;
@@ -533,7 +517,13 @@ export function OrganizationsView() {
       <SettingsSectionHeader
         title="Organizations"
         description="Create and manage the top-level homes for Asthra work."
-        actions={canCreateOrganization ? <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton> : undefined}
+        actions={organizations.length === 0 ? (
+          <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+        ) : (
+          <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
+            <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+          </PermissionAction>
+        )}
       />
       {permissions.isLoading || permissions.isFetching ? (
         <div className="mb-4 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
@@ -974,6 +964,7 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const scopedProjects = projects.filter((project) => project.workspace_id === workspaceId);
   const permissions = useCurrentPermissions({ workspaceId });
+  const workspaceActionScope = permissionActionScope(permissions);
   const canEditWorkspace =
     permissions.can(SETTINGS_ACTIONS.workspaceEdit.permissionCode) ||
     permissions.can(SETTINGS_ACTIONS.workspaceArchive.permissionCode) ||
@@ -1012,7 +1003,11 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
       <SettingsSectionHeader
         title={workspace.name}
         description={workspace.description ?? "Workspace administration and project setup."}
-        actions={canEditWorkspace ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Workspace</Button> : undefined}
+        actions={
+          <PermissionAction actionKey={SETTINGS_ACTIONS.workspaceEdit.actionKey} scope={workspaceActionScope}>
+            <Button type="button" onClick={() => setEditOpen(true)}>Edit Workspace</Button>
+          </PermissionAction>
+        }
       />
       <AdminTabs
         tabs={[
@@ -1089,6 +1084,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
   const projectWorkspace = project ? workspaces.find((workspace) => workspace.id === project.workspace_id) : undefined;
   const projectOrganizationId = project?.organization_id ?? projectWorkspace?.organization_id;
   const permissions = useCurrentPermissions({ orgId: projectOrganizationId, workspaceId: project?.workspace_id, projectId });
+  const projectActionScope = permissionActionScope(permissions);
   const canEditProject = permissions.can(SETTINGS_ACTIONS.projectEdit.permissionCode);
   const canArchiveProject = permissions.can(SETTINGS_ACTIONS.projectArchive.permissionCode);
   const canRestoreProject = permissions.can(SETTINGS_ACTIONS.projectRestore.permissionCode);
@@ -1208,8 +1204,8 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         title={project.name}
         description={project.description ?? "Project settings and operational metadata."}
         actions={<>
-          {canEditProject ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Project</Button> : null}
-          {canEditProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</Button> : null}
+          <PermissionButton actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope} type="button" onClick={() => setEditOpen(true)}>Edit Project</PermissionButton>
+          <PermissionButton actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope} type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</PermissionButton>
           <SettingsLinkButton href="/flow">Open Flow</SettingsLinkButton>
         </>}
       />
@@ -1231,14 +1227,20 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       <SettingsCard title="Ownership actions">
         <p className="mb-3 text-sm text-muted-foreground">Project owners should be selected from workspace members. If no members are available, invite members to the workspace first.</p>
         <div className="flex flex-wrap gap-2">
-          {canEditProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Change Owner</Button> : null}
-          {canEditProject ? <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} /> : null}
+          <PermissionButton actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope} type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Change Owner</PermissionButton>
+          <PermissionAction actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope}>
+            <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} />
+          </PermissionAction>
         </div>
       </SettingsCard>
       <SettingsCard
         title="Members"
         description="Project membership gives users project-scoped roles without assigning permissions directly."
-        actions={canEditProject ? <QuickCreateButton onClick={() => setMemberOpen(true)}>Add Project Member</QuickCreateButton> : undefined}
+        actions={
+          <PermissionAction actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope}>
+            <QuickCreateButton onClick={() => setMemberOpen(true)}>Add Project Member</QuickCreateButton>
+          </PermissionAction>
+        }
       >
         <SettingsDataTable
           columns={["Name", "Email", "Role", "Team", "Status", "Joined", "Actions"]}
@@ -1251,7 +1253,9 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
               member.team_id ? `Team ${member.team_id}` : "No team",
               roleDisplayName(member.status),
               formatDate(member.joined_at),
-              <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this project?`} onConfirm={() => removeProjectMemberMutation.mutate(member.id)} />
+              <PermissionAction key={member.id} actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope}>
+                <ConfirmActionButton label="Remove" message={`Remove ${user.name} from this project?`} onConfirm={() => removeProjectMemberMutation.mutate(member.id)} />
+              </PermissionAction>
             ];
           })}
           emptyMessage="No project members"
@@ -1262,9 +1266,13 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           title={isProjectArchived ? "Restore project" : "Archive project"}
           description={isProjectArchived ? "Restore this project to the active project list." : "Archive this project without permanently deleting it. Archived projects remain recoverable from the Projects filter."}
           actions={isProjectArchived ? (
-            canRestoreProject ? <ConfirmActionButton label="Restore Project" message={`Restore project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "active", is_active: true })} /> : null
+            <PermissionAction actionKey={SETTINGS_ACTIONS.projectRestore.actionKey} scope={projectActionScope}>
+              <ConfirmActionButton label="Restore Project" message={`Restore project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "active", is_active: true })} />
+            </PermissionAction>
           ) : (
-            canArchiveProject ? <ConfirmActionButton label="Archive Project" message={`Archive project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "archived", is_active: false })} /> : null
+            <PermissionAction actionKey={SETTINGS_ACTIONS.projectArchive.actionKey} scope={projectActionScope}>
+              <ConfirmActionButton label="Archive Project" message={`Archive project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "archived", is_active: false })} />
+            </PermissionAction>
           )}
         />
       ) : null}
@@ -1370,6 +1378,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
   const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
+  const memberActionScope = permissionActionScope(permissions);
   const canInvite = permissions.can(SETTINGS_ACTIONS.memberInvite.permissionCode);
   const canChangeRoles = permissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
@@ -1534,9 +1543,13 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       <SettingsSectionHeader
         title="Members"
         description="Invite members, review status, filter membership, and assign roles without using raw database screens."
-        actions={canInvite ? <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton> : undefined}
+        actions={
+          <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
+            <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton>
+          </PermissionAction>
+        }
       />
-      {!canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
+      {!permissions.isLoading && !permissions.isFetching && !canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
       <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
           {DEFAULT_ROLE_MEANINGS.map(([role, meaning]) => (
@@ -1585,8 +1598,12 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
               row.status === "pending" ? `Last sent: ${formatDate(row.date)}` : formatDate(row.date),
               "Not tracked yet",
               <div key={`${row.id}-actions`} className="flex flex-wrap gap-2">
-                {row.status === "pending" && canInvite ? <Button type="button" size="sm" variant="outline" onClick={() => resendMutation.mutate(row.id)}>Resend Invite</Button> : null}
-                {row.status === "pending" && canInvite ? <Button type="button" size="sm" variant="outline" onClick={() => cancelInviteMutation.mutate(row.id)}>Cancel Invite</Button> : null}
+                {row.status === "pending" ? (
+                  <PermissionButton actionKey={SETTINGS_ACTIONS.memberResend.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => resendMutation.mutate(row.id)}>Resend Invite</PermissionButton>
+                ) : null}
+                {row.status === "pending" ? (
+                  <PermissionButton actionKey={SETTINGS_ACTIONS.memberCancel.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => cancelInviteMutation.mutate(row.id)}>Cancel Invite</PermissionButton>
+                ) : null}
               </div>
             ];
           }
@@ -1600,7 +1617,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             "Not tracked yet",
             <div key={row.userId} className="flex flex-wrap gap-2">
               <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
-	      {canChangeRoles ? <Button type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</Button> : null}
+              <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton>
               {canRemoveMembers ? (
                 <ConfirmActionButton
                   label="Remove"
@@ -1919,6 +1936,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
+  const teamCreateActionScope = permissionActionScope(permissions);
   const canCreateTeam = permissions.can(SETTINGS_ACTIONS.teamCreate.permissionCode);
   const teamsQuery = useQuery({ queryKey: ["settings", "teams"], queryFn: () => settingsApi.listTeams(accessToken ?? ""), enabled: Boolean(accessToken) });
   const teams = (teamsQuery.data ?? [])
@@ -1983,8 +2001,16 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
           ]}
         />
       ) : null}
-      <SettingsSectionHeader title="Teams" description="Create lightweight workspace teams for future ownership and permissions." actions={canCreateTeam ? <QuickCreateButton onClick={() => setOpen(true)}>Create Team</QuickCreateButton> : undefined} />
-      {!canCreateTeam ? <SettingsCard title="Limited access" description="You need settings.team.create to create teams in this workspace scope." /> : null}
+      <SettingsSectionHeader
+        title="Teams"
+        description="Create lightweight workspace teams for future ownership and permissions."
+        actions={
+          <PermissionAction actionKey={SETTINGS_ACTIONS.teamCreate.actionKey} scope={teamCreateActionScope}>
+            <QuickCreateButton onClick={() => setOpen(true)}>Create Team</QuickCreateButton>
+          </PermissionAction>
+        }
+      />
+      {!permissions.isLoading && !permissions.isFetching && !canCreateTeam ? <SettingsCard title="Limited access" description="You need settings.team.create to create teams in this workspace scope." /> : null}
       <SearchBox value={search} onChange={setSearch} placeholder="Search teams" />
       <SettingsDataTable
         columns={["Name", "Description", "Members Count", "Lead", "Status", "Actions"]}
@@ -1996,8 +2022,12 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
           team.is_active === false ? "Archived" : "Active",
           <div key={team.id} className="flex flex-wrap gap-2">
             <SettingsLinkButton href={`/settings/teams/${team.id}`} variant="outline">View</SettingsLinkButton>
-            <SettingsLinkButton href={`/settings/teams/${team.id}`} variant="outline">Edit</SettingsLinkButton>
-            <ConfirmActionButton label="Delete" message={`Archive team ${team.name}?`} onConfirm={() => deleteMutation.mutate(team.id)} />
+            <PermissionAction actionKey={SETTINGS_ACTIONS.teamEdit.actionKey} scope={teamCreateActionScope}>
+              <SettingsLinkButton href={`/settings/teams/${team.id}`} variant="outline">Edit</SettingsLinkButton>
+            </PermissionAction>
+            <PermissionAction actionKey={SETTINGS_ACTIONS.teamDelete.actionKey} scope={teamCreateActionScope}>
+              <ConfirmActionButton label="Delete" message={`Archive team ${team.name}?`} onConfirm={() => deleteMutation.mutate(team.id)} />
+            </PermissionAction>
           </div>
         ])}
         emptyMessage="No teams yet"
@@ -2034,6 +2064,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   const teamQuery = useQuery({ queryKey: ["settings", "team", teamId], queryFn: () => settingsApi.getTeam(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const team = teamQuery.data;
   const permissions = useCurrentPermissions({ workspaceId: team?.workspace_id });
+  const teamActionScope = permissionActionScope(permissions);
   const canEditTeam = permissions.can(SETTINGS_ACTIONS.teamEdit.permissionCode);
   const canAddTeamMember = permissions.can(SETTINGS_ACTIONS.teamMemberAdd.permissionCode);
   const canRemoveTeamMember = permissions.can(SETTINGS_ACTIONS.teamMemberRemove.permissionCode);
@@ -2131,8 +2162,10 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
         description={team.description ?? "Team administration."}
         actions={
           <div className="flex flex-wrap gap-2">
-            {canEditTeam ? <Button variant="outline" onClick={() => setEditOpen(true)}>Edit Team</Button> : null}
-            {canAddTeamMember ? <QuickCreateButton onClick={() => setAssignOpen(true)}>Assign Member</QuickCreateButton> : null}
+            <PermissionButton actionKey={SETTINGS_ACTIONS.teamEdit.actionKey} scope={teamActionScope} type="button" variant="outline" onClick={() => setEditOpen(true)}>Edit Team</PermissionButton>
+            <PermissionAction actionKey={SETTINGS_ACTIONS.teamMemberAdd.actionKey} scope={teamActionScope}>
+              <QuickCreateButton onClick={() => setAssignOpen(true)}>Assign Member</QuickCreateButton>
+            </PermissionAction>
           </div>
         }
       />
@@ -2155,7 +2188,9 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
               rolesQuery.data?.find((role) => role.id === member.role_id)?.name ?? member.member_role,
               roleDisplayName(member.status ?? user.status),
               formatDate(member.joined_at ?? member.created_at),
-              canRemoveTeamMember ? <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this team?`} onConfirm={() => removeTeamMemberMutation.mutate(member.id)} /> : "View only"
+              <PermissionAction key={member.id} actionKey={SETTINGS_ACTIONS.teamMemberRemove.actionKey} scope={teamActionScope}>
+                <ConfirmActionButton label="Remove" message={`Remove ${user.name} from this team?`} onConfirm={() => removeTeamMemberMutation.mutate(member.id)} />
+              </PermissionAction>
             ];
           })}
           emptyMessage="No team members"
@@ -2196,14 +2231,17 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   );
 }
 
-function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" }) {
+type AccessControlSection = "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" | "qa-matrix";
+
+function AccessControlTabs({ active }: { active: AccessControlSection }) {
   const tabs = [
     { key: "roles", label: "Roles", href: "/settings/access-control" },
     { key: "permissions", label: "Permissions", href: "/settings/access-control/permissions" },
     { key: "mapping", label: "Role Mapping", href: "/settings/access-control/mapping" },
     { key: "assignments", label: "Assignments", href: "/settings/access-control/assignments" },
     { key: "registry", label: "Permission Registry", href: "/settings/access-control/registry" },
-    { key: "gaps", label: "Permission Gaps", href: "/settings/access-control/gaps" }
+    { key: "gaps", label: "Permission Gaps", href: "/settings/access-control/gaps" },
+    { key: "qa-matrix", label: "QA Matrix", href: "/settings/access-control/qa-matrix" }
   ] as const;
   return (
     <nav aria-label="Access Control sections" className="flex flex-wrap gap-2 border-b pb-2">
@@ -2222,12 +2260,13 @@ function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapp
   );
 }
 
-export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" }) {
+export function AccessControlView({ section = "roles" }: { section?: AccessControlSection }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
   const platformContext = usePlatformContext();
   const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const canCreatePermission = currentPermissions.can(SETTINGS_ACTIONS.permissionManage.permissionCode);
+  const accessControlActionScope = permissionActionScope(currentPermissions);
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [resourceFilter, setResourceFilter] = useState("");
@@ -2413,9 +2452,11 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
         description="Unified RBAC center for roles, permission catalog, and role-permission mapping."
         actions={
           <div className="flex flex-wrap gap-2">
-            {canManageRoleMappings ? <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton> : null}
-            {canManageRoleMappings ? <Button type="button" variant="outline" onClick={() => setAssignmentCreateOpen(true)}>Assign Role</Button> : null}
-            {canCreatePermission ? <Button type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</Button> : null}
+            <PermissionAction actionKey={SETTINGS_ACTIONS.roleCreate.actionKey} scope={accessControlActionScope}>
+              <QuickCreateButton onClick={() => setRoleCreateOpen(true)}>Create Custom Role</QuickCreateButton>
+            </PermissionAction>
+            <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={accessControlActionScope} type="button" variant="outline" onClick={() => setAssignmentCreateOpen(true)}>Assign Role</PermissionButton>
+            <PermissionButton actionKey={SETTINGS_ACTIONS.permissionCreate.actionKey} scope={accessControlActionScope} type="button" variant="outline" onClick={() => setPermissionCreateOpen(true)}>Create Permission</PermissionButton>
           </div>
         }
       />
@@ -2623,8 +2664,10 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               <div><div className="text-muted-foreground">Preview created</div><div className="text-2xl font-semibold">{syncPreviewQuery.data?.created_count ?? 0}</div></div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => syncPreviewQuery.refetch()} disabled={syncPreviewQuery.isFetching}>Sync Preview</Button>
-              <Button
+              <PermissionButton actionKey={SETTINGS_ACTIONS.permissionManage.actionKey} scope={accessControlActionScope} type="button" variant="outline" onClick={() => syncPreviewQuery.refetch()} disabled={syncPreviewQuery.isFetching}>Sync Preview</PermissionButton>
+              <PermissionButton
+                actionKey={SETTINGS_ACTIONS.permissionManage.actionKey}
+                scope={accessControlActionScope}
                 type="button"
                 onClick={() => {
                   if (window.confirm("Sync registry permissions? Custom permissions will be preserved and role mappings will not be auto-applied.")) {
@@ -2634,7 +2677,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
                 disabled={syncRegistryMutation.isPending}
               >
                 Sync Permissions
-              </Button>
+              </PermissionButton>
             </div>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
               <div><span className="text-muted-foreground">Updated preview:</span> {syncPreviewQuery.data?.updated_count ?? 0}</div>
@@ -2670,7 +2713,9 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
           title="Permission Gaps"
           description="Registry permissions that are missing, inactive, or deprecated. These are the action keys that need catalog attention before UI or backend enforcement can rely on them."
           actions={
-            <Button
+            <PermissionButton
+              actionKey={SETTINGS_ACTIONS.permissionManage.actionKey}
+              scope={accessControlActionScope}
               type="button"
               variant="outline"
               onClick={() => {
@@ -2681,7 +2726,7 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               disabled={syncRegistryMutation.isPending}
             >
               Generate Missing Permissions
-            </Button>
+            </PermissionButton>
           }
         >
           <SettingsDataTable
@@ -2696,6 +2741,34 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
             ])}
             emptyMessage="No permission gaps"
           />
+        </SettingsCard>
+      ) : null}
+      {section === "qa-matrix" ? (
+        <SettingsCard
+          title="Permission QA Matrix"
+          description="Development and admin view for validating action keys, required permissions, and current allow/deny results."
+        >
+          {process.env.NODE_ENV === "production" && !canManageRoleMappings ? (
+            <SettingsEmptyState title="QA matrix unavailable" description="This diagnostic view is available to Access Control administrators." />
+          ) : (
+            <SettingsDataTable
+              columns={["Action", "Permission", "Module", "Resource", "Scope", "Risk", "Result"]}
+              rows={listActionDefinitions().map((action) => [
+                action.actionKey,
+                action.permissionCode,
+                moduleLabel(action.module),
+                roleDisplayName(action.resource),
+                roleDisplayName(action.scopeResolver),
+                roleDisplayName(action.riskLevel),
+                currentPermissions.isLoading || currentPermissions.isFetching
+                  ? "Checking"
+                  : currentPermissions.can(action.permissionCode)
+                    ? "Allowed"
+                    : "Denied"
+              ])}
+              emptyMessage="No registered actions"
+            />
+          )}
         </SettingsCard>
       ) : null}
       <SettingsCreateDialog title="Create custom role" open={roleCreateOpen && canManageRoleMappings} onOpenChange={setRoleCreateOpen} onSubmit={submitCustomRole}>
