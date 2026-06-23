@@ -17,6 +17,7 @@ import AccessControlAssignmentsPage from "@/app/settings/access-control/assignme
 import AccessControlGapsPage from "@/app/settings/access-control/gaps/page";
 import AccessControlMappingPage from "@/app/settings/access-control/mapping/page";
 import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
+import AccessControlQAMatrixPage from "@/app/settings/access-control/qa-matrix/page";
 import AccessControlRegistryPage from "@/app/settings/access-control/registry/page";
 import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, ProjectsView, TeamDetailView, TeamsView, WorkspaceDetailView, WorkspacesView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
@@ -51,7 +52,12 @@ vi.mock("@/context/platformContext", () => ({
       "settings.project.manage",
       "settings.member.invite",
       "settings.member.remove",
+      "settings.member.resend",
+      "settings.member.cancel",
+      "settings.role.create",
+      "settings.role.edit",
       "settings.role.manage",
+      "settings.permission.create",
       "settings.permission.manage",
       "settings.team.manage"
     ],
@@ -71,11 +77,16 @@ vi.mock("@/context/platformContext", () => ({
       "settings.workspace.archive",
       "settings.workspace.restore",
       "settings.project.manage",
-      "settings.member.invite",
-      "settings.member.remove",
-      "settings.role.manage",
-      "settings.permission.manage",
-      "settings.team.manage"
+        "settings.member.invite",
+        "settings.member.remove",
+        "settings.member.resend",
+        "settings.member.cancel",
+        "settings.role.create",
+        "settings.role.edit",
+        "settings.role.manage",
+        "settings.permission.create",
+        "settings.permission.manage",
+        "settings.team.manage"
     ],
     permissions: null,
     isLoading: false,
@@ -107,7 +118,12 @@ vi.mock("@/services/api/settings-api", () => ({
         "settings.project.restore",
         "settings.member.invite",
         "settings.member.remove",
+        "settings.member.resend",
+        "settings.member.cancel",
+        "settings.role.create",
+        "settings.role.edit",
         "settings.role.manage",
+        "settings.permission.create",
         "settings.permission.manage",
         "settings.team.manage",
         "settings.team.create",
@@ -656,5 +672,11 @@ describe("Settings frontend screens", () => {
     expect((await screen.findAllByText("Permission Gaps")).length).toBeGreaterThan(0);
     expect(await screen.findByRole("button", { name: "Generate Missing Permissions" })).toBeInTheDocument();
     expect(await screen.findByText("No permission gaps")).toBeInTheDocument();
+
+    cleanup();
+    renderWithQuery(<AccessControlQAMatrixPage />);
+    expect(await screen.findByText("Permission QA Matrix")).toBeInTheDocument();
+    expect((await screen.findAllByText("settings.project.restore")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("settings.team.edit")).length).toBeGreaterThan(0);
   });
 });
