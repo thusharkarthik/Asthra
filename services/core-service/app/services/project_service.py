@@ -201,6 +201,8 @@ class ProjectService:
             return
         if self.project_repository.is_workspace_member(workspace.id, user.id):
             return
+        if AccessControlService(self.db).can_access_scope(user.id, "workspace", workspace.id):
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this workspace.",

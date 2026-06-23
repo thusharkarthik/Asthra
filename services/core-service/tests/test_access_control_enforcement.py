@@ -8,11 +8,13 @@ from app.models.workspace import WorkspaceMember
 from app.schemas.invitation import InvitationCreate
 from app.schemas.organization import OrganizationCreate
 from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.schemas.team import TeamCreate, TeamUpdate
 from app.schemas.workspace import WorkspaceCreate
 from app.services.access_control_service import AccessControlService
 from app.services.invitation_service import InvitationService
 from app.services.organization_service import OrganizationService
 from app.services.role_service import RoleService
+from app.services.team_service import TeamService
 from app.services.workspace_service import WorkspaceService
 from app.services.project_service import ProjectService
 
@@ -101,6 +103,74 @@ def test_user_without_invite_permission_gets_403():
 
         assert exc.value.status_code == 403
         assert "settings.member.invite" in str(exc.value.detail)
+    finally:
+        db.close()
+
+
+def test_workspace_admin_inherits_project_permissions():
+    db = SessionLocal()
+    try:
+        owner = _create_user(db, "workspace-owner@example.com")
+        admin = _create_user(db, "workspace-admin@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Workspace Admin Org"), owner)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), owner)
+        project = ProjectService(db).create(ProjectCreate(workspace_id=workspace.id, name="Platform"), owner)
+        RoleService(db).ensure_role_catalog()
+        workspace_admin = db.query(Role).filter(Role.key == "workspace_admin").first()
+        db.add(WorkspaceMember(workspace_id=workspace.id, user_id=admin.id, role_id=workspace_admin.id, member_role=workspace_admin.key))
+        db.commit()
+
+        access = AccessControlService(db)
+
+        assert access.has_permission(admin.id, "settings.project.edit", "project", project.id) is True
+        assert access.has_permission(admin.id, "settings.team.edit", "workspace", workspace.id) is True
+    finally:
+        db.close()
+
+
+def test_project_viewer_cannot_archive_or_restore_project():
+    db = SessionLocal()
+    try:
+        owner = _create_user(db, "viewer-owner@example.com")
+        viewer = _create_user(db, "project-viewer@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Project Viewer Org"), owner)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), owner)
+        project = ProjectService(db).create(ProjectCreate(workspace_id=workspace.id, name="Platform"), owner)
+        RoleService(db).ensure_role_catalog()
+        viewer_role = db.query(Role).filter(Role.key == "workspace_viewer").first()
+        db.add(WorkspaceMember(workspace_id=workspace.id, user_id=viewer.id, role_id=viewer_role.id, member_role=viewer_role.key))
+        db.commit()
+
+        access = AccessControlService(db)
+
+        assert access.has_permission(viewer.id, "settings.project.view", "project", project.id) is True
+        assert access.has_permission(viewer.id, "settings.project.archive", "project", project.id) is False
+        assert access.has_permission(viewer.id, "settings.project.restore", "project", project.id) is False
+        with pytest.raises(HTTPException) as exc:
+            ProjectService(db).update(project.id, ProjectUpdate(status="archived", is_active=False), viewer)
+        assert exc.value.status_code == 403
+    finally:
+        db.close()
+
+
+def test_team_edit_requires_permission():
+    db = SessionLocal()
+    try:
+        owner = _create_user(db, "team-owner@example.com")
+        viewer = _create_user(db, "team-viewer@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Team Edit Org"), owner)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), owner)
+        team = TeamService(db).create(TeamCreate(workspace_id=workspace.id, name="Backend Team"), owner)
+        RoleService(db).ensure_role_catalog()
+        viewer_role = db.query(Role).filter(Role.key == "workspace_viewer").first()
+        db.add(WorkspaceMember(workspace_id=workspace.id, user_id=viewer.id, role_id=viewer_role.id, member_role=viewer_role.key))
+        db.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            TeamService(db).update(team.id, TeamUpdate(name="Backend Platform"), viewer)
+
+        assert exc.value.status_code == 403
+        assert "settings.team.edit" in str(exc.value.detail)
     finally:
         db.close()
 

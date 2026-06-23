@@ -109,6 +109,22 @@ class AccessControlService:
         resolved = self.get_user_permissions(user_id, scope_type, scope_id)
         return permission_code in set(resolved["permission_codes"])
 
+    def has_permission(
+        self,
+        user_id: int,
+        permission_code: str,
+        scope_type: str | None = None,
+        scope_id: int | None = None,
+    ) -> bool:
+        return self.can(user_id, permission_code, scope_type, scope_id)
+
+    def can_access_scope(self, user_id: int, scope_type: str | None = None, scope_id: int | None = None) -> bool:
+        try:
+            resolved = self.get_user_permissions(user_id, scope_type, scope_id)
+        except HTTPException:
+            return False
+        return bool(resolved["roles"] or resolved["permission_codes"])
+
     def get_effective_roles(self, user_id: int, scope_type: str | None = None, scope_id: int | None = None) -> list[dict]:
         return self.get_user_permissions(user_id, scope_type, scope_id)["roles"]
 
@@ -323,18 +339,18 @@ class AccessControlService:
 
     def _get_workspace(self, workspace_id: int) -> Workspace:
         workspace = self.db.get(Workspace, workspace_id)
-        if workspace is None or not workspace.is_active:
+        if workspace is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
         return workspace
 
     def _get_project(self, project_id: int) -> Project:
         project = self.db.get(Project, project_id)
-        if project is None or not project.is_active:
+        if project is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         return project
 
     def _get_team(self, team_id: int) -> Team:
         team = self.db.get(Team, team_id)
-        if team is None or not team.is_active:
+        if team is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found.")
         return team

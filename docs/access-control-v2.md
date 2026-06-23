@@ -80,3 +80,40 @@ The Phase B generator covers:
 - collab
 
 The registry can be expanded module by module without deleting custom permissions or forcing role mapping changes.
+
+## Phase C Enforcement
+
+Phase C standardizes permission resolution and enforcement.
+
+Backend checks use the effective permission resolver:
+
+- platform roles apply globally
+- organization roles apply to the organization and child workspaces/projects
+- workspace roles apply to the workspace and child projects
+- project roles apply only to the project
+- team roles apply only to the team
+
+Archived or inactive records still participate in scope resolution so restore/archive actions can be authorized after refresh.
+
+Critical Settings actions now use precise permission codes:
+
+- `settings.organization.edit`
+- `settings.organization.archive`
+- `settings.organization.restore`
+- `settings.workspace.edit`
+- `settings.workspace.archive`
+- `settings.workspace.restore`
+- `settings.project.edit`
+- `settings.project.archive`
+- `settings.project.restore`
+- `settings.team.create`
+- `settings.team.edit`
+- `settings.team.delete`
+- `settings.team.member.add`
+- `settings.team.member.remove`
+- `settings.member.invite`
+- `settings.member.remove`
+- `settings.member.resend`
+- `settings.member.cancel`
+
+Frontend visibility uses the same permission codes through `can(permissionCode)`.

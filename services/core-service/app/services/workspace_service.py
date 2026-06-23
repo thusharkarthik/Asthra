@@ -28,7 +28,7 @@ class WorkspaceService:
             )
         AccessControlService(self.db).require(
             current_user,
-            "settings.workspace.manage",
+            "settings.workspace.create",
             "organization",
             workspace_create.organization_id,
         )
@@ -100,7 +100,7 @@ class WorkspaceService:
         workspace = self.get(workspace_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.workspace.manage",
+            self._permission_for_workspace_update(workspace, workspace_update),
             "workspace",
             workspace.id,
         )
@@ -114,7 +114,7 @@ class WorkspaceService:
         workspace = self.get(workspace_id, current_user)
         AccessControlService(self.db).require(
             current_user,
-            "settings.workspace.manage",
+            "settings.workspace.archive",
             "workspace",
             workspace.id,
         )
@@ -138,10 +138,21 @@ class WorkspaceService:
             return
         if self.workspace_repository.is_member(workspace.id, user.id):
             return
+        if AccessControlService(self.db).can_access_scope(user.id, "workspace", workspace.id):
+            return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this workspace.",
         )
+
+    def _permission_for_workspace_update(self, workspace: Workspace, workspace_update: WorkspaceUpdate) -> str:
+        restoring = workspace.is_active is False and workspace_update.is_active is True
+        archiving = workspace_update.is_active is False
+        if restoring:
+            return "settings.workspace.restore"
+        if archiving:
+            return "settings.workspace.archive"
+        return "settings.workspace.edit"
 
     def _build_unique_slug(self, *, organization_id: int, name: str) -> str:
         base_slug = self._slugify(name)
