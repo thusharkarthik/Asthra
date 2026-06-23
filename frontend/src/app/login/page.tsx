@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 
 const AUTH_LOGIN_TRANSITION_MS = 1850;
+const AUTH_ROUTE_SWAP_DELAY_MS = 250;
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -46,9 +47,10 @@ export default function LoginPage() {
       setIsTransitioning(true);
       await login({ email: email.trim(), password });
       setAuthTransition("login");
-      await wait(AUTH_LOGIN_TRANSITION_MS);
-      setAuthTransition(null);
+      await wait(AUTH_ROUTE_SWAP_DELAY_MS);
       router.replace("/");
+      await wait(AUTH_LOGIN_TRANSITION_MS - AUTH_ROUTE_SWAP_DELAY_MS + 100);
+      setAuthTransition(null);
     } catch {
       setIsTransitioning(false);
       setAuthTransition(null);

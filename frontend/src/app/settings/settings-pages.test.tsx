@@ -16,9 +16,57 @@ import AccessControlPage from "@/app/settings/access-control/page";
 import AccessControlAssignmentsPage from "@/app/settings/access-control/assignments/page";
 import AccessControlMappingPage from "@/app/settings/access-control/mapping/page";
 import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
-import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, TeamDetailView, WorkspaceDetailView } from "@/components/settings/settings-admin-views";
+import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, ProjectsView, TeamDetailView, TeamsView, WorkspaceDetailView, WorkspacesView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+vi.mock("@/context/platformContext", () => ({
+  useCurrentScope: () => ({ organizationId: 1, workspaceId: 2, projectId: 3 }),
+  usePlatformContext: () => ({
+    currentScope: { organizationId: 1, workspaceId: 2, projectId: 3 },
+    contextVersions: {
+      user_id: 1,
+      organization_id: 1,
+      organization_version: 1,
+      workspace_id: 2,
+      workspace_version: 1,
+      project_id: 3,
+      project_version: 1,
+      access_version: 1,
+      generated_at: "2026-01-01T00:00:00Z"
+    },
+    permissionCodes: [
+      "settings.organization.manage",
+      "settings.workspace.manage",
+      "settings.project.manage",
+      "settings.member.invite",
+      "settings.member.remove",
+      "settings.role.manage",
+      "settings.permission.manage",
+      "settings.team.manage"
+    ],
+    can: () => true
+  }),
+  useCan: () => true,
+  useCurrentPermissions: () => ({
+    permissionCodes: [
+      "settings.organization.manage",
+      "settings.workspace.manage",
+      "settings.project.manage",
+      "settings.member.invite",
+      "settings.member.remove",
+      "settings.role.manage",
+      "settings.permission.manage",
+      "settings.team.manage"
+    ],
+    permissions: null,
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn()
+  })
+}));
 
 vi.mock("@/services/api/settings-api", () => ({
   settingsApi: {
@@ -313,6 +361,51 @@ describe("Settings frontend screens", () => {
     expect(screen.getAllByText("Organization").length).toBeGreaterThan(0);
     expect(screen.getByText("Back to Organization")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Organizations.*Asthra.*Members/);
+  });
+
+  it("does not duplicate active member and pending invite rows for the same email and scope", async () => {
+    vi.mocked(settingsApi.listInvitations).mockResolvedValueOnce([
+      { id: 12, email: "user@example.com", organization_id: 1, workspace_id: 2, status: "pending", invited_by_id: 1, updated_at: "2026-01-09T00:00:00Z" }
+    ]);
+
+    renderWithQuery(<MembersView workspaceId={2} />);
+
+    expect(await screen.findByText("Test User")).toBeInTheDocument();
+    expect(screen.queryByText("Pending invitation")).not.toBeInTheDocument();
+    expect(screen.getAllByText("user@example.com")).toHaveLength(1);
+  });
+
+  it("auto-scopes create workspace from organization detail", async () => {
+    vi.mocked(settingsApi.createWorkspace).mockResolvedValueOnce({ id: 4, organization_id: 1, name: "Product Workspace", description: "Product planning", is_active: true });
+
+    renderWithQuery(<WorkspacesView organizationId={1} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create Workspace" }));
+    expect(screen.getByDisplayValue("Asthra")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Organization" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Product Workspace"), { target: { value: "Product Workspace" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Workspace" })[1]);
+    await waitFor(() => expect(settingsApi.createWorkspace).toHaveBeenCalledWith("token", expect.objectContaining({ organization_id: 1, name: "Product Workspace" })));
+  });
+
+  it("auto-scopes create project and team from workspace detail", async () => {
+    vi.mocked(settingsApi.createProject).mockResolvedValueOnce({ id: 8, workspace_id: 2, name: "Mobile App", status: "active", is_active: true });
+
+    renderWithQuery(<ProjectsView workspaceId={2} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create Project" }));
+    expect(screen.getByDisplayValue("Platform")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Asthra Alpha"), { target: { value: "Mobile App" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Project" })[1]);
+    await waitFor(() => expect(settingsApi.createProject).toHaveBeenCalledWith("token", expect.objectContaining({ workspace_id: 2, name: "Mobile App" })));
+
+    cleanup();
+    renderWithQuery(<TeamsView workspaceId={2} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Create Team" }));
+    expect(screen.getByDisplayValue("Platform")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Engineering"), { target: { value: "QA Team" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create Team" })[1]);
+    await waitFor(() => expect(settingsApi.createTeam).toHaveBeenCalledWith("token", expect.objectContaining({ workspace_id: 2, name: "QA Team" })));
   });
 
   it("renders member detail", async () => {

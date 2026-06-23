@@ -537,6 +537,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const targetOrganizationId = organizationId ?? selectedOrganizationId ?? organizations[0]?.id;
+  const targetOrganization = organizations.find((organization) => organization.id === targetOrganizationId);
   const permissions = useCurrentPermissions({ orgId: targetOrganizationId ?? undefined });
   const canCreateWorkspace = permissions.can("settings.workspace.manage");
   const visibleWorkspaces = organizationId ? workspaces.filter((workspace) => workspace.organization_id === organizationId) : workspaces;
@@ -625,13 +626,20 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       )}
       <SettingsCreateDialog title="Create workspace" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Organization" required>
-          <select name="organization_id" defaultValue={targetOrganizationId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
+          {organizationId ? (
+            <>
+              <input type="hidden" name="organization_id" value={targetOrganizationId ?? ""} />
+              <Input value={targetOrganization?.name ?? `Organization ${organizationId}`} readOnly />
+            </>
+          ) : (
+            <select name="organization_id" defaultValue={targetOrganizationId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          )}
         </FormField>
         <FormField label="Name" required>
           <Input name="name" placeholder="Product Workspace" />
@@ -651,12 +659,19 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
-  const targetWorkspaceId = workspaceId ?? selectedWorkspaceId ?? workspaces[0]?.id;
+  const visibleWorkspaces = workspaceId
+    ? workspaces.filter((workspace) => workspace.id === workspaceId)
+    : selectedOrganizationId
+      ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
+      : workspaces;
+  const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
+  const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
   const canCreateProject = permissions.can("settings.project.manage");
-  const visibleProjects = workspaceId ? projects.filter((project) => project.workspace_id === workspaceId) : projects;
+  const visibleProjects = targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects;
 
   const mutation = useMutation({
     mutationFn: (payload: { workspace_id: number; name: string; description?: string; status?: string }) => settingsApi.createProject(accessToken ?? "", payload),
@@ -741,13 +756,20 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       )}
       <SettingsCreateDialog title="Create project" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Workspace" required>
-          <select name="workspace_id" defaultValue={targetWorkspaceId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
+          {workspaceId ? (
+            <>
+              <input type="hidden" name="workspace_id" value={targetWorkspaceId ?? ""} />
+              <Input value={targetWorkspace?.name ?? `Workspace ${workspaceId}`} readOnly />
+            </>
+          ) : (
+            <select name="workspace_id" defaultValue={targetWorkspaceId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              {visibleWorkspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+          )}
         </FormField>
         <FormField label="Name" required>
           <Input name="name" placeholder="Asthra Alpha" />
@@ -1136,6 +1158,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
       if (search && !haystack.includes(search.toLowerCase())) return false;
       if (roleFilter && normalizeRole(row.role) !== roleFilter) return false;
+      if (!statusFilter && row.kind === "invitation" && row.status !== "pending") return false;
       if (statusFilter && row.status.toLowerCase() !== statusFilter) return false;
       if (scopeFilter && row.scopeType !== scopeFilter) return false;
       return true;
@@ -1333,7 +1356,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
               row.role,
               row.scopeLabel,
               roleDisplayName(row.status),
-              formatDate(row.date),
+              row.status === "pending" ? `Last sent: ${formatDate(row.date)}` : formatDate(row.date),
               "Not tracked yet",
               <div key={`${row.id}-actions`} className="flex flex-wrap gap-2">
                 {row.status === "pending" && canInvite ? <Button type="button" size="sm" variant="outline" onClick={() => resendMutation.mutate(row.id)}>Resend Invite</Button> : null}
@@ -1404,6 +1427,7 @@ type MemberListRow =
       email: string;
       role: string;
       scopeType: "organization" | "workspace";
+      scopeId?: number | null;
       scopeLabel: string;
       status: string;
       date?: string;
@@ -1416,6 +1440,7 @@ type MemberListRow =
       email: string;
       role: string;
       scopeType: "organization" | "workspace";
+      scopeId?: number | null;
       scopeLabel: string;
       status: string;
       date?: string;
@@ -1449,6 +1474,7 @@ function buildMemberRows({
       email: user.email,
       role: roleNameFromRecord(role, member.member_role),
       scopeType: member.workspace_id ? "workspace" : "organization",
+      scopeId: member.workspace_id ?? organizationId ?? null,
       scopeLabel: member.workspace_id
         ? `Workspace: ${workspace?.name ?? member.workspace_id}`
         : `Organization: ${organization?.name ?? member.organization_id ?? "Selected"}`,
@@ -1457,7 +1483,14 @@ function buildMemberRows({
       profilePending: !profiles.get(member.user_id)
     };
   });
-  const invitationRows: MemberListRow[] = invitations.map((invitation) => {
+  const activeKeys = new Set(
+    activeRows.map((row) => `${row.email.toLowerCase()}|${row.scopeType}|${row.scopeId ?? "none"}`)
+  );
+  const invitationRows: MemberListRow[] = invitations.filter((invitation) => {
+    const scopeType = invitation.workspace_id ? "workspace" : "organization";
+    const scopeId = invitation.workspace_id ?? invitation.organization_id ?? null;
+    return !activeKeys.has(`${invitation.email.toLowerCase()}|${scopeType}|${scopeId ?? "none"}`);
+  }).map((invitation) => {
     const workspace = invitation.workspace_id ? workspaces.find((item) => item.id === invitation.workspace_id) : null;
     const organization = organizations.find((item) => item.id === invitation.organization_id);
     const role = roles.find((item) => item.id === invitation.role_id);
@@ -1468,11 +1501,12 @@ function buildMemberRows({
       email: invitation.email,
       role: roleNameFromRecord(role, "member"),
       scopeType: invitation.workspace_id ? "workspace" : "organization",
+      scopeId: invitation.workspace_id ?? invitation.organization_id ?? null,
       scopeLabel: invitation.workspace_id
         ? `Workspace: ${workspace?.name ?? invitation.workspace_id}`
         : `Organization: ${organization?.name ?? invitation.organization_id}`,
       status: invitation.status,
-      date: invitation.created_at ?? invitation.expires_at
+      date: invitation.updated_at ?? invitation.created_at ?? invitation.expires_at
     };
   });
   return [...activeRows, ...invitationRows];
@@ -1656,7 +1690,8 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
     : selectedOrganizationId
       ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
       : workspaces;
-  const targetWorkspaceId = workspaceId ?? selectedWorkspaceId ?? visibleWorkspaces[0]?.id;
+  const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
+  const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
   const canCreateTeam = permissions.can("settings.team.manage");
   const teamsQuery = useQuery({ queryKey: ["settings", "teams"], queryFn: () => settingsApi.listTeams(accessToken ?? ""), enabled: Boolean(accessToken) });
@@ -1743,9 +1778,16 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
       />
       <SettingsCreateDialog title="Create team" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Workspace" required>
-          <select name="workspace_id" defaultValue={targetWorkspaceId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm" disabled={Boolean(workspaceId)}>
-            {visibleWorkspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
-          </select>
+          {workspaceId ? (
+            <>
+              <input type="hidden" name="workspace_id" value={targetWorkspaceId ?? ""} />
+              <Input value={targetWorkspace?.name ?? `Workspace ${workspaceId}`} readOnly />
+            </>
+          ) : (
+            <select name="workspace_id" defaultValue={targetWorkspaceId ?? ""} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+              {visibleWorkspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+            </select>
+          )}
         </FormField>
         <FormField label="Name" required><Input name="name" placeholder="Engineering" /></FormField>
         <FormField label="Description"><Input name="description" placeholder="Build and operations team" /></FormField>
