@@ -103,6 +103,8 @@ Core owns:
 - Permissions
 - Memberships
 
+Core also owns the permission registry. Registry permissions use `module.resource.action` codes and are synced into the permission catalog on startup.
+
 Flow owns:
 
 - Work Items

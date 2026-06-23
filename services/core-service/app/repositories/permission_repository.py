@@ -29,7 +29,11 @@ class PermissionRepository:
         name: str,
         description: str | None,
         module: str | None = None,
+        resource: str | None = None,
+        action: str | None = None,
         scope: str = "workspace",
+        risk_level: str = "low",
+        source: str = "custom",
         status: str = "active",
     ) -> Permission:
         permission = Permission(
@@ -38,7 +42,11 @@ class PermissionRepository:
             name=name,
             description=description,
             module=module,
+            resource=resource,
+            action=action,
             scope=scope,
+            risk_level=risk_level,
+            source=source,
             status=status,
             is_active=status == "active",
         )

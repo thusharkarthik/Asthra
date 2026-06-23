@@ -27,8 +27,16 @@ def _ensure_rbac_columns(engine: Engine) -> None:
             permission_columns = {column["name"] for column in inspector.get_columns("permissions")}
             if "module" not in permission_columns:
                 connection.execute(text("ALTER TABLE permissions ADD COLUMN module VARCHAR(100)"))
+            if "resource" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN resource VARCHAR(100)"))
+            if "action" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN action VARCHAR(100)"))
             if "scope" not in permission_columns:
                 connection.execute(text("ALTER TABLE permissions ADD COLUMN scope VARCHAR(50) DEFAULT 'workspace' NOT NULL"))
+            if "risk_level" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN risk_level VARCHAR(50) DEFAULT 'low' NOT NULL"))
+            if "source" not in permission_columns:
+                connection.execute(text("ALTER TABLE permissions ADD COLUMN source VARCHAR(50) DEFAULT 'custom' NOT NULL"))
             if "status" not in permission_columns:
                 connection.execute(text("ALTER TABLE permissions ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL"))
 

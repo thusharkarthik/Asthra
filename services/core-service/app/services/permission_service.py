@@ -7,59 +7,11 @@ from app.repositories.permission_repository import PermissionRepository
 from app.schemas.role import PermissionCreate, PermissionUpdate
 from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
+from app.services.permission_registry import iter_registry_permissions
 
 VALID_PERMISSION_STATUSES = {"active", "inactive", "deprecated"}
-
-CORE_PERMISSION_CATALOG = [
-    ("settings.organization.view", "View organizations", "View organization settings and hierarchy.", "settings", "organization"),
-    ("settings.organization.manage", "Manage organizations", "Create and update organization settings.", "settings", "organization"),
-    ("settings.workspace.view", "View workspaces", "View workspace settings and context.", "settings", "workspace"),
-    ("settings.workspace.manage", "Manage workspaces", "Create and update workspace settings.", "settings", "workspace"),
-    ("settings.project.view", "View projects", "View project settings and membership context.", "settings", "project"),
-    ("settings.project.manage", "Manage projects", "Create and update project settings.", "settings", "project"),
-    ("settings.member.view", "View members", "View organization and workspace members.", "settings", "workspace"),
-    ("settings.member.invite", "Invite members", "Invite users into organizations and workspaces.", "settings", "workspace"),
-    ("settings.member.remove", "Remove members", "Remove users from organizations and workspaces.", "settings", "workspace"),
-    ("settings.role.view", "View roles", "View access-control roles.", "settings", "organization"),
-    ("settings.role.manage", "Manage roles", "Create and update custom roles.", "settings", "organization"),
-    ("settings.permission.view", "View permissions", "View the permission catalog.", "settings", "organization"),
-    ("settings.permission.manage", "Manage permissions", "Create and update custom permissions.", "settings", "organization"),
-    ("settings.team.view", "View teams", "View workspace teams.", "settings", "workspace"),
-    ("settings.team.manage", "Manage teams", "Create and manage workspace teams.", "settings", "workspace"),
-    ("flow.work_item.view", "View work items", "View Flow work items.", "flow", "project"),
-    ("flow.work_item.create", "Create work items", "Create Flow work items.", "flow", "project"),
-    ("flow.work_item.edit", "Edit work items", "Update Flow work items.", "flow", "project"),
-    ("flow.work_item.delete", "Delete work items", "Delete or archive Flow work items.", "flow", "project"),
-    ("flow.work_item.assign", "Assign work items", "Assign Flow work items to users.", "flow", "project"),
-    ("flow.board.view", "View boards", "View Flow boards.", "flow", "project"),
-    ("flow.sprint.view", "View Flow sprints", "View Flow sprint plans and execution.", "flow", "project"),
-    ("flow.sprint.manage", "Manage Flow sprints", "Create and manage Flow sprints.", "flow", "project"),
-    ("flow.release.view", "View Flow releases", "View Flow release plans and progress.", "flow", "project"),
-    ("flow.release.manage", "Manage Flow releases", "Create and manage Flow releases.", "flow", "project"),
-    ("flow.workflow.view", "View Flow workflows", "View Flow workflow definitions.", "flow", "project"),
-    ("flow.workflow.manage", "Manage Flow workflows", "Create and update Flow workflows.", "flow", "project"),
-    ("flow.report.view", "View Flow reports", "View Flow reports and summaries.", "flow", "project"),
-    ("docs.space.view", "View Docs spaces", "View knowledge spaces.", "docs", "workspace"),
-    ("docs.space.manage", "Manage Docs spaces", "Create and update knowledge spaces.", "docs", "workspace"),
-    ("docs.page.view", "View Docs pages", "View knowledge pages.", "docs", "workspace"),
-    ("docs.page.create", "Create Docs pages", "Create knowledge pages.", "docs", "workspace"),
-    ("docs.page.edit", "Edit Docs pages", "Update knowledge pages.", "docs", "workspace"),
-    ("docs.page.delete", "Delete Docs pages", "Delete or archive knowledge pages.", "docs", "workspace"),
-    ("discover.idea.view", "View ideas", "View Discover ideas.", "discover", "workspace"),
-    ("discover.idea.manage", "Manage ideas", "Create and update Discover ideas.", "discover", "workspace"),
-    ("desk.ticket.view", "View Desk tickets", "View support tickets.", "desk", "workspace"),
-    ("desk.ticket.manage", "Manage Desk tickets", "Create and update support tickets.", "desk", "workspace"),
-    ("pulse.incident.view", "View incidents", "View Pulse incidents.", "pulse", "workspace"),
-    ("pulse.incident.manage", "Manage incidents", "Create and update Pulse incidents.", "pulse", "workspace"),
-    ("dev.release.view", "View Dev releases", "View Dev releases.", "dev", "workspace"),
-    ("dev.release.manage", "Manage Dev releases", "Create and update Dev releases.", "dev", "workspace"),
-    ("automation.rule.view", "View automation rules", "View automation rules.", "automation", "workspace"),
-    ("automation.rule.manage", "Manage automation rules", "Create and update automation rules.", "automation", "workspace"),
-    ("guard.audit.view", "View audit records", "View governance and audit records.", "guard", "organization"),
-    ("insights.report.view", "View Insights reports", "View analytics reports.", "insights", "workspace"),
-    ("media.asset.view", "View media assets", "View media assets.", "media", "workspace"),
-    ("media.asset.manage", "Manage media assets", "Create and update media assets.", "media", "workspace"),
-]
+VALID_PERMISSION_RISK_LEVELS = {"low", "medium", "high"}
+VALID_PERMISSION_SOURCES = {"registry", "custom"}
 
 
 class PermissionService:
@@ -72,6 +24,8 @@ class PermissionService:
         self._require_permission_manage(current_user)
         code = self._normalize_code(permission_create.code)
         self._validate_status(permission_create.status)
+        self._validate_risk_level(permission_create.risk_level)
+        self._validate_source(permission_create.source)
         if self.permission_repository.get_by_code(code) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -82,7 +36,11 @@ class PermissionService:
             name=permission_create.name.strip(),
             description=permission_create.description,
             module=permission_create.module,
+            resource=permission_create.resource,
+            action=permission_create.action,
             scope=permission_create.scope,
+            risk_level=permission_create.risk_level,
+            source=permission_create.source,
             status=permission_create.status,
         )
         ActivityService(self.db).log_activity(
@@ -128,6 +86,10 @@ class PermissionService:
             permission_update.name = permission_update.name.strip()
         if permission_update.status is not None:
             self._validate_status(permission_update.status)
+        if permission_update.risk_level is not None:
+            self._validate_risk_level(permission_update.risk_level)
+        if permission_update.source is not None:
+            self._validate_source(permission_update.source)
         permission = self.permission_repository.update(permission, permission_update)
         ContextVersionService(self.db).bump_access("platform", None)
         self.db.commit()
@@ -142,34 +104,109 @@ class PermissionService:
         self.db.commit()
 
     def ensure_permission_catalog(self) -> None:
-        for code, name, description, module, scope in CORE_PERMISSION_CATALOG:
-            existing = self.permission_repository.get_by_code(code)
+        registry_items = iter_registry_permissions()
+        registry_codes = {item.code for item in registry_items}
+        for item in registry_items:
+            existing = self.permission_repository.get_by_code(item.code)
             if existing is not None:
                 changed = False
-                if existing.module != module:
-                    existing.module = module
+                if existing.name != item.name:
+                    existing.name = item.name
                     changed = True
-                if existing.scope != scope:
-                    existing.scope = scope
+                if existing.description != item.description:
+                    existing.description = item.description
+                    changed = True
+                if existing.module != item.module:
+                    existing.module = item.module
+                    changed = True
+                if existing.resource != item.resource:
+                    existing.resource = item.resource
+                    changed = True
+                if existing.action != item.action:
+                    existing.action = item.action
+                    changed = True
+                if existing.scope != item.scope:
+                    existing.scope = item.scope
+                    changed = True
+                if existing.risk_level != item.risk_level:
+                    existing.risk_level = item.risk_level
+                    changed = True
+                if existing.source != "registry":
+                    existing.source = "registry"
                     changed = True
                 if existing.status != "active":
                     existing.status = "active"
                     existing.is_active = True
                     changed = True
-                if not existing.description:
-                    existing.description = description
-                    changed = True
                 if changed:
                     self.db.commit()
                 continue
             self.permission_repository.create(
-                code=code,
-                name=name,
-                description=description,
-                module=module,
-                scope=scope,
+                code=item.code,
+                name=item.name,
+                description=item.description,
+                module=item.module,
+                resource=item.resource,
+                action=item.action,
+                scope=item.scope,
+                risk_level=item.risk_level,
+                source="registry",
                 status="active",
             )
+        for permission in self.permission_repository.list(include_inactive=True):
+            if permission.source != "registry" or permission.code in registry_codes:
+                continue
+            if permission.status != "deprecated" or permission.is_active:
+                permission.status = "deprecated"
+                permission.is_active = False
+                self.db.commit()
+
+    def registry_status(self) -> list[dict]:
+        self.ensure_permission_catalog()
+        permissions_by_code = {permission.code: permission for permission in self.permission_repository.list(include_inactive=True)}
+        rows: list[dict] = []
+        for item in iter_registry_permissions():
+            permission = permissions_by_code.get(item.code)
+            rows.append({
+                "code": item.code,
+                "name": item.name,
+                "description": item.description,
+                "module": item.module,
+                "resource": item.resource,
+                "action": item.action,
+                "scope": item.scope,
+                "risk_level": item.risk_level,
+                "exists": permission is not None,
+                "status": permission.status if permission is not None else "missing",
+            })
+        return rows
+
+    def permission_gaps(self) -> list[dict]:
+        permissions_by_code = {permission.code: permission for permission in self.permission_repository.list(include_inactive=True)}
+        gaps: list[dict] = []
+        registry_codes = {item.code for item in iter_registry_permissions()}
+        for item in iter_registry_permissions():
+            permission = permissions_by_code.get(item.code)
+            if permission is None or permission.status != "active" or not permission.is_active:
+                gaps.append({
+                    "module": item.module,
+                    "resource": item.resource,
+                    "action": item.action,
+                    "expected_permission_code": item.code,
+                    "status": "missing" if permission is None else permission.status,
+                    "suggested_fix": "Run the permission registry sync on startup or reactivate the registry permission.",
+                })
+        for permission in permissions_by_code.values():
+            if permission.source == "registry" and permission.code not in registry_codes:
+                gaps.append({
+                    "module": permission.module or permission.code.split(".")[0],
+                    "resource": permission.resource or "unknown",
+                    "action": permission.action or "unknown",
+                    "expected_permission_code": permission.code,
+                    "status": "deprecated",
+                    "suggested_fix": "Review this registry permission and keep it deprecated unless a screen or endpoint still uses it.",
+                })
+        return gaps
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:
@@ -196,4 +233,18 @@ class PermissionService:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Permission status must be active, inactive, or deprecated.",
+            )
+
+    def _validate_risk_level(self, value: str) -> None:
+        if value not in VALID_PERMISSION_RISK_LEVELS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Permission risk level must be low, medium, or high.",
+            )
+
+    def _validate_source(self, value: str) -> None:
+        if value not in VALID_PERMISSION_SOURCES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Permission source must be registry or custom.",
             )

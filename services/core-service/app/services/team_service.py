@@ -24,7 +24,7 @@ class TeamService:
     def create(self, team_create: TeamCreate, current_user: User) -> Team:
         self._ensure_active_user(current_user)
         workspace = self._get_active_workspace(team_create.workspace_id)
-        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", workspace.id)
+        AccessControlService(self.db).require(current_user, "settings.team.create", "workspace", workspace.id)
 
         slug = self._build_unique_slug(workspace_id=workspace.id, name=team_create.name)
         try:
@@ -66,7 +66,7 @@ class TeamService:
 
     def update(self, team_id: int, team_update: TeamUpdate, current_user: User) -> Team:
         team = self.get(team_id, current_user)
-        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
+        AccessControlService(self.db).require(current_user, "settings.team.edit", "workspace", team.workspace_id)
         team = self.team_repository.update(team, team_update)
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
         self.db.commit()
@@ -75,7 +75,7 @@ class TeamService:
 
     def delete(self, team_id: int, current_user: User) -> None:
         team = self.get(team_id, current_user)
-        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
+        AccessControlService(self.db).require(current_user, "settings.team.delete", "workspace", team.workspace_id)
         self.team_repository.update(team, TeamUpdate(is_active=False))
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
         self.db.commit()
@@ -87,7 +87,7 @@ class TeamService:
         current_user: User,
     ) -> TeamMember:
         team = self.get(team_id, current_user)
-        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
+        AccessControlService(self.db).require(current_user, "settings.team.member.add", "workspace", team.workspace_id)
         target_user = self.team_repository.get_user(member_create.user_id)
         if target_user is None or not target_user.is_active:
             raise HTTPException(
@@ -132,7 +132,7 @@ class TeamService:
 
     def remove_member(self, team_id: int, user_id: int, current_user: User) -> None:
         team = self.get(team_id, current_user)
-        AccessControlService(self.db).require(current_user, "settings.team.manage", "workspace", team.workspace_id)
+        AccessControlService(self.db).require(current_user, "settings.team.member.remove", "workspace", team.workspace_id)
         member = self.team_repository.get_member(team.id, user_id)
         if member is None:
             raise HTTPException(

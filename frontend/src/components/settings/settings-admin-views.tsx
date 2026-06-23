@@ -339,7 +339,7 @@ export function SettingsHomeView() {
   const permissions = useCurrentPermissions();
   const canCreateOrganization = organizations.length === 0 || permissions.can("settings.organization.manage");
   const canCreateWorkspace = permissions.can("settings.workspace.manage");
-  const canCreateProject = permissions.can("settings.project.manage");
+  const canCreateProject = permissions.can("settings.project.create");
   const cards = [
     { title: "Administration", value: "Open", href: "/settings/administration" },
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
@@ -698,7 +698,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
-  const canCreateProject = permissions.can("settings.project.manage");
+  const canCreateProject = permissions.can("settings.project.create");
   const visibleProjects = (targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects).filter((project) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
@@ -769,7 +769,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
         description="Projects scope Flow work, Docs knowledge, discovery, tickets, and operations."
         actions={canCreateProject ? <QuickCreateButton onClick={() => setOpen(true)}>Create Project</QuickCreateButton> : undefined}
       />
-      {!canCreateProject ? <SettingsCard title="Limited access" description="You need settings.project.manage to create projects in this scope." /> : null}
+      {!canCreateProject ? <SettingsCard title="Limited access" description="You need settings.project.create to create projects in this scope." /> : null}
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
       ) : (
@@ -1057,7 +1057,9 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
   const projectWorkspace = project ? workspaces.find((workspace) => workspace.id === project.workspace_id) : undefined;
   const projectOrganizationId = project?.organization_id ?? projectWorkspace?.organization_id;
   const permissions = useCurrentPermissions({ orgId: projectOrganizationId, workspaceId: project?.workspace_id, projectId });
-  const canManageProject = permissions.can("settings.project.manage");
+  const canEditProject = permissions.can("settings.project.edit");
+  const canArchiveProject = permissions.can("settings.project.archive");
+  const canRestoreProject = permissions.can("settings.project.restore");
   const workspaceMembersQuery = useQuery({
     queryKey: ["settings", "project-owner-members", project?.workspace_id],
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", project?.workspace_id ?? 0),
@@ -1174,8 +1176,8 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         title={project.name}
         description={project.description ?? "Project settings and operational metadata."}
         actions={<>
-          {canManageProject ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Project</Button> : null}
-          {canManageProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</Button> : null}
+          {canEditProject ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Project</Button> : null}
+          {canEditProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</Button> : null}
           <SettingsLinkButton href="/flow">Open Flow</SettingsLinkButton>
         </>}
       />
@@ -1197,14 +1199,14 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       <SettingsCard title="Ownership actions">
         <p className="mb-3 text-sm text-muted-foreground">Project owners should be selected from workspace members. If no members are available, invite members to the workspace first.</p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Change Owner</Button>
-          <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} />
+          {canEditProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Change Owner</Button> : null}
+          {canEditProject ? <ConfirmActionButton label="Remove Owner" message="Remove this project owner?" onConfirm={() => ownerMutation.mutate(null)} /> : null}
         </div>
       </SettingsCard>
       <SettingsCard
         title="Members"
         description="Project membership gives users project-scoped roles without assigning permissions directly."
-        actions={<QuickCreateButton onClick={() => setMemberOpen(true)}>Add Project Member</QuickCreateButton>}
+        actions={canEditProject ? <QuickCreateButton onClick={() => setMemberOpen(true)}>Add Project Member</QuickCreateButton> : undefined}
       >
         <SettingsDataTable
           columns={["Name", "Email", "Role", "Team", "Status", "Joined", "Actions"]}
@@ -1223,14 +1225,14 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           emptyMessage="No project members"
         />
       </SettingsCard>
-      {canManageProject ? (
+      {canArchiveProject || canRestoreProject ? (
         <SettingsDangerZone
           title={isProjectArchived ? "Restore project" : "Archive project"}
           description={isProjectArchived ? "Restore this project to the active project list." : "Archive this project without permanently deleting it. Archived projects remain recoverable from the Projects filter."}
           actions={isProjectArchived ? (
-            <ConfirmActionButton label="Restore Project" message={`Restore project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "active", is_active: true })} />
+            canRestoreProject ? <ConfirmActionButton label="Restore Project" message={`Restore project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "active", is_active: true })} /> : null
           ) : (
-            <ConfirmActionButton label="Archive Project" message={`Archive project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "archived", is_active: false })} />
+            canArchiveProject ? <ConfirmActionButton label="Archive Project" message={`Archive project ${project.name}?`} onConfirm={() => statusProjectMutation.mutate({ status: "archived", is_active: false })} /> : null
           )}
         />
       ) : null}
@@ -1885,7 +1887,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
-  const canCreateTeam = permissions.can("settings.team.manage");
+  const canCreateTeam = permissions.can("settings.team.create");
   const teamsQuery = useQuery({ queryKey: ["settings", "teams"], queryFn: () => settingsApi.listTeams(accessToken ?? ""), enabled: Boolean(accessToken) });
   const teams = (teamsQuery.data ?? [])
     .filter((team: TeamRecord) => visibleWorkspaces.some((workspace) => workspace.id === team.workspace_id))
@@ -1950,7 +1952,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
         />
       ) : null}
       <SettingsSectionHeader title="Teams" description="Create lightweight workspace teams for future ownership and permissions." actions={canCreateTeam ? <QuickCreateButton onClick={() => setOpen(true)}>Create Team</QuickCreateButton> : undefined} />
-      {!canCreateTeam ? <SettingsCard title="Limited access" description="You need settings.team.manage to create teams in this workspace scope." /> : null}
+      {!canCreateTeam ? <SettingsCard title="Limited access" description="You need settings.team.create to create teams in this workspace scope." /> : null}
       <SearchBox value={search} onChange={setSearch} placeholder="Search teams" />
       <SettingsDataTable
         columns={["Name", "Description", "Members Count", "Lead", "Status", "Actions"]}
@@ -2000,7 +2002,9 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   const teamQuery = useQuery({ queryKey: ["settings", "team", teamId], queryFn: () => settingsApi.getTeam(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const team = teamQuery.data;
   const permissions = useCurrentPermissions({ workspaceId: team?.workspace_id });
-  const canManageTeam = permissions.can("settings.team.manage");
+  const canEditTeam = permissions.can("settings.team.edit");
+  const canAddTeamMember = permissions.can("settings.team.member.add");
+  const canRemoveTeamMember = permissions.can("settings.team.member.remove");
   const membersQuery = useQuery({ queryKey: ["settings", "team-members", teamId], queryFn: () => settingsApi.listTeamMembers(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const workspaceMembersQuery = useQuery({
@@ -2095,8 +2099,8 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
         description={team.description ?? "Team administration."}
         actions={
           <div className="flex flex-wrap gap-2">
-            {canManageTeam ? <Button variant="outline" onClick={() => setEditOpen(true)}>Edit Team</Button> : null}
-            <QuickCreateButton onClick={() => setAssignOpen(true)}>Assign Member</QuickCreateButton>
+            {canEditTeam ? <Button variant="outline" onClick={() => setEditOpen(true)}>Edit Team</Button> : null}
+            {canAddTeamMember ? <QuickCreateButton onClick={() => setAssignOpen(true)}>Assign Member</QuickCreateButton> : null}
           </div>
         }
       />
@@ -2119,7 +2123,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
               rolesQuery.data?.find((role) => role.id === member.role_id)?.name ?? member.member_role,
               roleDisplayName(member.status ?? user.status),
               formatDate(member.joined_at ?? member.created_at),
-              <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this team?`} onConfirm={() => removeTeamMemberMutation.mutate(member.id)} />
+              canRemoveTeamMember ? <ConfirmActionButton key={member.id} label="Remove" message={`Remove ${user.name} from this team?`} onConfirm={() => removeTeamMemberMutation.mutate(member.id)} /> : "View only"
             ];
           })}
           emptyMessage="No team members"
@@ -2160,12 +2164,14 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   );
 }
 
-function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" | "assignments" }) {
+function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" }) {
   const tabs = [
     { key: "roles", label: "Roles", href: "/settings/access-control" },
     { key: "permissions", label: "Permissions", href: "/settings/access-control/permissions" },
     { key: "mapping", label: "Role Mapping", href: "/settings/access-control/mapping" },
-    { key: "assignments", label: "Assignments", href: "/settings/access-control/assignments" }
+    { key: "assignments", label: "Assignments", href: "/settings/access-control/assignments" },
+    { key: "registry", label: "Permission Registry", href: "/settings/access-control/registry" },
+    { key: "gaps", label: "Permission Gaps", href: "/settings/access-control/gaps" }
   ] as const;
   return (
     <nav aria-label="Access Control sections" className="flex flex-wrap gap-2 border-b pb-2">
@@ -2184,7 +2190,7 @@ function AccessControlTabs({ active }: { active: "roles" | "permissions" | "mapp
   );
 }
 
-export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" | "assignments" }) {
+export function AccessControlView({ section = "roles" }: { section?: "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentPermissions = useCurrentPermissions();
   const platformContext = usePlatformContext();
@@ -2192,6 +2198,12 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const canCreatePermission = currentPermissions.can("settings.permission.manage");
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
+  const [resourceFilter, setResourceFilter] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [scopeFilter, setScopeFilter] = useState("");
+  const [riskFilter, setRiskFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [roleCreateOpen, setRoleCreateOpen] = useState(false);
   const [permissionCreateOpen, setPermissionCreateOpen] = useState(false);
   const [assignmentCreateOpen, setAssignmentCreateOpen] = useState(false);
@@ -2200,6 +2212,8 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const permissionRegistryQuery = useQuery({ queryKey: ["settings", "permission-registry"], queryFn: () => settingsApi.listPermissionRegistry(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const permissionGapsQuery = useQuery({ queryKey: ["settings", "permission-gaps"], queryFn: () => settingsApi.listPermissionGaps(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleAssignmentsQuery = useQuery({ queryKey: ["settings", "role-assignments"], queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roles = rolesQuery.data ?? [];
@@ -2225,9 +2239,23 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
   const members = membersQuery.data ?? [];
   const filteredPermissions = permissions
     .filter((permission) => `${permission.code} ${permission.name} ${permission.description ?? ""}`.toLowerCase().includes(search.toLowerCase()))
-    .filter((permission) => (moduleFilter ? permissionModule(permission) === moduleFilter : true));
+    .filter((permission) => (moduleFilter ? permissionModule(permission) === moduleFilter : true))
+    .filter((permission) => (resourceFilter ? permission.resource === resourceFilter : true))
+    .filter((permission) => (actionFilter ? permission.action === actionFilter : true))
+    .filter((permission) => (scopeFilter ? permission.scope === scopeFilter : true))
+    .filter((permission) => (riskFilter ? permission.risk_level === riskFilter : true))
+    .filter((permission) => (sourceFilter ? permission.source === sourceFilter : true))
+    .filter((permission) => (statusFilter ? (permission.status ?? (permission.is_active === false ? "inactive" : "active")) === statusFilter : true));
   const groupedPermissions = groupPermissionsByModule(filteredPermissions);
   const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...permissions.map(permissionModule)])).sort();
+  const resources = Array.from(new Set(permissions.map((permission) => permission.resource).filter(Boolean) as string[])).sort();
+  const actions = Array.from(new Set(permissions.map((permission) => permission.action).filter(Boolean) as string[])).sort();
+  const scopes = Array.from(new Set(permissions.map((permission) => permission.scope).filter(Boolean) as string[])).sort();
+  const risks = Array.from(new Set(permissions.map((permission) => permission.risk_level).filter(Boolean) as string[])).sort();
+  const sources = Array.from(new Set(permissions.map((permission) => permission.source).filter(Boolean) as string[])).sort();
+  const statuses = Array.from(new Set(permissions.map((permission) => permission.status ?? (permission.is_active === false ? "inactive" : "active")))).sort();
+  const registryItems = permissionRegistryQuery.data ?? [];
+  const registryModules = Array.from(new Set(registryItems.map((item) => item.module))).sort();
   const createRoleMutation = useMutation({
     mutationFn: (payload: { name: string; description?: string; scope: string }) => settingsApi.createRole(accessToken ?? "", { ...payload, is_system: false, is_editable: true }),
     onSuccess: async () => {
@@ -2391,18 +2419,51 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
       ) : null}
       {section === "permissions" ? (
         <div className="space-y-4">
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_repeat(3,180px)] xl:grid-cols-[minmax(0,1fr)_repeat(6,160px)]">
             <SearchBox value={search} onChange={setSearch} placeholder="Search permissions" />
             <select aria-label="Permission module filter" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
               <option value="">All modules</option>
               {modules.map((module) => <option key={module} value={module}>{moduleLabel(module)}</option>)}
             </select>
+            <select aria-label="Permission resource filter" value={resourceFilter} onChange={(event) => setResourceFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All resources</option>
+              {resources.map((resource) => <option key={resource} value={resource}>{roleDisplayName(resource)}</option>)}
+            </select>
+            <select aria-label="Permission action filter" value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All actions</option>
+              {actions.map((action) => <option key={action} value={action}>{roleDisplayName(action)}</option>)}
+            </select>
+            <select aria-label="Permission scope filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All scopes</option>
+              {scopes.map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
+            </select>
+            <select aria-label="Permission risk filter" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All risk</option>
+              {risks.map((risk) => <option key={risk} value={risk}>{roleDisplayName(risk)}</option>)}
+            </select>
+            <select aria-label="Permission source filter" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All sources</option>
+              {sources.map((source) => <option key={source} value={source}>{roleDisplayName(source)}</option>)}
+            </select>
+            <select aria-label="Permission status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All statuses</option>
+              {statuses.map((status) => <option key={status} value={status}>{roleDisplayName(status)}</option>)}
+            </select>
           </div>
           {modules.filter((module) => groupedPermissions[module]?.length).map((module) => (
             <SettingsCard key={module} title={moduleLabel(module)} description={`${groupedPermissions[module].length} permissions`}>
               <SettingsDataTable
-                columns={["Code", "Name", "Scope", "Status"]}
-                rows={groupedPermissions[module].map((permission) => [permission.code, permission.name, roleDisplayName(permission.scope), roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active"))])}
+                columns={["Code", "Name", "Resource", "Action", "Scope", "Risk", "Source", "Status"]}
+                rows={groupedPermissions[module].map((permission) => [
+                  permission.code,
+                  permission.name,
+                  roleDisplayName(permission.resource ?? "unknown"),
+                  roleDisplayName(permission.action ?? "unknown"),
+                  roleDisplayName(permission.scope),
+                  roleDisplayName(permission.risk_level ?? "low"),
+                  roleDisplayName(permission.source ?? "custom"),
+                  roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active"))
+                ])}
                 emptyMessage={`No ${moduleLabel(module)} permissions`}
               />
             </SettingsCard>
@@ -2456,6 +2517,46 @@ export function AccessControlView({ section = "roles" }: { section?: "roles" | "
               <ConfirmActionButton key={assignment.id} label="Revoke" message="Revoke this role assignment?" onConfirm={() => deleteAssignmentMutation.mutate(assignment.id)} />
             ])}
             emptyMessage="No scoped role assignments"
+          />
+        </SettingsCard>
+      ) : null}
+      {section === "registry" ? (
+        <div className="space-y-4">
+          {registryModules.map((module) => {
+            const moduleItems = registryItems.filter((item) => item.module === module);
+            return (
+              <SettingsCard key={module} title={`${moduleLabel(module)} Registry`} description={`${moduleItems.length} generated action permissions`}>
+                <SettingsDataTable
+                  columns={["Permission", "Resource", "Action", "Scope", "Risk", "Sync Status"]}
+                  rows={moduleItems.map((item) => [
+                    <div key={item.code}><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.code}</div></div>,
+                    roleDisplayName(item.resource),
+                    roleDisplayName(item.action),
+                    roleDisplayName(item.scope),
+                    roleDisplayName(item.risk_level),
+                    item.exists ? roleDisplayName(item.status) : "Missing"
+                  ])}
+                  emptyMessage={`No ${moduleLabel(module)} registry permissions`}
+                />
+              </SettingsCard>
+            );
+          })}
+          {!registryItems.length && !permissionRegistryQuery.isLoading ? <SettingsEmptyState title="No registry permissions" description="The backend registry endpoint returned no generated permissions." /> : null}
+        </div>
+      ) : null}
+      {section === "gaps" ? (
+        <SettingsCard title="Permission Gaps" description="Registry permissions that are missing, inactive, or deprecated. These are the action keys that need catalog attention before UI or backend enforcement can rely on them.">
+          <SettingsDataTable
+            columns={["Module", "Resource", "Action", "Expected Code", "Status", "Suggested Fix"]}
+            rows={(permissionGapsQuery.data ?? []).map((gap) => [
+              moduleLabel(gap.module),
+              roleDisplayName(gap.resource),
+              roleDisplayName(gap.action),
+              gap.expected_permission_code,
+              roleDisplayName(gap.status),
+              gap.suggested_fix
+            ])}
+            emptyMessage="No permission gaps"
           />
         </SettingsCard>
       ) : null}

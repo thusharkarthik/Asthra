@@ -6,9 +6,11 @@ import type {
   CurrentUserPermissions,
   EffectivePermissionsRecord,
   InvitationRecord,
+  PermissionGapRecord,
   Organization,
   OrganizationMember,
   PermissionRecord,
+  PermissionRegistryItem,
   ProjectMembershipRecord,
   ProjectRecord,
   RoleAssignmentRecord,
@@ -212,6 +214,12 @@ export const settingsApi = {
 
   listPermissions(token: string) {
     return apiRequest<PermissionRecord[]>(`${CORE_PREFIX}/permissions`, { method: "GET", authToken: token });
+  },
+  listPermissionRegistry(token: string) {
+    return apiRequest<PermissionRegistryItem[]>(`${CORE_PREFIX}/permissions/registry`, { method: "GET", authToken: token });
+  },
+  listPermissionGaps(token: string) {
+    return apiRequest<PermissionGapRecord[]>(`${CORE_PREFIX}/permissions/gaps`, { method: "GET", authToken: token });
   },
   createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });
