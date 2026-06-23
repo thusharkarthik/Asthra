@@ -33,6 +33,25 @@ class InvitationRepository:
         )
         return self.db.scalar(statement)
 
+    def get_duplicate_by_status(
+        self,
+        *,
+        email: str,
+        organization_id: int,
+        workspace_id: int | None,
+        status: str,
+        exclude_id: int | None = None,
+    ) -> Invitation | None:
+        statement = select(Invitation).where(
+            Invitation.email == email,
+            Invitation.organization_id == organization_id,
+            Invitation.workspace_id == workspace_id,
+            Invitation.status == status,
+        )
+        if exclude_id is not None:
+            statement = statement.where(Invitation.id != exclude_id)
+        return self.db.scalar(statement)
+
     def list_for_user(self, user_id: int) -> list[Invitation]:
         statement = (
             select(Invitation)
@@ -101,6 +120,10 @@ class InvitationRepository:
         self.db.commit()
         self.db.refresh(invitation)
         return invitation
+
+    def delete(self, invitation: Invitation) -> None:
+        self.db.delete(invitation)
+        self.db.flush()
 
     def add_memberships(self, invitation: Invitation, user_id: int) -> None:
         if not self.is_organization_member(invitation.organization_id, user_id):

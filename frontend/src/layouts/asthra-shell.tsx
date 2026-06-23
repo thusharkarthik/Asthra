@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 const publicPaths = new Set(["/login", "/register"]);
 const AUTH_LOGOUT_TRANSITION_MS = 1450;
+const AUTH_ROUTE_SWAP_DELAY_MS = 220;
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -105,10 +106,11 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     setUserMenuOpen(false);
     setAuthTransition("logout");
-    await wait(AUTH_LOGOUT_TRANSITION_MS);
+    await wait(AUTH_ROUTE_SWAP_DELAY_MS);
     logout();
-    router.push("/login");
-    window.setTimeout(() => setAuthTransition(null), 250);
+    router.replace("/login");
+    await wait(AUTH_LOGOUT_TRANSITION_MS - AUTH_ROUTE_SWAP_DELAY_MS + 100);
+    setAuthTransition(null);
   };
 
   return (

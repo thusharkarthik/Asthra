@@ -178,6 +178,15 @@ class InvitationService:
         self._require_invitation_manage(invitation, current_user)
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be revoked.")
+        stale_cancelled = self.repository.get_duplicate_by_status(
+            email=invitation.email,
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            status="cancelled",
+            exclude_id=invitation.id,
+        )
+        if stale_cancelled is not None:
+            self.repository.delete(stale_cancelled)
         invitation = self.repository.update_status(invitation, "cancelled")
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
@@ -202,8 +211,6 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be resent.")
         invitation.token = token_urlsafe(32)
         invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-        self.db.commit()
-        self.db.refresh(invitation)
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
@@ -213,6 +220,12 @@ class InvitationService:
             action="invitation.resent",
             description=f"Invitation for {invitation.email} was resent.",
         )
+        ContextVersionService(self.db).bump_access(
+            "workspace" if invitation.workspace_id is not None else "organization",
+            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
+        )
+        self.db.commit()
+        self.db.refresh(invitation)
         return invitation
 
     def _ensure_active_user(self, user: User) -> None:

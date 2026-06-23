@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.activity_log import ActivityLog
-from app.models.organization import Organization
+from app.models.organization import Organization, OrganizationMember
 from app.models.project import Project, ProjectMembership
 from app.models.role import Role
 from app.models.team import Team, TeamMember
@@ -122,6 +122,7 @@ class ScopedMembershipService:
         self._require_scope_manage(current_user, assignment.scope_type, assignment.scope_id)
         assignment.status = "revoked"
         assignment.revoked_at = datetime.now(timezone.utc)
+        self._ensure_default_role_after_revocation(assignment, current_user)
         self.db.commit()
         self._log("role.revoked", current_user.id, assignment.scope_type, assignment.scope_id, "role_assignment", assignment.id)
         ContextVersionService(self.db).bump_access(assignment.scope_type, assignment.scope_id)
@@ -325,6 +326,108 @@ class ScopedMembershipService:
             .first()
             is not None
         )
+
+    def _ensure_default_role_after_revocation(self, assignment: RoleAssignment, current_user: User) -> None:
+        if assignment.scope_type == "platform" or assignment.scope_id is None:
+            return
+        has_active_role = (
+            self.db.query(RoleAssignment.id)
+            .filter(
+                RoleAssignment.user_id == assignment.user_id,
+                RoleAssignment.scope_type == assignment.scope_type,
+                RoleAssignment.scope_id == assignment.scope_id,
+                RoleAssignment.status == "active",
+                RoleAssignment.id != assignment.id,
+            )
+            .first()
+            is not None
+        )
+        if has_active_role:
+            return
+        fallback_key_by_scope = {
+            "organization": "organization_auditor",
+            "workspace": "workspace_member",
+            "project": "project_contributor",
+            "team": "team_member",
+        }
+        fallback_key = fallback_key_by_scope.get(assignment.scope_type)
+        if fallback_key is None:
+            return
+        role = (
+            self.db.query(Role)
+            .filter(Role.key == fallback_key, Role.scope == assignment.scope_type, Role.is_active.is_(True))
+            .first()
+        )
+        if role is None:
+            return
+        existing = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == assignment.user_id,
+                RoleAssignment.role_id == role.id,
+                RoleAssignment.scope_type == assignment.scope_type,
+                RoleAssignment.scope_id == assignment.scope_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            existing.status = "active"
+            existing.revoked_at = None
+            existing.assigned_by = current_user.id
+            existing.assigned_at = datetime.now(timezone.utc)
+        else:
+            self.db.add(
+                RoleAssignment(
+                    user_id=assignment.user_id,
+                    role_id=role.id,
+                    scope_type=assignment.scope_type,
+                    scope_id=assignment.scope_id,
+                    status="active",
+                    assigned_by=current_user.id,
+                    assigned_at=datetime.now(timezone.utc),
+                )
+            )
+        self._update_scope_membership_role(assignment, role)
+
+    def _update_scope_membership_role(self, assignment: RoleAssignment, role: Role) -> None:
+        if assignment.scope_type == "organization":
+            membership = (
+                self.db.query(OrganizationMember)
+                .filter(OrganizationMember.organization_id == assignment.scope_id, OrganizationMember.user_id == assignment.user_id)
+                .first()
+            )
+            if membership is not None:
+                membership.role_id = role.id
+                membership.member_role = role.key
+            return
+        if assignment.scope_type == "workspace":
+            membership = (
+                self.db.query(WorkspaceMember)
+                .filter(WorkspaceMember.workspace_id == assignment.scope_id, WorkspaceMember.user_id == assignment.user_id)
+                .first()
+            )
+            if membership is not None:
+                membership.role_id = role.id
+                membership.member_role = role.key
+            return
+        if assignment.scope_type == "project":
+            membership = (
+                self.db.query(ProjectMembership)
+                .filter(ProjectMembership.project_id == assignment.scope_id, ProjectMembership.user_id == assignment.user_id)
+                .first()
+            )
+            if membership is not None:
+                membership.role_id = role.id
+            return
+        if assignment.scope_type == "team":
+            membership = (
+                self.db.query(TeamMember)
+                .filter(TeamMember.team_id == assignment.scope_id, TeamMember.user_id == assignment.user_id)
+                .first()
+            )
+            if membership is not None:
+                membership.role_id = role.id
+                membership.member_role = role.key
 
     def _log(self, action: str, actor_user_id: int, scope_type: str, scope_id: int | None, entity_type: str, entity_id: int) -> None:
         organization_id = scope_id if scope_type == "organization" else None
