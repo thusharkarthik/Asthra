@@ -18,6 +18,10 @@ class UserRepository:
         statement = select(User).where(User.email == email.lower())
         return self.db.scalar(statement)
 
+    def list_active(self) -> list[User]:
+        statement = select(User).where(User.is_active.is_(True)).order_by(User.email)
+        return list(self.db.scalars(statement).all())
+
     def shares_membership(self, user_id: int, other_user_id: int) -> bool:
         organization_ids = select(OrganizationMember.organization_id).where(
             OrganizationMember.user_id == user_id

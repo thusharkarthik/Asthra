@@ -9,6 +9,7 @@ Bootstrap behavior:
 - the user receives the hidden `Superuser` role at platform scope
 - the user receives the `Platform Owner` role at platform scope
 - both legacy platform user-role and scoped role-assignment records are created for compatibility
+- the bootstrap does not require an organization, workspace, project, or team to exist
 
 Later registered users follow the normal registration flow and are not superusers.
 
@@ -37,4 +38,15 @@ The last Superuser cannot be removed through role assignment or legacy user-role
 1. Reset local data.
 2. Register the first account.
 3. Confirm `/api/v1/me/permissions` includes `superuser` and `platform_owner` roles.
-4. Create organization, workspace, project, and team from the UI.
+4. Confirm Settings -> Members shows the first user in the global platform directory.
+5. Create organization, workspace, project, and team from the UI.
+
+## Members Directories
+
+Settings -> Members is the global user directory. It shows platform users before any organization exists and includes platform roles such as Superuser and Platform Owner when the viewer is allowed to see them.
+
+Scoped member pages remain scoped:
+
+- Organization detail -> Members lists organization members.
+- Workspace detail -> Members lists workspace members.
+- Project detail -> Members lists project members where project membership exists.

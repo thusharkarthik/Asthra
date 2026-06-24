@@ -241,6 +241,7 @@ vi.mock("@/services/api/settings-api", () => ({
     getTeam: vi.fn(async () => ({ id: 6, workspace_id: 2, name: "Engineering", description: "Build team", created_by_id: 1, is_active: true })),
     listTeamMembers: vi.fn(async () => [{ id: 13, team_id: 6, user_id: 1, role_id: 4, member_role: "lead", status: "active", joined_at: "2026-01-03T00:00:00Z" }]),
     getUser: vi.fn(async () => ({ id: 1, email: "user@example.com", full_name: "Test User", is_active: true })),
+    listUsers: vi.fn(async () => [{ id: 1, email: "user@example.com", full_name: "Test User", is_active: true, is_superuser: false, created_at: "2026-01-01T00:00:00Z" }]),
     listUserRoles: vi.fn(async () => [{ id: 14, user_id: 1, role_id: 4 }]),
     listRoleAssignments: vi.fn(async () => [{ id: 31, user_id: 1, role_id: 8, scope_type: "project", scope_id: 3, status: "active", assigned_by: 1, assigned_at: "2026-01-04T00:00:00Z" }]),
     createRoleAssignment: vi.fn(async () => ({ id: 32, user_id: 1, role_id: 8, scope_type: "project", scope_id: 3, status: "active" })),
@@ -453,6 +454,30 @@ describe("Settings frontend screens", () => {
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Workspaces.*Platform.*Members/);
   }, 10000);
 
+  it("shows the first bootstrapped user in the global members directory without an organization", async () => {
+    useAuthStore.setState({
+      currentUser: { id: 1, email: "brahma@asthra.com", full_name: "Brahma", is_active: true, is_superuser: true }
+    });
+    vi.mocked(settingsApi.listOrganizations).mockResolvedValueOnce([]);
+    vi.mocked(settingsApi.listWorkspaces).mockResolvedValueOnce([]);
+    vi.mocked(settingsApi.listProjects).mockResolvedValueOnce([]);
+    vi.mocked(settingsApi.listUsers).mockResolvedValueOnce([
+      { id: 1, email: "brahma@asthra.com", full_name: "Brahma", is_active: true, is_superuser: true, created_at: "2026-01-01T00:00:00Z" }
+    ]);
+    vi.mocked(settingsApi.listRoleAssignments).mockResolvedValueOnce([
+      { id: 41, user_id: 1, role_id: 0, scope_type: "platform", scope_id: null, status: "active", assigned_by: 1, assigned_at: "2026-01-01T00:00:00Z" },
+      { id: 42, user_id: 1, role_id: 1, scope_type: "platform", scope_id: null, status: "active", assigned_by: 1, assigned_at: "2026-01-01T00:00:00Z" }
+    ]);
+
+    renderWithQuery(<MembersView />);
+
+    expect(await screen.findByText("Brahma")).toBeInTheDocument();
+    expect(screen.getByText("brahma@asthra.com")).toBeInTheDocument();
+    expect(screen.getAllByText("Superuser, Platform Owner").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Platform").length).toBeGreaterThan(0);
+    expect(screen.getByText("Users are visible before an organization exists. Create an organization before sending scoped invitations.")).toBeInTheDocument();
+  });
+
   it("supports member search filters sort and invite actions", async () => {
     renderWithQuery(<MembersView workspaceId={2} />);
 
@@ -560,6 +585,27 @@ describe("Settings frontend screens", () => {
     fireEvent.change(screen.getByPlaceholderText("Engineering"), { target: { value: "QA Team" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Create Team" })[1]);
     await waitFor(() => expect(settingsApi.createTeam).toHaveBeenCalledWith("token", expect.objectContaining({ workspace_id: 2, name: "QA Team" })));
+  });
+
+  it("lists all accessible workspaces when creating a project from global Settings Projects", async () => {
+    vi.mocked(settingsApi.listOrganizations).mockResolvedValueOnce([
+      { id: 1, name: "Asthra", description: "Platform org", is_active: true },
+      { id: 9, name: "Acme", description: "Customer org", is_active: true }
+    ]);
+    vi.mocked(settingsApi.listWorkspaces).mockResolvedValueOnce([
+      { id: 2, organization_id: 1, name: "Platform", description: "Default workspace", is_active: true },
+      { id: 22, organization_id: 9, name: "Product", description: "Product workspace", is_active: true }
+    ]);
+    useWorkspaceStore.setState({ selectedOrganizationId: 1, selectedWorkspaceId: 2 });
+
+    renderWithQuery(<ProjectsView />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create Project" }));
+    const workspaceSelect = screen.getAllByRole("combobox").find((element) => element.getAttribute("name") === "workspace_id") as HTMLElement | undefined;
+    expect(workspaceSelect).toBeDefined();
+    if (!workspaceSelect) throw new Error("Workspace selector not found.");
+    expect(workspaceSelect).toHaveTextContent("Platform");
+    expect(workspaceSelect).toHaveTextContent("Product");
   });
 
   it("renders member detail", async () => {

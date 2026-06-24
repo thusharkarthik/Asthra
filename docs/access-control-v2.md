@@ -27,6 +27,20 @@ Safety rules:
 - platform roles can only be assigned at platform scope
 - hidden roles cannot be assigned by scoped organization/workspace/project administrators
 
+Platform-scope permission resolution must work before any organization exists. A Superuser bypasses permission checks through `User.is_superuser`; a Platform Owner resolves platform role permissions from platform-scoped role assignments.
+
+## Members Directory
+
+Settings -> Members is the global platform user directory. It lists all active platform users and their platform/scoped role assignments, including the first bootstrapped user before an organization exists.
+
+Scoped member pages remain separate:
+
+- Organization detail -> Members lists organization membership.
+- Workspace detail -> Members lists workspace membership.
+- Project detail -> Members lists project membership.
+
+This avoids hiding platform users behind organization setup and prevents global user management from depending on bottom-bar organization/workspace/project selection.
+
 ## Permission Naming
 
 Permissions use:

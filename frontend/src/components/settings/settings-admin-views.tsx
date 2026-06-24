@@ -720,19 +720,16 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
-  const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
-  const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
-  const visibleWorkspaces = workspaceId
+  const isScopedProjectCreate = Boolean(workspaceId);
+  const visibleWorkspaces = isScopedProjectCreate
     ? workspaces.filter((workspace) => workspace.id === workspaceId)
-    : selectedOrganizationId
-      ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
-      : workspaces;
-  const targetWorkspaceId = workspaceId ?? (selectedWorkspaceId && visibleWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId) ? selectedWorkspaceId : visibleWorkspaces[0]?.id);
+    : workspaces;
+  const targetWorkspaceId = workspaceId ?? visibleWorkspaces[0]?.id;
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
   const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
-  const visibleProjects = (targetWorkspaceId ? projects.filter((project) => project.workspace_id === targetWorkspaceId) : projects).filter((project) => {
+  const visibleProjects = (workspaceId ? projects.filter((project) => project.workspace_id === workspaceId) : projects).filter((project) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
     return project.is_active !== false && project.status !== "archived";
@@ -831,7 +828,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       )}
       <SettingsCreateDialog title="Create project" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Workspace" required>
-          {workspaceId ? (
+          {isScopedProjectCreate ? (
             <>
               <input type="hidden" name="workspace_id" value={targetWorkspaceId ?? ""} />
               <Input value={targetWorkspace?.name ?? `Workspace ${workspaceId}`} readOnly />
@@ -1364,6 +1361,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
 export function MembersView({ organizationId, workspaceId }: { organizationId?: number; workspaceId?: number }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const isGlobalDirectory = !organizationId && !workspaceId;
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -1381,7 +1379,17 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       if (organizationId) return settingsApi.listOrganizationMembers(accessToken ?? "", organizationId);
       return settingsApi.listWorkspaceMembers(accessToken ?? "", workspaceId ?? 0);
     },
-    enabled: Boolean(accessToken && (organizationId || workspaceId))
+    enabled: Boolean(accessToken && !isGlobalDirectory && (organizationId || workspaceId))
+  });
+  const globalUsersQuery = useQuery({
+    queryKey: queryKeys.members.list("platform", null),
+    queryFn: () => settingsApi.listUsers(accessToken ?? ""),
+    enabled: Boolean(accessToken && isGlobalDirectory)
+  });
+  const globalRoleAssignmentsQuery = useQuery({
+    queryKey: ["settings", "global-member-role-assignments"],
+    queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""),
+    enabled: Boolean(accessToken && isGlobalDirectory)
   });
   const members = membersQuery.data ?? [];
   const userProfiles = useUserProfiles(members.map((member) => member.user_id));
@@ -1405,7 +1413,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopedInvitations = (invitationsQuery.data ?? [])
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
-  const memberRows = buildMemberRows({ members, invitations: scopedInvitations, profiles, roles: visibleRoles, organizations, workspaces });
+  const memberRows = isGlobalDirectory
+    ? buildGlobalMemberRows({ users: globalUsersQuery.data ?? [], roleAssignments: globalRoleAssignmentsQuery.data ?? [], roles: visibleRoles })
+    : buildMemberRows({ members, invitations: scopedInvitations, profiles, roles: visibleRoles, organizations, workspaces });
   const filteredRows = memberRows
     .filter((row) => {
       const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
@@ -1560,13 +1570,16 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       ) : null}
       <SettingsSectionHeader
         title="Members"
-        description="Invite members, review status, filter membership, and assign roles without using raw database screens."
+        description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
-          <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-            <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton>
-          </PermissionAction>
+          !isGlobalDirectory || organizations.length ? (
+            <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
+              <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton>
+            </PermissionAction>
+          ) : undefined
         }
       />
+      {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Create an organization before sending scoped invitations." /> : null}
       {!permissions.isLoading && !permissions.isFetching && !canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
       <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
@@ -1592,8 +1605,11 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         </select>
         <select aria-label="Scope filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
           <option value="">All scopes</option>
+          <option value="platform">Platform</option>
           <option value="organization">Organization</option>
           <option value="workspace">Workspace</option>
+          <option value="project">Project</option>
+          <option value="team">Team</option>
         </select>
         <select aria-label="Sort members" value={sortKey} onChange={(event) => setSortKey(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
           <option value="name">Sort by name</option>
@@ -1635,8 +1651,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             "Not tracked yet",
             <div key={row.userId} className="flex flex-wrap gap-2">
               <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
-              <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton>
-              {canRemoveMembers ? (
+              {!isGlobalDirectory ? <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton> : null}
+              {!isGlobalDirectory && canRemoveMembers ? (
                 <ConfirmActionButton
                   label="Remove"
                   message={`Remove ${row.name} from ${row.scopeLabel}?`}
@@ -1687,7 +1703,7 @@ type MemberListRow =
       name: string;
       email: string;
       role: string;
-      scopeType: "organization" | "workspace";
+      scopeType: "platform" | "organization" | "workspace" | "project" | "team";
       scopeId?: number | null;
       scopeLabel: string;
       status: string;
@@ -1700,7 +1716,7 @@ type MemberListRow =
       name: string;
       email: string;
       role: string;
-      scopeType: "organization" | "workspace";
+      scopeType: "platform" | "organization" | "workspace" | "project" | "team";
       scopeId?: number | null;
       scopeLabel: string;
       status: string;
@@ -1771,6 +1787,38 @@ function buildMemberRows({
     };
   });
   return [...activeRows, ...invitationRows];
+}
+
+function buildGlobalMemberRows({
+  users,
+  roleAssignments,
+  roles
+}: {
+  users: CoreUser[];
+  roleAssignments: RoleAssignmentRecord[];
+  roles: RoleRecord[];
+}): MemberListRow[] {
+  return users.map((user) => {
+    const activeAssignments = roleAssignments.filter((assignment) => assignment.user_id === user.id && assignment.status === "active");
+    const assignedRoles = activeAssignments
+      .map((assignment) => roles.find((role) => role.id === assignment.role_id))
+      .filter((role): role is RoleRecord => Boolean(role));
+    const platformRoles = assignedRoles.filter((role) => role.scope === "platform");
+    const roleNames = assignedRoles.map((role) => role.name);
+    return {
+      kind: "member",
+      userId: user.id,
+      name: displayUser(user, user.id).name,
+      email: user.email,
+      role: roleNames.length ? roleNames.join(", ") : user.is_superuser ? "Superuser" : "No roles assigned",
+      scopeType: platformRoles.length ? "platform" : (activeAssignments[0]?.scope_type as MemberListRow["scopeType"] | undefined) ?? "platform",
+      scopeId: platformRoles.length ? null : activeAssignments[0]?.scope_id ?? null,
+      scopeLabel: platformRoles.length ? "Platform" : roleDisplayName(activeAssignments[0]?.scope_type ?? "platform"),
+      status: user.is_active ? "active" : "inactive",
+      date: user.created_at,
+      profilePending: false
+    };
+  });
 }
 
 function compareMemberRows(left: MemberListRow, right: MemberListRow, sortKey: string) {
