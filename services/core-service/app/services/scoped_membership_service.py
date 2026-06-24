@@ -10,7 +10,7 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.project import Project, ProjectMembership
 from app.models.role import Role
 from app.models.team import Team, TeamMember
-from app.models.user import RoleAssignment, User
+from app.models.user import RoleAssignment, User, UserRole
 from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.scoped_membership import (
     ProjectMembershipCreate,
@@ -57,6 +57,7 @@ class ScopedMembershipService:
         target_user = self._get_active_user(assignment_create.user_id)
         role = self._get_active_role(assignment_create.role_id)
         self._ensure_scope_exists(assignment_create.scope_type, assignment_create.scope_id)
+        self._ensure_role_can_be_assigned(role, current_user, assignment_create.scope_type)
 
         existing = (
             self.db.query(RoleAssignment)
@@ -105,9 +106,13 @@ class ScopedMembershipService:
         assignment = self._get_assignment(assignment_id)
         self._require_role_assignment_manage(current_user, assignment.scope_type, assignment.scope_id)
         if assignment_update.role_id is not None:
-            self._get_active_role(assignment_update.role_id)
-            assignment.role_id = assignment_update.role_id
+            role = self._get_active_role(assignment_update.role_id)
+            self._ensure_role_can_be_assigned(role, current_user, assignment.scope_type)
+            self._ensure_not_last_protected_assignment(assignment)
+            assignment.role_id = role.id
         if assignment_update.status is not None:
+            if assignment_update.status != "active":
+                self._ensure_not_last_protected_assignment(assignment)
             assignment.status = assignment_update.status
             assignment.revoked_at = datetime.now(timezone.utc) if assignment_update.status == "revoked" else None
         self.db.commit()
@@ -120,6 +125,7 @@ class ScopedMembershipService:
     def delete_role_assignment(self, assignment_id: int, current_user: User) -> None:
         assignment = self._get_assignment(assignment_id)
         self._require_role_assignment_manage(current_user, assignment.scope_type, assignment.scope_id)
+        self._ensure_not_last_protected_assignment(assignment)
         assignment.status = "revoked"
         assignment.revoked_at = datetime.now(timezone.utc)
         self._ensure_default_role_after_revocation(assignment, current_user)
@@ -316,6 +322,74 @@ class ScopedMembershipService:
 
     def _require_role_assignment_manage(self, user: User, scope_type: str, scope_id: int | None) -> None:
         AccessControlService(self.db).require(user, "settings.role.manage", scope_type, scope_id)
+
+    def _can_assign_platform_hidden_roles(self, user: User) -> bool:
+        if user.is_superuser:
+            return True
+        platform_owner = (
+            self.db.query(Role)
+            .filter(Role.key == "platform_owner", Role.scope == "platform", Role.is_active.is_(True))
+            .first()
+        )
+        if platform_owner is None:
+            return False
+        if (
+            self.db.query(UserRole.id)
+            .filter(UserRole.user_id == user.id, UserRole.role_id == platform_owner.id)
+            .first()
+            is not None
+        ):
+            return True
+        return (
+            self.db.query(RoleAssignment.id)
+            .filter(
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.role_id == platform_owner.id,
+                RoleAssignment.scope_type == "platform",
+                RoleAssignment.status == "active",
+            )
+            .first()
+            is not None
+        )
+
+    def _ensure_role_can_be_assigned(self, role: Role, current_user: User, scope_type: str) -> None:
+        if role.scope == "platform" and scope_type != "platform":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform roles can only be assigned at platform scope.")
+        if role.is_hidden and not self._can_assign_platform_hidden_roles(current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot assign this role.")
+
+    def _ensure_not_last_protected_assignment(self, assignment: RoleAssignment) -> None:
+        role = assignment.role
+        if role is None or role.key not in {"superuser", "platform_owner"} or role.scope != "platform":
+            return
+        protected_user_ids = {
+            row[0]
+            for row in self.db.query(UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .join(User, User.id == UserRole.user_id)
+            .filter(Role.key == role.key, Role.scope == "platform", User.is_active.is_(True))
+            .all()
+        }
+        protected_user_ids.update(
+            row[0]
+            for row in self.db.query(RoleAssignment.user_id)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .join(User, User.id == RoleAssignment.user_id)
+            .filter(
+                Role.key == role.key,
+                Role.scope == "platform",
+                RoleAssignment.status == "active",
+                User.is_active.is_(True),
+            )
+            .all()
+        )
+        if role.key == "superuser":
+            protected_user_ids.update(
+                row[0]
+                for row in self.db.query(User.id).filter(User.is_superuser.is_(True), User.is_active.is_(True)).all()
+            )
+        if len(protected_user_ids) <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot remove the last {role.name}.")
 
     def _ensure_project_access(self, project: Project, user: User) -> None:
         if user.is_superuser or self._is_workspace_member(project.workspace_id, user.id):

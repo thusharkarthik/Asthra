@@ -22,6 +22,7 @@ import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { useCurrentPermissions } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
+import { useProgressStore } from "@/stores/progress-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 
@@ -65,10 +66,16 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [routeLoading, setRouteLoading] = useState(false);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
+  const progressActive = useProgressStore((state) => state.active);
+  const progressValue = useProgressStore((state) => state.progress);
+  const progressFailed = useProgressStore((state) => state.failed);
+  const startProgress = useProgressStore((state) => state.startProgress);
+  const completeProgress = useProgressStore((state) => state.completeProgress);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const isPublicPath = publicPaths.has(pathname);
-  const showBottomProgress = routeLoading || isFetching > 0 || isMutating > 0;
+  const hasShellLoading = routeLoading || isFetching > 0 || isMutating > 0;
+  const showBottomProgress = progressActive || hasShellLoading;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated && !isPublicPath) {
@@ -108,6 +115,15 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isPublicPath, pathname]);
 
+  useEffect(() => {
+    if (isPublicPath) return;
+    if (hasShellLoading) {
+      startProgress();
+      return;
+    }
+    if (progressActive) completeProgress();
+  }, [completeProgress, hasShellLoading, isPublicPath, progressActive, startProgress]);
+
   if (isPublicPath) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
@@ -129,11 +145,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
 
   const handleLogout = async () => {
     setUserMenuOpen(false);
+    startProgress();
     setAuthTransition("logout");
     await wait(AUTH_ROUTE_SWAP_DELAY_MS);
     logout();
     router.replace("/login");
     await wait(AUTH_LOGOUT_TRANSITION_MS - AUTH_ROUTE_SWAP_DELAY_MS + 100);
+    completeProgress();
     setAuthTransition(null);
   };
 
@@ -164,7 +182,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
               showBottomProgress ? "opacity-100" : "opacity-0"
             )}
           >
-            <div className="h-full w-1/3 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.65)] animate-bottom-dock-progress" />
+            <div
+              className={cn(
+                "h-full rounded-full shadow-[0_0_10px_rgba(6,182,212,0.65)] transition-[width] duration-200 ease-out",
+                progressFailed ? "bg-destructive" : "bg-cyan-500"
+              )}
+              style={{ width: `${showBottomProgress ? Math.max(progressValue, 8) : 0}%` }}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
             <div className="flex shrink-0 items-center gap-2 pr-2">

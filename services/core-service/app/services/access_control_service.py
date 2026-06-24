@@ -66,9 +66,21 @@ class AccessControlService:
 
         if user.is_superuser:
             permissions = self._all_permission_codes()
-            return {
-                "permission_codes": permissions,
-                "roles": [
+            roles = self._resolve_roles(user_id, scope_type, scope_id)
+            role_payload = [
+                {
+                    "id": role.id,
+                    "name": role.name,
+                    "key": role.key,
+                    "scope": role.scope,
+                    "source_scope_type": role.source_scope_type,
+                    "source_scope_id": role.source_scope_id,
+                }
+                for role in roles
+            ]
+            if not any(role["key"] == "superuser" for role in role_payload):
+                role_payload.insert(
+                    0,
                     {
                         "id": 0,
                         "name": "Superuser",
@@ -76,8 +88,11 @@ class AccessControlService:
                         "scope": "platform",
                         "source_scope_type": "platform",
                         "source_scope_id": None,
-                    }
-                ],
+                    },
+                )
+            return {
+                "permission_codes": permissions,
+                "roles": role_payload,
                 "scope": {"scope_type": scope_type, "scope_id": scope_id},
             }
 
@@ -106,6 +121,9 @@ class AccessControlService:
         scope_type: str | None = None,
         scope_id: int | None = None,
     ) -> bool:
+        user = self.db.get(User, user_id)
+        if user is not None and user.is_active and user.is_superuser:
+            return True
         resolved = self.get_user_permissions(user_id, scope_type, scope_id)
         return permission_code in set(resolved["permission_codes"])
 

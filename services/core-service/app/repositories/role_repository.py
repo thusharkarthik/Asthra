@@ -35,6 +35,7 @@ class RoleRepository:
         organization_id: int | None,
         is_system: bool = False,
         is_editable: bool = True,
+        is_hidden: bool = False,
     ) -> Role:
         role = Role(
             name=name,
@@ -44,6 +45,7 @@ class RoleRepository:
             organization_id=organization_id,
             is_system=is_system,
             is_editable=is_editable,
+            is_hidden=is_hidden,
         )
         self.db.add(role)
         self.db.commit()

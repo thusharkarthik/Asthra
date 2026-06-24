@@ -292,6 +292,9 @@ export const settingsApi = {
   getUser(token: string, userId: number) {
     return apiRequest<CoreUser>(`${CORE_PREFIX}/users/${userId}`, { method: "GET", authToken: token });
   },
+  listUsers(token: string) {
+    return apiRequest<CoreUser[]>(`${CORE_PREFIX}/users`, { method: "GET", authToken: token });
+  },
   assignUserRole(token: string, userId: number, roleId: number) {
     return apiRequest<UserRoleRecord>(`${CORE_PREFIX}/users/${userId}/roles`, { method: "POST", authToken: token, json: { role_id: roleId } });
   },

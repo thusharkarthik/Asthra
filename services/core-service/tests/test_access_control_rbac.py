@@ -1,4 +1,4 @@
-from tests.conftest import create_auth_headers, create_test_organization, create_test_workspace
+from tests.conftest import auth_headers, create_auth_headers, create_test_organization, create_test_user, get_auth_token, create_test_workspace
 
 
 def test_permission_catalog_is_seeded_from_permissions_api(client):
@@ -24,6 +24,29 @@ def test_permission_catalog_is_seeded_from_permissions_api(client):
     assert flow_permission["module"] == "flow"
     assert flow_permission["scope"] == "project"
     assert flow_permission["status"] == "active"
+
+
+def test_superuser_role_visibility_is_protected(client):
+    platform_headers = create_auth_headers(client, email="platform@example.com")
+    create_test_user(client, email="normal@example.com")
+    normal_headers = auth_headers(get_auth_token(client, email="normal@example.com"))
+
+    platform_roles = client.get("/api/v1/roles", headers=platform_headers).json()
+    normal_roles = client.get("/api/v1/roles", headers=normal_headers).json()
+
+    assert any(role["key"] == "superuser" and role["is_hidden"] is True for role in platform_roles)
+    assert all(role["key"] != "superuser" for role in normal_roles)
+
+
+def test_cannot_remove_last_superuser_user_role(client):
+    platform_headers = create_auth_headers(client, email="platform@example.com")
+    me = client.get("/api/v1/users/me", headers=platform_headers).json()
+    superuser_role = next(role for role in client.get("/api/v1/roles", headers=platform_headers).json() if role["key"] == "superuser")
+
+    response = client.delete(f"/api/v1/users/{me['id']}/roles/{superuser_role['id']}", headers=platform_headers)
+
+    assert response.status_code == 400
+    assert "last Superuser" in response.text
 
 
 def test_effective_access_debug_endpoint_returns_action_results(client):

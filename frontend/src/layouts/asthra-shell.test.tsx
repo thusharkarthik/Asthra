@@ -1,11 +1,12 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AsthraShell } from "@/layouts/asthra-shell";
 import { PlatformContextProvider } from "@/context/platformContext";
 import { QueryProvider } from "@/providers/query-provider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
+import { useProgressStore } from "@/stores/progress-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -76,6 +77,7 @@ describe("AsthraShell", () => {
     });
     navigationMock.searchParams = "";
     useUIStore.setState({ isAssistantOpen: false, isSearchOpen: false, isCommandPaletteOpen: false });
+    useProgressStore.getState().resetProgress();
   });
 
   it("renders shell regions and child content", () => {
@@ -117,7 +119,9 @@ describe("AsthraShell", () => {
 
     const progress = screen.getByTestId("bottom-dock-progress");
     expect(progress).toHaveClass("absolute");
-    expect(progress.querySelector(".animate-bottom-dock-progress")).toBeInTheDocument();
+    act(() => useProgressStore.getState().startProgress());
+    const bar = progress.firstElementChild as HTMLElement;
+    expect(bar.style.width).not.toBe("100%");
     expect(screen.getByRole("contentinfo", { name: /workspace bottom dock/i })).toHaveClass("relative");
   });
 

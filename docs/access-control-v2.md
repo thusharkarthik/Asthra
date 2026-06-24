@@ -8,6 +8,39 @@ Access Control V2 keeps the existing RBAC rule:
 
 Phase A focused on classifying and normalizing the current permission catalog. Phase B adds a registry generator and safe sync process for creating and maintaining registry-owned permissions.
 
+## Superuser Bootstrap
+
+When the user table is empty, the first registered user is bootstrapped as:
+
+- `is_superuser = true`
+- hidden `Superuser` platform role
+- `Platform Owner` platform role
+
+`Superuser` is a hidden recovery role. It is not shown to organization, workspace, or project administrators. It is visible only to users who are already Superuser or Platform Owner.
+
+`Platform Owner` is the business-level platform owner role. It can see platform roles and access platform-level RBAC tools.
+
+Safety rules:
+
+- the last Superuser cannot be removed
+- the last Platform Owner cannot be removed
+- platform roles can only be assigned at platform scope
+- hidden roles cannot be assigned by scoped organization/workspace/project administrators
+
+Platform-scope permission resolution must work before any organization exists. A Superuser bypasses permission checks through `User.is_superuser`; a Platform Owner resolves platform role permissions from platform-scoped role assignments.
+
+## Members Directory
+
+Settings -> Members is the global platform user directory. It lists all active platform users and their platform/scoped role assignments, including the first bootstrapped user before an organization exists.
+
+Scoped member pages remain separate:
+
+- Organization detail -> Members lists organization membership.
+- Workspace detail -> Members lists workspace membership.
+- Project detail -> Members lists project membership.
+
+This avoids hiding platform users behind organization setup and prevents global user management from depending on bottom-bar organization/workspace/project selection.
+
 ## Permission Naming
 
 Permissions use:

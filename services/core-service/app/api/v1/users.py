@@ -31,6 +31,15 @@ def update_me(
     return UserService(db).update_me(profile_update, current_user)
 
 
+@router.get("", response_model=list[UserProfileRead])
+@router.get("/", response_model=list[UserProfileRead])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[User]:
+    return UserService(db).list_users(current_user)
+
+
 @router.get("/{user_id}", response_model=UserProfileRead)
 def get_user(
     user_id: int,

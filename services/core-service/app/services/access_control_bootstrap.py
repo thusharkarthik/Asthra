@@ -8,7 +8,9 @@ from app.services.role_service import RoleService
 
 
 def initialize_access_control(engine: Engine, db: Session) -> None:
-    Base.metadata.create_all(bind=engine)
+    existing_tables = set(inspect(engine).get_table_names())
+    if not {"users", "roles", "permissions"}.issubset(existing_tables):
+        Base.metadata.create_all(bind=engine, checkfirst=bool(existing_tables))
     _ensure_rbac_columns(engine)
     PermissionService(db).ensure_permission_catalog()
     RoleService(db).ensure_role_catalog(sync_permissions=False)
@@ -48,6 +50,8 @@ def _ensure_rbac_columns(engine: Engine) -> None:
                 connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_system BOOLEAN DEFAULT {false_default} NOT NULL"))
             if "is_editable" not in role_columns:
                 connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_editable BOOLEAN DEFAULT {true_default} NOT NULL"))
+            if "is_hidden" not in role_columns:
+                connection.execute(text(f"ALTER TABLE roles ADD COLUMN is_hidden BOOLEAN DEFAULT {false_default} NOT NULL"))
 
         for table_name in ("organizations", "workspaces", "projects"):
             if table_name not in table_names:

@@ -5,6 +5,7 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserProfileUpdate
 from app.services.activity_service import ActivityService
+from app.services.access_control_service import AccessControlService
 
 
 class UserService:
@@ -38,6 +39,13 @@ class UserService:
         if self.user_repository.shares_membership(current_user.id, user_id):
             return user
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid user access.")
+
+    def list_users(self, current_user: User) -> list[User]:
+        self._ensure_active_user(current_user)
+        access = AccessControlService(self.db)
+        if not current_user.is_superuser and not access.can(current_user.id, "settings.member.view", "platform", None):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission required: settings.member.view")
+        return self.user_repository.list_active()
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:
