@@ -6,6 +6,7 @@ export type NavItem = {
   action?: "search" | "assistant";
   icon: LucideIcon;
   disabled?: boolean;
+  requiredPermissions?: string[];
 };
 
 export type NavSection = {

@@ -428,10 +428,11 @@ class RoleService:
         key = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
         return key or "role"
 
-    def ensure_role_catalog(self) -> None:
+    def ensure_role_catalog(self, *, sync_permissions: bool = True) -> None:
         from app.services.permission_service import PermissionService
 
-        PermissionService(self.db).ensure_permission_catalog()
+        if sync_permissions:
+            PermissionService(self.db).ensure_permission_catalog()
         changed = False
         role_by_key: dict[str, Role] = {}
         for template in ASTHRA_ROLE_TEMPLATES:
@@ -449,7 +450,7 @@ class RoleService:
                     changed = True
                 role_by_key[key] = existing
                 continue
-            role = self.role_repository.create(
+            role = Role(
                 name=name,
                 key=key,
                 description=description,
@@ -458,6 +459,7 @@ class RoleService:
                 is_system=True,
                 is_editable=False,
             )
+            self.db.add(role)
             role_by_key[key] = role
             changed = True
         if changed:
@@ -468,22 +470,43 @@ class RoleService:
         permissions = self.permission_repository.list()
         permission_ids_by_code = {permission.code: permission.id for permission in permissions}
         permission_codes = sorted(permission_ids_by_code)
+        role_ids = [role.id for role in role_by_key.values() if role is not None]
+        existing_mappings = (
+            self.db.query(RolePermission)
+            .filter(RolePermission.role_id.in_(role_ids))
+            .all()
+            if role_ids
+            else []
+        )
+        existing_by_role: dict[int, set[int]] = {}
+        mappings_by_pair: dict[tuple[int, int], RolePermission] = {}
+        for mapping in existing_mappings:
+            existing_by_role.setdefault(mapping.role_id, set()).add(mapping.permission_id)
+            mappings_by_pair[(mapping.role_id, mapping.permission_id)] = mapping
+
+        dirty = False
         for template in ASTHRA_ROLE_TEMPLATES:
             role = role_by_key.get(template["key"])
             if role is None:
                 continue
-            wanted_permission_ids = [
+            wanted_permission_ids = {
                 permission_ids_by_code[code]
                 for code in permission_codes
                 if self._permission_matches_template(code, template["permission_patterns"])
-            ]
-            existing_permission_ids = {
-                role_permission.permission_id
-                for role_permission in self.role_repository.list_permissions(role.id)
             }
-            if existing_permission_ids == set(wanted_permission_ids):
+            existing_permission_ids = existing_by_role.get(role.id, set())
+            if existing_permission_ids == wanted_permission_ids:
                 continue
-            self.role_repository.replace_permissions(role.id, wanted_permission_ids)
+            for permission_id in existing_permission_ids - wanted_permission_ids:
+                mapping = mappings_by_pair.get((role.id, permission_id))
+                if mapping is not None:
+                    self.db.delete(mapping)
+                    dirty = True
+            for permission_id in wanted_permission_ids - existing_permission_ids:
+                self.db.add(RolePermission(role_id=role.id, permission_id=permission_id))
+                dirty = True
+        if dirty:
+            self.db.commit()
 
     def _permission_matches_template(self, permission_code: str, patterns: list[str]) -> bool:
         for pattern in patterns:

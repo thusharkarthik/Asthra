@@ -147,6 +147,32 @@ REGISTRY_DEFINITIONS: dict[str, dict[str, tuple[str, list[str]]]] = {
         "message": ("workspace", ["crud"]),
         "announcement": ("workspace", ["crud", "publish", "manage"]),
     },
+    "dev": {
+        "repository": ("project", ["crud", "manage"]),
+        "release": ("project", ["crud", "lifecycle", "manage"]),
+        "deployment": ("project", ["view", "create", "execute", "manage"]),
+        "environment": ("project", ["crud", "configure", "manage"]),
+        "version": ("project", ["view", "create", "manage"]),
+    },
+    "automation": {
+        "rule": ("workspace", ["crud", "configure", "execute", "manage"]),
+        "workflow": ("workspace", ["crud", "trigger", "execute", "manage"]),
+    },
+    "connect": {
+        "integration": ("workspace", ["crud", "configure", "manage"]),
+        "webhook": ("workspace", ["crud", "configure", "manage"]),
+    },
+    "guard": {
+        "audit": ("organization", ["view", "export", "manage"]),
+        "security": ("organization", ["view", "manage"]),
+    },
+    "insights": {
+        "report": ("workspace", ["view", "export", "manage"]),
+        "dashboard": ("workspace", ["view", "create", "edit", "manage"]),
+    },
+    "media": {
+        "asset": ("workspace", ["view", "upload", "download", "delete", "manage"]),
+    },
 }
 
 

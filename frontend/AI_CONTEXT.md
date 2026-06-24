@@ -47,6 +47,9 @@ The frontend provides the Asthra application shell, routing, scoped navigation, 
 - Do not use role names for access checks.
 - Frontend permission guards are usability controls, not security boundaries.
 - Backend APIs must still enforce protected actions.
+- Use `frontend/src/access/actionRegistry.ts` for action keys.
+- Use `Can`, `PermissionButton`, `PermissionLink`, `PermissionMenuItem`, and `PermissionSection` for permission-aware UI.
+- Sidebar module links should require at least one module view permission, such as `flow.*.view`.
 
 ## Shared UI Patterns
 

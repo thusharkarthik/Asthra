@@ -19,6 +19,7 @@ import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
+import { useCurrentPermissions } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -35,6 +36,17 @@ function wait(ms: number) {
 function WorkspaceContextLoader() {
   useWorkspaceContextQueries();
   return null;
+}
+
+function PermissionAwareSidebar({ collapsed }: { collapsed: boolean }) {
+  const permissions = useCurrentPermissions();
+  return (
+    <SidebarNav
+      collapsed={collapsed}
+      permissionCodes={permissions.permissionCodes}
+      permissionsLoading={permissions.isLoading}
+    />
+  );
 }
 
 export function AsthraShell({ children }: { children: ReactNode }) {
@@ -131,7 +143,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1 pb-3">
         <aside className={cn("hidden min-h-0 shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <SidebarNav collapsed={sidebarCollapsed} />
+            <PermissionAwareSidebar collapsed={sidebarCollapsed} />
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
