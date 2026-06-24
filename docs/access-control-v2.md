@@ -152,3 +152,19 @@ The QA route is:
 - `/settings/access-control/qa-matrix`
 
 It shows the current user's allowed/denied result for registered actions and is intended for role-by-role QA.
+
+## Role Certification QA
+
+Role certification tooling adds a repeatable QA surface for scoped RBAC.
+
+Frontend route:
+
+- `/settings/access-control/role-certification`
+
+Backend debug endpoint:
+
+- `GET /api/v1/access-control/debug/effective-access`
+
+The certification page allows admins/testers to select a user and scope, inspect direct and inherited roles, review effective permissions, run key action checks, view permission source traces, and export a JSON QA report.
+
+The debug endpoint is diagnostic only. Product authorization still relies on normal protected endpoints and the backend permission resolver.

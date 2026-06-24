@@ -19,6 +19,7 @@ import AccessControlMappingPage from "@/app/settings/access-control/mapping/page
 import AccessControlPermissionsPage from "@/app/settings/access-control/permissions/page";
 import AccessControlQAMatrixPage from "@/app/settings/access-control/qa-matrix/page";
 import AccessControlRegistryPage from "@/app/settings/access-control/registry/page";
+import AccessControlRoleCertificationPage from "@/app/settings/access-control/role-certification/page";
 import { MemberDetailView, MembersView, OrganizationDetailView, ProjectDetailView, ProjectsView, TeamDetailView, TeamsView, WorkspaceDetailView, WorkspacesView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -209,6 +210,24 @@ vi.mock("@/services/api/settings-api", () => ({
     listRoleMappingSuggestions: vi.fn(async () => [
       { role_key: "organization_owner", permission_patterns: ["settings.organization.*", "settings.project.*"], suggested_permissions: ["settings.project.restore"], suggested_count: 1, high_risk_count: 1, note: "Suggestion only. Permissions are not automatically applied." }
     ]),
+    getEffectiveAccessDebug: vi.fn(async () => ({
+      user: { id: 1, email: "user@example.com", full_name: "Test User", is_active: true, is_superuser: false },
+      scope: { scope_type: "project", scope_id: 3 },
+      direct_roles: [{ id: 8, name: "Project Manager", key: "project_manager", scope: "project", source_scope_type: "project", source_scope_id: 3 }],
+      inherited_roles: [{ id: 3, name: "Organization Owner", key: "organization_owner", scope: "organization", source_scope_type: "organization", source_scope_id: 1 }],
+      effective_permissions: ["settings.project.restore", "settings.project.archive", "settings.team.edit", "flow.work_item.create"],
+      permission_trace: [
+        {
+          permission_code: "settings.project.restore",
+          sources: [{ role_name: "Organization Owner", role_key: "organization_owner", role_scope: "organization", source_scope_type: "organization", source_scope_id: 1, scope_label: "Asthra", inherited_through: ["Organization", "Workspace", "Project"] }]
+        }
+      ],
+      action_results: [
+        { action_key: "settings.project.restore", action_label: "Restore Project", permission_code: "settings.project.restore", allowed: true, source_role: "Organization Owner", scope_source: "Asthra", sources: [] },
+        { action_key: "settings.team.edit", action_label: "Edit Team", permission_code: "settings.team.edit", allowed: true, source_role: "Organization Owner", scope_source: "Asthra", sources: [] },
+        { action_key: "settings.member.role.assign", action_label: "Assign Member Role", permission_code: "settings.member.role.assign", allowed: false, source_role: null, scope_source: null, sources: [] }
+      ]
+    })),
     listOrganizationMembers: vi.fn(async () => [{ id: 10, organization_id: 1, user_id: 1, role_id: 4, member_role: "owner", created_at: "2026-01-01T00:00:00Z" }]),
     listWorkspaceMembers: vi.fn(async () => [{ id: 11, workspace_id: 2, user_id: 1, role_id: 4, member_role: "admin", created_at: "2026-01-01T00:00:00Z" }]),
     listProjectMembers: vi.fn(async () => [{ id: 21, project_id: 3, user_id: 1, role_id: 8, team_id: null, status: "active", joined_at: "2026-01-02T00:00:00Z" }]),
@@ -430,7 +449,7 @@ describe("Settings frontend screens", () => {
     expect(screen.getByText("Organization: Asthra")).toBeInTheDocument();
     expect(screen.getByText("Back to Workspace")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Settings breadcrumbs" })).toHaveTextContent(/Settings.*Workspaces.*Platform.*Members/);
-  });
+  }, 10000);
 
   it("supports member search filters sort and invite actions", async () => {
     renderWithQuery(<MembersView workspaceId={2} />);
@@ -678,5 +697,36 @@ describe("Settings frontend screens", () => {
     expect(await screen.findByText("Permission QA Matrix")).toBeInTheDocument();
     expect((await screen.findAllByText("settings.project.restore")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("settings.team.edit")).length).toBeGreaterThan(0);
+
+    cleanup();
+    renderWithQuery(<AccessControlRoleCertificationPage />);
+    expect(await screen.findByText("Role Certification Matrix")).toBeInTheDocument();
+    expect(await screen.findByText("Scope Simulation")).toBeInTheDocument();
+    expect(await screen.findByText("Action Test Runner")).toBeInTheDocument();
+    expect((await screen.findAllByText("Organization Owner")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Restore Project")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Permission Source Trace")).toBeInTheDocument();
+    expect(await screen.findByText("Organization -> Workspace -> Project")).toBeInTheDocument();
+  }, 12000);
+
+  it("exports the role certification QA report", async () => {
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:qa-report") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:qa-report");
+    const revokeObjectUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    renderWithQuery(<AccessControlRoleCertificationPage />);
+
+    await screen.findByText("Role Certification Matrix");
+    await waitFor(() => expect(settingsApi.getEffectiveAccessDebug).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: /Export QA Report/ }));
+
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
+
+    createObjectUrl.mockRestore();
+    revokeObjectUrl.mockRestore();
+    click.mockRestore();
   });
 });

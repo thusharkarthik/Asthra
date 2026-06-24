@@ -2231,7 +2231,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   );
 }
 
-type AccessControlSection = "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" | "qa-matrix";
+type AccessControlSection = "roles" | "permissions" | "mapping" | "assignments" | "registry" | "gaps" | "qa-matrix" | "role-certification";
 
 function AccessControlTabs({ active }: { active: AccessControlSection }) {
   const tabs = [
@@ -2241,7 +2241,8 @@ function AccessControlTabs({ active }: { active: AccessControlSection }) {
     { key: "assignments", label: "Assignments", href: "/settings/access-control/assignments" },
     { key: "registry", label: "Permission Registry", href: "/settings/access-control/registry" },
     { key: "gaps", label: "Permission Gaps", href: "/settings/access-control/gaps" },
-    { key: "qa-matrix", label: "QA Matrix", href: "/settings/access-control/qa-matrix" }
+    { key: "qa-matrix", label: "QA Matrix", href: "/settings/access-control/qa-matrix" },
+    { key: "role-certification", label: "Role Certification", href: "/settings/access-control/role-certification" }
   ] as const;
   return (
     <nav aria-label="Access Control sections" className="flex flex-wrap gap-2 border-b pb-2">

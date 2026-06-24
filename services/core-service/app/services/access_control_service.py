@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.organization import OrganizationMember
+from app.models.organization import Organization, OrganizationMember
 from app.models.permission import Permission
 from app.models.project import Project, ProjectMembership
 from app.models.role import Role, RolePermission
@@ -130,6 +130,62 @@ class AccessControlService:
 
     def get_effective_permissions(self, user_id: int, scope_type: str | None = None, scope_id: int | None = None) -> list[str]:
         return self.get_user_permissions(user_id, scope_type, scope_id)["permission_codes"]
+
+    def debug_effective_access(
+        self,
+        user_id: int,
+        scope_type: str | None = None,
+        scope_id: int | None = None,
+        action_keys: list[str] | None = None,
+    ) -> dict:
+        user = self.db.get(User, user_id)
+        if user is None or not user.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        scope_type, scope_id = self._normalize_scope(scope_type, scope_id)
+        resolved = self.get_user_permissions(user_id, scope_type, scope_id)
+        roles = resolved["roles"]
+        direct_roles = [
+            role for role in roles
+            if role["source_scope_type"] == scope_type and role["source_scope_id"] == scope_id
+        ]
+        inherited_roles = [role for role in roles if role not in direct_roles]
+        permission_sources = self._permission_source_trace(roles, user.is_superuser, scope_type, scope_id)
+        permission_codes = sorted(resolved["permission_codes"])
+        action_results = []
+        for action_key in action_keys or []:
+            permission_code = action_key.strip()
+            if not permission_code:
+                continue
+            sources = permission_sources.get(permission_code, [])
+            action_results.append({
+                "action_key": action_key,
+                "action_label": permission_code.replace(".", " ").replace("_", " ").title(),
+                "permission_code": permission_code,
+                "allowed": permission_code in permission_codes,
+                "source_role": sources[0]["role_name"] if sources else None,
+                "scope_source": sources[0]["scope_label"] if sources else None,
+                "sources": sources,
+            })
+
+        return {
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+            },
+            "scope": {"scope_type": scope_type, "scope_id": scope_id},
+            "direct_roles": direct_roles,
+            "inherited_roles": inherited_roles,
+            "effective_permissions": permission_codes,
+            "permission_trace": [
+                {"permission_code": code, "sources": permission_sources.get(code, [])}
+                for code in permission_codes
+            ],
+            "action_results": action_results,
+        }
 
     def require(
         self,
@@ -319,6 +375,58 @@ class AccessControlService:
         )
         return {row[0] for row in rows}
 
+    def _permission_source_trace(
+        self,
+        resolved_roles: list[dict],
+        is_superuser: bool,
+        target_scope_type: str,
+        target_scope_id: int | None,
+    ) -> dict[str, list[dict]]:
+        if is_superuser:
+            return {
+                code: [{
+                    "role_name": "Superuser",
+                    "role_key": "superuser",
+                    "role_scope": "platform",
+                    "source_scope_type": "platform",
+                    "source_scope_id": None,
+                    "scope_label": "Platform",
+                    "inherited_through": self._scope_path("platform", None, target_scope_type, target_scope_id),
+                }]
+                for code in self._all_permission_codes()
+            }
+        role_ids = [role["id"] for role in resolved_roles]
+        if not role_ids:
+            return {}
+        role_by_id = {role["id"]: role for role in resolved_roles}
+        rows = (
+            self.db.query(Permission.code, Role.id)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .join(Role, Role.id == RolePermission.role_id)
+            .filter(
+                Role.id.in_(role_ids),
+                Role.is_active.is_(True),
+                Permission.is_active.is_(True),
+                Permission.status == "active",
+            )
+            .all()
+        )
+        trace: dict[str, list[dict]] = {}
+        for permission_code, role_id in rows:
+            role = role_by_id.get(role_id)
+            if role is None:
+                continue
+            trace.setdefault(permission_code, []).append({
+                "role_name": role["name"],
+                "role_key": role["key"],
+                "role_scope": role["scope"],
+                "source_scope_type": role["source_scope_type"],
+                "source_scope_id": role["source_scope_id"],
+                "scope_label": self._scope_label(role["source_scope_type"], role["source_scope_id"]),
+                "inherited_through": self._scope_path(role["source_scope_type"], role["source_scope_id"], target_scope_type, target_scope_id),
+            })
+        return trace
+
     def _all_permission_codes(self) -> list[str]:
         rows = (
             self.db.query(Permission.code)
@@ -327,6 +435,42 @@ class AccessControlService:
             .all()
         )
         return [row[0] for row in rows]
+
+    def _scope_label(self, scope_type: str, scope_id: int | None) -> str:
+        if scope_type == "platform" or scope_id is None:
+            return "Platform"
+        if scope_type == "organization":
+            organization = self.db.get(Organization, scope_id)
+            return organization.name if organization else f"Organization {scope_id}"
+        if scope_type == "workspace":
+            workspace = self.db.get(Workspace, scope_id)
+            return workspace.name if workspace else f"Workspace {scope_id}"
+        if scope_type == "project":
+            project = self.db.get(Project, scope_id)
+            return project.name if project else f"Project {scope_id}"
+        if scope_type == "team":
+            team = self.db.get(Team, scope_id)
+            return team.name if team else f"Team {scope_id}"
+        return f"{scope_type.title()} {scope_id}"
+
+    def _scope_path(
+        self,
+        source_scope_type: str,
+        source_scope_id: int | None,
+        target_scope_type: str,
+        target_scope_id: int | None,
+    ) -> list[str]:
+        if source_scope_type == target_scope_type and source_scope_id == target_scope_id:
+            return [source_scope_type.title()]
+        order = ["platform", "organization", "workspace", "project", "team"]
+        try:
+            source_index = order.index(source_scope_type)
+            target_index = order.index(target_scope_type)
+        except ValueError:
+            return [source_scope_type.title(), target_scope_type.title()]
+        if source_index <= target_index:
+            return [item.title() for item in order[source_index:target_index + 1]]
+        return [source_scope_type.title(), target_scope_type.title()]
 
     def _role_by_key(self, key: str | None) -> Role | None:
         if key is None:
