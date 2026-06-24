@@ -3,6 +3,7 @@ import type {
   ApiKeyRecord,
   CoreNotificationRecord,
   CoreUser,
+  EffectiveAccessDebugRecord,
   CurrentUserPermissions,
   EffectivePermissionsRecord,
   InvitationRecord,
@@ -235,6 +236,14 @@ export const settingsApi = {
   },
   listRoleMappingSuggestions(token: string) {
     return apiRequest<RoleMappingSuggestion[]>(`${CORE_PREFIX}/access-control/role-mapping-suggestions`, { method: "GET", authToken: token });
+  },
+  getEffectiveAccessDebug(token: string, params: { user_id: number; scope_type?: string; scope_id?: number | null; action_keys?: string[] }) {
+    const search = new URLSearchParams();
+    search.set("user_id", String(params.user_id));
+    if (params.scope_type) search.set("scope_type", params.scope_type);
+    if (params.scope_id) search.set("scope_id", String(params.scope_id));
+    (params.action_keys ?? []).forEach((actionKey) => search.append("action_keys", actionKey));
+    return apiRequest<EffectiveAccessDebugRecord>(`${CORE_PREFIX}/access-control/debug/effective-access?${search.toString()}`, { method: "GET", authToken: token });
   },
   createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });

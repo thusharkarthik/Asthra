@@ -1,4 +1,4 @@
-from tests.conftest import create_auth_headers
+from tests.conftest import create_auth_headers, create_test_organization, create_test_workspace
 
 
 def test_permission_catalog_is_seeded_from_permissions_api(client):
@@ -24,6 +24,40 @@ def test_permission_catalog_is_seeded_from_permissions_api(client):
     assert flow_permission["module"] == "flow"
     assert flow_permission["scope"] == "project"
     assert flow_permission["status"] == "active"
+
+
+def test_effective_access_debug_endpoint_returns_action_results(client):
+    headers = create_auth_headers(client)
+    me = client.get("/api/v1/users/me", headers=headers).json()
+    organization = create_test_organization(client, headers)
+    workspace = create_test_workspace(client, headers, organization["id"])
+    project_response = client.post(
+        "/api/v1/projects",
+        json={"workspace_id": workspace["id"], "name": "Certification Project", "status": "active"},
+        headers=headers,
+    )
+    assert project_response.status_code == 201
+    project = project_response.json()
+
+    response = client.get(
+        "/api/v1/access-control/debug/effective-access",
+        params=[
+            ("user_id", me["id"]),
+            ("scope_type", "project"),
+            ("scope_id", project["id"]),
+            ("action_keys", "settings.project.restore"),
+            ("action_keys", "settings.project.archive"),
+        ],
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user"]["id"] == me["id"]
+    assert any(role["key"] == "organization_owner" for role in payload["inherited_roles"])
+    restore = next(result for result in payload["action_results"] if result["action_key"] == "settings.project.restore")
+    assert restore["allowed"] is True
+    assert restore["source_role"] == "Organization Owner"
 
 
 def test_create_permission_catalog_record(client):

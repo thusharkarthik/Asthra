@@ -315,6 +315,45 @@ export type EffectivePermissionsRecord = {
   scope_context: Record<string, unknown>;
 };
 
+export type EffectiveAccessRole = {
+  id: number;
+  name: string;
+  key: string;
+  scope: string;
+  source_scope_type: string;
+  source_scope_id?: number | null;
+};
+
+export type PermissionSourceTrace = {
+  role_name: string;
+  role_key: string;
+  role_scope: string;
+  source_scope_type: string;
+  source_scope_id?: number | null;
+  scope_label: string;
+  inherited_through: string[];
+};
+
+export type EffectiveAccessActionResult = {
+  action_key: string;
+  action_label: string;
+  permission_code: string;
+  allowed: boolean;
+  source_role?: string | null;
+  scope_source?: string | null;
+  sources: PermissionSourceTrace[];
+};
+
+export type EffectiveAccessDebugRecord = {
+  user: Pick<CoreUser, "id" | "email" | "full_name" | "is_active" | "is_superuser">;
+  scope: { scope_type: string; scope_id?: number | null };
+  direct_roles: EffectiveAccessRole[];
+  inherited_roles: EffectiveAccessRole[];
+  effective_permissions: string[];
+  permission_trace: Array<{ permission_code: string; sources: PermissionSourceTrace[] }>;
+  action_results: EffectiveAccessActionResult[];
+};
+
 export type CoreNotificationRecord = {
   id: number;
   user_id: number;

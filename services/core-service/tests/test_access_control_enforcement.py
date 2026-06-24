@@ -79,6 +79,57 @@ def test_organization_owner_can_manage_archived_project_after_refresh_scope():
         db.close()
 
 
+def test_effective_access_trace_shows_inherited_organization_owner_project_restore():
+    db = SessionLocal()
+    try:
+        user = _create_user(db, "trace-owner@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Trace Org"), user)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), user)
+        project = ProjectService(db).create(ProjectCreate(workspace_id=workspace.id, name="Platform"), user)
+
+        trace = AccessControlService(db).debug_effective_access(
+            user.id,
+            "project",
+            project.id,
+            ["settings.project.restore", "settings.project.archive"],
+        )
+
+        assert any(role["key"] == "organization_owner" for role in trace["inherited_roles"])
+        restore = next(result for result in trace["action_results"] if result["action_key"] == "settings.project.restore")
+        assert restore["allowed"] is True
+        assert restore["source_role"] == "Organization Owner"
+        assert "Organization" in restore["sources"][0]["inherited_through"]
+        assert "Project" in restore["sources"][0]["inherited_through"]
+    finally:
+        db.close()
+
+
+def test_effective_access_trace_denies_project_viewer_edit_archive_restore():
+    db = SessionLocal()
+    try:
+        owner = _create_user(db, "trace-viewer-owner@example.com")
+        viewer = _create_user(db, "trace-project-viewer@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Trace Viewer Org"), owner)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Engineering"), owner)
+        project = ProjectService(db).create(ProjectCreate(workspace_id=workspace.id, name="Platform"), owner)
+        RoleService(db).ensure_role_catalog()
+        viewer_role = db.query(Role).filter(Role.key == "workspace_viewer").first()
+        db.add(WorkspaceMember(workspace_id=workspace.id, user_id=viewer.id, role_id=viewer_role.id, member_role=viewer_role.key))
+        db.commit()
+
+        trace = AccessControlService(db).debug_effective_access(
+            viewer.id,
+            "project",
+            project.id,
+            ["settings.project.edit", "settings.project.archive", "settings.project.restore"],
+        )
+
+        assert all(result["allowed"] is False for result in trace["action_results"])
+        assert "settings.project.view" in trace["effective_permissions"]
+    finally:
+        db.close()
+
+
 def test_user_without_invite_permission_gets_403():
     db = SessionLocal()
     try:
