@@ -10,6 +10,7 @@ class RoleCreate(BaseModel):
     organization_id: int | None = None
     is_system: bool = False
     is_editable: bool = True
+    is_hidden: bool = False
 
     @field_validator("name")
     @classmethod
@@ -26,6 +27,7 @@ class RoleUpdate(BaseModel):
     scope: str | None = None
     is_system: bool | None = None
     is_editable: bool | None = None
+    is_hidden: bool | None = None
     is_active: bool | None = None
 
     @field_validator("name")
@@ -47,6 +49,7 @@ class RoleRead(TimestampedRead):
     scope: str
     is_system: bool = False
     is_editable: bool = True
+    is_hidden: bool = False
     is_active: bool
 
     @computed_field
@@ -177,6 +180,7 @@ class RoleTemplateRead(BaseModel):
     permission_patterns: list[str]
     is_system: bool
     is_editable: bool
+    is_hidden: bool = False
 
 
 class RolePermissionRead(TimestampedRead):

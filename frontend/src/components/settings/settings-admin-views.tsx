@@ -235,6 +235,23 @@ function roleNameFromRecord(role?: RoleRecord | null, fallback?: string | null) 
   return role?.name ?? roleDisplayName(fallback);
 }
 
+function canViewProtectedRoles(currentUser: CoreUser | null, permissions: ReturnType<typeof useCurrentPermissions>) {
+  return Boolean(
+    currentUser?.is_superuser
+    || permissions.data?.roles?.some((role) => role.key === "superuser" || role.key === "platform_owner")
+  );
+}
+
+function filterVisibleRoles(roles: RoleRecord[], canViewProtected: boolean) {
+  if (canViewProtected) return roles;
+  return roles.filter((role) => role.key !== "superuser" && role.name !== "Superuser" && !role.is_hidden);
+}
+
+function filterVisibleRoleTemplates(roles: RoleTemplateRecord[], canViewProtected: boolean) {
+  if (canViewProtected) return roles;
+  return roles.filter((role) => role.key !== "superuser" && role.name !== "Superuser" && !role.is_hidden);
+}
+
 function groupedRolesForInvite(roles: RoleRecord[], inviteScope: "organization" | "workspace" | "project" | "team", allowPlatformRoles: boolean) {
   const validScopes = new Set([inviteScope, "functional"]);
   if (allowPlatformRoles) validScopes.add("platform");
@@ -1335,7 +1352,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         <FormField label="Project role">
           <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
             <option value="">No project role</option>
-            {(rolesQuery.data ?? []).filter((role) => role.scope === "project" || role.scope === "functional").map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            {filterVisibleRoles(rolesQuery.data ?? [], false).filter((role) => role.scope === "project" || role.scope === "functional").map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
           </select>
         </FormField>
         <FormActions submitLabel="Add Member" isSubmitting={addProjectMemberMutation.isPending} onCancel={() => setMemberOpen(false)} />
@@ -1379,15 +1396,16 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
   const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
   const memberActionScope = permissionActionScope(permissions);
+  const visibleRoles = filterVisibleRoles(roles, canViewProtectedRoles(currentUser, permissions));
   const canInvite = permissions.can(SETTINGS_ACTIONS.memberInvite.permissionCode);
   const canChangeRoles = permissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
-  const groupedInviteRoles = groupedRolesForInvite(roles, inviteScope, false);
+  const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
   const scopedInvitations = (invitationsQuery.data ?? [])
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
-  const memberRows = buildMemberRows({ members, invitations: scopedInvitations, profiles, roles, organizations, workspaces });
+  const memberRows = buildMemberRows({ members, invitations: scopedInvitations, profiles, roles: visibleRoles, organizations, workspaces });
   const filteredRows = memberRows
     .filter((row) => {
       const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
@@ -1771,6 +1789,7 @@ function memberSortValue(row: MemberListRow, sortKey: string) {
 
 export function MemberDetailView({ userId }: { userId: number }) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -1785,6 +1804,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
     queryFn: () => settingsApi.listRoleAssignments(accessToken ?? "", { user_id: userId }),
     enabled: Boolean(accessToken && userId)
   });
+  const currentPermissions = useCurrentPermissions();
   const effectiveScope = selectedProjectId
     ? { scope_type: "project", scope_id: selectedProjectId }
     : selectedWorkspaceId
@@ -1797,6 +1817,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
     queryFn: () => settingsApi.getUserEffectivePermissions(accessToken ?? "", userId, effectiveScope),
     enabled: Boolean(accessToken && userId)
   });
+  const visibleRoles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions));
   const memberRoleIds = (userRolesQuery.data ?? []).map((assignment) => assignment.role_id);
   const inheritedPermissionsQuery = useQuery({
     queryKey: ["settings", "member-inherited-permissions", userId, memberRoleIds.join(",")],
@@ -1824,7 +1845,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
     onError: (error) => addToast({ type: "error", title: "Role removal failed", message: error instanceof Error ? error.message : "Unable to remove role." })
   });
   const user = userQuery.data;
-  const availableRoles = (rolesQuery.data ?? []).filter((role) => !memberRoleIds.includes(role.id));
+  const availableRoles = visibleRoles.filter((role) => !memberRoleIds.includes(role.id));
   return (
     <SettingsLayout
       breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members", href: "/settings/members" }, { label: displayUser(user, userId).name }]}
@@ -1847,7 +1868,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
         <SettingsDataTable
           columns={["Role", "Scope Type", "Scope ID", "Status", "Assigned", "Revoked"]}
           rows={(roleAssignmentsQuery.data ?? []).map((assignment: RoleAssignmentRecord) => [
-            roleNameById(rolesQuery.data ?? [], assignment.role_id),
+            roleNameById(visibleRoles, assignment.role_id),
             roleDisplayName(assignment.scope_type),
             assignment.scope_id ?? "Global",
             roleDisplayName(assignment.status),
@@ -1900,7 +1921,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
         <SettingsDataTable
           columns={["Role", "Scope", "System Role", "Assigned", "Actions"]}
           rows={(userRolesQuery.data ?? []).map((assignment) => {
-            const role = rolesQuery.data?.find((item) => item.id === assignment.role_id);
+            const role = visibleRoles.find((item) => item.id === assignment.role_id);
             return [
               role?.name ?? `Role ${assignment.role_id}`,
               roleDisplayName(role?.scope),
@@ -2055,6 +2076,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
 
 export function TeamDetailView({ teamId }: { teamId: number }) {
   const { accessToken, workspaces } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [editOpen, setEditOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -2070,6 +2092,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
   const canRemoveTeamMember = permissions.can(SETTINGS_ACTIONS.teamMemberRemove.permissionCode);
   const membersQuery = useQuery({ queryKey: ["settings", "team-members", teamId], queryFn: () => settingsApi.listTeamMembers(accessToken ?? "", teamId), enabled: Boolean(accessToken && teamId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const visibleRoles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, permissions));
   const workspaceMembersQuery = useQuery({
     queryKey: ["settings", "workspace-members-for-team", teamQuery.data?.workspace_id],
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", teamQuery.data?.workspace_id ?? 0),
@@ -2185,7 +2208,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
             return [
               user.name,
               user.email,
-              rolesQuery.data?.find((role) => role.id === member.role_id)?.name ?? member.member_role,
+              visibleRoles.find((role) => role.id === member.role_id)?.name ?? member.member_role,
               roleDisplayName(member.status ?? user.status),
               formatDate(member.joined_at ?? member.created_at),
               <PermissionAction key={member.id} actionKey={SETTINGS_ACTIONS.teamMemberRemove.actionKey} scope={teamActionScope}>
@@ -2222,7 +2245,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
         <FormField label="Role">
           <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
             <option value="">Default member</option>
-            {(rolesQuery.data ?? []).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+            {visibleRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
           </select>
         </FormField>
         <FormActions submitLabel="Assign Member" isSubmitting={assignMutation.isPending} onCancel={() => setAssignOpen(false)} />
@@ -2263,6 +2286,7 @@ function AccessControlTabs({ active }: { active: AccessControlSection }) {
 
 export function AccessControlView({ section = "roles" }: { section?: AccessControlSection }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const currentPermissions = useCurrentPermissions();
   const platformContext = usePlatformContext();
   const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
@@ -2291,7 +2315,9 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
   const roleMappingSuggestionsQuery = useQuery({ queryKey: ["settings", "role-mapping-suggestions"], queryFn: () => settingsApi.listRoleMappingSuggestions(accessToken ?? ""), enabled: Boolean(accessToken && section === "mapping") });
   const roleTemplatesQuery = useQuery({ queryKey: ["settings", "role-templates"], queryFn: () => settingsApi.listRoleTemplates(accessToken ?? ""), enabled: Boolean(accessToken) });
   const roleAssignmentsQuery = useQuery({ queryKey: ["settings", "role-assignments"], queryFn: () => settingsApi.listRoleAssignments(accessToken ?? ""), enabled: Boolean(accessToken) });
-  const roles = rolesQuery.data ?? [];
+  const rawRoles = rolesQuery.data ?? [];
+  const roles = filterVisibleRoles(rawRoles, canViewProtectedRoles(currentUser, currentPermissions));
+  const roleTemplates = filterVisibleRoleTemplates(roleTemplatesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions));
   const permissions = permissionsQuery.data ?? [];
   const rolePermissionsQuery = useQuery({
     queryKey: ["settings", "role-permissions", roles.map((role) => role.id).join(",")],
@@ -2445,7 +2471,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
         label: "Access Control",
         title: "Role Based Access Control",
         description: "Users receive roles, roles contain permissions, and permissions drive access across Asthra.",
-        meta: `${roles.length} roles / ${permissions.length} permissions / ${roleTemplatesQuery.data?.length ?? 0} templates`
+        meta: `${roles.length} roles / ${permissions.length} permissions / ${roleTemplates.length} templates`
       }}
     >
       <SettingsSectionHeader
@@ -2818,6 +2844,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
 export function RolesView({ organizationId }: { organizationId?: number }) {
   if (!organizationId) return <AccessControlView section="roles" />;
   const { accessToken, organizations } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const currentPermissions = useCurrentPermissions({ orgId: organizationId });
   const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const [open, setOpen] = useState(false);
@@ -2825,7 +2852,7 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
-  const roles = (rolesQuery.data ?? [])
+  const roles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions))
     .filter((role: RoleRecord) => (organizationId ? role.organization_id === organizationId || role.organization_id == null : true))
     .filter((role: RoleRecord) => `${role.name} ${role.description ?? ""} ${role.scope}`.toLowerCase().includes(search.toLowerCase()));
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;

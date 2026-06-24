@@ -144,6 +144,7 @@ vi.mock("@/services/api/settings-api", () => ({
     ]),
     listApiKeys: vi.fn(async () => []),
     listRoles: vi.fn(async () => [
+      { id: 0, name: "Superuser", key: "superuser", scope: "platform", organization_id: null, is_system: true, is_editable: false, is_hidden: true, is_active: true, permission_preset: "platform:superuser:placeholder" },
       { id: 1, name: "Platform Owner", key: "platform_owner", scope: "platform", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "platform:platform_owner:placeholder" },
       { id: 2, name: "Platform Admin", key: "platform_admin", scope: "platform", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "platform:platform_admin:placeholder" },
       { id: 4, name: "Workspace Admin", key: "workspace_admin", scope: "workspace", organization_id: 1, is_system: true, is_editable: false, is_active: true, permission_preset: "workspace:workspace_admin:placeholder" },
@@ -153,6 +154,7 @@ vi.mock("@/services/api/settings-api", () => ({
       { id: 9, name: "Project Contributor", key: "project_contributor", scope: "project", organization_id: null, is_system: true, is_editable: false, is_active: true, permission_preset: "project:project_contributor:placeholder" }
     ]),
     listRoleTemplates: vi.fn(async () => [
+      { name: "Superuser", key: "superuser", scope: "platform", description: "Hidden recovery role.", permission_patterns: ["*"], is_system: true, is_editable: false, is_hidden: true },
       { name: "Platform Owner", key: "platform_owner", scope: "platform", description: "Full platform administration.", permission_patterns: ["*"], is_system: true, is_editable: false },
       { name: "Project Manager", key: "project_manager", scope: "project", description: "Manage delivery.", permission_patterns: ["flow.work_item.*"], is_system: true, is_editable: false }
     ]),
@@ -652,6 +654,7 @@ describe("Settings frontend screens", () => {
     expect(await screen.findByText("Role Mapping")).toBeInTheDocument();
     expect(screen.getByText("Current User Permissions")).toBeInTheDocument();
     expect(await screen.findByText("System Role")).toBeInTheDocument();
+    expect(screen.queryByText("Superuser")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Custom Role" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Permission" })).toBeInTheDocument();
 

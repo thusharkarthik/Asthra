@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.role import Role, RolePermission
-from app.models.user import User, UserRole
+from app.models.user import RoleAssignment, User, UserRole
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
 from app.schemas.role import RoleCreate, RolePermissionCreate, RolePermissionsReplace, RoleUpdate, UserRoleCreate
@@ -19,11 +19,20 @@ VALID_ROLE_SCOPES = {"global", "platform", "organization", "workspace", "project
 
 ASTHRA_ROLE_TEMPLATES = [
     {
+        "name": "Superuser",
+        "key": "superuser",
+        "scope": "platform",
+        "description": "Hidden emergency platform recovery role with full permission bypass.",
+        "permission_patterns": ["*"],
+        "is_hidden": True,
+    },
+    {
         "name": "Platform Owner",
         "key": "platform_owner",
         "scope": "platform",
         "description": "Full platform administration and future billing ownership.",
         "permission_patterns": ["*"],
+        "is_hidden": False,
     },
     {
         "name": "Platform Admin",
@@ -211,6 +220,7 @@ class RoleService:
             organization_id=role_create.organization_id,
             is_system=role_create.is_system,
             is_editable=role_create.is_editable,
+            is_hidden=role_create.is_hidden,
         )
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
@@ -227,7 +237,10 @@ class RoleService:
     def list(self, current_user: User) -> list[Role]:
         self._ensure_active_user(current_user)
         self.ensure_role_catalog()
-        return self.role_repository.list()
+        roles = self.role_repository.list()
+        if self._can_view_hidden_roles(current_user):
+            return roles
+        return [role for role in roles if not role.is_hidden]
 
     def list_templates(self, current_user: User) -> list[dict]:
         self._ensure_active_user(current_user)
@@ -241,14 +254,18 @@ class RoleService:
                 "permission_patterns": template["permission_patterns"],
                 "is_system": True,
                 "is_editable": False,
+                "is_hidden": bool(template.get("is_hidden", False)),
             }
             for template in ASTHRA_ROLE_TEMPLATES
+            if not template.get("is_hidden") or self._can_view_hidden_roles(current_user)
         ]
 
     def get(self, role_id: int, current_user: User) -> Role:
         self._ensure_active_user(current_user)
         role = self.role_repository.get_by_id(role_id)
         if role is None or not role.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
+        if role.is_hidden and not self._can_view_hidden_roles(current_user):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
         return role
 
@@ -359,6 +376,7 @@ class RoleService:
         role = self.role_repository.get_by_id(user_role_create.role_id)
         if role is None or not role.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
+        self._ensure_role_can_be_assigned(role, current_user, "platform", None)
         if self.role_repository.get_user_role(user.id, role.id) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -394,6 +412,7 @@ class RoleService:
         user_role = self.role_repository.get_user_role(user.id, role_id)
         if user_role is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found.")
+        self._ensure_not_last_protected_role(user, user_role.role)
         self.role_repository.remove_user_role(user_role)
         ContextVersionService(self.db).bump_access("platform", None)
         self.db.commit()
@@ -414,6 +433,74 @@ class RoleService:
             scope_type,
             scope_id,
         )
+
+    def _can_view_hidden_roles(self, user: User) -> bool:
+        if user.is_superuser:
+            return True
+        platform_owner = (
+            self.db.query(Role)
+            .filter(Role.key == "platform_owner", Role.scope == "platform", Role.is_active.is_(True))
+            .first()
+        )
+        if platform_owner is None:
+            return False
+        user_role_exists = (
+            self.db.query(UserRole.id)
+            .filter(UserRole.user_id == user.id, UserRole.role_id == platform_owner.id)
+            .first()
+            is not None
+        )
+        if user_role_exists:
+            return True
+        return (
+            self.db.query(RoleAssignment.id)
+            .filter(
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.role_id == platform_owner.id,
+                RoleAssignment.scope_type == "platform",
+                RoleAssignment.status == "active",
+            )
+            .first()
+            is not None
+        )
+
+    def _ensure_role_can_be_assigned(self, role: Role, current_user: User, scope_type: str, scope_id: int | None) -> None:
+        if role.scope == "platform" and scope_type != "platform":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform roles can only be assigned at platform scope.")
+        if role.is_hidden and not self._can_view_hidden_roles(current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot assign this role.")
+
+    def _ensure_not_last_protected_role(self, user: User, role: Role | None) -> None:
+        if role is None or role.key not in {"superuser", "platform_owner"}:
+            return
+        protected_user_ids = {
+            row[0]
+            for row in self.db.query(UserRole.user_id)
+            .join(Role, Role.id == UserRole.role_id)
+            .join(User, User.id == UserRole.user_id)
+            .filter(Role.key == role.key, Role.scope == "platform", User.is_active.is_(True))
+            .all()
+        }
+        protected_user_ids.update(
+            row[0]
+            for row in self.db.query(RoleAssignment.user_id)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .join(User, User.id == RoleAssignment.user_id)
+            .filter(
+                Role.key == role.key,
+                Role.scope == "platform",
+                RoleAssignment.status == "active",
+                User.is_active.is_(True),
+            )
+            .all()
+        )
+        if role.key == "superuser":
+            protected_user_ids.update(
+                row[0]
+                for row in self.db.query(User.id).filter(User.is_superuser.is_(True), User.is_active.is_(True)).all()
+            )
+        if len(protected_user_ids) <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot remove the last {role.name}.")
 
     def _validate_scope(self, scope: str) -> str:
         normalized_scope = scope.strip().lower()
@@ -440,13 +527,21 @@ class RoleService:
             key = template["key"]
             scope = template["scope"]
             description = template["description"]
+            is_hidden = bool(template.get("is_hidden", False))
             existing = self.role_repository.get_by_scope_and_name(scope, name)
             if existing is not None:
-                if not existing.is_system or existing.is_editable or existing.key != key or existing.description != description:
+                if (
+                    not existing.is_system
+                    or existing.is_editable
+                    or existing.key != key
+                    or existing.description != description
+                    or existing.is_hidden != is_hidden
+                ):
                     existing.key = key
                     existing.is_system = True
                     existing.is_editable = False
                     existing.description = description
+                    existing.is_hidden = is_hidden
                     changed = True
                 role_by_key[key] = existing
                 continue
@@ -458,6 +553,7 @@ class RoleService:
                 organization_id=None,
                 is_system=True,
                 is_editable=False,
+                is_hidden=is_hidden,
             )
             self.db.add(role)
             role_by_key[key] = role

@@ -55,7 +55,7 @@ def server_url() -> Generator[str, None, None]:
     )
 
     try:
-        deadline = time.monotonic() + 20
+        deadline = time.monotonic() + 60
         with httpx.Client(base_url=url, timeout=1.0, trust_env=False) as probe_client:
             while time.monotonic() < deadline:
                 if process.poll() is not None:

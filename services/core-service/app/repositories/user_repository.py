@@ -50,11 +50,13 @@ class UserRepository:
         email: str,
         full_name: str | None,
         hashed_password: str,
+        is_superuser: bool = False,
     ) -> User:
         user = User(
             email=email.lower(),
             full_name=full_name,
             hashed_password=hashed_password,
+            is_superuser=is_superuser,
         )
         self.db.add(user)
         self.db.commit()

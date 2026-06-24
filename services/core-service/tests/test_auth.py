@@ -7,7 +7,31 @@ def test_register_user(client):
     assert user["email"] == "user@example.com"
     assert user["full_name"] == "Test User"
     assert user["is_active"] is True
+    assert user["is_superuser"] is True
     assert "hashed_password" not in user
+
+
+def test_first_user_bootstraps_superuser_and_platform_owner(client):
+    first_user = create_test_user(client, email="first@example.com")
+    token = get_auth_token(client, email="first@example.com")
+    headers = auth_headers(token)
+
+    assert first_user["is_superuser"] is True
+
+    permissions_response = client.get("/api/v1/me/permissions", headers=headers)
+    assert permissions_response.status_code == 200
+    permissions = permissions_response.json()
+    role_keys = {role["key"] for role in permissions["roles"]}
+    assert "superuser" in role_keys
+    assert "platform_owner" in role_keys
+    assert "settings.organization.create" in permissions["permission_codes"]
+
+
+def test_second_registered_user_is_not_superuser(client):
+    create_test_user(client, email="first@example.com")
+    second_user = create_test_user(client, email="second@example.com")
+
+    assert second_user["is_superuser"] is False
 
 
 def test_register_rejects_duplicate_email(client):

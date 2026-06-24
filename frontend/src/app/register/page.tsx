@@ -7,6 +7,7 @@ import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
+import { useProgressStore } from "@/stores/progress-store";
 import { useUIStore } from "@/stores/ui-store";
 
 const AUTH_LOGIN_TRANSITION_MS = 1850;
@@ -23,6 +24,9 @@ export default function RegisterPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const storeError = useAuthStore((state) => state.error);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
+  const startProgress = useProgressStore((state) => state.startProgress);
+  const completeProgress = useProgressStore((state) => state.completeProgress);
+  const failProgress = useProgressStore((state) => state.failProgress);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +54,7 @@ export default function RegisterPage() {
 
     try {
       setIsTransitioning(true);
+      startProgress();
       await register({
         email: email.trim(),
         password,
@@ -59,9 +64,11 @@ export default function RegisterPage() {
       await wait(AUTH_ROUTE_SWAP_DELAY_MS);
       router.replace("/");
       await wait(AUTH_LOGIN_TRANSITION_MS - AUTH_ROUTE_SWAP_DELAY_MS + 100);
+      completeProgress();
       setAuthTransition(null);
     } catch {
       setIsTransitioning(false);
+      failProgress();
       setAuthTransition(null);
       setFormError(null);
     }

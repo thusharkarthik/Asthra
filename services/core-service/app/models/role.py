@@ -20,6 +20,7 @@ class Role(TimestampMixin, Base):
     scope: Mapped[str] = mapped_column(String(50), default="organization", nullable=False)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_editable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     organization = relationship("Organization", back_populates="roles")

@@ -99,6 +99,7 @@ export type RoleRecord = {
   permission_preset?: string;
   is_system?: boolean;
   is_editable?: boolean;
+  is_hidden?: boolean;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -112,6 +113,7 @@ export type RoleTemplateRecord = {
   permission_patterns: string[];
   is_system: boolean;
   is_editable: boolean;
+  is_hidden?: boolean;
 };
 
 export type PermissionRecord = {
