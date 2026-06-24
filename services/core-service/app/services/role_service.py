@@ -477,6 +477,12 @@ class RoleService:
                 for code in permission_codes
                 if self._permission_matches_template(code, template["permission_patterns"])
             ]
+            existing_permission_ids = {
+                role_permission.permission_id
+                for role_permission in self.role_repository.list_permissions(role.id)
+            }
+            if existing_permission_ids == set(wanted_permission_ids):
+                continue
             self.role_repository.replace_permissions(role.id, wanted_permission_ids)
 
     def _permission_matches_template(self, permission_code: str, patterns: list[str]) -> bool:
