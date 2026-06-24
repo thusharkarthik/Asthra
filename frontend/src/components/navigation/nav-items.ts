@@ -36,40 +36,40 @@ export const navSections: NavSection[] = [
   {
     label: "Work",
     items: [
-      { label: "Flow", href: "/flow", icon: Briefcase },
-      { label: "Discover", href: "/discover", icon: Lightbulb },
-      { label: "Docs", href: "/docs", icon: FileText },
-      { label: "Collab", href: "/collab", icon: Activity }
+      { label: "Flow", href: "/flow", icon: Briefcase, requiredPermissions: ["flow.*.view"] },
+      { label: "Discover", href: "/discover", icon: Lightbulb, requiredPermissions: ["discover.*.view"] },
+      { label: "Docs", href: "/docs", icon: FileText, requiredPermissions: ["docs.*.view"] },
+      { label: "Collab", href: "/collab", icon: Activity, requiredPermissions: ["collab.*.view"] }
     ]
   },
   {
     label: "Operations",
     items: [
-      { label: "Desk", href: "/desk", icon: MessageSquare },
-      { label: "Pulse", href: "/pulse", icon: HeartPulse },
+      { label: "Desk", href: "/desk", icon: MessageSquare, requiredPermissions: ["desk.*.view"] },
+      { label: "Pulse", href: "/pulse", icon: HeartPulse, requiredPermissions: ["pulse.*.view"] },
       { label: "Automation", href: "/automation", icon: Bot }
     ]
   },
   {
     label: "Engineering",
     items: [
-      { label: "Dev", href: "/dev", icon: Wrench },
+      { label: "Dev", href: "/dev", icon: Wrench, requiredPermissions: ["dev.*.view"] },
       { label: "Connect", href: "/connect", icon: Cable }
     ]
   },
   {
     label: "Intelligence",
     items: [
-      { label: "Insights", href: "/insights", icon: Gauge },
+      { label: "Insights", href: "/insights", icon: Gauge, requiredPermissions: ["insights.*.view"] },
       { label: "Memory", href: "/memory", icon: Database, disabled: true }
     ]
   },
   {
     label: "Admin",
     items: [
-      { label: "Guard", href: "/guard", icon: ShieldCheck },
-      { label: "Media", href: "/media", icon: Image },
-      { label: "Settings", href: "/settings", icon: Settings }
+      { label: "Guard", href: "/guard", icon: ShieldCheck, requiredPermissions: ["guard.audit.view"] },
+      { label: "Media", href: "/media", icon: Image, requiredPermissions: ["media.*.view"] },
+      { label: "Settings", href: "/settings", icon: Settings, requiredPermissions: ["settings.*.view", "settings.*.manage"] }
     ]
   }
 ];

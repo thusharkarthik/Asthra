@@ -26,7 +26,6 @@ class InvitationService:
         organization = self.repository.get_organization(invitation_create.organization_id)
         if organization is None or not organization.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
-        self._ensure_organization_access(invitation_create.organization_id, current_user)
         permission_scope_type = "organization"
         permission_scope_id = invitation_create.organization_id
 
@@ -42,6 +41,8 @@ class InvitationService:
             self._ensure_workspace_access(invitation_create.workspace_id, current_user)
             permission_scope_type = "workspace"
             permission_scope_id = invitation_create.workspace_id
+        else:
+            self._ensure_organization_access(invitation_create.organization_id, current_user)
 
         AccessControlService(self.db).require(
             current_user,

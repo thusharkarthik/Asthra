@@ -127,6 +127,7 @@ class PermissionService:
             "skipped_custom": [],
             "total_registry_permissions": len(registry_items),
         }
+        dirty = False
 
         for item in registry_items:
             existing = permissions_by_code.get(item.code)
@@ -139,25 +140,30 @@ class PermissionService:
                     if not dry_run:
                         for field, value in update_data.items():
                             setattr(existing, field, value)
-                        self.db.commit()
+                        dirty = True
                 continue
             result["created_count"] += 1
             result["created"].append(item.code)
             if dry_run:
                 continue
-            self.permission_repository.create(
-                code=item.code,
-                name=item.name,
-                description=item.description,
-                module=item.module,
-                resource=item.resource,
-                action=item.action,
-                scope=item.scope,
-                risk_level=item.risk_level,
-                source="registry",
-                status="active",
-                is_system=True,
+            self.db.add(
+                Permission(
+                    code=item.code,
+                    key=item.code,
+                    name=item.name,
+                    description=item.description,
+                    module=item.module,
+                    resource=item.resource,
+                    action=item.action,
+                    scope=item.scope,
+                    risk_level=item.risk_level,
+                    source="registry",
+                    status="active",
+                    is_system=True,
+                    is_active=True,
+                )
             )
+            dirty = True
         for permission in existing_permissions:
             if permission.source == "custom":
                 result["skipped_custom_count"] += 1
@@ -169,7 +175,9 @@ class PermissionService:
                 if not dry_run:
                     permission.status = "deprecated"
                     permission.is_active = False
-                    self.db.commit()
+                    dirty = True
+        if dirty:
+            self.db.commit()
         if not dry_run:
             self.normalize_permission_metadata()
         return result
@@ -198,8 +206,8 @@ class PermissionService:
             if permission.is_system != expected_system and expected_system:
                 permission.is_system = True
                 changed = True
-            if changed:
-                self.db.commit()
+        if self.db.dirty:
+            self.db.commit()
 
     def _registry_update_data(self, permission: Permission, item: PermissionRegistryItem) -> dict:
         expected = {

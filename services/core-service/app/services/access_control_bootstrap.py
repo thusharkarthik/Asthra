@@ -11,7 +11,7 @@ def initialize_access_control(engine: Engine, db: Session) -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_rbac_columns(engine)
     PermissionService(db).ensure_permission_catalog()
-    RoleService(db).ensure_role_catalog()
+    RoleService(db).ensure_role_catalog(sync_permissions=False)
 
 
 def _ensure_rbac_columns(engine: Engine) -> None:

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { navSections } from "@/components/navigation/nav-items";
+import { canAny } from "@/lib/permissions";
 import { useUIStore } from "@/stores/ui-store";
 
 function isActive(pathname: string, href?: string) {
@@ -12,7 +13,26 @@ function isActive(pathname: string, href?: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SidebarNav({ collapsed = false }: { collapsed?: boolean }) {
+function hasNavigationAccess(
+  requiredPermissions: string[] | undefined,
+  permissionCodes: string[] | undefined,
+  permissionsLoading: boolean
+) {
+  if (!requiredPermissions?.length) return true;
+  if (permissionsLoading) return true;
+  if (!permissionCodes) return true;
+  return canAny(permissionCodes, requiredPermissions);
+}
+
+export function SidebarNav({
+  collapsed = false,
+  permissionCodes,
+  permissionsLoading = false
+}: {
+  collapsed?: boolean;
+  permissionCodes?: string[];
+  permissionsLoading?: boolean;
+}) {
   const pathname = usePathname();
   const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const setSearchOpen = useUIStore((state) => state.setSearchOpen);
@@ -27,7 +47,7 @@ export function SidebarNav({ collapsed = false }: { collapsed?: boolean }) {
       {navSections.map((section) => (
         <section key={section.label} aria-label={section.label} className="space-y-1">
           {!collapsed && <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</div>}
-          {section.items.map((item) => {
+          {section.items.filter((item) => hasNavigationAccess(item.requiredPermissions, permissionCodes, permissionsLoading)).map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
             const className = cn(

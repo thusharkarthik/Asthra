@@ -67,6 +67,8 @@ Identity, scope, membership, and access control.
 - Effective permissions are resolved from scoped roles.
 - Permissions are generated from the Core permission registry using `module.resource.action`.
 - User-facing actions should use precise permission codes such as `settings.project.restore` and `settings.team.edit`.
+- Static protected endpoints should use `require_permission(...)` from `app.core.permissions`.
+- Dynamic payload-sensitive actions should enforce permissions in the service method using `AccessControlService.require(...)`.
 
 ## UI Screens
 

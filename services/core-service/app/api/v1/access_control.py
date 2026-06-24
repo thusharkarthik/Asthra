@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
+from app.core.permissions import require_permission
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.role import PermissionGapRead
@@ -14,6 +15,7 @@ router = APIRouter()
 
 @router.get("/permission-inventory")
 def get_permission_inventory(
+    _: None = Depends(require_permission("settings.permission.view")),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -22,6 +24,7 @@ def get_permission_inventory(
 
 @router.get("/permission-gaps", response_model=list[PermissionGapRead])
 def get_permission_gaps(
+    _: None = Depends(require_permission("settings.permission.view")),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
@@ -30,6 +33,7 @@ def get_permission_gaps(
 
 @router.get("/permission-registry/sync-preview")
 def preview_permission_registry_sync(
+    _: None = Depends(require_permission("settings.permission.manage")),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -38,6 +42,7 @@ def preview_permission_registry_sync(
 
 @router.post("/permission-registry/sync")
 def sync_permission_registry(
+    _: None = Depends(require_permission("settings.permission.manage")),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -46,6 +51,7 @@ def sync_permission_registry(
 
 @router.get("/role-mapping-suggestions")
 def get_role_mapping_suggestions(
+    _: None = Depends(require_permission("settings.role.view")),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:

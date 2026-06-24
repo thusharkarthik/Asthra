@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Can, PermissionButton } from "@/access/permission-components";
+import { Can, PermissionButton, PermissionLink, PermissionSection } from "@/access/permission-components";
 
 function renderWithQuery(children: ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -53,5 +53,25 @@ describe("permission visibility components", () => {
 
     expect(screen.getByText("Checking access")).toBeInTheDocument();
     expect(screen.queryByText("Restore project")).not.toBeInTheDocument();
+  });
+
+  it("renders permission links when allowed", () => {
+    renderWithQuery(
+      <PermissionLink href="/settings/projects/1" actionKey="settings.project.restore" scope={{ permissionCodes: ["settings.project.restore"] }}>
+        Restore Link
+      </PermissionLink>
+    );
+
+    expect(screen.getByRole("link", { name: "Restore Link" })).toHaveAttribute("href", "/settings/projects/1");
+  });
+
+  it("hides permission sections when denied", () => {
+    renderWithQuery(
+      <PermissionSection actionKey="settings.team.edit" scope={{ permissionCodes: ["settings.team.view"] }}>
+        Team edit panel
+      </PermissionSection>
+    );
+
+    expect(screen.queryByText("Team edit panel")).not.toBeInTheDocument();
   });
 });

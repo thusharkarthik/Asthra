@@ -33,4 +33,19 @@ describe("SidebarNav", () => {
 
     expect(screen.getByRole("link", { name: /docs/i })).toHaveAttribute("aria-current", "page");
   });
+
+  it("hides module links when required view permissions are missing", () => {
+    render(<SidebarNav permissionCodes={["docs.page.view", "settings.organization.view"]} />);
+
+    expect(screen.getByRole("link", { name: /docs/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /flow/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /desk/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps module links visible while permissions are loading", () => {
+    render(<SidebarNav permissionCodes={[]} permissionsLoading />);
+
+    expect(screen.getByRole("link", { name: /flow/i })).toBeInTheDocument();
+  });
 });

@@ -147,6 +147,15 @@ def test_user_permissions_are_not_assigned_directly(client):
     assert response.status_code == 404
 
 
+def test_permission_registry_sync_requires_permission_manage(client):
+    headers = create_auth_headers(client)
+
+    response = client.post("/api/v1/access-control/permission-registry/sync", headers=headers)
+
+    assert response.status_code == 403
+    assert "settings.permission.manage" in response.text
+
+
 def test_role_templates_api_lists_enterprise_templates(client):
     headers = create_auth_headers(client)
 

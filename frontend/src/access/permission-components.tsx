@@ -2,6 +2,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { queryKeys } from "@/lib/queryKeys";
 import { can as hasPermission } from "@/lib/permissions";
@@ -56,6 +57,30 @@ export function useActionAccess(actionKey: string, scope?: ActionScope): ActionA
     isLoading,
     isDenied: !isLoading && !allowed,
     missingAction: !definition
+  };
+}
+
+export function usePermission(permissionCode: string, scope?: ActionScope) {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const ids = scopeIds(scope);
+  const permissionQuery = useQuery({
+    queryKey: queryKeys.permissions.current(ids.orgId, ids.workspaceId, ids.projectId),
+    queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {
+      org_id: ids.orgId,
+      workspace_id: ids.workspaceId,
+      project_id: ids.projectId
+    }),
+    enabled: Boolean(accessToken && !scope?.permissionCodes),
+    staleTime: 60_000
+  });
+  const permissionCodes = scope?.permissionCodes ?? permissionQuery.data?.permission_codes ?? [];
+  const isLoading = Boolean(scope?.isLoading ?? permissionQuery.isLoading);
+  const allowed = hasPermission(permissionCodes, permissionCode);
+  return {
+    permissionCode,
+    allowed,
+    isLoading,
+    isDenied: !isLoading && !allowed
   };
 }
 
@@ -150,4 +175,54 @@ export function PermissionMenuItem({
     return <button {...props} disabled title={`Requires ${access.permissionCode}`}>{children ?? access.label}</button>;
   }
   return null;
+}
+
+export function PermissionLink({
+  actionKey,
+  scope,
+  deniedMode = "hide",
+  disabledTitle,
+  children,
+  href,
+  className,
+  ...props
+}: ComponentProps<typeof Link> & {
+  actionKey: string;
+  scope?: ActionScope;
+  deniedMode?: DeniedMode;
+  disabledTitle?: string;
+}) {
+  const access = useActionAccess(actionKey, scope);
+  if (access.isLoading) {
+    return <span className={className} aria-disabled="true">{children ?? access.label}</span>;
+  }
+  if (access.allowed) {
+    return <Link href={href} className={className} {...props}>{children ?? access.label}</Link>;
+  }
+  if (deniedMode === "disabled") {
+    return <span className={className} aria-disabled="true" title={disabledTitle ?? `Requires ${access.permissionCode}`}>{children ?? access.label}</span>;
+  }
+  return null;
+}
+
+export function PermissionSection({
+  actionKey,
+  scope,
+  children,
+  deniedMode = "hide",
+  deniedFallback = null,
+  loadingFallback = null
+}: {
+  actionKey: string;
+  scope?: ActionScope;
+  children: ReactNode;
+  deniedMode?: DeniedMode;
+  deniedFallback?: ReactNode;
+  loadingFallback?: ReactNode;
+}) {
+  return (
+    <Can actionKey={actionKey} scope={scope} deniedMode={deniedMode} deniedFallback={deniedFallback} loadingFallback={loadingFallback}>
+      {children}
+    </Can>
+  );
 }
