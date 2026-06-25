@@ -38,6 +38,12 @@ Project memberships store who belongs to a project and the project role/team con
 
 Team memberships store who belongs to a team and the team role context.
 
+## Bottom Bar Isolation
+
+The `/settings/members` page is **not** influenced by the bottom bar (workspace/organization selector). It derives its scope entirely from the logged-in user's own role assignments and `is_superuser` flag. See [settings-members-roles.md](settings-members-roles.md) for the full scope resolution algorithm.
+
+Other settings pages (`/settings/organizations/:id/members`, `/settings/workspaces/:id/members`, `/settings/projects/:id/members`) are correctly scoped by their URL params and are unaffected by this isolation.
+
 ## Settings UI
 
 Access Control now includes an Assignments tab.

@@ -13,6 +13,23 @@ Settings now uses a scoped Asthra role catalog instead of only the original Owne
 
 Each role has a `name`, `key`, `scope`, description, and permission mappings. Users receive roles; roles contain permissions; permissions drive access checks.
 
+## Authority-Based Scope for `/settings/members`
+
+The `/settings/members` page derives its scope from the **logged-in user's authority** — not from the bottom bar workspace/organization selector. Changing the bottom bar has zero effect on this page.
+
+Scope resolution order:
+
+1. **Superuser** (`currentUser.is_superuser = true`) → global platform directory. No additional queries needed.
+2. **Platform admin/owner** (role key in `superuser | platform_owner | platform_admin` from `/me/permissions` with no scope params) → global platform directory.
+3. **Organization admin/owner** (active `RoleAssignment` with `scope_type="organization"` and role key in `organization_owner | organization_admin`) → org-scoped members for that organization.
+4. **Workspace admin/manager** (active `RoleAssignment` with `scope_type="workspace"` and role key in `workspace_admin | workspace_manager`) → workspace-scoped members for that workspace.
+5. **No elevated authority** → global directory (limited access shown based on permissions).
+
+The page fetches three queries (disabled for superusers):
+- `GET /me/permissions` with no scope params (platform scope) — detects platform-level roles
+- `GET /role-assignments?user_id={id}&status=active` — detects org/workspace admin roles
+- `GET /roles` — cross-references role IDs to role keys
+
 ## Invite Flow
 
 Settings -> Members supports inviting users by email within the current Settings scope.
@@ -99,3 +116,15 @@ The frontend loads `/me/permissions` for the active Settings scope and hides or 
 - Notification Accept/Decline actions need direct invite-action endpoints.
 - Last active timestamps are not tracked yet.
 - First-organization creation remains open as a bootstrap path for clean local installs.
+
+## Invite Scope Validation
+
+`scopeOrganizationId` in `MembersView` is derived strictly from props — no silent fallbacks:
+
+```
+scopeOrganizationId = organizationId
+  ?? workspaces.find(w => w.id === workspaceId)?.organization_id
+  ?? null   // no organizations[0] fallback
+```
+
+If `scopeOrganizationId` is `null` in global directory mode, the invite dialog shows "No scope — navigate to an organization or workspace" and the submit guard fires before the API call.
