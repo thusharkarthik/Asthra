@@ -1377,7 +1377,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     queryKey: ["settings", "members", organizationId, workspaceId],
     queryFn: async () => {
       if (organizationId) return settingsApi.listOrganizationMembers(accessToken ?? "", organizationId);
-      return settingsApi.listWorkspaceMembers(accessToken ?? "", workspaceId ?? 0);
+      if (!workspaceId) return [];
+      return settingsApi.listWorkspaceMembers(accessToken ?? "", workspaceId);
     },
     enabled: Boolean(accessToken && !isGlobalDirectory && (organizationId || workspaceId))
   });
@@ -1398,7 +1399,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const roles = rolesQuery.data ?? [];
   const profiles = new Map<number, CoreUser>(userProfiles.data ?? []);
   if (currentUser && !profiles.has(currentUser.id)) profiles.set(currentUser.id, currentUser);
-  const scopeOrganizationId = organizationId ?? workspaces.find((workspace) => workspace.id === workspaceId)?.organization_id ?? organizations[0]?.id;
+  const scopeOrganizationId = organizationId ?? workspaces.find((workspace) => workspace.id === workspaceId)?.organization_id ?? null;
   const scopeWorkspaceId = workspaceId ?? null;
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
@@ -1495,7 +1496,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     const email = getFormValue(form, "email");
     const roleId = Number(getFormValue(form, "role_id")) || null;
     if (!scopeOrganizationId) {
-      setFormError("Create or select an organization first.");
+      setFormError("Unable to determine organization scope. Navigate to a specific organization or workspace to invite members.");
       return;
     }
     if (!email) {
@@ -1672,7 +1673,16 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           </select>
         </FormField>
         <FormField label="Scope">
-          <Input value={workspaceId ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}` : `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}`} readOnly />
+          <Input
+            value={
+              workspaceId
+                ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}`
+                : scopeOrganizationId
+                  ? `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}`
+                  : "No scope — navigate to an organization or workspace"
+            }
+            readOnly
+          />
         </FormField>
         <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => setInviteOpen(false)} />
       </SettingsCreateDialog>
