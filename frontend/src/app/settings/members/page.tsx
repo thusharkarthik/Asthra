@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { MembersView } from "@/components/settings/settings-admin-views";
+import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
@@ -88,6 +89,17 @@ export default function MembersSettingsPage() {
     return <MembersView workspaceId={workspaceAssignment.scope_id} />;
   }
 
-  // No elevated authority — global directory (shows limited-access card if needed).
-  return <MembersView />;
+  // No authority role found — show restricted state. Do not call any member API.
+  return (
+    <SettingsLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members" }]}
+      backHref="/settings"
+      backLabel="Back to Settings"
+    >
+      <SettingsEmptyState
+        title="Access Restricted"
+        description="You don't have permission to view or manage members."
+      />
+    </SettingsLayout>
+  );
 }
