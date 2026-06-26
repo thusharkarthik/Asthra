@@ -98,6 +98,34 @@
 **Root cause**: `assign_user_role()` hardcoded `"platform"` and `None` in all permission checks, duplicate checks, context version bumps, and the `user_roles` write. `UserRoleCreate` schema also only had `role_id`.
 **Fix**: Added `scope_type: str = "platform"` and `scope_id: int | None = None` to `UserRoleCreate`. Updated `assign_user_role()` to use caller-supplied scope throughout. Duplicate check now targets `role_assignments` at the specific scope.
 
+### BUG-015 — Settings Don't Unlock Without Page Refresh After Role Assigned [FIXED 2026-06-26]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/hooks/use-settings-mutations.ts`
+**Symptom**: After a role is assigned to a user, that user must manually page-refresh for settings to unlock. The authority-level indicator doesn't update.
+**Root cause**: All role-assignment mutations (inline and in use-settings-mutations.ts) invalidated member list queries but NOT the authority resolution queries used by `settings/layout.tsx`: `["members-page", "platform-permissions"]` and `["members-page", "my-role-assignments", userId]`. These have `staleTime: 60_000` and never re-ran after role changes.
+**Fix**: Added `queryClient.invalidateQueries({ queryKey: ["members-page"] })` (prefix covers both auth queries) and `["settings", "roles"]` to: `invalidateSettingsAndContext()`, `useInviteMemberMutation.onSuccess`, `useAssignRoleMutation.onSuccess`, `MembersView.roleMutation.onSuccess`, `MemberDetailView.assignRoleMutation.onSuccess`, and `MemberDetailView.removeRoleMutation.onSuccess`.
+
+### BUG-016 — Invite Member Button Hidden When No Organizations Exist [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: On a fresh platform with no organizations, the Invite Member button is completely hidden. A superuser cannot invite anyone via the UI.
+**Root cause**: The button was wrapped in `!isGlobalDirectory || organizations.length ? ... : undefined`. When viewing the global directory (no org/workspace scope) AND no organizations exist, both conditions are false and the button disappears.
+**Fix**: Removed the ternary wrapper — `PermissionAction` already gates on `settings.member.invite` permission. Updated the info card text to clarify platform-scoped roles can be invited without an org.
+
+### BUG-017 — Platform Member Invite Shows Wrong Scope Error [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: Selecting Platform Member in the invite modal shows "Unable to determine organization scope. Navigate to a specific organization to invite members." — a confusing error for a role that needs no org.
+**Root cause**: `submitInvite` always required `effectiveOrgId` to be non-null. For platform-scoped roles in global directory mode, `effectiveOrgId = scopeOrganizationId = null`, triggering the error. The scope display also showed "No scope — navigate to an organization or workspace" instead of a positive confirmation.
+**Fix**: Changed the org requirement guard to only fire when `needsOrg` (non-platform roles). Platform-scoped invites pass `organization_id: null` to the API. Changed scope display for platform roles to "Platform scope (no additional scope required)". Updated inviteMutation payload type to accept `organization_id: number | null`.
+
+### BUG-018 — Non-Platform Roles Not Appearing in Current Roles After Assignment [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: Assigning Organization Admin or Workspace Admin from member detail "Assign Role" section doesn't appear in the Current Roles list after assignment.
+**Root cause**: The "Current Roles" card read from `userRolesQuery` (`GET /users/{id}/roles` → `user_roles` table), but `assignRoleMutation` now calls `createRoleAssignment` which writes only to `role_assignments`. The two tables diverged after the dual-write change — new assignments from the frontend went to `role_assignments` only.
+**Fix**: Changed "Current Roles" data source from `userRolesQuery.data` to `activeAssignments` (from `roleAssignmentsQuery`, filtered to `status === "active"`). Updated `memberRoleIds`, `availableRoles`, and `removeRoleMutation` to use `roleAssignmentsQuery` data. `removeRoleMutation` now calls `deleteRoleAssignment(assignment.id)` instead of `removeUserRole(role_id)`.
+
 ## Open
 
 _(none currently tracked)_
