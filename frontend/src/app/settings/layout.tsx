@@ -1,25 +1,44 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
-import { MemberDetailView } from "@/components/settings/settings-admin-views";
-import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
+import { SettingsEmptyState, SettingsLayout as SettingsPageLayout } from "@/components/settings/settings-components";
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
 const WORKSPACE_ADMIN_KEYS = new Set(["workspace_admin", "workspace_manager"]);
 
-export default function MemberDetailPage() {
-  const params = useParams();
-  const userId = Number(params.id as string);
+// Routes accessible to any authenticated user regardless of admin authority.
+const PERSONAL_ROUTES = new Set([
+  "/settings",
+  "/settings/profile",
+  "/settings/preferences",
+  "/settings/notifications",
+  "/settings/account",
+]);
 
+export default function SettingsGuard({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isSuperuser = Boolean(currentUser?.is_superuser);
 
-  // Same query keys as members/page.tsx and settings/layout.tsx — one cached fetch serves all.
+  // Belt-and-suspenders redirect — AsthraShell also handles this at the top level.
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [hasHydrated, isAuthenticated, router]);
+
+  // Shared query keys with members/page.tsx so TanStack Query serves one cached result
+  // for all three consumers: this layout, members/page, and members/[id]/page.
   const platformPermsQuery = useQuery({
     queryKey: ["members-page", "platform-permissions"],
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {}),
@@ -45,26 +64,31 @@ export default function MemberDetailPage() {
     staleTime: 60_000,
   });
 
-  // Superuser — always allowed.
-  if (isSuperuser) {
-    return <MemberDetailView userId={userId} />;
+  // Not yet hydrated or no token — AsthraShell renders the loading state; no children here.
+  if (!hasHydrated || !accessToken) {
+    return null;
   }
 
-  // Still resolving authority.
+  // Superuser gets unrestricted access to all settings.
+  if (isSuperuser) {
+    return <>{children}</>;
+  }
+
+  // Still resolving authority — hold rendering to avoid premature child API calls.
   if (platformPermsQuery.isLoading || myAssignmentsQuery.isLoading || rolesQuery.isLoading) {
     return null;
   }
 
-  // Platform admin/owner — allowed.
+  // Platform admin or owner → full access.
   const platformRoles = platformPermsQuery.data?.roles ?? [];
   if (platformRoles.some((r) => PLATFORM_ADMIN_KEYS.has(r.key))) {
-    return <MemberDetailView userId={userId} />;
+    return <>{children}</>;
   }
 
   const assignments = myAssignmentsQuery.data ?? [];
   const roleById = new Map((rolesQuery.data ?? []).map((r) => [r.id, r]));
 
-  // Org admin/owner — allowed.
+  // Org admin/owner → full access.
   const hasOrgAuthority = assignments
     .filter((a) => a.scope_type === "organization" && a.scope_id != null)
     .some((a) => {
@@ -73,10 +97,10 @@ export default function MemberDetailPage() {
     });
 
   if (hasOrgAuthority) {
-    return <MemberDetailView userId={userId} />;
+    return <>{children}</>;
   }
 
-  // Workspace admin/manager — allowed.
+  // Workspace admin/manager → full access.
   const hasWorkspaceAuthority = assignments
     .filter((a) => a.scope_type === "workspace" && a.scope_id != null)
     .some((a) => {
@@ -85,24 +109,25 @@ export default function MemberDetailPage() {
     });
 
   if (hasWorkspaceAuthority) {
-    return <MemberDetailView userId={userId} />;
+    return <>{children}</>;
   }
 
-  // No authority — show restricted state, do not render member detail.
+  // No admin authority — personal routes remain accessible.
+  if (PERSONAL_ROUTES.has(pathname)) {
+    return <>{children}</>;
+  }
+
+  // Everything else is blocked for users with no admin authority.
   return (
-    <SettingsLayout
-      breadcrumbs={[
-        { label: "Settings", href: "/settings" },
-        { label: "Members", href: "/settings/members" },
-        { label: "Member Detail" },
-      ]}
-      backHref="/settings/members"
-      backLabel="Back to Members"
+    <SettingsPageLayout
+      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Restricted" }]}
+      backHref="/settings"
+      backLabel="Back to Settings"
     >
       <SettingsEmptyState
         title="Access Restricted"
-        description="You don't have permission to view member details."
+        description="You don't have permission to access this settings page."
       />
-    </SettingsLayout>
+    </SettingsPageLayout>
   );
 }
