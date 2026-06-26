@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-26 (role assignment unification — dual-write to role_assignments)
+Last updated: 2026-06-26 (QA bug fixes — settings unlock, invite button, platform invite scope, current roles)
 
 ## Phase
 

@@ -133,7 +133,10 @@ function invalidateSettingsAndContext(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: queryKeys.roles.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.teams.all }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all })
+    queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all }),
+    // Invalidate authority queries used by settings/layout.tsx so settings unlock without page refresh.
+    queryClient.invalidateQueries({ queryKey: ["members-page"] }),
+    queryClient.invalidateQueries({ queryKey: ["settings", "roles"] })
   ]);
 }
 
@@ -1533,8 +1536,10 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     .sort((left, right) => compareMemberRows(left, right, sortKey));
 
   const inviteMutation = useMutation({
-    mutationFn: (payload: { email: string; organization_id: number; workspace_id?: number | null; role_id?: number | null }) =>
-      settingsApi.createInvitation(accessToken ?? "", payload),
+    // organization_id is null for platform-scoped invites when no org context exists.
+    mutationFn: (payload: { email: string; organization_id: number | null; workspace_id?: number | null; role_id?: number | null }) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settingsApi.createInvitation(accessToken ?? "", payload as any),
     onSuccess: async (invitation) => {
       setInviteOpen(false);
       setFormError(null);
@@ -1562,6 +1567,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       setRoleOpen(null);
       setRoleFormError(null);
       await invalidateSettingsAndContext(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
@@ -1609,9 +1615,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       return;
     }
     const needsOrg = inviteRoleScopeCategory !== "platform";
-    const effectiveOrgId = needsOrg ? (Number(inviteOrgId) || null) : scopeOrganizationId;
-    if (!effectiveOrgId) {
-      setFormError(needsOrg ? "Select an organization for this role." : "Unable to determine organization scope. Navigate to a specific organization to invite members.");
+    const effectiveOrgId = needsOrg ? (Number(inviteOrgId) || null) : (scopeOrganizationId ?? null);
+    if (needsOrg && !effectiveOrgId) {
+      setFormError("Select an organization for this role.");
       return;
     }
     const needsWorkspace = inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team";
@@ -1686,14 +1692,12 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         title="Members"
         description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
-          !isGlobalDirectory || organizations.length ? (
-            <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-              <QuickCreateButton onClick={() => { setInviteRoleId(String(platformMemberRole?.id ?? "")); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
-            </PermissionAction>
-          ) : undefined
+          <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
+            <QuickCreateButton onClick={() => { setInviteRoleId(String(platformMemberRole?.id ?? "")); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
+          </PermissionAction>
         }
       />
-      {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Create an organization before sending scoped invitations." /> : null}
+      {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Member, Platform Admin) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
       {!permissions.isLoading && !permissions.isFetching && !canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
       <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
@@ -1811,10 +1815,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           </FormField>
         ) : (
           <FormField label="Scope">
-            <Input
-              value={workspaceId ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}` : scopeOrganizationId ? `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}` : "No scope — navigate to an organization or workspace"}
-              readOnly
-            />
+            <Input value="Platform scope (no additional scope required)" readOnly />
           </FormField>
         )}
         {(inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team") ? (
@@ -2027,7 +2028,9 @@ export function MemberDetailView({ userId }: { userId: number }) {
     enabled: Boolean(accessToken && userId)
   });
   const visibleRoles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions));
-  const memberRoleIds = (userRolesQuery.data ?? []).map((assignment) => assignment.role_id);
+  // Active role_assignments is the source of truth — user_roles only has backward-compat unscoped data.
+  const activeAssignments = (roleAssignmentsQuery.data ?? []).filter((a) => a.status === "active");
+  const memberRoleIds = activeAssignments.map((assignment) => assignment.role_id);
   const assignSelectedRole = visibleRoles.find((role) => role.id === Number(assignRoleId));
   const assignScopeCategory: "platform" | "organization" | "workspace" | "project" | "team" = (() => {
     const scope = assignSelectedRole?.scope ?? "";
@@ -2054,14 +2057,18 @@ export function MemberDetailView({ userId }: { userId: number }) {
       setAssignWsId("");
       await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
   });
   const removeRoleMutation = useMutation({
-    mutationFn: (roleId: number) => settingsApi.removeUserRole(accessToken ?? "", userId, roleId),
+    mutationFn: (assignmentId: number) => settingsApi.deleteRoleAssignment(accessToken ?? "", assignmentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
       addToast({ type: "success", title: "Role removed" });
     },
     onError: (error) => addToast({ type: "error", title: "Role removal failed", message: error instanceof Error ? error.message : "Unable to remove role." })
@@ -2191,14 +2198,14 @@ export function MemberDetailView({ userId }: { userId: number }) {
       >
         <SettingsDataTable
           columns={["Role", "Scope", "System Role", "Assigned", "Actions"]}
-          rows={(userRolesQuery.data ?? []).map((assignment) => {
+          rows={activeAssignments.map((assignment) => {
             const role = visibleRoles.find((item) => item.id === assignment.role_id);
             return [
               role?.name ?? `Role ${assignment.role_id}`,
-              roleDisplayName(role?.scope),
+              scopeLabelForAssignment(assignment, organizations, workspaces),
               role?.is_system ? "Yes" : "No",
-              formatDate(assignment.created_at),
-              <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.role_id)} disabled={removeRoleMutation.isPending}>Remove</Button>
+              formatDate(assignment.assigned_at),
+              <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.id)} disabled={removeRoleMutation.isPending}>Remove</Button>
             ];
           })}
           emptyMessage="No assigned roles"

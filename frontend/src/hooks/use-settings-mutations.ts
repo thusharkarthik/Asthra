@@ -66,6 +66,9 @@ export function useInviteMemberMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
       await queryClient.invalidateQueries({ queryKey: ["settings", "members"] });
       await queryClient.invalidateQueries({ queryKey: ["settings", "global-member-role-assignments"] });
+      // Invalidate authority queries used by settings/layout.tsx so settings unlock without page refresh.
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
     }
   });
 }
@@ -85,6 +88,8 @@ export function useAssignRoleMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.roles });
       await queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.permissions });
+      // Invalidate authority queries used by settings/layout.tsx so settings unlock without page refresh.
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
     }
   });
 }
