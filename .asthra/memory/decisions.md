@@ -1,5 +1,20 @@
 # Architectural Decisions
 
+## 2026-06-26 — role_assignments is Primary Write Path; user_roles is Backward-Compat Only
+
+**Decision**: `POST /users/{id}/roles` now dual-writes to both `user_roles` (for backward compat) and `role_assignments` (primary, scoped). `role_assignments` is the authoritative source of truth for scoped role data.
+
+**Rationale**: The `user_roles` table is unscoped — unique on `(user_id, role_id)` only. It cannot represent the same role assigned at multiple scopes (e.g., workspace_admin at workspace 1 AND workspace 2). `role_assignments` has `(user_id, role_id, scope_type, scope_id)` uniqueness and supports this naturally.
+
+**Constraints (Phase A)**:
+- `user_roles` table is NOT dropped. Still written to for backward compat with any code reading from it.
+- `_resolve_roles()` in `access_control_service.py` now only applies `user_roles` entries where `role.scope == "platform"`. Non-platform roles get their correct scope from `role_assignments`.
+- Phase B (future): consolidation pass to stop writing to `user_roles` entirely and migrate read paths to `role_assignments` exclusively.
+
+**`platform_member` role** added to `ASTHRA_ROLE_TEMPLATES`: minimal platform-scoped role for newly invited users (settings.profile.view, settings.notifications.view, settings.preferences.view). Default selection in invite modal.
+
+---
+
 ## 2026-06-25 — Settings Members Page: Authority-Based Scope
 
 **Decision**: `/settings/members` derives scope from the logged-in user's own roles, not from the bottom bar.

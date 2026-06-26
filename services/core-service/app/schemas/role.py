@@ -190,6 +190,8 @@ class RolePermissionRead(TimestampedRead):
 
 class UserRoleCreate(BaseModel):
     role_id: int
+    scope_type: str = "platform"
+    scope_id: int | None = None
 
 
 class UserRoleRead(TimestampedRead):

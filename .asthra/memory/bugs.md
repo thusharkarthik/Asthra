@@ -84,6 +84,20 @@
 **Symptom**: Description fields for Org, Workspace, Project, Team, Role, and Permission create/edit forms used `<Input>` (single-line `<input type="text">`), making it impractical to enter multi-sentence descriptions.
 **Fix**: All 12 `<Input name="description">` replaced with `<textarea rows={3}>` using matching CSS via `DESCRIPTION_TEXTAREA_CLASS` constant. Vertically resizable, minimum 3 rows.
 
+### BUG-013 — Non-Platform Roles in user_roles Treated as Platform-Scope [FIXED 2026-06-26]
+
+**File**: `services/core-service/app/services/access_control_service.py`
+**Symptom**: If a non-platform role (e.g., `organization_admin`, `workspace_manager`) was in the `user_roles` table, `_resolve_roles()` would treat it as having platform-level permissions — giving the user elevated access across the entire platform.
+**Root cause**: `_resolve_roles()` iterated all `UserRole` rows and called `_add_role(roles, role, "platform", None)` unconditionally, regardless of `role.scope`.
+**Fix**: Added `and role.scope == "platform"` guard: only platform-scoped roles from `user_roles` are applied at platform scope. Org/workspace roles are correctly scoped via `role_assignments`.
+
+### BUG-014 — assign_user_role() Ignored scope_type/scope_id from Request Body [FIXED 2026-06-26]
+
+**File**: `services/core-service/app/services/role_service.py`
+**Symptom**: `POST /users/{id}/roles` with `{ role_id, scope_type: "organization", scope_id: 5 }` silently assigned at platform scope — the scope fields were accepted but ignored.
+**Root cause**: `assign_user_role()` hardcoded `"platform"` and `None` in all permission checks, duplicate checks, context version bumps, and the `user_roles` write. `UserRoleCreate` schema also only had `role_id`.
+**Fix**: Added `scope_type: str = "platform"` and `scope_id: int | None = None` to `UserRoleCreate`. Updated `assign_user_role()` to use caller-supplied scope throughout. Duplicate check now targets `role_assignments` at the specific scope.
+
 ## Open
 
 _(none currently tracked)_

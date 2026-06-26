@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-26 (memory system formalized)
+Last updated: 2026-06-26 (role assignment unification — dual-write to role_assignments)
 
 ## Phase
 
@@ -8,9 +8,7 @@ Last updated: 2026-06-26 (memory system formalized)
 
 ## Branch
 
-All 2026-06-26 work committed. Current branch: `chore/memory-system-setup` (formalizing .asthra memory system).
-
-Previous work landed on `fix/settings-members-authority-scope`.
+Current branch: `fix/settings-members-authority-scope`. Uncommitted changes (role assignment unification task).
 
 ## Settings Auth Guard + Authority Context
 
@@ -58,6 +56,9 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 ## RBAC Architecture
 
 - Two role tables: `UserRole` (unscoped, no audit) and `RoleAssignment` (scoped, with status/audit).
+- **Phase A (current)**: `assign_user_role()` dual-writes to both tables. `role_assignments` is primary. `user_roles` kept for backward compat — only platform-scoped entries are applied at platform scope in `_resolve_roles()`.
+- **Phase B (deferred)**: Stop writing to `user_roles`, migrate all read paths to `role_assignments` only. Listed in `doNotTouch` until explicitly scoped.
+- `platform_member` role added to `ASTHRA_ROLE_TEMPLATES` — minimal platform role for new invitees.
 - Platform-scope `/me/permissions` (no query params) only returns platform-level roles. Org/workspace assignments never surface at platform scope.
 - `useCurrentPermissions` hook cannot force platform scope by passing null — always falls back to store selections.
 - `getCurrentPermissions(token, {})` called directly (bypassing the hook) correctly targets platform scope.
