@@ -41,6 +41,14 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - **`/settings/workspaces/:id/members`** — correctly scoped by URL param. Untouched.
 - **`/settings/projects/:id/members`** — correctly scoped by URL param. Untouched.
 
+## Frontend Access Control
+
+`lib/rbac.ts` has been deleted (2026-06-26). `lib/role-utils.ts` replaces it with display/sorting utilities only:
+- `normalizeRole()`, `roleRank()`, `ROLE_RANK`, `RoleName`, `RoleContext`
+- No access control functions
+
+`can()` from `usePlatformContext()` (backed by `lib/permissions.ts` + backend permission codes) is the **sole** frontend access control mechanism. Do not add role-rank checks for visibility/gating decisions — use `can("module.resource.action")` instead.
+
 ## RBAC Architecture
 
 - Two role tables: `UserRole` (unscoped, no audit) and `RoleAssignment` (scoped, with status/audit).
