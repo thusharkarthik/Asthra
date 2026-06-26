@@ -1455,6 +1455,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const [roleOpen, setRoleOpen] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const [inviteRoleId, setInviteRoleId] = useState("");
+  const [inviteOrgId, setInviteOrgId] = useState<number | "">("");
+  const [inviteWsId, setInviteWsId] = useState<number | "">("");
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const membersQuery = useQuery<Array<{ user_id: number; role_id?: number | null; member_role: string }>>({
@@ -1495,6 +1498,22 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
+  const platformMemberRole = visibleRoles.find((role) => role.key === "platform_member");
+  const groupedAllRoles = visibleRoles
+    .filter((role) => role.is_active !== false)
+    .reduce<Record<string, RoleRecord[]>>((groups, role) => {
+      groups[role.scope] = [...(groups[role.scope] ?? []), role];
+      return groups;
+    }, {});
+  const inviteSelectedRole = visibleRoles.find((role) => role.id === Number(inviteRoleId));
+  const inviteRoleScopeCategory: "platform" | "organization" | "workspace" | "project" | "team" = (() => {
+    const scope = inviteSelectedRole?.scope ?? "";
+    if (scope === "organization") return "organization";
+    if (scope === "workspace") return "workspace";
+    if (scope === "project") return "project";
+    if (scope === "team") return "team";
+    return "platform";
+  })();
   const scopedInvitations = (invitationsQuery.data ?? [])
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
@@ -1519,6 +1538,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     onSuccess: async (invitation) => {
       setInviteOpen(false);
       setFormError(null);
+      setInviteRoleId("");
+      setInviteOrgId("");
+      setInviteWsId("");
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
       await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Invitation created", message: `${invitation.email} was invited.` });
@@ -1578,11 +1600,6 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     event.preventDefault();
     const form = event.currentTarget;
     const email = getFormValue(form, "email");
-    const roleId = Number(getFormValue(form, "role_id")) || null;
-    if (!scopeOrganizationId) {
-      setFormError("Unable to determine organization scope. Navigate to a specific organization or workspace to invite members.");
-      return;
-    }
     if (!email) {
       setFormError("Email is required.");
       return;
@@ -1591,7 +1608,19 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       setFormError("Enter a valid email address.");
       return;
     }
-    inviteMutation.mutate({ email, organization_id: scopeOrganizationId, workspace_id: scopeWorkspaceId, role_id: roleId });
+    const needsOrg = inviteRoleScopeCategory !== "platform";
+    const effectiveOrgId = needsOrg ? (Number(inviteOrgId) || null) : scopeOrganizationId;
+    if (!effectiveOrgId) {
+      setFormError(needsOrg ? "Select an organization for this role." : "Unable to determine organization scope. Navigate to a specific organization to invite members.");
+      return;
+    }
+    const needsWorkspace = inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team";
+    const effectiveWsId = needsWorkspace ? (Number(inviteWsId) || null) : scopeWorkspaceId;
+    if (needsWorkspace && !effectiveWsId) {
+      setFormError("Select a workspace for this role.");
+      return;
+    }
+    inviteMutation.mutate({ email, organization_id: effectiveOrgId, workspace_id: effectiveWsId, role_id: Number(inviteRoleId) || null });
   }
 
   return (
@@ -1659,7 +1688,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         actions={
           !isGlobalDirectory || organizations.length ? (
             <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-              <QuickCreateButton onClick={() => setInviteOpen(true)}>Invite Member</QuickCreateButton>
+              <QuickCreateButton onClick={() => { setInviteRoleId(String(platformMemberRole?.id ?? "")); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
             </PermissionAction>
           ) : undefined
         }
@@ -1749,26 +1778,61 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         })}
         emptyMessage="No members found"
       />
-      <SettingsCreateDialog title="Invite member" open={inviteOpen} onOpenChange={setInviteOpen} onSubmit={submitInvite} error={formError}>
+      <SettingsCreateDialog
+        title="Invite member"
+        open={inviteOpen}
+        onOpenChange={(open) => { setInviteOpen(open); if (!open) { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setFormError(null); } }}
+        onSubmit={submitInvite}
+        error={formError}
+      >
         <FormField label="Email" required><Input name="email" type="email" placeholder="teammate@example.com" /></FormField>
         <FormField label="Role">
-          <select name="role_id" aria-label="Invite role" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            <RoleSelectOptions groupedRoles={groupedInviteRoles} />
+          <select
+            aria-label="Invite role"
+            value={inviteRoleId}
+            onChange={(e) => { setInviteRoleId(e.target.value); setInviteOrgId(""); setInviteWsId(""); }}
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="">Default member</option>
+            <RoleSelectOptions groupedRoles={groupedAllRoles} includeDefault={false} />
           </select>
         </FormField>
-        <FormField label="Scope">
-          <Input
-            value={
-              workspaceId
-                ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}`
-                : scopeOrganizationId
-                  ? `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}`
-                  : "No scope — navigate to an organization or workspace"
-            }
-            readOnly
-          />
-        </FormField>
-        <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => setInviteOpen(false)} />
+        {inviteRoleScopeCategory !== "platform" ? (
+          <FormField label="Organization" required>
+            <select
+              aria-label="Invite organization"
+              value={inviteOrgId}
+              onChange={(e) => { setInviteOrgId(Number(e.target.value) || ""); setInviteWsId(""); }}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">Select organization</option>
+              {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+            </select>
+          </FormField>
+        ) : (
+          <FormField label="Scope">
+            <Input
+              value={workspaceId ? `Workspace: ${scopedWorkspace?.name ?? workspaceId}` : scopeOrganizationId ? `Organization: ${scopedOrganization?.name ?? scopeOrganizationId}` : "No scope — navigate to an organization or workspace"}
+              readOnly
+            />
+          </FormField>
+        )}
+        {(inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team") ? (
+          <FormField label="Workspace" required>
+            <select
+              aria-label="Invite workspace"
+              value={inviteWsId}
+              onChange={(e) => setInviteWsId(Number(e.target.value) || "")}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">Select workspace</option>
+              {workspaces
+                .filter((ws) => !inviteOrgId || ws.organization_id === Number(inviteOrgId))
+                .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+            </select>
+          </FormField>
+        ) : null}
+        <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => { setInviteOpen(false); setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setFormError(null); }} />
       </SettingsCreateDialog>
       <SettingsCreateDialog title="Change role" open={roleOpen !== null} onOpenChange={(open) => { setRoleOpen(open ? roleOpen : null); if (!open) setRoleFormError(null); }} onSubmit={(event) => {
         event.preventDefault();
@@ -1930,6 +1994,7 @@ function memberSortValue(row: MemberListRow, sortKey: string) {
 }
 
 export function MemberDetailView({ userId }: { userId: number }) {
+  const { organizations, workspaces } = useSettingsData();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
@@ -1938,6 +2003,8 @@ export function MemberDetailView({ userId }: { userId: number }) {
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const [assignRoleId, setAssignRoleId] = useState("");
+  const [assignOrgId, setAssignOrgId] = useState<number | "">("");
+  const [assignWsId, setAssignWsId] = useState<number | "">("");
   const userQuery = useQuery({ queryKey: ["settings", "user", userId], queryFn: () => settingsApi.getUser(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const userRolesQuery = useQuery({ queryKey: ["settings", "user-roles", userId], queryFn: () => settingsApi.listUserRoles(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
@@ -1961,6 +2028,15 @@ export function MemberDetailView({ userId }: { userId: number }) {
   });
   const visibleRoles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions));
   const memberRoleIds = (userRolesQuery.data ?? []).map((assignment) => assignment.role_id);
+  const assignSelectedRole = visibleRoles.find((role) => role.id === Number(assignRoleId));
+  const assignScopeCategory: "platform" | "organization" | "workspace" | "project" | "team" = (() => {
+    const scope = assignSelectedRole?.scope ?? "";
+    if (scope === "organization") return "organization";
+    if (scope === "workspace") return "workspace";
+    if (scope === "project") return "project";
+    if (scope === "team") return "team";
+    return "platform";
+  })();
   const inheritedPermissionsQuery = useQuery({
     queryKey: ["settings", "member-inherited-permissions", userId, memberRoleIds.join(",")],
     queryFn: async () => {
@@ -1970,10 +2046,14 @@ export function MemberDetailView({ userId }: { userId: number }) {
     enabled: Boolean(accessToken && memberRoleIds.length)
   });
   const assignRoleMutation = useMutation({
-    mutationFn: (roleId: number) => settingsApi.assignUserRole(accessToken ?? "", userId, roleId),
+    mutationFn: (payload: { role_id: number; scope_type: string; scope_id: number | null }) =>
+      settingsApi.createRoleAssignment(accessToken ?? "", { user_id: userId, role_id: payload.role_id, scope_type: payload.scope_type, scope_id: payload.scope_id }),
     onSuccess: async () => {
       setAssignRoleId("");
+      setAssignOrgId("");
+      setAssignWsId("");
       await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments", userId] });
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
@@ -2051,12 +2131,61 @@ export function MemberDetailView({ userId }: { userId: number }) {
         title="Current Roles"
         description="Users receive roles. Inherited permissions are calculated from assigned role mappings."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <select aria-label="Assign member role" value={assignRoleId} onChange={(event) => setAssignRoleId(event.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Assign member role"
+              value={assignRoleId}
+              onChange={(event) => { setAssignRoleId(event.target.value); setAssignOrgId(""); setAssignWsId(""); }}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            >
               <option value="">Select role</option>
               {availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
             </select>
-            <Button type="button" size="sm" disabled={!assignRoleId || assignRoleMutation.isPending} onClick={() => assignRoleMutation.mutate(Number(assignRoleId))}>Assign Role</Button>
+            {assignScopeCategory !== "platform" ? (
+              <select
+                aria-label="Assign organization"
+                value={assignOrgId}
+                onChange={(e) => { setAssignOrgId(Number(e.target.value) || ""); setAssignWsId(""); }}
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Select org</option>
+                {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+              </select>
+            ) : null}
+            {(assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") ? (
+              <select
+                aria-label="Assign workspace"
+                value={assignWsId}
+                onChange={(e) => setAssignWsId(Number(e.target.value) || "")}
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Select workspace</option>
+                {workspaces
+                  .filter((ws) => !assignOrgId || ws.organization_id === Number(assignOrgId))
+                  .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+              </select>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              disabled={
+                !assignRoleId ||
+                (assignScopeCategory !== "platform" && !assignOrgId) ||
+                ((assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") && !assignWsId) ||
+                assignRoleMutation.isPending
+              }
+              onClick={() => {
+                const scopeId =
+                  assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team"
+                    ? Number(assignWsId) || null
+                    : assignScopeCategory === "organization"
+                      ? Number(assignOrgId) || null
+                      : null;
+                assignRoleMutation.mutate({ role_id: Number(assignRoleId), scope_type: assignScopeCategory, scope_id: scopeId });
+              }}
+            >
+              Assign Role
+            </Button>
           </div>
         }
       >

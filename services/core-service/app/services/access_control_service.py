@@ -240,7 +240,7 @@ class AccessControlService:
 
         for user_role in self.db.query(UserRole).filter(UserRole.user_id == user_id).all():
             role = user_role.role
-            if role and role.is_active:
+            if role and role.is_active and role.scope == "platform":
                 self._add_role(roles, role, "platform", None)
         self._add_role_assignments(roles, user_id, scope_type, scope_id)
 

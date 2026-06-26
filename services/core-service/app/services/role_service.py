@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -47,6 +48,13 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "platform",
         "description": "Support operational access for platform assistance.",
         "permission_patterns": ["*.view", "desk.ticket.manage", "pulse.incident.view"],
+    },
+    {
+        "name": "Platform Member",
+        "key": "platform_member",
+        "scope": "platform",
+        "description": "Default role for invited users. Minimal platform access until a scoped role is assigned.",
+        "permission_patterns": ["settings.profile.view", "settings.notifications.view", "settings.preferences.view"],
     },
     {
         "name": "Organization Owner",
@@ -369,20 +377,56 @@ class RoleService:
         current_user: User,
     ) -> UserRole:
         self._ensure_active_user(current_user)
-        self._require_role_manage(current_user, "platform", None)
+        scope_type = user_role_create.scope_type
+        scope_id = user_role_create.scope_id
+        self._require_role_manage(current_user, scope_type, scope_id)
         user = self.role_repository.get_user(user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
         role = self.role_repository.get_by_id(user_role_create.role_id)
         if role is None or not role.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
-        self._ensure_role_can_be_assigned(role, current_user, "platform", None)
-        if self.role_repository.get_user_role(user.id, role.id) is not None:
+        self._ensure_role_can_be_assigned(role, current_user, scope_type, None)
+
+        # Primary duplicate check is on role_assignments (scope-aware)
+        existing_assignment = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.role_id == role.id,
+                RoleAssignment.scope_type == scope_type,
+                RoleAssignment.scope_id == scope_id,
+            )
+            .first()
+        )
+        if existing_assignment is not None and existing_assignment.status == "active":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Role is already assigned to this user.",
+                detail="Role is already assigned to this user at this scope.",
             )
-        user_role = self.role_repository.assign_user_role(user.id, role.id)
+
+        # Backward-compat: write to user_roles (skip if already present — no scope info there)
+        user_role: UserRole | None = self.role_repository.get_user_role(user.id, role.id)
+        if user_role is None:
+            user_role = self.role_repository.assign_user_role(user.id, role.id)
+
+        # Primary write to role_assignments with full scope info
+        if existing_assignment is not None:
+            existing_assignment.status = "active"
+            existing_assignment.revoked_at = None
+            existing_assignment.assigned_by = current_user.id
+            existing_assignment.assigned_at = datetime.now(timezone.utc)
+        else:
+            self.db.add(RoleAssignment(
+                user_id=user.id,
+                role_id=role.id,
+                scope_type=scope_type,
+                scope_id=scope_id,
+                status="active",
+                assigned_by=current_user.id,
+                assigned_at=datetime.now(timezone.utc),
+            ))
+
         NotificationService(self.db).create_notification(
             user_id=user.id,
             type="role.assigned",
@@ -392,7 +436,7 @@ class RoleService:
             entity_type="role",
             entity_id=str(role.id),
         )
-        ContextVersionService(self.db).bump_access("platform", None)
+        ContextVersionService(self.db).bump_access(scope_type, scope_id)
         self.db.commit()
         return user_role
 
