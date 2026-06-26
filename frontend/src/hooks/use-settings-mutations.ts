@@ -64,6 +64,8 @@ export function useInviteMemberMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.invitations.list });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
       await queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "members"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "global-member-role-assignments"] });
     }
   });
 }
@@ -77,6 +79,8 @@ export function useAssignRoleMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot });
       await queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "members"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "global-member-role-assignments"] });
       await queryClient.invalidateQueries({ queryKey: queryKeys.roles.all });
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.roles });
       await queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });

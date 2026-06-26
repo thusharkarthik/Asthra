@@ -219,6 +219,14 @@ class AccessControlService:
             detail=f"Permission required: {permission_code}",
         )
 
+    def guard_superuser_self_removal(self, target_user_id: int, current_user: User) -> None:
+        """Block a superuser from removing their own roles — another superuser must perform this action."""
+        if current_user.is_superuser and current_user.id == target_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Superusers cannot remove their own roles. Ask another superuser.",
+            )
+
     def _normalize_scope(self, scope_type: str | None, scope_id: int | None) -> tuple[str, int | None]:
         normalized = (scope_type or "platform").strip().lower()
         if normalized not in {"platform", "organization", "workspace", "project", "team"}:

@@ -51,6 +51,21 @@
 **Root cause**: `settings/page.tsx` unconditionally rendered `<SettingsHomeView />`. The layout guard allowed personal-route access for members but did not filter what the page displayed.
 **Fix**: Exported `SettingsAuthorityContext` + `useSettingsAuthority` from `settings/layout.tsx`. `settings/page.tsx` reads `authorityLevel` — members see only 4 personal cards (Profile, Preferences, Notifications, Account); all admin levels render full `<SettingsHomeView />`. Default context `null` maps to admin view so tests that render the page without the layout continue to pass.
 
+### BUG-008 — Superuser Self-Removal Not Blocked [FIXED 2026-06-26]
+
+**Files**: `services/core-service/app/api/v1/role_assignments.py`, `services/core-service/app/api/v1/users.py`, `services/core-service/app/services/access_control_service.py`
+**Symptom**: A superuser could delete their own role assignments (when 2+ superusers exist) because the existing "last superuser" guard only blocked removal when there was exactly 1 superuser left — not self-removal in general.
+**Root cause**: `_ensure_not_last_protected_assignment` and `_ensure_not_last_protected_role` check count > 1, not whether the actor is targeting themselves.
+**Fix**: Added `AccessControlService.guard_superuser_self_removal(target_user_id, current_user)` → raises 400 "Superusers cannot remove their own roles." Called from `DELETE /role-assignments/{id}`, `PATCH /role-assignments/{id}`, and `DELETE /users/{user_id}/roles/{role_id}`.
+**Note**: The "last superuser removal by another user" was already guarded correctly by the existing service-layer checks.
+
+### BUG-009 — Member List Stale After Remove/Invite/Role Change [FIXED 2026-06-26]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/hooks/use-settings-mutations.ts`
+**Symptom**: After removing, inviting, or changing the role of a member, the list showed stale data until a manual page reload.
+**Root cause**: `invalidateSettingsAndContext()` invalidated `queryKeys.members.all` = `["members"]`, which matched `queryKeys.members.list(...)` = `["members", "list", ...]` (global directory). But the scoped member list query uses key `["settings", "members", orgId, wsId]`, which starts with `"settings"` — not matched by the `["members"]` prefix.
+**Fix**: Added `["settings", "members"]` and `["settings", "global-member-role-assignments"]` to `invalidateSettingsAndContext()`. Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
+
 ## Open
 
 _(none currently tracked)_

@@ -5,6 +5,7 @@ from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.user import RoleAssignment, User
 from app.schemas.scoped_membership import RoleAssignmentCreate, RoleAssignmentRead, RoleAssignmentUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.scoped_membership_service import ScopedMembershipService
 
 router = APIRouter()
@@ -46,6 +47,9 @@ def update_role_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RoleAssignment:
+    assignment = db.get(RoleAssignment, assignment_id)
+    if assignment is not None:
+        AccessControlService(db).guard_superuser_self_removal(assignment.user_id, current_user)
     return ScopedMembershipService(db).update_role_assignment(assignment_id, assignment_update, current_user)
 
 
@@ -55,5 +59,8 @@ def delete_role_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
+    assignment = db.get(RoleAssignment, assignment_id)
+    if assignment is not None:
+        AccessControlService(db).guard_superuser_self_removal(assignment.user_id, current_user)
     ScopedMembershipService(db).delete_role_assignment(assignment_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

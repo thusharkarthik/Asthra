@@ -127,6 +127,9 @@ function invalidateSettingsAndContext(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.projects.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.members.all }),
+    // The scoped member list uses ["settings", "members", orgId, wsId] — must invalidate by prefix.
+    queryClient.invalidateQueries({ queryKey: ["settings", "members"] }),
+    queryClient.invalidateQueries({ queryKey: ["settings", "global-member-role-assignments"] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.roles.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.teams.all }),

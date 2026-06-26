@@ -7,6 +7,7 @@ from app.models.user import User, UserRole
 from app.schemas.role import UserRoleCreate, UserRoleRead
 from app.schemas.scoped_membership import EffectivePermissionsRead
 from app.schemas.user import UserProfileRead, UserProfileUpdate
+from app.services.access_control_service import AccessControlService
 from app.services.role_service import RoleService
 from app.services.scoped_membership_service import ScopedMembershipService
 from app.services.user_service import UserService
@@ -75,6 +76,7 @@ def remove_user_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
+    AccessControlService(db).guard_superuser_self_removal(user_id, current_user)
     RoleService(db).remove_user_role(user_id, role_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

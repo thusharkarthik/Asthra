@@ -51,3 +51,18 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 ## First User Bootstrap
 
 First registered user gets `is_superuser=True`, plus dual-write to both `UserRole` and `RoleAssignment` for `superuser` and `platform_owner` roles.
+
+## Superuser Self-Removal Guard
+
+Added 2026-06-26. `AccessControlService.guard_superuser_self_removal(target_user_id, current_user)` raises 400 if a superuser tries to modify their own roles. Called from:
+- `DELETE /role-assignments/{id}` in `role_assignments.py`
+- `PATCH /role-assignments/{id}` in `role_assignments.py`
+- `DELETE /users/{user_id}/roles/{role_id}` in `users.py`
+
+The "last superuser" guard already existed in `ScopedMembershipService._ensure_not_last_protected_assignment()` and `RoleService._ensure_not_last_protected_role()` — these were not added by this task.
+
+## Member List Cache Invalidation
+
+Fixed 2026-06-26. `invalidateSettingsAndContext()` in `settings-admin-views.tsx` now also invalidates `["settings", "members"]` and `["settings", "global-member-role-assignments"]` — the exact keys used by `membersQuery` in `MembersView`. Previously only `["members"]` was invalidated, which missed the `["settings", "members", orgId, wsId]` prefix.
+
+Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
