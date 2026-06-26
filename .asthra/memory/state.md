@@ -1,10 +1,16 @@
 # Platform State
 
-Last updated: 2026-06-26
+Last updated: 2026-06-26 (memory system formalized)
+
+## Phase
+
+**Core Stabilization** — RBAC hardening, Settings access control, Settings UX polish, notification improvements.
 
 ## Branch
 
-`feature/bootstrap-superuser-and-progress` → cleaned up and fixes committed to `fix/settings-members-authority-scope`
+All 2026-06-26 work committed. Current branch: `chore/memory-system-setup` (formalizing .asthra memory system).
+
+Previous work landed on `fix/settings-members-authority-scope`.
 
 ## Settings Auth Guard + Authority Context
 

@@ -16,5 +16,38 @@
     "Future cross-service coordination uses events.",
     "Ownership boundaries must be respected."
   ],
-  "currentPriority": ["Flow Maturity", "Discover Maturity", "Docs Maturity", "Desk", "Pulse", "Dev"]
+  "currentPhase": "Core Stabilization — RBAC, Settings, Member Management, Notifications",
+  "targetUser": "Engineering and product teams at growing companies, 20–200 people, who need structured execution without enterprise tool overhead.",
+  "currentPriority": [
+    "Core stabilization and RBAC hardening",
+    "Settings UX and access control enforcement",
+    "Flow maturity",
+    "Discover maturity",
+    "Docs maturity"
+  ],
+  "doNotTouch": [
+    "shared packages (shared-auth, shared-db, shared-events, shared-schemas, shared-platform) without explicit instruction",
+    "alembic migration files without explicit instruction",
+    "docker-compose.yml service ports",
+    "UserRole vs RoleAssignment consolidation — deferred to Phase B",
+    "AI service and Memory service connection — deferred to Phase C"
+  ],
+  "agentInstructions": {
+    "beforeStarting": [
+      "Read .asthra/platform.json",
+      "Read .asthra/memory/state.md",
+      "Read .asthra/memory/bugs.md",
+      "Read relevant service AI_CONTEXT.md if touching backend",
+      "Read frontend/AI_CONTEXT.md if touching frontend",
+      "Run git status"
+    ],
+    "beforeFinishing": [
+      "Update .asthra/memory/state.md",
+      "Append to .asthra/memory/decisions.md if any architectural choice was made",
+      "Update .asthra/memory/bugs.md for any bug fixed or discovered",
+      "Append to .asthra/sessions/YYYY-MM-DD.md",
+      "Run npm run build if frontend was touched",
+      "Report summary of files changed and tests run"
+    ]
+  }
 }
