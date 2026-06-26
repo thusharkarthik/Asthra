@@ -11,7 +11,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { usePlatformContext } from "@/context/platformContext";
 import { settingsApi } from "@/services/api/settings-api";
 import { queryKeys } from "@/lib/queryKeys";
-import { normalizeRole } from "@/lib/rbac";
+import { normalizeRole } from "@/lib/role-utils";
 import { can as hasPermission } from "@/lib/permissions";
 import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
 import { PermissionAction, PermissionButton } from "@/access/permission-components";
