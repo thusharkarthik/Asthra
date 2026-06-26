@@ -137,6 +137,85 @@ function invalidateSettingsAndContext(queryClient: QueryClient) {
   ]);
 }
 
+// Shared class for description <textarea> elements — matches Input styling without fixed height.
+const DESCRIPTION_TEXTAREA_CLASS =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 resize-y min-h-[72px]";
+
+type MemberSelectOption = { userId: number; name: string; email: string };
+
+function SettingsMemberSelect({
+  name,
+  placeholder = "Type 2+ characters to search…",
+  members,
+}: {
+  name: string;
+  placeholder?: string;
+  members: MemberSelectOption[];
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const selected = selectedId != null ? (members.find((m) => m.userId === selectedId) ?? null) : null;
+  const filtered =
+    search.length >= 2
+      ? members.filter(
+          (m) =>
+            m.name.toLowerCase().includes(search.toLowerCase()) ||
+            m.email.toLowerCase().includes(search.toLowerCase()),
+        )
+      : [];
+
+  return (
+    <div className="relative">
+      <input type="hidden" name={name} value={selectedId ?? ""} />
+      {selected ? (
+        <div className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+          <span className="flex-1 truncate">
+            {selected.name}
+            {selected.email ? <span className="ml-1 text-muted-foreground">· {selected.email}</span> : null}
+          </span>
+          <button
+            type="button"
+            aria-label="Clear selection"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => { setSelectedId(null); setSearch(""); }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <Input
+          placeholder={placeholder}
+          value={search}
+          autoComplete="off"
+          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => { if (search.length >= 2) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+      )}
+      {open && search.length >= 2 && (
+        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-background shadow-md">
+          {filtered.length > 0 ? (
+            filtered.map((m) => (
+              <button
+                key={m.userId}
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                onMouseDown={() => { setSelectedId(m.userId); setSearch(""); setOpen(false); }}
+              >
+                <span className="font-medium">{m.name}</span>
+                {m.email ? <span className="ml-2 text-xs text-muted-foreground">{m.email}</span> : null}
+              </button>
+            ))
+          ) : (
+            <p className="p-3 text-sm text-muted-foreground">No results found</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "Not available";
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
@@ -583,7 +662,7 @@ export function OrganizationsView() {
           <Input name="name" placeholder="Acme Platform" />
         </FormField>
         <FormField label="Description">
-          <Input name="description" placeholder="Internal product organization" />
+          <textarea name="description" placeholder="Internal product organization" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormActions submitLabel="Create Organization" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
@@ -708,7 +787,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
           <Input name="name" placeholder="Product Workspace" />
         </FormField>
         <FormField label="Description">
-          <Input name="description" placeholder="Product and engineering planning" />
+          <textarea name="description" placeholder="Product and engineering planning" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormActions submitLabel="Create Workspace" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
@@ -850,7 +929,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
           <Input name="name" placeholder="Asthra Alpha" />
         </FormField>
         <FormField label="Description">
-          <Input name="description" placeholder="Initial internal alpha project" />
+          <textarea name="description" placeholder="Initial internal alpha project" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormActions submitLabel="Create Project" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
@@ -957,7 +1036,7 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
           <Input name="name" defaultValue={organization.name} />
         </FormField>
         <FormField label="Description">
-          <Input name="description" defaultValue={organization.description ?? ""} />
+          <textarea name="description" defaultValue={organization.description ?? ""} className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormField label="Status">
           <select name="is_active" defaultValue={String(organization.is_active !== false)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -1066,7 +1145,7 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
           <Input name="name" defaultValue={workspace.name} />
         </FormField>
         <FormField label="Description">
-          <Input name="description" defaultValue={workspace.description ?? ""} />
+          <textarea name="description" defaultValue={workspace.description ?? ""} className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormField label="Status">
           <select name="is_active" defaultValue={String(workspace.is_active !== false)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -1313,7 +1392,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
           <Input name="name" defaultValue={project.name} />
         </FormField>
         <FormField label="Description">
-          <Input name="description" defaultValue={project.description ?? ""} />
+          <textarea name="description" defaultValue={project.description ?? ""} className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormField label="Status">
           <select name="status" defaultValue={project.is_active === false ? "archived" : project.status ?? "active"} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -1329,25 +1408,27 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         if (ownerId) ownerMutation.mutate(ownerId);
       }}>
         <FormField label="Workspace member" required>
-          <select name="owner_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            <option value="">Select owner</option>
-            {(workspaceMembersQuery.data ?? []).map((member) => {
-              const user = displayUser(ownerProfiles.get(member.user_id), member.user_id);
-              return <option key={member.user_id} value={member.user_id}>{user.name} - {user.email}</option>;
+          <SettingsMemberSelect
+            name="owner_id"
+            placeholder="Search workspace members…"
+            members={(workspaceMembersQuery.data ?? []).map((m) => {
+              const user = displayUser(ownerProfiles.get(m.user_id), m.user_id);
+              return { userId: m.user_id, name: user.name, email: user.email };
             })}
-          </select>
+          />
         </FormField>
         <FormActions submitLabel="Assign Owner" isSubmitting={ownerMutation.isPending} onCancel={() => setOwnerOpen(false)} />
       </SettingsCreateDialog>
       <SettingsCreateDialog title="Add project member" open={memberOpen} onOpenChange={setMemberOpen} onSubmit={submitProjectMember} error={memberFormError}>
         <FormField label="Workspace member" required>
-          <select name="user_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            <option value="">Select member</option>
-            {(workspaceMembersQuery.data ?? []).map((member) => {
-              const user = displayUser(ownerProfiles.get(member.user_id), member.user_id);
-              return <option key={member.user_id} value={member.user_id}>{user.name} - {user.email}</option>;
+          <SettingsMemberSelect
+            name="user_id"
+            placeholder="Search workspace members…"
+            members={(workspaceMembersQuery.data ?? []).map((m) => {
+              const user = displayUser(ownerProfiles.get(m.user_id), m.user_id);
+              return { userId: m.user_id, name: user.name, email: user.email };
             })}
-          </select>
+          />
         </FormField>
         <FormField label="Project role">
           <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -2128,7 +2209,7 @@ export function TeamsView({ workspaceId }: { workspaceId?: number }) {
           )}
         </FormField>
         <FormField label="Name" required><Input name="name" placeholder="Engineering" /></FormField>
-        <FormField label="Description"><Input name="description" placeholder="Build and operations team" /></FormField>
+        <FormField label="Description"><textarea name="description" placeholder="Build and operations team" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <FormActions submitLabel="Create Team" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
     </SettingsLayout>
@@ -2284,7 +2365,7 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
       <SettingsCard title="Roles" description="Team scoped roles apply inside this team only. Higher workspace and project roles remain visible in member effective permissions." />
       <SettingsCreateDialog title="Edit team" open={editOpen} onOpenChange={setEditOpen} onSubmit={submitEdit} error={editFormError}>
         <FormField label="Name" required><Input name="name" defaultValue={team.name} /></FormField>
-        <FormField label="Description"><Input name="description" defaultValue={team.description ?? ""} /></FormField>
+        <FormField label="Description"><textarea name="description" defaultValue={team.description ?? ""} className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <FormField label="Status">
           <select name="is_active" defaultValue={team.is_active === false ? "false" : "true"} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
             <option value="true">Active</option>
@@ -2295,13 +2376,14 @@ export function TeamDetailView({ teamId }: { teamId: number }) {
       </SettingsCreateDialog>
       <SettingsCreateDialog title="Assign member to team" open={assignOpen} onOpenChange={setAssignOpen} onSubmit={submitAssign} error={formError}>
         <FormField label="Workspace member" required>
-          <select name="user_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-            <option value="">Select member</option>
-            {(workspaceMembersQuery.data ?? []).map((member) => {
-              const user = displayUser(workspaceMemberProfiles.get(member.user_id), member.user_id);
-              return <option key={member.user_id} value={member.user_id}>{user.name} - {user.email}</option>;
+          <SettingsMemberSelect
+            name="user_id"
+            placeholder="Search workspace members…"
+            members={(workspaceMembersQuery.data ?? []).map((m) => {
+              const user = displayUser(workspaceMemberProfiles.get(m.user_id), m.user_id);
+              return { userId: m.user_id, name: user.name, email: user.email };
             })}
-          </select>
+          />
         </FormField>
         <FormField label="Role">
           <select name="role_id" className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -2866,7 +2948,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
             {["platform", "organization", "workspace", "project", "team", "functional"].map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
           </select>
         </FormField>
-        <FormField label="Description"><Input name="description" placeholder="Custom access role for this team" /></FormField>
+        <FormField label="Description"><textarea name="description" placeholder="Custom access role for this team" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <FormActions submitLabel="Create Custom Role" isSubmitting={createRoleMutation.isPending} onCancel={() => setRoleCreateOpen(false)} />
       </SettingsCreateDialog>
       <SettingsCreateDialog title="Create permission" open={permissionCreateOpen && canCreatePermission} onOpenChange={setPermissionCreateOpen} onSubmit={submitPermission}>
@@ -2878,7 +2960,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
             {["platform", "organization", "workspace", "project", "team", "functional"].map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
           </select>
         </FormField>
-        <FormField label="Description"><Input name="description" placeholder="What this permission allows" /></FormField>
+        <FormField label="Description"><textarea name="description" placeholder="What this permission allows" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <input type="hidden" name="status" value="active" />
         <FormActions submitLabel="Create Permission" isSubmitting={createPermissionMutation.isPending} onCancel={() => setPermissionCreateOpen(false)} />
       </SettingsCreateDialog>
@@ -2983,7 +3065,7 @@ export function RolesView({ organizationId }: { organizationId?: number }) {
       />
       <SettingsCreateDialog title="Create role" open={open && canManageRoleMappings} onOpenChange={setOpen} onSubmit={submit}>
         <FormField label="Name" required><Input name="name" placeholder="Workspace Admin" /></FormField>
-        <FormField label="Description"><Input name="description" placeholder="Can manage workspace setup" /></FormField>
+        <FormField label="Description"><textarea name="description" placeholder="Can manage workspace setup" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <FormActions submitLabel="Create Role" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
     </SettingsLayout>
@@ -3083,7 +3165,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
       <SettingsCreateDialog title="Create permission" open={open && canManagePermissions} onOpenChange={setOpen} onSubmit={submit}>
         <FormField label="Code" required><Input name="code" placeholder="workspace.manage" /></FormField>
         <FormField label="Name" required><Input name="name" placeholder="Manage workspace" /></FormField>
-        <FormField label="Description"><Input name="description" placeholder="Allows workspace setup changes" /></FormField>
+        <FormField label="Description"><textarea name="description" placeholder="Allows workspace setup changes" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} /></FormField>
         <FormActions submitLabel="Create Permission" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
       </SettingsCreateDialog>
     </SettingsLayout>

@@ -66,6 +66,24 @@
 **Root cause**: `invalidateSettingsAndContext()` invalidated `queryKeys.members.all` = `["members"]`, which matched `queryKeys.members.list(...)` = `["members", "list", ...]` (global directory). But the scoped member list query uses key `["settings", "members", orgId, wsId]`, which starts with `"settings"` — not matched by the `["members"]` prefix.
 **Fix**: Added `["settings", "members"]` and `["settings", "global-member-role-assignments"]` to `invalidateSettingsAndContext()`. Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
 
+### BUG-010 — "Mark All Read" Visible With Zero Notifications [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/platform/notification-center.tsx`
+**Symptom**: "Mark all read" button rendered even when there were zero notifications, cluttering the empty state.
+**Fix**: Wrapped button in `{allNotifications.some(n => n.unread) ? ... : null}`.
+
+### BUG-011 — Member Selection Was Static Dropdown (Unusable With Many Users) [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: "Assign project owner", "Add project member", and "Assign member to team" dialogs used static `<select>` lists that rendered all workspace members, becoming unwieldy with many users.
+**Fix**: Added `SettingsMemberSelect` component with searchable typeahead (2+ char minimum), filtered dropdown, clear button, and hidden `<input>` for form compatibility. Applied to all three dialogs.
+
+### BUG-012 — Description Fields Single-Line (Wrong Input Type) [FIXED 2026-06-26]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: Description fields for Org, Workspace, Project, Team, Role, and Permission create/edit forms used `<Input>` (single-line `<input type="text">`), making it impractical to enter multi-sentence descriptions.
+**Fix**: All 12 `<Input name="description">` replaced with `<textarea rows={3}>` using matching CSS via `DESCRIPTION_TEXTAREA_CLASS` constant. Vertically resizable, minimum 3 rows.
+
 ## Open
 
 _(none currently tracked)_

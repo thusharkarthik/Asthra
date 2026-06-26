@@ -76,7 +76,9 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
         <div className="flex items-center gap-2 text-sm font-semibold"><Bell className="h-4 w-4" />Notifications</div>
         <Button size="icon" variant="ghost" aria-label="Close notifications" onClick={onClose}><X className="h-4 w-4" /></Button>
       </div>
-      <div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => { markAllRead(); if (accessToken) markAllCoreReadMutation.mutate(); }}>Mark all read</Button></div>
+      {allNotifications.some((n) => n.unread) ? (
+        <div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => { markAllRead(); if (accessToken) markAllCoreReadMutation.mutate(); }}>Mark all read</Button></div>
+      ) : null}
       <div className="max-h-80 space-y-2 overflow-y-auto">
         {allNotifications.map((item) => (
           <div key={item.id} className="block rounded-md border p-3 hover:bg-muted" onClick={() => {
