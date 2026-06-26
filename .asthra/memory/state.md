@@ -61,6 +61,24 @@ Added 2026-06-26. `AccessControlService.guard_superuser_self_removal(target_user
 
 The "last superuser" guard already existed in `ScopedMembershipService._ensure_not_last_protected_assignment()` and `RoleService._ensure_not_last_protected_role()` — these were not added by this task.
 
+## Notification Center
+
+`frontend/src/components/platform/notification-center.tsx` — updated 2026-06-26.
+
+"Mark all read" button now hidden when there are no unread notifications. Condition: `allNotifications.some(n => n.unread)`. Empty state shows cleanly without the button.
+
+## Settings Forms UX
+
+`frontend/src/components/settings/settings-admin-views.tsx` — updated 2026-06-26.
+
+**Searchable member typeahead**: Added `SettingsMemberSelect` component (file-local). Replaces static `<select>` for:
+- "Assign project owner" dialog (`owner_id`)
+- "Add project member" dialog (`user_id`)
+- "Assign member to team" dialog (`user_id`)
+Uses hidden `<input>` for form value compatibility. Shows filtered dropdown after 2+ characters. `onMouseDown` for selection prevents blur from closing the dropdown prematurely.
+
+**Multiline description fields**: All `<Input name="description">` replaced with `<textarea rows={3}>` using `DESCRIPTION_TEXTAREA_CLASS` constant (same CSS as Input component but without `h-9`, adds `py-2 resize-y min-h-[72px]`). Applied to 12 locations: create/edit forms for Org, Workspace, Project, Team, Role, and Permission.
+
 ## Member List Cache Invalidation
 
 Fixed 2026-06-26. `invalidateSettingsAndContext()` in `settings-admin-views.tsx` now also invalidates `["settings", "members"]` and `["settings", "global-member-role-assignments"]` — the exact keys used by `membersQuery` in `MembersView`. Previously only `["members"]` was invalidated, which missed the `["settings", "members", orgId, wsId]` prefix.
