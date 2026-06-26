@@ -1,12 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { SettingsEmptyState, SettingsLayout as SettingsPageLayout } from "@/components/settings/settings-components";
+
+export type SettingsAuthorityValue = {
+  authorityLevel: "superuser" | "platform" | "org" | "workspace" | "member" | null;
+  orgId: number | null;
+  workspaceId: number | null;
+};
+
+export const SettingsAuthorityContext = createContext<SettingsAuthorityValue>({
+  authorityLevel: null,
+  orgId: null,
+  workspaceId: null,
+});
+
+// Convenience hook — avoids importing createContext/useContext in every consumer.
+export function useSettingsAuthority(): SettingsAuthorityValue {
+  return useContext(SettingsAuthorityContext);
+}
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
@@ -71,7 +88,11 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
 
   // Superuser gets unrestricted access to all settings.
   if (isSuperuser) {
-    return <>{children}</>;
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "superuser", orgId: null, workspaceId: null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
   }
 
   // Still resolving authority — hold rendering to avoid premature child API calls.
@@ -82,39 +103,55 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
   // Platform admin or owner → full access.
   const platformRoles = platformPermsQuery.data?.roles ?? [];
   if (platformRoles.some((r) => PLATFORM_ADMIN_KEYS.has(r.key))) {
-    return <>{children}</>;
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "platform", orgId: null, workspaceId: null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
   }
 
   const assignments = myAssignmentsQuery.data ?? [];
   const roleById = new Map((rolesQuery.data ?? []).map((r) => [r.id, r]));
 
-  // Org admin/owner → full access.
-  const hasOrgAuthority = assignments
+  // Org admin/owner → full access with org context.
+  const orgAssignment = assignments
     .filter((a) => a.scope_type === "organization" && a.scope_id != null)
-    .some((a) => {
+    .find((a) => {
       const role = roleById.get(a.role_id);
       return role != null && role.key != null && ORG_ADMIN_KEYS.has(role.key);
     });
 
-  if (hasOrgAuthority) {
-    return <>{children}</>;
+  if (orgAssignment != null) {
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "org", orgId: orgAssignment.scope_id ?? null, workspaceId: null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
   }
 
-  // Workspace admin/manager → full access.
-  const hasWorkspaceAuthority = assignments
+  // Workspace admin/manager → full access with workspace context.
+  const workspaceAssignment = assignments
     .filter((a) => a.scope_type === "workspace" && a.scope_id != null)
-    .some((a) => {
+    .find((a) => {
       const role = roleById.get(a.role_id);
       return role != null && role.key != null && WORKSPACE_ADMIN_KEYS.has(role.key);
     });
 
-  if (hasWorkspaceAuthority) {
-    return <>{children}</>;
+  if (workspaceAssignment != null) {
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "workspace", orgId: null, workspaceId: workspaceAssignment.scope_id ?? null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
   }
 
-  // No admin authority — personal routes remain accessible.
+  // No admin authority — personal routes remain accessible as member-level.
   if (PERSONAL_ROUTES.has(pathname)) {
-    return <>{children}</>;
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "member", orgId: null, workspaceId: null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
   }
 
   // Everything else is blocked for users with no admin authority.

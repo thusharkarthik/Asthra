@@ -44,6 +44,13 @@
 **Root cause**: No `layout.tsx` existed under `/settings/`, so every route was unguarded.
 **Fix**: Created `settings/layout.tsx` as a central auth guard. Uses same authority resolution pattern as `members/page.tsx`. Non-admin users are restricted to personal routes (`/settings/profile`, `/settings/preferences`, `/settings/notifications`, `/settings/account`). All other routes show "Access Restricted".
 
+### BUG-007 — Regular Members Saw Full Admin Dashboard on /settings [FIXED 2026-06-26]
+
+**File**: `frontend/src/app/settings/page.tsx`
+**Symptom**: Any authenticated user navigating to `/settings` (a personal route, allowed by the layout guard) saw the full admin dashboard — org/workspace/member/team cards, "Operational setup flow", "Administration hierarchy", etc.
+**Root cause**: `settings/page.tsx` unconditionally rendered `<SettingsHomeView />`. The layout guard allowed personal-route access for members but did not filter what the page displayed.
+**Fix**: Exported `SettingsAuthorityContext` + `useSettingsAuthority` from `settings/layout.tsx`. `settings/page.tsx` reads `authorityLevel` — members see only 4 personal cards (Profile, Preferences, Notifications, Account); all admin levels render full `<SettingsHomeView />`. Default context `null` maps to admin view so tests that render the page without the layout continue to pass.
+
 ## Open
 
 _(none currently tracked)_
