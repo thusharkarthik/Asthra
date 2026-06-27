@@ -128,6 +128,13 @@
 
 ## Open
 
+### BUG-020 — Assign Role + Remove Role Buttons Visible to Users Without settings.role.manage [FIXED 2026-06-27]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx` (`MemberDetailView`)
+**Symptom**: The "Assign Role" button and all "Remove" role buttons in the member detail "Current Roles" card were visible and clickable regardless of whether the current user had `settings.role.manage` permission. Clicking would return a permission error from the API.
+**Root cause**: Both buttons were plain `<Button>` components with no permission guard, unlike `MembersView` which already used `PermissionButton` and `canRemoveMembers` checks.
+**Fix**: Added `canManageRoles = currentPermissions.can("settings.role.manage")`. Entire role assignment UI (role selector, org/workspace selectors, Assign Role button) hidden via `canManageRoles ? <div>...</div> : undefined` in the `actions` prop. Remove button per role row hidden via `canManageRoles ? <Button>Remove</Button> : null`.
+
 ### BUG-019 — 3 pre-existing test failures in test_access_control_rbac.py [OPEN]
 
 **File**: `services/core-service/tests/test_access_control_rbac.py`

@@ -1,5 +1,21 @@
 # Architectural Decisions
 
+## 2026-06-27 — platform_member Retired; organization_member Added
+
+**Decision**: Remove `platform_member` (platform-scoped) from the role catalog. Add `organization_member` (organization-scoped) as the base org membership role.
+
+**Rationale for removing platform_member**: The role was a temporary fallback for invited users before the "authenticated, no org" onboarding state was implemented. It served no architectural purpose once the platform invite flow was reworked. Keeping it created confusion in role dropdowns — users would see a platform role that doesn't grant any meaningful access.
+
+**Rationale for adding organization_member**: A base org-level role was missing for users who belong to an org but have not yet been assigned to a workspace. This fills the hierarchy gap between "has no role" and "Organization Auditor". It grants minimal visibility (profile, notifications, preferences, org view) without allowing any management or workspace access.
+
+**Implementation**:
+- Removed from `ASTHRA_ROLE_TEMPLATES` in `role_service.py`
+- `ensure_role_catalog()` now deactivates `platform_member` in DB on first call after deploy (sets `is_active = False`, does not delete)
+- `organization_member` added to `ASTHRA_ROLE_TEMPLATES` after `organization_auditor`
+- Frontend: removed `platformMemberRole` variable and its use as the default invite role; updated info card text; `is_active !== false` filter in `groupedAllRoles` automatically excludes the now-inactive platform_member
+
+---
+
 ## 2026-06-26 — user_roles Fully Retired; role_assignments is Sole Source of Truth
 
 **Decision**: `user_roles` table is fully retired — nothing writes to it, nothing reads from it. `role_assignments` is the exclusive authority for all role information across all scopes.
