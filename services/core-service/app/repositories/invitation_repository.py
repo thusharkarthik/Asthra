@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
 from app.models.organization import Organization, OrganizationMember
-from app.models.user import User
+from app.models.user import RoleAssignment, User
 from app.models.workspace import Workspace, WorkspaceMember
 
 
@@ -22,32 +22,38 @@ class InvitationRepository:
         self,
         *,
         email: str,
-        organization_id: int,
+        organization_id: int | None,
         workspace_id: int | None,
     ) -> Invitation | None:
         statement = select(Invitation).where(
             Invitation.email == email,
-            Invitation.organization_id == organization_id,
             Invitation.workspace_id == workspace_id,
             Invitation.status == "pending",
         )
+        if organization_id is None:
+            statement = statement.where(Invitation.organization_id.is_(None))
+        else:
+            statement = statement.where(Invitation.organization_id == organization_id)
         return self.db.scalar(statement)
 
     def get_duplicate_by_status(
         self,
         *,
         email: str,
-        organization_id: int,
+        organization_id: int | None,
         workspace_id: int | None,
         status: str,
         exclude_id: int | None = None,
     ) -> Invitation | None:
         statement = select(Invitation).where(
             Invitation.email == email,
-            Invitation.organization_id == organization_id,
             Invitation.workspace_id == workspace_id,
             Invitation.status == status,
         )
+        if organization_id is None:
+            statement = statement.where(Invitation.organization_id.is_(None))
+        else:
+            statement = statement.where(Invitation.organization_id == organization_id)
         if exclude_id is not None:
             statement = statement.where(Invitation.id != exclude_id)
         return self.db.scalar(statement)
@@ -93,7 +99,7 @@ class InvitationRepository:
         self,
         *,
         email: str,
-        organization_id: int,
+        organization_id: int | None,
         workspace_id: int | None,
         invited_by_id: int,
         role_id: int | None,
@@ -126,12 +132,11 @@ class InvitationRepository:
         self.db.flush()
 
     def add_memberships(self, invitation: Invitation, user_id: int) -> None:
-        if not self.is_organization_member(invitation.organization_id, user_id):
+        if invitation.organization_id is not None and not self.is_organization_member(invitation.organization_id, user_id):
             self.db.add(
                 OrganizationMember(
                     organization_id=invitation.organization_id,
                     user_id=user_id,
-                    role_id=invitation.role_id,
                     member_role="member",
                 )
             )
@@ -140,10 +145,34 @@ class InvitationRepository:
                 WorkspaceMember(
                     workspace_id=invitation.workspace_id,
                     user_id=user_id,
-                    role_id=invitation.role_id,
                     member_role="member",
                 )
             )
+        if invitation.role_id is not None:
+            scope_type = "workspace" if invitation.workspace_id is not None else "organization"
+            scope_id = invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id
+            if scope_id is not None:
+                existing = (
+                    self.db.query(RoleAssignment)
+                    .filter(
+                        RoleAssignment.user_id == user_id,
+                        RoleAssignment.role_id == invitation.role_id,
+                        RoleAssignment.scope_type == scope_type,
+                        RoleAssignment.scope_id == scope_id,
+                        RoleAssignment.status == "active",
+                    )
+                    .first()
+                )
+                if existing is None:
+                    self.db.add(RoleAssignment(
+                        user_id=user_id,
+                        role_id=invitation.role_id,
+                        scope_type=scope_type,
+                        scope_id=scope_id,
+                        status="active",
+                        assigned_by=invitation.invited_by_id,
+                        assigned_at=datetime.now(timezone.utc),
+                    ))
         invitation.status = "accepted"
         self.db.commit()
         self.db.refresh(invitation)

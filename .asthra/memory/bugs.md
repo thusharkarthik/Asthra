@@ -128,4 +128,12 @@
 
 ## Open
 
-_(none currently tracked)_
+### BUG-019 — 3 pre-existing test failures in test_access_control_rbac.py [OPEN]
+
+**File**: `services/core-service/tests/test_access_control_rbac.py`
+**Tests**:
+1. `test_effective_access_debug_endpoint_returns_action_results` — asserts `source_role == "Organization Owner"` but gets `"Superuser"`. The first user's superuser role is in `role_assignments` and gets inserted into the roles dict before org-owner (which comes from org membership table), so it wins the permission source lookup.
+2. `test_create_permission_catalog_record` — expects 201 creating `automation.workflow.view`, gets 409. This permission is already seeded in the permission catalog.
+3. `test_permission_registry_sync_requires_permission_manage` — expects 403 from superuser on POST `/permission-registry/sync`. But superuser has all permissions (including `settings.permission.manage`), so it returns 200.
+**Pre-existing**: All 3 tests existed with these assertions on `main` before this branch. Not caused by `fix/remove-user-roles` changes.
+**Fix**: Update test assertions to match actual behavior, or add the `automation.workflow.view` permission to the permission seed data dedup check, or restrict sync endpoint to non-superuser roles.

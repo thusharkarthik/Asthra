@@ -8,7 +8,7 @@ from app.models.invitation import Invitation
 from app.models.notification import Notification
 from app.models.role import Role
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import RoleAssignment, User, UserRole
+from app.models.user import RoleAssignment, User
 from app.repositories.user_repository import UserRepository
 from app.services.notification_service import NotificationService
 from app.services.role_service import RoleService
@@ -87,8 +87,6 @@ class AuthService:
                         assigned_at=now,
                     )
                 )
-            if self.db.scalar(select(UserRole.id).where(UserRole.user_id == user.id, UserRole.role_id == role.id)) is None:
-                self.db.add(UserRole(user_id=user.id, role_id=role.id))
         self.db.commit()
 
     def get_current_user(self, user_id: int) -> User:

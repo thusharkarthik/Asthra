@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-26 (QA bug fixes — settings unlock, invite button, platform invite scope, current roles)
+Last updated: 2026-06-26 (role_assignments unification — user_roles fully retired, platform invite scope)
 
 ## Phase
 
@@ -8,7 +8,7 @@ Last updated: 2026-06-26 (QA bug fixes — settings unlock, invite button, platf
 
 ## Branch
 
-Current branch: `fix/settings-members-authority-scope`. Uncommitted changes (role assignment unification task).
+Current branch: `fix/remove-user-roles`. Uncommitted changes (9 files modified: auth_service, role_service, access_control_service, invitation model/schema/repository/service, users.py endpoints, test_access_control_rbac).
 
 ## Settings Auth Guard + Authority Context
 
@@ -55,26 +55,38 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 
 ## RBAC Architecture
 
-- Two role tables: `UserRole` (unscoped, no audit) and `RoleAssignment` (scoped, with status/audit).
-- **Phase A (current)**: `assign_user_role()` dual-writes to both tables. `role_assignments` is primary. `user_roles` kept for backward compat — only platform-scoped entries are applied at platform scope in `_resolve_roles()`.
-- **Phase B (deferred)**: Stop writing to `user_roles`, migrate all read paths to `role_assignments` only. Listed in `doNotTouch` until explicitly scoped.
+- Two role tables: `UserRole` (unscoped, no audit, kept but fully retired) and `RoleAssignment` (scoped, with status/audit, sole source of truth).
+- **Phase B complete (2026-06-26)**: `role_assignments` is the **exclusive** source of truth. Nothing writes to `user_roles`. Nothing reads from `user_roles`. `_resolve_roles()` reads only from `role_assignments` + legacy membership table role fields (OrganizationMember, WorkspaceMember, etc.).
+- `user_roles` table kept in schema but no code writes/reads it. Production DB would need a migration to add `nullable=True` on `organization_id` in `invitations` table.
 - `platform_member` role added to `ASTHRA_ROLE_TEMPLATES` — minimal platform role for new invitees.
 - Platform-scope `/me/permissions` (no query params) only returns platform-level roles. Org/workspace assignments never surface at platform scope.
 - `useCurrentPermissions` hook cannot force platform scope by passing null — always falls back to store selections.
 - `getCurrentPermissions(token, {})` called directly (bypassing the hook) correctly targets platform scope.
 
+## Invitation Schema (Platform Scope Support)
+
+`Invitation.organization_id` is now nullable (`int | None`). `organization_id is None` = platform-scoped invite. When accepted, writes directly to `role_assignments` via `_assign_platform_role()`. No org membership created.
+
+`InvitationCreate.organization_id: int | None = None` and `InvitationRead.organization_id: int | None = None`.
+
+Duplicate invite detection uses `.is_(None)` for NULL comparison in SQLAlchemy (not `== None`).
+
 ## First User Bootstrap
 
-First registered user gets `is_superuser=True`, plus dual-write to both `UserRole` and `RoleAssignment` for `superuser` and `platform_owner` roles.
+First registered user gets `is_superuser=True`, plus write to `RoleAssignment` (only) for `superuser` and `platform_owner` roles.
 
 ## Superuser Self-Removal Guard
 
 Added 2026-06-26. `AccessControlService.guard_superuser_self_removal(target_user_id, current_user)` raises 400 if a superuser tries to modify their own roles. Called from:
 - `DELETE /role-assignments/{id}` in `role_assignments.py`
 - `PATCH /role-assignments/{id}` in `role_assignments.py`
-- `DELETE /users/{user_id}/roles/{role_id}` in `users.py`
+- (users.py endpoints removed entirely — use /role-assignments instead)
 
-The "last superuser" guard already existed in `ScopedMembershipService._ensure_not_last_protected_assignment()` and `RoleService._ensure_not_last_protected_role()` — these were not added by this task.
+The "last superuser" guard already existed in `ScopedMembershipService._ensure_not_last_protected_assignment()` and `RoleService._ensure_not_last_protected_role()`.
+
+## Users API
+
+`POST /users/{id}/roles`, `GET /users/{id}/roles`, `DELETE /users/{id}/roles/{role_id}` — **removed** from `users.py`. Role operations go through `/api/v1/role-assignments` endpoints exclusively.
 
 ## Notification Center
 

@@ -10,7 +10,7 @@ from app.models.permission import Permission
 from app.models.project import Project, ProjectMembership
 from app.models.role import Role, RolePermission
 from app.models.team import Team, TeamMember
-from app.models.user import RoleAssignment, User, UserRole
+from app.models.user import RoleAssignment, User
 from app.models.workspace import Workspace, WorkspaceMember
 from app.services.role_service import RoleService
 
@@ -238,10 +238,6 @@ class AccessControlService:
     def _resolve_roles(self, user_id: int, scope_type: str, scope_id: int | None) -> list[ResolvedRole]:
         roles: dict[tuple[int, str, int | None], ResolvedRole] = {}
 
-        for user_role in self.db.query(UserRole).filter(UserRole.user_id == user_id).all():
-            role = user_role.role
-            if role and role.is_active and role.scope == "platform":
-                self._add_role(roles, role, "platform", None)
         self._add_role_assignments(roles, user_id, scope_type, scope_id)
 
         if scope_type == "organization" and scope_id is not None:

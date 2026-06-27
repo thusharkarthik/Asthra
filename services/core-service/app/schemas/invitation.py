@@ -7,7 +7,7 @@ from app.schemas.base import TimestampedRead
 
 class InvitationCreate(BaseModel):
     email: EmailStr
-    organization_id: int
+    organization_id: int | None = None
     workspace_id: int | None = None
     role_id: int | None = None
 
@@ -18,7 +18,7 @@ class InvitationAccept(BaseModel):
 
 class InvitationRead(TimestampedRead):
     email: EmailStr
-    organization_id: int
+    organization_id: int | None = None
     workspace_id: int | None = None
     invited_by_id: int
     role_id: int | None = None
@@ -29,12 +29,18 @@ class InvitationRead(TimestampedRead):
     @computed_field
     @property
     def scope_type(self) -> str:
-        return "workspace" if self.workspace_id is not None else "organization"
+        if self.workspace_id is not None:
+            return "workspace"
+        if self.organization_id is not None:
+            return "organization"
+        return "platform"
 
     @computed_field
     @property
-    def scope_id(self) -> int:
-        return self.workspace_id if self.workspace_id is not None else self.organization_id
+    def scope_id(self) -> int | None:
+        if self.workspace_id is not None:
+            return self.workspace_id
+        return self.organization_id
 
     @computed_field
     @property

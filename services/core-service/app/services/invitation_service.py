@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
 from app.models.role import Role
-from app.models.user import User, UserRole
+from app.models.user import RoleAssignment, User
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.invitation import InvitationAccept, InvitationCreate
 from app.services.access_control_service import AccessControlService
@@ -23,26 +23,32 @@ class InvitationService:
     def create(self, invitation_create: InvitationCreate, current_user: User) -> Invitation:
         self._ensure_active_user(current_user)
         email = invitation_create.email.lower()
-        organization = self.repository.get_organization(invitation_create.organization_id)
-        if organization is None or not organization.is_active:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
-        permission_scope_type = "organization"
-        permission_scope_id = invitation_create.organization_id
+        organization_id = invitation_create.organization_id
 
-        if invitation_create.workspace_id is not None:
-            workspace = self.repository.get_workspace(invitation_create.workspace_id)
-            if workspace is None or not workspace.is_active:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
-            if workspace.organization_id != invitation_create.organization_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Workspace does not belong to this organization.",
-                )
-            self._ensure_workspace_access(invitation_create.workspace_id, current_user)
-            permission_scope_type = "workspace"
-            permission_scope_id = invitation_create.workspace_id
+        if organization_id is None:
+            permission_scope_type = "platform"
+            permission_scope_id = None
         else:
-            self._ensure_organization_access(invitation_create.organization_id, current_user)
+            organization = self.repository.get_organization(organization_id)
+            if organization is None or not organization.is_active:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+            permission_scope_type = "organization"
+            permission_scope_id = organization_id
+
+            if invitation_create.workspace_id is not None:
+                workspace = self.repository.get_workspace(invitation_create.workspace_id)
+                if workspace is None or not workspace.is_active:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
+                if workspace.organization_id != organization_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Workspace does not belong to this organization.",
+                    )
+                self._ensure_workspace_access(invitation_create.workspace_id, current_user)
+                permission_scope_type = "workspace"
+                permission_scope_id = invitation_create.workspace_id
+            else:
+                self._ensure_organization_access(organization_id, current_user)
 
         AccessControlService(self.db).require(
             current_user,
@@ -53,25 +59,24 @@ class InvitationService:
 
         pending_duplicate = self.repository.get_pending_duplicate(
             email=email,
-            organization_id=invitation_create.organization_id,
+            organization_id=organization_id,
             workspace_id=invitation_create.workspace_id,
         )
         if pending_duplicate is not None:
-            pending_duplicate.token = token_urlsafe(32)
-            pending_duplicate.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-            ContextVersionService(self.db).bump_access(permission_scope_type, permission_scope_id)
-            self.db.commit()
-            self.db.refresh(pending_duplicate)
-            return pending_duplicate
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A pending invitation already exists for this email and scope. Use resend to extend it.",
+            )
 
         invited_user = self.repository.get_user_by_email(email)
         self._ensure_role_allowed(invitation_create.role_id, current_user)
         if invited_user is not None:
-            already_member = (
-                self.repository.is_workspace_member(invitation_create.workspace_id, invited_user.id)
-                if invitation_create.workspace_id is not None
-                else self.repository.is_organization_member(invitation_create.organization_id, invited_user.id)
-            )
+            if organization_id is None:
+                already_member = False
+            elif invitation_create.workspace_id is not None:
+                already_member = self.repository.is_workspace_member(invitation_create.workspace_id, invited_user.id)
+            else:
+                already_member = self.repository.is_organization_member(organization_id, invited_user.id)
             if already_member:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -79,7 +84,7 @@ class InvitationService:
                 )
             stale_accepted = self.repository.get_duplicate_by_status(
                 email=email,
-                organization_id=invitation_create.organization_id,
+                organization_id=organization_id,
                 workspace_id=invitation_create.workspace_id,
                 status="accepted",
             )
@@ -88,7 +93,7 @@ class InvitationService:
 
         invitation = self.repository.create(
             email=email,
-            organization_id=invitation_create.organization_id,
+            organization_id=organization_id,
             workspace_id=invitation_create.workspace_id,
             invited_by_id=current_user.id,
             role_id=invitation_create.role_id,
@@ -96,8 +101,12 @@ class InvitationService:
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         if invited_user is not None:
-            self.repository.add_memberships(invitation, invited_user.id)
-            invitation = self.repository.get_by_id(invitation.id) or invitation
+            if organization_id is None:
+                self._assign_platform_role(invitation.role_id, invited_user.id, current_user.id)
+                invitation.status = "accepted"
+            else:
+                self.repository.add_memberships(invitation, invited_user.id)
+                invitation = self.repository.get_by_id(invitation.id) or invitation
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
@@ -158,7 +167,12 @@ class InvitationService:
         if current_user.email.lower() != invitation.email.lower():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation email does not match user.")
 
-        self.repository.add_memberships(invitation, current_user.id)
+        if invitation.organization_id is None:
+            self._assign_platform_role(invitation.role_id, current_user.id, invitation.invited_by_id)
+            invitation.status = "accepted"
+        else:
+            self.repository.add_memberships(invitation, current_user.id)
+
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
@@ -178,10 +192,7 @@ class InvitationService:
             entity_type="invitation",
             entity_id=str(invitation.id),
         )
-        ContextVersionService(self.db).bump_access(
-            "workspace" if invitation.workspace_id is not None else "organization",
-            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
-        )
+        self._bump_invitation_scope(invitation)
         self.db.commit()
         return invitation
 
@@ -209,10 +220,7 @@ class InvitationService:
             action="invitation.cancelled",
             description=f"Invitation for {invitation.email} was cancelled.",
         )
-        ContextVersionService(self.db).bump_access(
-            "workspace" if invitation.workspace_id is not None else "organization",
-            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
-        )
+        self._bump_invitation_scope(invitation)
         self.db.commit()
         return invitation
 
@@ -232,10 +240,7 @@ class InvitationService:
             action="invitation.resent",
             description=f"Invitation for {invitation.email} was resent.",
         )
-        ContextVersionService(self.db).bump_access(
-            "workspace" if invitation.workspace_id is not None else "organization",
-            invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id,
-        )
+        self._bump_invitation_scope(invitation)
         self.db.commit()
         self.db.refresh(invitation)
         return invitation
@@ -250,7 +255,11 @@ class InvitationService:
         if invitation.workspace_id is not None:
             self._ensure_workspace_access(invitation.workspace_id, user)
             return
-        self._ensure_organization_access(invitation.organization_id, user)
+        if invitation.organization_id is not None:
+            self._ensure_organization_access(invitation.organization_id, user)
+            return
+        if not AccessControlService(self.db).can_access_scope(user.id, "platform", None):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid invitation access.")
 
     def _ensure_organization_access(self, organization_id: int, user: User) -> None:
         organization = self.repository.get_organization(organization_id)
@@ -290,10 +299,12 @@ class InvitationService:
         if role.scope != "platform" or current_user.is_superuser:
             return
         platform_assignment = (
-            self.db.query(UserRole)
-            .join(Role, Role.id == UserRole.role_id)
+            self.db.query(RoleAssignment)
+            .join(Role, Role.id == RoleAssignment.role_id)
             .filter(
-                UserRole.user_id == current_user.id,
+                RoleAssignment.user_id == current_user.id,
+                RoleAssignment.scope_type == "platform",
+                RoleAssignment.status == "active",
                 Role.key.in_(["platform_owner", "platform_admin"]),
                 Role.is_active.is_(True),
             )
@@ -303,17 +314,44 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only platform owners or admins can assign platform roles.")
 
     def _require_invitation_manage(self, invitation: Invitation, current_user: User, permission_code: str) -> None:
-        if invitation.workspace_id is not None:
-            AccessControlService(self.db).require(
-                current_user,
-                permission_code,
-                "workspace",
-                invitation.workspace_id,
-            )
+        if invitation.organization_id is None:
+            AccessControlService(self.db).require(current_user, permission_code, "platform", None)
             return
-        AccessControlService(self.db).require(
-            current_user,
-            permission_code,
-            "organization",
-            invitation.organization_id,
+        if invitation.workspace_id is not None:
+            AccessControlService(self.db).require(current_user, permission_code, "workspace", invitation.workspace_id)
+            return
+        AccessControlService(self.db).require(current_user, permission_code, "organization", invitation.organization_id)
+
+    def _assign_platform_role(self, role_id: int | None, user_id: int, assigning_user_id: int) -> None:
+        if role_id is None:
+            return
+        existing = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.role_id == role_id,
+                RoleAssignment.scope_type == "platform",
+                RoleAssignment.scope_id.is_(None),
+                RoleAssignment.status == "active",
+            )
+            .first()
         )
+        if existing is not None:
+            return
+        self.db.add(RoleAssignment(
+            user_id=user_id,
+            role_id=role_id,
+            scope_type="platform",
+            scope_id=None,
+            status="active",
+            assigned_by=assigning_user_id,
+            assigned_at=datetime.now(timezone.utc),
+        ))
+
+    def _bump_invitation_scope(self, invitation: Invitation) -> None:
+        if invitation.organization_id is None:
+            ContextVersionService(self.db).bump_access("platform", None)
+        elif invitation.workspace_id is not None:
+            ContextVersionService(self.db).bump_access("workspace", invitation.workspace_id)
+        else:
+            ContextVersionService(self.db).bump_access("organization", invitation.organization_id)

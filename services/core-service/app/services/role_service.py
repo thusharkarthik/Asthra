@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.role import Role, RolePermission
-from app.models.user import RoleAssignment, User, UserRole
+from app.models.user import RoleAssignment, User
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.role_repository import RoleRepository
 from app.schemas.role import RoleCreate, RolePermissionCreate, RolePermissionsReplace, RoleUpdate, UserRoleCreate
@@ -375,7 +375,7 @@ class RoleService:
         user_id: int,
         user_role_create: UserRoleCreate,
         current_user: User,
-    ) -> UserRole:
+    ) -> RoleAssignment:
         self._ensure_active_user(current_user)
         scope_type = user_role_create.scope_type
         scope_id = user_role_create.scope_id
@@ -388,7 +388,6 @@ class RoleService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
         self._ensure_role_can_be_assigned(role, current_user, scope_type, None)
 
-        # Primary duplicate check is on role_assignments (scope-aware)
         existing_assignment = (
             self.db.query(RoleAssignment)
             .filter(
@@ -405,19 +404,14 @@ class RoleService:
                 detail="Role is already assigned to this user at this scope.",
             )
 
-        # Backward-compat: write to user_roles (skip if already present — no scope info there)
-        user_role: UserRole | None = self.role_repository.get_user_role(user.id, role.id)
-        if user_role is None:
-            user_role = self.role_repository.assign_user_role(user.id, role.id)
-
-        # Primary write to role_assignments with full scope info
         if existing_assignment is not None:
             existing_assignment.status = "active"
             existing_assignment.revoked_at = None
             existing_assignment.assigned_by = current_user.id
             existing_assignment.assigned_at = datetime.now(timezone.utc)
+            assignment = existing_assignment
         else:
-            self.db.add(RoleAssignment(
+            assignment = RoleAssignment(
                 user_id=user.id,
                 role_id=role.id,
                 scope_type=scope_type,
@@ -425,7 +419,8 @@ class RoleService:
                 status="active",
                 assigned_by=current_user.id,
                 assigned_at=datetime.now(timezone.utc),
-            ))
+            )
+            self.db.add(assignment)
 
         NotificationService(self.db).create_notification(
             user_id=user.id,
@@ -438,28 +433,8 @@ class RoleService:
         )
         ContextVersionService(self.db).bump_access(scope_type, scope_id)
         self.db.commit()
-        return user_role
-
-    def list_user_roles(self, user_id: int, current_user: User) -> list[UserRole]:
-        self._ensure_active_user(current_user)
-        user = self.role_repository.get_user(user_id)
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-        return self.role_repository.list_user_roles(user.id)
-
-    def remove_user_role(self, user_id: int, role_id: int, current_user: User) -> None:
-        self._ensure_active_user(current_user)
-        self._require_role_manage(current_user, "platform", None)
-        user = self.role_repository.get_user(user_id)
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-        user_role = self.role_repository.get_user_role(user.id, role_id)
-        if user_role is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found.")
-        self._ensure_not_last_protected_role(user, user_role.role)
-        self.role_repository.remove_user_role(user_role)
-        ContextVersionService(self.db).bump_access("platform", None)
-        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
 
     def _ensure_active_user(self, user: User) -> None:
         if not user.is_active:
@@ -488,14 +463,6 @@ class RoleService:
         )
         if platform_owner is None:
             return False
-        user_role_exists = (
-            self.db.query(UserRole.id)
-            .filter(UserRole.user_id == user.id, UserRole.role_id == platform_owner.id)
-            .first()
-            is not None
-        )
-        if user_role_exists:
-            return True
         return (
             self.db.query(RoleAssignment.id)
             .filter(
@@ -513,38 +480,6 @@ class RoleService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform roles can only be assigned at platform scope.")
         if role.is_hidden and not self._can_view_hidden_roles(current_user):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot assign this role.")
-
-    def _ensure_not_last_protected_role(self, user: User, role: Role | None) -> None:
-        if role is None or role.key not in {"superuser", "platform_owner"}:
-            return
-        protected_user_ids = {
-            row[0]
-            for row in self.db.query(UserRole.user_id)
-            .join(Role, Role.id == UserRole.role_id)
-            .join(User, User.id == UserRole.user_id)
-            .filter(Role.key == role.key, Role.scope == "platform", User.is_active.is_(True))
-            .all()
-        }
-        protected_user_ids.update(
-            row[0]
-            for row in self.db.query(RoleAssignment.user_id)
-            .join(Role, Role.id == RoleAssignment.role_id)
-            .join(User, User.id == RoleAssignment.user_id)
-            .filter(
-                Role.key == role.key,
-                Role.scope == "platform",
-                RoleAssignment.status == "active",
-                User.is_active.is_(True),
-            )
-            .all()
-        )
-        if role.key == "superuser":
-            protected_user_ids.update(
-                row[0]
-                for row in self.db.query(User.id).filter(User.is_superuser.is_(True), User.is_active.is_(True)).all()
-            )
-        if len(protected_user_ids) <= 1:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot remove the last {role.name}.")
 
     def _validate_scope(self, scope: str) -> str:
         normalized_scope = scope.strip().lower()
