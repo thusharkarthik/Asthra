@@ -50,13 +50,6 @@ ASTHRA_ROLE_TEMPLATES = [
         "permission_patterns": ["*.view", "desk.ticket.manage", "pulse.incident.view"],
     },
     {
-        "name": "Platform Member",
-        "key": "platform_member",
-        "scope": "platform",
-        "description": "Default role for invited users. Minimal platform access until a scoped role is assigned.",
-        "permission_patterns": ["settings.profile.view", "settings.notifications.view", "settings.preferences.view"],
-    },
-    {
         "name": "Organization Owner",
         "key": "organization_owner",
         "scope": "organization",
@@ -76,6 +69,13 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "organization",
         "description": "Read organization settings and audit data.",
         "permission_patterns": ["*.view", "guard.audit.view", "insights.report.view"],
+    },
+    {
+        "name": "Organization Member",
+        "key": "organization_member",
+        "scope": "organization",
+        "description": "Base organization membership role. User belongs to the organization but is not yet assigned to a specific workspace.",
+        "permission_patterns": ["settings.profile.view", "settings.notifications.view", "settings.preferences.view", "settings.organization.view"],
     },
     {
         "name": "Workspace Admin",
@@ -500,6 +500,10 @@ class RoleService:
         if sync_permissions:
             PermissionService(self.db).ensure_permission_catalog()
         changed = False
+        legacy_pm = self.db.query(Role).filter(Role.key == "platform_member", Role.scope == "platform").first()
+        if legacy_pm is not None and legacy_pm.is_active:
+            legacy_pm.is_active = False
+            changed = True
         role_by_key: dict[str, Role] = {}
         for template in ASTHRA_ROLE_TEMPLATES:
             name = template["name"]

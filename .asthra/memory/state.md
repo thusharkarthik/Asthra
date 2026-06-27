@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-26 (role_assignments unification — user_roles fully retired, platform invite scope)
+Last updated: 2026-06-27 (role catalog cleanup — platform_member retired, organization_member added; action button visibility guards)
 
 ## Phase
 
@@ -58,7 +58,8 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - Two role tables: `UserRole` (unscoped, no audit, kept but fully retired) and `RoleAssignment` (scoped, with status/audit, sole source of truth).
 - **Phase B complete (2026-06-26)**: `role_assignments` is the **exclusive** source of truth. Nothing writes to `user_roles`. Nothing reads from `user_roles`. `_resolve_roles()` reads only from `role_assignments` + legacy membership table role fields (OrganizationMember, WorkspaceMember, etc.).
 - `user_roles` table kept in schema but no code writes/reads it. Production DB would need a migration to add `nullable=True` on `organization_id` in `invitations` table.
-- `platform_member` role added to `ASTHRA_ROLE_TEMPLATES` — minimal platform role for new invitees.
+- `platform_member` role **removed** from `ASTHRA_ROLE_TEMPLATES` (2026-06-27). Deactivated in DB on next `ensure_role_catalog()` call. No replacement platform role needed — onboarding uses "authenticated, no org" state instead.
+- `organization_member` role **added** to `ASTHRA_ROLE_TEMPLATES` (2026-06-27) — scope: organization, minimal perms: settings.profile.view, settings.notifications.view, settings.preferences.view, settings.organization.view. Sits below Organization Auditor in hierarchy.
 - Platform-scope `/me/permissions` (no query params) only returns platform-level roles. Org/workspace assignments never surface at platform scope.
 - `useCurrentPermissions` hook cannot force platform scope by passing null — always falls back to store selections.
 - `getCurrentPermissions(token, {})` called directly (bypassing the hook) correctly targets platform scope.
@@ -87,6 +88,19 @@ The "last superuser" guard already existed in `ScopedMembershipService._ensure_n
 ## Users API
 
 `POST /users/{id}/roles`, `GET /users/{id}/roles`, `DELETE /users/{id}/roles/{role_id}` — **removed** from `users.py`. Role operations go through `/api/v1/role-assignments` endpoints exclusively.
+
+## Settings Action Button Visibility
+
+Updated 2026-06-27. `MemberDetailView` in `settings-admin-views.tsx` now guards role management buttons:
+- `canManageRoles = currentPermissions.can("settings.role.manage")`
+- "Assign Role" button + org/workspace scope selectors: hidden when `!canManageRoles` (entire `actions` prop becomes `undefined`)
+- "Remove" button per role row: hidden when `!canManageRoles`
+
+`MembersView` was already guarded:
+- Invite Member: `PermissionAction` with `settings.member.invite`
+- Change Role: `PermissionButton` with `settings.role.manage`
+- Remove Member: `canRemoveMembers = permissions.can("settings.member.remove")`
+- Resend/Cancel Invite: `PermissionButton` with respective action keys
 
 ## Notification Center
 

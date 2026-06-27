@@ -1501,7 +1501,6 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
-  const platformMemberRole = visibleRoles.find((role) => role.key === "platform_member");
   const groupedAllRoles = visibleRoles
     .filter((role) => role.is_active !== false)
     .reduce<Record<string, RoleRecord[]>>((groups, role) => {
@@ -1693,11 +1692,11 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
           <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-            <QuickCreateButton onClick={() => { setInviteRoleId(String(platformMemberRole?.id ?? "")); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
+            <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
           </PermissionAction>
         }
       />
-      {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Member, Platform Admin) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
+      {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Admin, Platform Support) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
       {!permissions.isLoading && !permissions.isFetching && !canInvite ? <SettingsCard title="Limited access" description="Your current permissions allow viewing members, but do not include settings.member.invite." /> : null}
       <SettingsCard title="Role model" description="Asthra uses scoped system roles backed by permission mappings. Users receive roles, never direct permissions.">
         <div className="grid gap-2 md:grid-cols-5">
@@ -2015,6 +2014,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
     enabled: Boolean(accessToken && userId)
   });
   const currentPermissions = useCurrentPermissions();
+  const canManageRoles = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const effectiveScope = selectedProjectId
     ? { scope_type: "project", scope_id: selectedProjectId }
     : selectedWorkspaceId
@@ -2138,7 +2138,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
         title="Current Roles"
         description="Users receive roles. Inherited permissions are calculated from assigned role mappings."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          canManageRoles ? <div className="flex flex-wrap items-center gap-2">
             <select
               aria-label="Assign member role"
               value={assignRoleId}
@@ -2193,7 +2193,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
             >
               Assign Role
             </Button>
-          </div>
+          </div> : undefined
         }
       >
         <SettingsDataTable
@@ -2205,7 +2205,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
               scopeLabelForAssignment(assignment, organizations, workspaces),
               role?.is_system ? "Yes" : "No",
               formatDate(assignment.assigned_at),
-              <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.id)} disabled={removeRoleMutation.isPending}>Remove</Button>
+              canManageRoles ? <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.id)} disabled={removeRoleMutation.isPending}>Remove</Button> : null
             ];
           })}
           emptyMessage="No assigned roles"
