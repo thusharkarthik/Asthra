@@ -1,5 +1,21 @@
 # Architectural Decisions
 
+## 2026-06-26 — user_roles Fully Retired; role_assignments is Sole Source of Truth
+
+**Decision**: `user_roles` table is fully retired — nothing writes to it, nothing reads from it. `role_assignments` is the exclusive authority for all role information across all scopes.
+
+**Changes (branch: fix/remove-user-roles)**:
+- `auth_service._assign_first_user_platform_roles()`: writes only to `RoleAssignment`, not `UserRole`
+- `role_service.assign_user_role()`: returns `RoleAssignment` instead of `UserRole`, raises 409 on duplicate (no silent refresh), no `user_roles` write
+- `access_control_service._resolve_roles()`: removed `UserRole` loop entirely; reads from `role_assignments` + legacy membership role fields
+- `invitation_repository.add_memberships()`: writes `RoleAssignment` after membership creation; no `role_id` written to `OrganizationMember`/`WorkspaceMember`
+- `users.py`: removed `POST/GET/DELETE /users/{id}/roles` endpoints — use `/role-assignments` instead
+- `Invitation.organization_id`: nullable for platform-scope invites; `invitation_service` routes to `_assign_platform_role()` when `organization_id is None`
+
+**Constraint**: `user_roles` table is NOT dropped (data is preserved). Production DB needs a migration for `invitations.organization_id` nullable change.
+
+---
+
 ## 2026-06-26 — role_assignments is Primary Write Path; user_roles is Backward-Compat Only
 
 **Decision**: `POST /users/{id}/roles` now dual-writes to both `user_roles` (for backward compat) and `role_assignments` (primary, scoped). `role_assignments` is the authoritative source of truth for scoped role data.

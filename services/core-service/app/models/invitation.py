@@ -15,7 +15,7 @@ class Invitation(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
     workspace_id: Mapped[int | None] = mapped_column(ForeignKey("workspaces.id"))
     invited_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     role_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id"))

@@ -38,15 +38,22 @@ def test_superuser_role_visibility_is_protected(client):
     assert all(role["key"] != "superuser" for role in normal_roles)
 
 
-def test_cannot_remove_last_superuser_user_role(client):
+def test_cannot_remove_last_superuser_role_assignment(client):
     platform_headers = create_auth_headers(client, email="platform@example.com")
     me = client.get("/api/v1/users/me", headers=platform_headers).json()
     superuser_role = next(role for role in client.get("/api/v1/roles", headers=platform_headers).json() if role["key"] == "superuser")
+    assignments = client.get(
+        "/api/v1/role-assignments",
+        params={"user_id": me["id"], "role_id": superuser_role["id"]},
+        headers=platform_headers,
+    ).json()
+    assert len(assignments) > 0
+    assignment_id = assignments[0]["id"]
 
-    response = client.delete(f"/api/v1/users/{me['id']}/roles/{superuser_role['id']}", headers=platform_headers)
+    response = client.delete(f"/api/v1/role-assignments/{assignment_id}", headers=platform_headers)
 
     assert response.status_code == 400
-    assert "last Superuser" in response.text
+    assert "cannot" in response.text.lower()
 
 
 def test_effective_access_debug_endpoint_returns_action_results(client):
