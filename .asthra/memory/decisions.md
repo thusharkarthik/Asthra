@@ -1,5 +1,29 @@
 # Architectural Decisions
 
+## 2026-06-28 — Skipped-Onboarding Shell State Lives in the Shell, Not a Store
+
+**Decision**: `skippedOnboarding` state is a React `useState` in `AsthraShell`, not a Zustand store or URL param. The motivational home page independently detects "no-org" state (`organizations.length === 0 && !is_superuser`) rather than reading skip state.
+
+**Why**: Skip state is session-local and intentionally ephemeral — if the user refreshes, they see the onboarding gate again (encouraging org creation). Persisting it in a store or localStorage would undermine this intent. The home page detecting "no-org" independently is correct because by the time a user reaches `/`, they've either: (a) come from the OnboardingGate skip link, or (b) somehow have no org on a direct load — both should show motivational content.
+
+**How to apply**: If skip state ever needs persistence (e.g., to survive page refresh), use sessionStorage or a Zustand store with reset-on-logout. Do not use localStorage.
+
+## 2026-06-28 — Invite Modal Role Scoping: Platform Roles Hidden from Org Context
+
+**Decision**: `groupedInviteModalRoles` (IIFE-computed) replaces `groupedAllRoles` in the invite dialog. Filters by `role.scope === "platform"` for global directory, and `role.scope !== "platform"` for org/workspace context.
+
+**Why**: Platform roles (Platform Owner, Admin, Support) should never appear in org-level invite flows — an org admin cannot grant platform roles. Conversely, global directory invites (superuser/platform admin context) should only show platform roles since they have no org scope to assign non-platform roles to.
+
+**How to apply**: If new role scopes are added, the invite modal filter logic in `groupedInviteModalRoles` may need updating. The `groupedRolesForInvite` function (used for the "Change role" dialog) already filters correctly and doesn't need changing.
+
+## 2026-06-28 — Self-Serve Onboarding Gate: Organizations List + Platform Roles as Access Signal
+
+**Decision**: Onboarding gate condition uses `organizations.length === 0 && !is_superuser && hasPlatformRole === false` rather than fetching a separate role-assignments list.
+
+**Why**: The `organizationsQuery` is already in-flight from `platformContext` so there's no extra network request. Platform-scope `/me/permissions` already runs at platform scope for unauthenticated users (no org selected), so `permissions?.roles` at that scope accurately captures platform-level assignments. Org/workspace/project-scope assignments are correctly proxied by the organizations list (you can't have a workspace role without belonging to an org's membership structure). The edge case (workspace-only without org membership) is too uncommon to warrant a dedicated `/me/role-assignments` query.
+
+**How to apply**: Gate logic in `asthra-shell.tsx` — no new queries needed. To expand scope check in future, add a `/me/role-assignments` query or check a new field on the user object.
+
 ## 2026-06-28 — Role-Permission Sync Is Now Additive Only; Manual Assignments Are Permanent Truth
 
 **Decision**: `_sync_role_template_permissions()` no longer deletes any existing `RolePermission` rows. It only adds permissions that match template patterns but are absent from the DB. Manual permission assignments made via the admin UI persist permanently across restarts and syncs.

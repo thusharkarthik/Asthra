@@ -2,6 +2,145 @@
 
 import Link from "next/link";
 import { Building2, FolderKanban, PanelsTopLeft } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AsthraLogo } from "@/components/brand/asthra-logo";
+import { queryKeys } from "@/lib/queryKeys";
+import { settingsApi } from "@/services/api/settings-api";
+import { useAuthStore } from "@/stores/auth-store";
+
+function OrgCreateForm({
+  onSuccess,
+  submitLabel = "Create Organization"
+}: {
+  onSuccess?: () => void;
+  submitLabel?: string;
+}) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!accessToken) throw new Error("Not authenticated");
+      return settingsApi.onboardOrganization(accessToken, {
+        name: name.trim(),
+        description: description.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      setFormError(error.message ?? "Something went wrong. Please try again.");
+    },
+  });
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError(null);
+    if (!name.trim()) {
+      setFormError("Organization name is required.");
+      return;
+    }
+    mutation.mutate();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <label htmlFor="org-name" className="text-sm font-medium leading-none">
+          Organization name <span className="text-destructive">*</span>
+        </label>
+        <input
+          id="org-name"
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Acme Corp"
+          required
+          disabled={mutation.isPending}
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label htmlFor="org-description" className="text-sm font-medium leading-none">
+          Description <span className="text-muted-foreground font-normal">(optional)</span>
+        </label>
+        <textarea
+          id="org-description"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="A short description of your organization"
+          rows={3}
+          disabled={mutation.isPending}
+          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y min-h-[72px]"
+        />
+      </div>
+      {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+      <button
+        type="submit"
+        disabled={mutation.isPending || !name.trim()}
+        className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+      >
+        {mutation.isPending ? "Creating…" : submitLabel}
+      </button>
+    </form>
+  );
+}
+
+export function CreateOrgDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Create organization">
+      <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-lg">
+        <h2 className="mb-4 text-base font-semibold">Create your organization</h2>
+        <OrgCreateForm onSuccess={() => onOpenChange(false)} />
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          className="mt-3 w-full text-center text-sm text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function OnboardingGate({ onSkip }: { onSkip?: () => void }) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center gap-3">
+          <AsthraLogo markClassName="h-14 w-14 rounded-2xl" showWordmark />
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">Welcome to Asthra</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Create your organization to get started</p>
+          </div>
+        </div>
+        <div className="space-y-4 rounded-lg border bg-card p-6 shadow-sm">
+          <OrgCreateForm />
+        </div>
+        {onSkip ? (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            >
+              Skip for now
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </main>
+  );
+}
 
 type PlatformSetupGuideProps = {
   hasOrganization?: boolean;

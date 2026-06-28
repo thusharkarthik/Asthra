@@ -1501,12 +1501,17 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
-  const groupedAllRoles = visibleRoles
-    .filter((role) => role.is_active !== false)
-    .reduce<Record<string, RoleRecord[]>>((groups, role) => {
+  // Invite modal role list: global directory shows platform-only; org/ws context shows non-platform only.
+  const groupedInviteModalRoles = (() => {
+    const activeRoles = visibleRoles.filter((role) => role.is_active !== false);
+    const filtered = isGlobalDirectory
+      ? activeRoles.filter((role) => role.scope === "platform")
+      : activeRoles.filter((role) => role.scope !== "platform");
+    return filtered.reduce<Record<string, RoleRecord[]>>((groups, role) => {
       groups[role.scope] = [...(groups[role.scope] ?? []), role];
       return groups;
     }, {});
+  })();
   const inviteSelectedRole = visibleRoles.find((role) => role.id === Number(inviteRoleId));
   const inviteRoleScopeCategory: "platform" | "organization" | "workspace" | "project" | "team" = (() => {
     const scope = inviteSelectedRole?.scope ?? "";
@@ -1797,7 +1802,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
           >
             <option value="">Default member</option>
-            <RoleSelectOptions groupedRoles={groupedAllRoles} includeDefault={false} />
+            <RoleSelectOptions groupedRoles={groupedInviteModalRoles} includeDefault={false} />
           </select>
         </FormField>
         {inviteRoleScopeCategory !== "platform" ? (

@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-28 (role-permission sync made additive-only; ensure_role_catalog hot-path calls demoted to sync_permissions=False)
+Last updated: 2026-06-28 (stop-motion contextual help explainer upgrade)
 
 ## Phase
 
@@ -8,7 +8,7 @@ Last updated: 2026-06-28 (role-permission sync made additive-only; ensure_role_c
 
 ## Branch
 
-Current branch: `fix/remove-user-roles`. Uncommitted changes (9 files modified: auth_service, role_service, access_control_service, invitation model/schema/repository/service, users.py endpoints, test_access_control_rbac).
+Current branch: `fix/role-permission-editing`. Uncommitted changes (7 files: bugs.md, decisions.md, state.md, sessions/2026-06-27.md, settings-admin-views.tsx, roles.py, role_service.py) plus onboarding gate changes pending commit.
 
 ## Settings Auth Guard + Authority Context
 
@@ -52,6 +52,76 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - No access control functions
 
 `can()` from `usePlatformContext()` (backed by `lib/permissions.ts` + backend permission codes) is the **sole** frontend access control mechanism. Do not add role-rank checks for visibility/gating decisions — use `can("module.resource.action")` instead.
+
+## Invite Modal Role Filtering (fixed 2026-06-28)
+
+`MembersView` in `settings-admin-views.tsx` now uses `groupedInviteModalRoles` in the invite dialog role dropdown:
+- **Global directory context** (`isGlobalDirectory = true`): only platform-scope roles visible (Platform Owner, Platform Admin, Platform Support)
+- **Org/workspace context** (`organizationId` or `workspaceId` provided): platform-scope roles completely excluded, only org/workspace/project/team/functional roles shown
+- Computed as an IIFE replacing the old `groupedAllRoles` which showed all roles without scope filtering
+- "Change role" dialog (already used `groupedInviteRoles`) was already correct — not changed
+
+## Onboarding Skip + Restricted Shell (added 2026-06-28)
+
+`OnboardingGate` now accepts `onSkip?: () => void`. The "Skip for now" text link only renders when the prop is provided.
+
+Shell skip state is in `asthra-shell.tsx` (`skippedOnboarding: useState<boolean>(false)`). When skipped:
+- `isSkippedUser = needsOnboarding && skippedOnboarding` (true when user still has no org but skipped)
+- `useEffect` watches `isSkippedUser + pathname` — redirects to `/` if path not in `["/", "/settings", "/settings/profile", "/settings/preferences", "/settings/notifications", "/settings/account"]`
+- Sidebar receives `skippedUser={isSkippedUser}` → `SidebarNav` filters items to only `href === "/"` or `href === "/settings"`
+- After org is created, `needsOnboarding` becomes false, `isSkippedUser` becomes false, all restrictions lifted automatically
+
+## Motivational Home for No-Org Users (added 2026-06-28)
+
+`page.tsx` detects `isNoOrgUser = organizations.length === 0 && !currentUser?.is_superuser`. When true, renders an early-return motivational layout:
+- Header: "You're one step away from unlocking everything"
+- 4 benefit cards: Manage Work (Briefcase), Document Everything (FileText), Discover Ideas (Lightbulb), Collaborate (Users)
+- Primary CTA: "Create Your Organization" → opens `CreateOrgDialog`
+- Secondary note with links to Profile and Preferences
+- `CreateOrgDialog` (new export from `platform-setup-guide.tsx`) is a modal wrapper around the shared `OrgCreateForm` function component. On success, invalidates `organizations.all` + `permissions.all`.
+- `OrgCreateForm` is an internal function component (not exported) that powers both `OnboardingGate` and `CreateOrgDialog`.
+
+## Contextual Help Modal (upgraded to stop-motion explainer 2026-06-28)
+
+- `frontend/src/lib/help-registry.ts`: `HelpStep = { label: string; icon?: string }`. `HelpContent.steps` is `HelpStep[]`. All 17 routes enriched with emoji icons. `matchHelpContent(pathname)` unchanged.
+- `frontend/src/components/platform/contextual-help.tsx`: Stop-motion explainer animation. State: `headerVisible`, `visibleSteps`, `arrowsVisible: boolean[]`, `ctaVisible`.
+- **Animation sequence** (per step): base delay = `700 + index * 850ms`. Arrow `index-1` revealed at `base` (200ms CSS width transition). Card `index` revealed at `base + 200ms` (300ms CSS transition: opacity + translateX + scale). CTA/footer fades in 300ms after last step. Title/description fade in on open (300ms/200ms + 150ms stagger).
+- `AnimatedArrow`: `overflow-hidden` container transitions `width: 0 → 32px` + `opacity: 0 → 1`. Contains `div.h-px.flex-1` line + `→` arrowhead.
+- `StepCard`: Active card = `bg-primary text-primary-foreground scale(1.05) opacity-1`. Past cards = `bg-muted text-muted-foreground opacity-0.65`. Hidden card = `opacity-0 translateX(1rem)`. Icon (emoji) shown at text-base, fallback is numbered circle.
+- Modal width upgraded from `max-w-sm` → `max-w-xl` to fit 5-step chain horizontally.
+- Steps use `flex flex-wrap gap-y-3` — wraps naturally if too wide, arrows still animate.
+- All state resets on close; reopening restarts animation from beginning.
+- Routes with no steps (e.g. `/`): `ctaVisible` set immediately, "Got it" button visible from open.
+- `asthra-shell.tsx`: `HelpCircle` button wires to `helpOpen` state; modal rendered at end of shell JSX.
+
+## Self-Serve Onboarding Gate (added 2026-06-28)
+
+New users with no organization membership are blocked from the main app and shown a full-screen onboarding screen to create their first organization.
+
+**Backend** (`POST /organizations/onboard`):
+- Authentication-only (no permission check required)
+- Checks that user has no active `role_assignments` with `scope_type in [organization, workspace, project, team]` — returns 400 if they do
+- Creates org via `create_with_owner()` (which also creates `OrganizationMember` and activity log)
+- Creates `RoleAssignment` for `organization_owner` role at the new org scope
+- Creates welcome `Notification`
+- Publishes `core.organization.created` event with `via: "onboarding"`
+
+**Frontend gate logic** (`asthra-shell.tsx`):
+```ts
+const hasPlatformRole = (permissions?.roles?.length ?? 0) > 0;
+const needsOnboarding = !isPublicPath && !contextLoading && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
+```
+- Superusers bypass (is_superuser check)
+- Platform owners/admins bypass (hasPlatformRole check — permissions resolved at platform scope)
+- Org/workspace members bypass (organizations.length > 0)
+- Gate only shown after context queries resolve (contextLoading guard prevents false positives during initial fetch)
+
+**`OnboardingGate` component** (`platform-setup-guide.tsx`):
+- Full-screen centered layout, Asthra logo, welcome heading
+- Form: org name (required) + description (optional)
+- Calls `settingsApi.onboardOrganization()` → `POST /organizations/onboard`
+- On success: invalidates `queryKeys.organizations.all` and `queryKeys.permissions.all`
+- After invalidation, `organizations` refetches and becomes non-empty → gate check fails → normal shell renders
 
 ## RBAC Architecture
 

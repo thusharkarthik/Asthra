@@ -24,14 +24,18 @@ function hasNavigationAccess(
   return canAny(permissionCodes, requiredPermissions);
 }
 
+const SKIPPED_ALLOWED_HREFS = new Set(["/", "/settings"]);
+
 export function SidebarNav({
   collapsed = false,
   permissionCodes,
-  permissionsLoading = false
+  permissionsLoading = false,
+  skippedUser = false
 }: {
   collapsed?: boolean;
   permissionCodes?: string[];
   permissionsLoading?: boolean;
+  skippedUser?: boolean;
 }) {
   const pathname = usePathname();
   const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
@@ -47,7 +51,7 @@ export function SidebarNav({
       {navSections.map((section) => (
         <section key={section.label} aria-label={section.label} className="space-y-1">
           {!collapsed && <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</div>}
-          {section.items.filter((item) => hasNavigationAccess(item.requiredPermissions, permissionCodes, permissionsLoading)).map((item) => {
+          {section.items.filter((item) => hasNavigationAccess(item.requiredPermissions, permissionCodes, permissionsLoading)).filter((item) => !skippedUser || SKIPPED_ALLOWED_HREFS.has(item.href ?? "")).map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
             const className = cn(

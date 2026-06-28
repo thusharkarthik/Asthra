@@ -19,7 +19,9 @@ import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
-import { useCurrentPermissions } from "@/context/platformContext";
+import { useCurrentPermissions, usePlatformContext } from "@/context/platformContext";
+import { OnboardingGate } from "@/components/platform/platform-setup-guide";
+import { ContextualHelpModal } from "@/components/platform/contextual-help";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useProgressStore } from "@/stores/progress-store";
@@ -39,13 +41,14 @@ function WorkspaceContextLoader() {
   return null;
 }
 
-function PermissionAwareSidebar({ collapsed }: { collapsed: boolean }) {
+function PermissionAwareSidebar({ collapsed, skippedUser }: { collapsed: boolean; skippedUser?: boolean }) {
   const permissions = useCurrentPermissions();
   return (
     <SidebarNav
       collapsed={collapsed}
       permissionCodes={permissions.permissionCodes}
       permissionsLoading={permissions.isLoading}
+      skippedUser={skippedUser}
     />
   );
 }
@@ -57,6 +60,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const currentUser = useAuthStore((state) => state.currentUser);
   const logout = useAuthStore((state) => state.logout);
+  const { organizations, permissions, isLoading: contextLoading } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const unreadNotifications = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
@@ -64,6 +68,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [skippedOnboarding, setSkippedOnboarding] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -76,6 +82,9 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isPublicPath = publicPaths.has(pathname);
   const hasShellLoading = routeLoading || isFetching > 0 || isMutating > 0;
   const showBottomProgress = progressActive || hasShellLoading;
+  const hasPlatformRole = (permissions?.roles?.length ?? 0) > 0;
+  const needsOnboarding = !isPublicPath && !contextLoading && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
+  const isSkippedUser = needsOnboarding && skippedOnboarding;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated && !isPublicPath) {
@@ -124,6 +133,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     if (progressActive) completeProgress();
   }, [completeProgress, hasShellLoading, isPublicPath, progressActive, startProgress]);
 
+  useEffect(() => {
+    if (!isSkippedUser) return;
+    const allowed = ["/", "/settings", "/settings/profile", "/settings/preferences", "/settings/notifications", "/settings/account"];
+    const isAllowed = allowed.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    if (!isAllowed) router.replace("/");
+  }, [isSkippedUser, pathname, router]);
+
   if (isPublicPath) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
@@ -141,6 +157,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
         </div>
       </main>
     );
+  }
+
+  if (needsOnboarding && !skippedOnboarding) {
+    return <OnboardingGate onSkip={() => setSkippedOnboarding(true)} />;
   }
 
   const handleLogout = async () => {
@@ -161,7 +181,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1 pb-3">
         <aside className={cn("hidden min-h-0 shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <PermissionAwareSidebar collapsed={sidebarCollapsed} />
+            <PermissionAwareSidebar collapsed={sidebarCollapsed} skippedUser={isSkippedUser} />
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -220,7 +240,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
                 <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} placement="bottom" />
               </div>
               <ThemeToggle className="dark:text-white dark:hover:bg-white/10" />
-              <Button size="icon" variant="ghost" className="dark:text-white dark:hover:bg-white/10" aria-label="Help">
+              <Button size="icon" variant="ghost" className="dark:text-white dark:hover:bg-white/10" aria-label="Help" onClick={() => setHelpOpen(true)}>
                 <HelpCircle className="h-4 w-4" />
               </Button>
               <div className="hidden min-w-0 max-w-40 text-right text-xs leading-tight text-muted-foreground dark:text-white/60 lg:block">
@@ -251,6 +271,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       <AssistantDock />
       <SearchDialog />
       <CommandPalette />
+      <ContextualHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} pathname={pathname} />
     </div>
   );
 }

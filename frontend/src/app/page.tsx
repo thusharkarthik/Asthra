@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Bot, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { Bot, Briefcase, FileText, Lightbulb, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { CardSkeleton, ErrorState, EmptyModuleState } from "@/components/layout/ui-states";
@@ -10,7 +11,7 @@ import { navSections } from "@/components/navigation/nav-items";
 import { PlatformActivityFeed } from "@/components/platform/activity-feed";
 import { CrossModuleLinks } from "@/components/platform/cross-module-links";
 import { FavoritesList, RecentItemsList } from "@/components/platform/recent-favorites";
-import { PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
+import { CreateOrgDialog, PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
 import { WorkspaceDashboardSummaryCards } from "@/components/platform/workspace-dashboard-summary";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
@@ -61,9 +62,33 @@ const pinnedModules = [
   { title: "Insights", href: "/insights", description: "Review platform metrics" }
 ];
 
+const BENEFIT_CARDS = [
+  {
+    icon: Briefcase,
+    title: "Manage Work",
+    description: "Plan, track and deliver with Flow — sprints, boards, releases and more."
+  },
+  {
+    icon: FileText,
+    title: "Document Everything",
+    description: "Create spaces and pages in Docs. Keep your team's knowledge organized."
+  },
+  {
+    icon: Lightbulb,
+    title: "Discover Ideas",
+    description: "Capture ideas, validate features, and convert them into execution work."
+  },
+  {
+    icon: Users,
+    title: "Collaborate",
+    description: "Invite your team, assign roles, and work together across projects."
+  }
+];
+
 export default function HomePage() {
   const { isLoading, error } = useWorkspaceContextQueries();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const { organizations, workspaces, projects } = useWorkspaceStore();
   const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: () => getWorkspaceActivity(accessToken), retry: 0 });
   const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: () => getWorkspaceDashboardSummary(accessToken), retry: 0 });
@@ -72,6 +97,55 @@ export default function HomePage() {
   const modified = useRecentItemsStore((state) => state.modified);
   const setSearchOpen = useUIStore((state) => state.setSearchOpen);
   const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
+
+  const isNoOrgUser = organizations.length === 0 && !currentUser?.is_superuser;
+
+  if (isNoOrgUser) {
+    return (
+      <>
+        <PageHeader title="Home" description="Welcome to Asthra." />
+        <div className="mx-auto max-w-2xl space-y-8 py-4">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold">You're one step away from unlocking everything</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Create your organization to access Flow, Docs, Discover, and everything else Asthra has to offer.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {BENEFIT_CARDS.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.title} className="rounded-lg border bg-card p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">{card.title}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{card.description}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCreateOrgOpen(true)}
+              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              Create Your Organization
+            </button>
+            <p className="text-xs text-muted-foreground">
+              You can also access your{" "}
+              <Link href="/settings/profile" className="underline underline-offset-2">Profile</Link>
+              {" "}and{" "}
+              <Link href="/settings/preferences" className="underline underline-offset-2">Preferences</Link>
+              {" "}while you set up your organization.
+            </p>
+          </div>
+        </div>
+        <CreateOrgDialog open={createOrgOpen} onOpenChange={setCreateOrgOpen} />
+      </>
+    );
+  }
+
   const countCards = [
     { title: "Organizations", value: organizations.length, description: "Available core organizations" },
     { title: "Workspaces", value: workspaces.length, description: "Workspaces in the selected organization" },

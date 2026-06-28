@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
-from app.models.user import User
+from app.models.role import Role
+from app.models.user import RoleAssignment, User
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
 from app.services.access_control_service import AccessControlService
@@ -35,6 +38,73 @@ class OrganizationService:
         publish_event(
             "core.organization.created",
             payload={"name": organization.name},
+            organization_id=organization.id,
+            actor_user_id=current_user.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+        )
+        return organization
+
+    def onboard(
+        self,
+        organization_create: OrganizationCreate,
+        current_user: User,
+    ) -> Organization:
+        self._ensure_active_user(current_user)
+        existing_assignment = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == current_user.id,
+                RoleAssignment.status == "active",
+                RoleAssignment.scope_type.in_(["organization", "workspace", "project", "team"]),
+            )
+            .first()
+        )
+        if existing_assignment is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You already have access to an organization.",
+            )
+        slug = self._build_unique_slug(organization_create.name)
+        organization = self.organization_repository.create_with_owner(
+            name=organization_create.name.strip(),
+            slug=slug,
+            description=organization_create.description,
+            created_by_id=current_user.id,
+        )
+        org_owner_role = (
+            self.db.query(Role)
+            .filter(Role.key == "organization_owner", Role.is_active.is_(True))
+            .first()
+        )
+        if org_owner_role is not None:
+            self.db.add(
+                RoleAssignment(
+                    user_id=current_user.id,
+                    role_id=org_owner_role.id,
+                    scope_type="organization",
+                    scope_id=organization.id,
+                    status="active",
+                    assigned_by=current_user.id,
+                    assigned_at=datetime.now(timezone.utc),
+                )
+            )
+        self.db.add(
+            Notification(
+                user_id=current_user.id,
+                organization_id=organization.id,
+                type="onboarding",
+                title="Welcome to Asthra",
+                message=f"Your organization '{organization.name}' has been created. You are now the Organization Owner.",
+                entity_type="organization",
+                entity_id=str(organization.id),
+            )
+        )
+        self.db.commit()
+        self.db.refresh(organization)
+        publish_event(
+            "core.organization.created",
+            payload={"name": organization.name, "via": "onboarding"},
             organization_id=organization.id,
             actor_user_id=current_user.id,
             entity_type="organization",

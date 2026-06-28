@@ -50,6 +50,9 @@ export const settingsApi = {
     const query = search.toString();
     return apiRequest<Organization[]>(`${CORE_PREFIX}/organizations${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
   },
+  onboardOrganization(token: string, payload: { name: string; description?: string | null }) {
+    return apiRequest<Organization>(`${CORE_PREFIX}/organizations/onboard`, { method: "POST", authToken: token, json: payload });
+  },
   createOrganization(token: string, payload: NamedCreatePayload) {
     return apiRequest<Organization>(`${CORE_PREFIX}/organizations`, { method: "POST", authToken: token, json: payload });
   },
