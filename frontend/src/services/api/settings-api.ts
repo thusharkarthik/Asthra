@@ -53,6 +53,9 @@ export const settingsApi = {
   onboardOrganization(token: string, payload: { name: string; description?: string | null }) {
     return apiRequest<Organization>(`${CORE_PREFIX}/organizations/onboard`, { method: "POST", authToken: token, json: payload });
   },
+  platformOnboardOrganization(token: string, payload: { name: string; description?: string; owner_user_id: number }) {
+    return apiRequest<Organization>(`${CORE_PREFIX}/organizations/platform-onboard`, { method: "POST", authToken: token, json: payload });
+  },
   createOrganization(token: string, payload: NamedCreatePayload) {
     return apiRequest<Organization>(`${CORE_PREFIX}/organizations`, { method: "POST", authToken: token, json: payload });
   },

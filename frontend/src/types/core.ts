@@ -23,6 +23,7 @@ export type Organization = {
   description?: string | null;
   slug?: string;
   owner_id?: number;
+  owner_name?: string | null;
   created_by_id?: number;
   is_active?: boolean;
   created_at?: string;

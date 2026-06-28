@@ -11,6 +11,7 @@ from app.schemas.organization import (
     OrganizationMemberUpdate,
     OrganizationRead,
     OrganizationUpdate,
+    PlatformOnboardCreate,
 )
 from app.schemas.settings import OrganizationSettingsRead, OrganizationSettingsUpdate
 from app.services.membership_service import MembershipService
@@ -27,6 +28,15 @@ def onboard_organization(
     current_user: User = Depends(get_current_user),
 ) -> Organization:
     return OrganizationService(db).onboard(organization_create, current_user)
+
+
+@router.post("/platform-onboard", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
+def platform_onboard_organization(
+    payload: PlatformOnboardCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Organization:
+    return OrganizationService(db).platform_onboard(payload, current_user)
 
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)

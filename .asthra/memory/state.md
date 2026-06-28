@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-28 (stop-motion contextual help explainer upgrade)
+Last updated: 2026-06-28 (platform-led organization onboarding: POST /platform-onboard + owner assignment + org list owner column)
 
 ## Phase
 
@@ -52,6 +52,28 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - No access control functions
 
 `can()` from `usePlatformContext()` (backed by `lib/permissions.ts` + backend permission codes) is the **sole** frontend access control mechanism. Do not add role-rank checks for visibility/gating decisions — use `can("module.resource.action")` instead.
+
+## Platform-Led Organization Onboarding (added 2026-06-28)
+
+**Backend**:
+- New schema: `PlatformOnboardCreate { name, description, owner_user_id }` in `schemas/organization.py`
+- `OrganizationRead` gains `owner_name: str | None = None` (populated by service, defaults to None for ORM compat)
+- New endpoint: `POST /organizations/platform-onboard` → `OrganizationService.platform_onboard()`
+- `platform_onboard()`: requires `settings.organization.create` at platform scope, validates owner exists + active, creates org with `created_by_id=current_user`, adds owner as `OrganizationMember(member_role="owner")` + `RoleAssignment(organization_owner)`, sends notification to owner, logs activity
+- `list()` enriched via `_attach_owner_names()`: single batch query joining `RoleAssignment + User + Role` filtered by `scope_type="organization"`, `role.key="organization_owner"`, `status="active"`. Sets `org.owner_name` attribute on each SQLAlchemy model instance (Pydantic `from_attributes` picks it up)
+
+**Frontend**:
+- `types/core.ts`: added `owner_name?: string | null` to `Organization`
+- `settings-api.ts`: added `platformOnboardOrganization()` → `POST /organizations/platform-onboard`
+- `OrganizationsView` (settings-admin-views.tsx):
+  - `canPlatformOnboard = currentUser.is_superuser || roles.some(r => platform_owner/platform_admin)`
+  - "Onboard Organization" `<Button variant="outline">` shown when `canPlatformOnboard`, separate from existing "Create Organization"
+  - Users loaded via lazy query (enabled only when onboardOpen + canPlatformOnboard)
+  - Onboard modal: name + description + `SettingsMemberSelect` for owner (required), info note, FormActions
+  - `platformOnboardMutation.onSuccess(org, variables)`: reads `variables.owner_user_id` to get owner name for toast
+  - Org table: added "Owner" column showing `owner_name` or `"No owner assigned"` in muted text
+
+**Key distinction**: `POST /onboard` is for self-serve (authenticated user creates their own org, no permission check). `POST /platform-onboard` is for platform admins creating orgs for others (requires `settings.organization.create` at platform scope, takes `owner_user_id`).
 
 ## Invite Modal Role Filtering (fixed 2026-06-28)
 

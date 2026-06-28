@@ -16,6 +16,20 @@ class OrganizationCreate(BaseModel):
         return name
 
 
+class PlatformOnboardCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    owner_user_id: int
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("Organization name is required.")
+        return name
+
+
 class OrganizationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
@@ -38,6 +52,7 @@ class OrganizationRead(TimestampedRead):
     slug: str
     created_by_id: int
     is_active: bool
+    owner_name: str | None = None
 
 
 class OrganizationMemberCreate(BaseModel):

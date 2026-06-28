@@ -1,5 +1,21 @@
 # Architectural Decisions
 
+## 2026-06-28 — Platform-Led Onboarding: Owner Assigned Directly, No Email
+
+**Decision**: `POST /organizations/platform-onboard` creates an org AND assigns the owner in one atomic transaction. Owner is an existing user identified by `owner_user_id`. No email invite flow is used.
+
+**Why**: In dev environments the email service is not ready. Platform admins know the target user (they're already registered) and need to provision orgs instantly without a separate invitation/acceptance round-trip. The owner gets a Notification in-app and has `organization_owner` RoleAssignment immediately — no pending state.
+
+**How to apply**: When email service is ready, a future variant can send an email notification as well. The endpoint does not touch the invitation system, so it's safe to extend without breaking invitations.
+
+## 2026-06-28 — OrganizationRead.owner_name: Set as Dynamic Attribute on SQLAlchemy Model
+
+**Decision**: `owner_name: str | None = None` is added to `OrganizationRead` Pydantic schema. It's populated by setting `org.owner_name = "..."` directly on the SQLAlchemy model instance in the service, before serialization. Pydantic `model_validate(..., from_attributes=True)` picks it up via `getattr`.
+
+**Why**: Adding a JOIN to the ORM model or creating a separate response class would require touching shared schemas or complex repository changes. Setting attributes on SQLAlchemy model instances is safe in Python — instances are regular objects. The `from_attributes` mode reads via `getattr`, so any dynamically set attribute is included.
+
+**How to apply**: `owner_name` defaults to `None` in `OrganizationRead`. Any endpoint that doesn't call `_attach_owner_names()` will just return `None`. The batch query in `_attach_owner_names()` runs once per `list()` call using `.in_(org_ids)` to avoid N+1.
+
 ## 2026-06-28 — Skipped-Onboarding Shell State Lives in the Shell, Not a Store
 
 **Decision**: `skippedOnboarding` state is a React `useState` in `AsthraShell`, not a Zustand store or URL param. The motivational home page independently detects "no-org" state (`organizations.length === 0 && !is_superuser`) rather than reading skip state.
