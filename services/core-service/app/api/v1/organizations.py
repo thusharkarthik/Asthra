@@ -20,6 +20,15 @@ from app.services.settings_service import SettingsService
 router = APIRouter()
 
 
+@router.post("/onboard", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
+def onboard_organization(
+    organization_create: OrganizationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Organization:
+    return OrganizationService(db).onboard(organization_create, current_user)
+
+
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 def create_organization(
     organization_create: OrganizationCreate,
