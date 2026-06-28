@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.activity_log import ActivityLog
 from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
 from app.models.role import Role
 from app.models.user import RoleAssignment, User
 from app.repositories.organization_repository import OrganizationRepository
-from app.schemas.organization import OrganizationCreate, OrganizationUpdate
+from app.schemas.organization import OrganizationCreate, OrganizationUpdate, PlatformOnboardCreate
 from app.services.access_control_service import AccessControlService
 from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
@@ -112,6 +113,99 @@ class OrganizationService:
         )
         return organization
 
+    def platform_onboard(
+        self,
+        payload: PlatformOnboardCreate,
+        current_user: User,
+    ) -> Organization:
+        self._ensure_active_user(current_user)
+        AccessControlService(self.db).require(
+            current_user,
+            "settings.organization.create",
+            "platform",
+            None,
+        )
+        owner = (
+            self.db.query(User)
+            .filter(User.id == payload.owner_user_id, User.is_active.is_(True))
+            .first()
+        )
+        if owner is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Owner user not found or is inactive.",
+            )
+        slug = self._build_unique_slug(payload.name)
+        organization = Organization(
+            name=payload.name.strip(),
+            slug=slug,
+            description=payload.description,
+            created_by_id=current_user.id,
+        )
+        self.db.add(organization)
+        self.db.flush()
+        self.db.add(
+            OrganizationMember(
+                organization_id=organization.id,
+                user_id=owner.id,
+                member_role="owner",
+            )
+        )
+        org_owner_role = (
+            self.db.query(Role)
+            .filter(Role.key == "organization_owner", Role.is_active.is_(True))
+            .first()
+        )
+        if org_owner_role is not None:
+            self.db.add(
+                RoleAssignment(
+                    user_id=owner.id,
+                    role_id=org_owner_role.id,
+                    scope_type="organization",
+                    scope_id=organization.id,
+                    status="active",
+                    assigned_by=current_user.id,
+                    assigned_at=datetime.now(timezone.utc),
+                )
+            )
+        admin_name = current_user.full_name or current_user.email
+        self.db.add(
+            Notification(
+                user_id=owner.id,
+                organization_id=organization.id,
+                type="onboarding",
+                title="You've been assigned as Organization Owner",
+                message=(
+                    f"You have been assigned as Organization Owner for "
+                    f"'{organization.name}' by {admin_name}."
+                ),
+                entity_type="organization",
+                entity_id=str(organization.id),
+            )
+        )
+        self.db.add(
+            ActivityLog(
+                actor_user_id=current_user.id,
+                organization_id=organization.id,
+                action="organization.created",
+                entity_type="organization",
+                entity_id=str(organization.id),
+                description=f"Organization '{organization.name}' was created via platform onboarding.",
+                summary=f"Organization '{organization.name}' was created.",
+            )
+        )
+        self.db.commit()
+        self.db.refresh(organization)
+        publish_event(
+            "core.organization.created",
+            payload={"name": organization.name, "via": "platform-onboard"},
+            organization_id=organization.id,
+            actor_user_id=current_user.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+        )
+        return organization
+
     def list(
         self,
         current_user: User,
@@ -126,10 +220,36 @@ class OrganizationService:
         else:
             organizations = self.organization_repository.list_for_user(current_user.id, include_inactive=include_all)
         if status_filter == "inactive":
-            return [organization for organization in organizations if not organization.is_active]
-        if status_filter == "active":
-            return [organization for organization in organizations if organization.is_active]
+            organizations = [organization for organization in organizations if not organization.is_active]
+        elif status_filter == "active":
+            organizations = [organization for organization in organizations if organization.is_active]
+        self._attach_owner_names(organizations)
         return organizations
+
+    def _attach_owner_names(self, organizations: list[Organization]) -> None:
+        if not organizations:
+            return
+        org_ids = [org.id for org in organizations]
+        owner_pairs = (
+            self.db.query(RoleAssignment, User)
+            .join(User, User.id == RoleAssignment.user_id)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .filter(
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.scope_id.in_(org_ids),
+                RoleAssignment.status == "active",
+                Role.key == "organization_owner",
+                Role.is_active.is_(True),
+            )
+            .all()
+        )
+        owner_map: dict[int, str] = {
+            assignment.scope_id: user.full_name or user.email
+            for assignment, user in owner_pairs
+            if assignment.scope_id is not None
+        }
+        for org in organizations:
+            org.owner_name = owner_map.get(org.id)
 
     def get(self, organization_id: int, current_user: User) -> Organization:
         self._ensure_active_user(current_user)

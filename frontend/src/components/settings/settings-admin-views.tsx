@@ -575,11 +575,16 @@ export function AdministrationDashboardView() {
 
 export function OrganizationsView() {
   const { accessToken, organizations } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const permissions = useCurrentPermissions();
   const [statusFilter, setStatusFilter] = useState("active");
   const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
   const createOrganizationScope = permissionActionScope(permissions);
   const showLimitedAccess = !permissions.isLoading && !permissions.isFetching && !canCreateOrganization;
+  const canPlatformOnboard = Boolean(
+    currentUser?.is_superuser ||
+    permissions.data?.roles?.some((role) => ["platform_owner", "platform_admin"].includes(role.key))
+  );
   const visibleOrganizations = organizations.filter((organization) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "inactive") return organization.is_active === false;
@@ -587,9 +592,22 @@ export function OrganizationsView() {
   });
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [onboardOpen, setOnboardOpen] = useState(false);
+  const [onboardFormError, setOnboardFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
   const setSelectedOrganization = useWorkspaceStore((state) => state.setSelectedOrganization);
+
+  const usersQuery = useQuery({
+    queryKey: ["settings", "all-users"],
+    queryFn: () => settingsApi.listUsers(accessToken ?? ""),
+    enabled: Boolean(accessToken && canPlatformOnboard && onboardOpen),
+  });
+  const userOptions: MemberSelectOption[] = (usersQuery.data ?? []).map((u) => ({
+    userId: u.id,
+    name: u.full_name || u.email,
+    email: u.email,
+  }));
 
   const mutation = useMutation({
     mutationFn: (payload: { name: string; description?: string }) => settingsApi.createOrganization(accessToken ?? "", payload),
@@ -603,6 +621,20 @@ export function OrganizationsView() {
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create organization.")
   });
 
+  const platformOnboardMutation = useMutation({
+    mutationFn: (payload: { name: string; description?: string; owner_user_id: number }) =>
+      settingsApi.platformOnboardOrganization(accessToken ?? "", payload),
+    onSuccess: async (organization, variables) => {
+      setOnboardOpen(false);
+      setOnboardFormError(null);
+      const owner = (usersQuery.data ?? []).find((u) => u.id === variables.owner_user_id);
+      const ownerName = owner ? (owner.full_name || owner.email) : "the selected user";
+      await invalidateSettingsAndContext(queryClient);
+      addToast({ type: "success", title: "Organization onboarded", message: `${organization.name} created. ${ownerName} has been assigned as Owner.` });
+    },
+    onError: (error) => setOnboardFormError(error instanceof Error ? error.message : "Unable to onboard organization."),
+  });
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -614,18 +646,39 @@ export function OrganizationsView() {
     mutation.mutate({ name, description: getFormValue(form, "description") || undefined });
   }
 
+  function submitOnboard(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = getFormValue(form, "name");
+    const ownerUserIdStr = getFormValue(form, "owner_user_id");
+    if (!name) { setOnboardFormError("Organization name is required."); return; }
+    if (!ownerUserIdStr) { setOnboardFormError("Please select an owner."); return; }
+    const ownerUserId = Number(ownerUserIdStr);
+    if (!ownerUserId) { setOnboardFormError("Please select a valid owner."); return; }
+    platformOnboardMutation.mutate({ name, description: getFormValue(form, "description") || undefined, owner_user_id: ownerUserId });
+  }
+
   return (
     <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Organizations" }]} backHref="/settings" backLabel="Back to Settings">
       <SettingsSectionHeader
         title="Organizations"
         description="Create and manage the top-level homes for Asthra work."
-        actions={organizations.length === 0 ? (
-          <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
-        ) : (
-          <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
-            <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
-          </PermissionAction>
-        )}
+        actions={
+          <div className="flex items-center gap-2">
+            {canPlatformOnboard ? (
+              <Button variant="outline" onClick={() => setOnboardOpen(true)}>
+                Onboard Organization
+              </Button>
+            ) : null}
+            {organizations.length === 0 ? (
+              <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+            ) : (
+              <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
+                <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+              </PermissionAction>
+            )}
+          </div>
+        }
       />
       {permissions.isLoading || permissions.isFetching ? (
         <div className="mb-4 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
@@ -649,10 +702,15 @@ export function OrganizationsView() {
         </select>
       </div>
       <SettingsDataTable
-        columns={["Name", "Description", "Status", "Actions"]}
+        columns={["Name", "Description", "Owner", "Status", "Actions"]}
         rows={visibleOrganizations.map((organization) => [
           organization.name,
           organization.description ?? "No description",
+          organization.owner_name ? (
+            organization.owner_name
+          ) : (
+            <span key={`owner-${organization.id}`} className="text-muted-foreground">No owner assigned</span>
+          ),
           organization.is_active === false ? "Inactive" : "Active",
           <Link key={organization.id} className="text-primary hover:underline" href={`/settings/organizations/${organization.id}`}>
             Open
@@ -668,6 +726,25 @@ export function OrganizationsView() {
           <textarea name="description" placeholder="Internal product organization" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
         </FormField>
         <FormActions submitLabel="Create Organization" isSubmitting={mutation.isPending} onCancel={() => setOpen(false)} />
+      </SettingsCreateDialog>
+      <SettingsCreateDialog title="Onboard Organization" open={onboardOpen} onOpenChange={setOnboardOpen} onSubmit={submitOnboard} error={onboardFormError}>
+        <FormField label="Organization Name" required>
+          <Input name="name" placeholder="Acme Corp" />
+        </FormField>
+        <FormField label="Description">
+          <textarea name="description" placeholder="Internal product organization" className={DESCRIPTION_TEXTAREA_CLASS} rows={3} />
+        </FormField>
+        <FormField label="Organization Owner" required>
+          <SettingsMemberSelect
+            name="owner_user_id"
+            placeholder="Search by name or email…"
+            members={userOptions}
+          />
+        </FormField>
+        <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+          The selected user will be assigned as Organization Owner and notified immediately.
+        </p>
+        <FormActions submitLabel="Onboard Organization" isSubmitting={platformOnboardMutation.isPending} onCancel={() => setOnboardOpen(false)} />
       </SettingsCreateDialog>
     </SettingsLayout>
   );
