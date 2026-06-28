@@ -3310,6 +3310,7 @@ export function PermissionsView({ organizationId }: { organizationId?: number } 
 
 export function RoleDetailView({ roleId }: { roleId: number }) {
   const { accessToken } = useSettingsData();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const currentPermissions = useCurrentPermissions();
   const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const queryClient = useQueryClient();
@@ -3318,25 +3319,58 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const rolePermissionsQuery = useQuery({ queryKey: ["settings", "role-permissions", roleId], queryFn: () => settingsApi.listRolePermissions(accessToken ?? "", roleId), enabled: Boolean(accessToken && roleId) });
   const role = rolesQuery.data?.find((item) => item.id === roleId);
+  type RolePermissionEntry = { id: number; role_id: number; permission_id: number };
+  const rolePermQueryKey = ["settings", "role-permissions", roleId] as const;
   const addPermissionMutation = useMutation({
     mutationFn: (permissionId: number) => settingsApi.addRolePermission(accessToken ?? "", roleId, permissionId),
+    onMutate: async (permissionId: number) => {
+      await queryClient.cancelQueries({ queryKey: rolePermQueryKey });
+      const previousData = queryClient.getQueryData<RolePermissionEntry[]>(rolePermQueryKey);
+      queryClient.setQueryData<RolePermissionEntry[]>(rolePermQueryKey, (old) => {
+        if (!old || old.some((item) => item.permission_id === permissionId)) return old;
+        return [...old, { id: -1, role_id: roleId, permission_id: permissionId }];
+      });
+      return { previousData };
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      // Invalidate general context first so ensure_role_catalog() runs before we re-fetch role permissions.
       await invalidateSettingsAndContext(queryClient);
+      await queryClient.invalidateQueries({ queryKey: rolePermQueryKey });
       addToast({ type: "success", title: "Permission assigned" });
     },
-    onError: (error) => addToast({ type: "error", title: "Permission assignment failed", message: error instanceof Error ? error.message : "Unable to assign permission." })
+    onError: (error, _permissionId, context) => {
+      if (context?.previousData !== undefined) queryClient.setQueryData(rolePermQueryKey, context.previousData);
+      addToast({ type: "error", title: "Permission assignment failed", message: error instanceof Error ? error.message : "Unable to assign permission." });
+    },
   });
   const removePermissionMutation = useMutation({
     mutationFn: (permissionId: number) => settingsApi.removeRolePermission(accessToken ?? "", roleId, permissionId),
+    onMutate: async (permissionId: number) => {
+      await queryClient.cancelQueries({ queryKey: rolePermQueryKey });
+      const previousData = queryClient.getQueryData<RolePermissionEntry[]>(rolePermQueryKey);
+      queryClient.setQueryData<RolePermissionEntry[]>(rolePermQueryKey, (old) => old?.filter((item) => item.permission_id !== permissionId));
+      return { previousData };
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["settings", "role-permissions", roleId] });
+      // Invalidate general context first so ensure_role_catalog() runs before we re-fetch role permissions.
       await invalidateSettingsAndContext(queryClient);
+      await queryClient.invalidateQueries({ queryKey: rolePermQueryKey });
       addToast({ type: "success", title: "Permission removed" });
     },
-    onError: (error) => addToast({ type: "error", title: "Permission removal failed", message: error instanceof Error ? error.message : "Unable to remove permission." })
+    onError: (error, _permissionId, context) => {
+      if (context?.previousData !== undefined) queryClient.setQueryData(rolePermQueryKey, context.previousData);
+      addToast({ type: "error", title: "Permission removal failed", message: error instanceof Error ? error.message : "Unable to remove permission." });
+    },
   });
   if (!role) return <SettingsEmptyState title="Role not found" description="Open the access control center or refresh the page." action={<SettingsLinkButton href="/settings/access-control">Access Control</SettingsLinkButton>} />;
+  const resolvedRoles = currentPermissions.data?.roles ?? [];
+  const isSuperuserUser = Boolean(currentUser?.is_superuser);
+  const isPlatformOwner = resolvedRoles.some((r) => r.key === "platform_owner");
+  const isSuperuserRole = role.key === "superuser";
+  // Superuser and Platform Owner can edit any role's permissions except the Superuser role itself.
+  // Platform Admin (canManageRoleMappings) can only edit non-system roles (is_editable !== false).
+  const canEditAnyRole = (isSuperuserUser || isPlatformOwner) && !isSuperuserRole;
+  const canEditPermissions = canEditAnyRole || (canManageRoleMappings && role.is_editable !== false && !isSuperuserRole);
   const linkedPermissionIds = new Set((rolePermissionsQuery.data ?? []).map((item) => item.permission_id));
   const groupedPermissions = groupPermissionsByModule(permissionsQuery.data ?? []);
   const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...Object.keys(groupedPermissions)])).filter((module) => groupedPermissions[module]?.length);
@@ -3353,8 +3387,8 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
           <div><dt className="text-muted-foreground">Assigned Permissions</dt><dd>{linkedPermissionIds.size}</dd></div>
         </dl>
       </SettingsCard>
-      {role.is_editable === false ? <SettingsCard title="System Role Locked" description="System role templates are managed by Asthra and cannot be manually edited or remapped." /> : null}
-      {!canManageRoleMappings ? <SettingsCard title="View Only" description="You need settings.role.manage to change role-permission mappings." /> : null}
+      {isSuperuserRole ? <SettingsCard title="Superuser Role — Always Read-Only" description="The Superuser role is permanently managed by the system. Its permissions cannot be modified by anyone." /> : role.is_system && !canEditAnyRole ? <SettingsCard title="System Role" description="System role templates are managed by Asthra. Only Superuser and Platform Owner can modify their permission mappings." /> : null}
+      {!canEditPermissions && !isSuperuserRole ? <SettingsCard title="View Only" description="You need settings.role.manage to change role-permission mappings. Superuser or Platform Owner privileges are required to edit system role permissions." /> : null}
       {modules.map((module) => (
         <SettingsCard key={module} title={`${moduleLabel(module)} Permissions`} description="Assign or remove permissions from this role.">
           <SettingsDataTable
@@ -3370,10 +3404,10 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
                   <input
                     type="checkbox"
                     checked={linked}
-                    disabled={!canManageRoleMappings || role.is_editable === false || addPermissionMutation.isPending || removePermissionMutation.isPending}
+                    disabled={!canEditPermissions || addPermissionMutation.isPending || removePermissionMutation.isPending}
                     onChange={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
                   />
-                  {!canManageRoleMappings || role.is_editable === false ? "View only" : linked ? "Assigned" : "Assign Permission"}
+                  {!canEditPermissions ? "View only" : linked ? "Assigned" : "Assign Permission"}
                 </label>
               ];
             })}

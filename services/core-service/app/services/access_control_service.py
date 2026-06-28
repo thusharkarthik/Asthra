@@ -61,7 +61,7 @@ class AccessControlService:
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-        RoleService(self.db).ensure_role_catalog()
+        RoleService(self.db).ensure_role_catalog(sync_permissions=False)
         scope_type, scope_id = self._normalize_scope(scope_type, scope_id)
 
         if user.is_superuser:

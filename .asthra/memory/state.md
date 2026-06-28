@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-27 (role catalog cleanup — platform_member retired, organization_member added; action button visibility guards)
+Last updated: 2026-06-28 (role-permission sync made additive-only; ensure_role_catalog hot-path calls demoted to sync_permissions=False)
 
 ## Phase
 
@@ -60,6 +60,12 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - `user_roles` table kept in schema but no code writes/reads it. Production DB would need a migration to add `nullable=True` on `organization_id` in `invitations` table.
 - `platform_member` role **removed** from `ASTHRA_ROLE_TEMPLATES` (2026-06-27). Deactivated in DB on next `ensure_role_catalog()` call. No replacement platform role needed — onboarding uses "authenticated, no org" state instead.
 - `organization_member` role **added** to `ASTHRA_ROLE_TEMPLATES` (2026-06-27) — scope: organization, minimal perms: settings.profile.view, settings.notifications.view, settings.preferences.view, settings.organization.view. Sits below Organization Auditor in hierarchy.
+- 6 functional roles (product_owner, scrum_master, engineering_manager, release_manager, incident_commander, knowledge_manager) **deactivated** (2026-06-27). `is_active: False` added to their `ASTHRA_ROLE_TEMPLATES` entries. `ensure_role_catalog()` enforces deactivation in DB on every startup. Roles are NOT deleted — they can be reactivated when Labels system ships in Phase B.
+- Role permission editing available (2026-06-27) for Superuser and Platform Owner: `_can_manage_role_permissions()` bypasses the `is_editable=False` guard in `link_permission()` / `unlink_permission()`, except the Superuser role itself is always locked. Platform Admin can only edit non-system roles (existing `is_editable` check applies).
+- `POST /roles/{role_id}/permissions/{permission_id}` endpoint added — path-based permission assignment, calls `assign_permission_by_id()` → `link_permission()`.
+- **Role-permission sync is additive-only (2026-06-28)**: `_sync_role_template_permissions()` no longer deletes any existing `RolePermission` rows. It only adds permissions that are in template patterns but missing from the DB. Manual permission assignments persist permanently. Manual permission removals also persist (sync never re-adds what an admin removed).
+- **`ensure_role_catalog()` call frequency reduced (2026-06-28)**: `list()`, `list_templates()` in `role_service.py`, and `/me/permissions` resolution in `access_control_service.py` now call `ensure_role_catalog(sync_permissions=False)` instead of the full `sync_permissions=True`. The expensive `ensure_permission_catalog()` / `sync_registry_permissions()` call is no longer triggered on every API request.
+- **Admin sync trigger (2026-06-28)**: `POST /permission-registry/sync` (admin "Sync Permissions" button) now calls `RoleService(db).ensure_role_catalog(sync_permissions=False)` after syncing the permission catalog, so newly generated permissions are immediately seeded onto roles matching template patterns.
 - Platform-scope `/me/permissions` (no query params) only returns platform-level roles. Org/workspace assignments never surface at platform scope.
 - `useCurrentPermissions` hook cannot force platform scope by passing null — always falls back to store selections.
 - `getCurrentPermissions(token, {})` called directly (bypassing the hook) correctly targets platform scope.
