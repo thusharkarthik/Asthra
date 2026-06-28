@@ -160,6 +160,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Own product priorities and acceptance decisions.",
         "permission_patterns": ["flow.work_item.*", "flow.board.view", "flow.sprint.view", "flow.release.view", "flow.report.view", "docs.page.*", "discover.idea.*"],
+        "is_active": False,
     },
     {
         "name": "Scrum Master",
@@ -167,6 +168,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Facilitate sprint execution and team ceremonies.",
         "permission_patterns": ["flow.work_item.view", "flow.work_item.edit", "flow.work_item.assign", "flow.board.view", "flow.sprint.*", "flow.report.view"],
+        "is_active": False,
     },
     {
         "name": "Engineering Manager",
@@ -174,6 +176,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Manage engineering team delivery and ownership.",
         "permission_patterns": ["flow.*", "docs.page.view", "desk.ticket.view", "pulse.incident.view", "dev.release.*", "insights.report.view"],
+        "is_active": False,
     },
     {
         "name": "Release Manager",
@@ -181,6 +184,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Coordinate release planning and rollout readiness.",
         "permission_patterns": ["flow.work_item.view", "flow.board.view", "flow.release.*", "flow.report.view", "dev.release.*"],
+        "is_active": False,
     },
     {
         "name": "Incident Commander",
@@ -188,6 +192,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Coordinate incident response and communications.",
         "permission_patterns": ["desk.ticket.*", "pulse.incident.*", "flow.work_item.view", "flow.work_item.create", "docs.page.view"],
+        "is_active": False,
     },
     {
         "name": "Knowledge Manager",
@@ -195,6 +200,7 @@ ASTHRA_ROLE_TEMPLATES = [
         "scope": "functional",
         "description": "Manage knowledge quality and documentation practices.",
         "permission_patterns": ["docs.page.*", "settings.workspace.view"],
+        "is_active": False,
     },
 ]
 
@@ -244,7 +250,7 @@ class RoleService:
 
     def list(self, current_user: User) -> list[Role]:
         self._ensure_active_user(current_user)
-        self.ensure_role_catalog()
+        self.ensure_role_catalog(sync_permissions=False)
         roles = self.role_repository.list()
         if self._can_view_hidden_roles(current_user):
             return roles
@@ -252,7 +258,7 @@ class RoleService:
 
     def list_templates(self, current_user: User) -> list[dict]:
         self._ensure_active_user(current_user)
-        self.ensure_role_catalog()
+        self.ensure_role_catalog(sync_permissions=False)
         return [
             {
                 "name": template["name"],
@@ -307,6 +313,9 @@ class RoleService:
         ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
         self.db.commit()
 
+    def assign_permission_by_id(self, role_id: int, permission_id: int, current_user: User) -> RolePermission:
+        return self.link_permission(role_id, RolePermissionCreate(permission_id=permission_id), current_user)
+
     def link_permission(
         self,
         role_id: int,
@@ -315,7 +324,7 @@ class RoleService:
     ) -> RolePermission:
         role = self.get(role_id, current_user)
         self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
-        if not role.is_editable:
+        if not role.is_editable and not self._can_manage_role_permissions(current_user, role):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         permission = self.permission_repository.get_by_id(link_create.permission_id)
         if permission is None or not permission.is_active:
@@ -358,7 +367,7 @@ class RoleService:
     def unlink_permission(self, role_id: int, permission_id: int, current_user: User) -> None:
         role = self.get(role_id, current_user)
         self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
-        if not role.is_editable:
+        if not role.is_editable and not self._can_manage_role_permissions(current_user, role):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         role_permission = self.role_repository.get_role_permission(role.id, permission_id)
         if role_permission is None:
@@ -475,6 +484,33 @@ class RoleService:
             is not None
         )
 
+    def _can_manage_role_permissions(self, user: User, role: Role) -> bool:
+        """True if the user may add/remove permissions from any role (except superuser)."""
+        if role.key == "superuser":
+            return False
+        if user.is_superuser:
+            return True
+        return self._user_has_platform_owner(user)
+
+    def _user_has_platform_owner(self, user: User) -> bool:
+        platform_owner = (
+            self.db.query(Role)
+            .filter(Role.key == "platform_owner", Role.scope == "platform", Role.is_active.is_(True))
+            .first()
+        )
+        if platform_owner is None:
+            return False
+        return (
+            self.db.query(RoleAssignment.id)
+            .filter(
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.role_id == platform_owner.id,
+                RoleAssignment.status == "active",
+            )
+            .first()
+            is not None
+        )
+
     def _ensure_role_can_be_assigned(self, role: Role, current_user: User, scope_type: str, scope_id: int | None) -> None:
         if role.scope == "platform" and scope_type != "platform":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Platform roles can only be assigned at platform scope.")
@@ -511,6 +547,7 @@ class RoleService:
             scope = template["scope"]
             description = template["description"]
             is_hidden = bool(template.get("is_hidden", False))
+            is_active = bool(template.get("is_active", True))
             existing = self.role_repository.get_by_scope_and_name(scope, name)
             if existing is not None:
                 if (
@@ -519,12 +556,14 @@ class RoleService:
                     or existing.key != key
                     or existing.description != description
                     or existing.is_hidden != is_hidden
+                    or existing.is_active != is_active
                 ):
                     existing.key = key
                     existing.is_system = True
                     existing.is_editable = False
                     existing.description = description
                     existing.is_hidden = is_hidden
+                    existing.is_active = is_active
                     changed = True
                 role_by_key[key] = existing
                 continue
@@ -537,6 +576,7 @@ class RoleService:
                 is_system=True,
                 is_editable=False,
                 is_hidden=is_hidden,
+                is_active=is_active,
             )
             self.db.add(role)
             role_by_key[key] = role
@@ -574,13 +614,8 @@ class RoleService:
                 if self._permission_matches_template(code, template["permission_patterns"])
             }
             existing_permission_ids = existing_by_role.get(role.id, set())
-            if existing_permission_ids == wanted_permission_ids:
+            if wanted_permission_ids.issubset(existing_permission_ids):
                 continue
-            for permission_id in existing_permission_ids - wanted_permission_ids:
-                mapping = mappings_by_pair.get((role.id, permission_id))
-                if mapping is not None:
-                    self.db.delete(mapping)
-                    dirty = True
             for permission_id in wanted_permission_ids - existing_permission_ids:
                 self.db.add(RolePermission(role_id=role.id, permission_id=permission_id))
                 dirty = True

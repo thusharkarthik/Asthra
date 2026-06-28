@@ -103,6 +103,16 @@ def replace_role_permissions(
     return RoleService(db).replace_permissions(role_id, replace_create, current_user)
 
 
+@router.post("/{role_id}/permissions/{permission_id}", response_model=RolePermissionRead, status_code=status.HTTP_201_CREATED)
+def assign_role_permission_by_id(
+    role_id: int,
+    permission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RolePermission:
+    return RoleService(db).assign_permission_by_id(role_id, permission_id, current_user)
+
+
 @router.delete("/{role_id}/permissions/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
 def unlink_role_permission(
     role_id: int,

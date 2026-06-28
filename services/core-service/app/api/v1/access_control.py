@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.role import PermissionGapRead
 from app.services.access_control_service import AccessControlService
 from app.services.permission_service import PermissionService
+from app.services.role_service import RoleService
 
 
 router = APIRouter()
@@ -46,7 +47,11 @@ def sync_permission_registry(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    return PermissionService(db).sync_registry_permissions(dry_run=False)
+    result = PermissionService(db).sync_registry_permissions(dry_run=False)
+    # After syncing the permission catalog, seed new permissions onto roles that match
+    # template patterns. sync_permissions=False avoids re-running the catalog sync above.
+    RoleService(db).ensure_role_catalog(sync_permissions=False)
+    return result
 
 
 @router.get("/role-mapping-suggestions")

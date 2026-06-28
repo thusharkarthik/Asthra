@@ -128,6 +128,39 @@
 
 ## Open
 
+### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]
+
+**Files**: `services/core-service/app/services/role_service.py`, `services/core-service/app/services/access_control_service.py`, `services/core-service/app/api/v1/access_control.py`
+**Symptom**: Manually assigning a permission to a role (via the admin UI or API) would be wiped on the next `ensure_role_catalog()` call (triggered by list roles, get effective permissions, server startup, etc.). The permission would silently disappear. Conversely, manually removing a permission would be re-added by the next sync.
+**Root cause**: `_sync_role_template_permissions()` computed a full diff between existing DB permissions and template-desired permissions, then DELETE'd anything in `existing - wanted`. Template patterns are the only source of truth it respected — manual admin work was invisible to it.
+**Additional root cause**: `ensure_role_catalog()` with `sync_permissions=True` (which triggers the expensive `sync_registry_permissions()` permission catalog scan) was called on every `list()`, `list_templates()`, and `/me/permissions` request — on EVERY API call, not just startup. This is both costly and meant the destructive sync ran constantly.
+**Fix**:
+1. **Removed delete block** from `_sync_role_template_permissions()`: the `for permission_id in existing_permission_ids - wanted_permission_ids: self.db.delete(mapping)` block is gone entirely. Sync is now additive-only: only adds permissions that match template patterns but are absent from DB.
+2. **Updated early-exit condition**: changed `if existing_permission_ids == wanted_permission_ids` to `if wanted_permission_ids.issubset(existing_permission_ids)` — since we never remove, the only reason to enter the loop is if wanted permissions are missing.
+3. **Demoted hot-path calls**: `role_service.list()`, `role_service.list_templates()`, and `access_control_service.get_effective_permissions()` now call `ensure_role_catalog(sync_permissions=False)` instead of `sync_permissions=True`. Avoids re-scanning the permission catalog on every API request.
+4. **Wired admin sync trigger**: `POST /permission-registry/sync` (admin "Sync Permissions" button) now calls `RoleService(db).ensure_role_catalog(sync_permissions=False)` after syncing the permission catalog, so newly generated permissions are immediately seeded onto matching roles.
+**pytest**: `test_permission_registry.py` — 11/11 passed in clean run.
+
+### BUG-023 — Role Permission Checkbox Reverts / Removal Fails with 404 [FIXED 2026-06-28]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx` (`RoleDetailView`)
+
+**Bug A — Checkbox revert after assign**: After checking an unassigned permission, the checkbox briefly shows "Assigned" then reverts. **Root cause**: `addPermissionMutation.onSuccess` invalidated `role-permissions` FIRST (step 1), then called `invalidateSettingsAndContext` (step 2) which triggered a `rolesQuery` refetch → `ensure_role_catalog()` → `_sync_role_template_permissions()` ran and potentially removed the manually-added permission from DB. But `rolePermissionsQuery` was already "fresh" from step 1 and wouldn't auto-refetch, leaving stale "Assigned" state until the next background refetch.
+
+**Bug B — "Role permission link not found" on uncheck**: Direct consequence of Bug A. The stale `rolePermissionsQuery` showed a permission as linked when it was no longer in DB (removed by `_sync_role_template_permissions()`). DELETE called with `permission.id` → backend 404 because no matching `RolePermission` row exists.
+
+**Fix**:
+1. Swapped invalidation order in both mutations' `onSuccess`: `invalidateSettingsAndContext` first (so `ensure_role_catalog()` runs and backend reaches final DB state), then `rolePermissionsQuery` refetch (so UI reflects authoritative post-sync state).
+2. Added `onMutate` optimistic updates to both mutations: immediately update `role-permissions` cache on click (instant UI feedback), rollback in `onError` (on API failure). This eliminates any visual flicker.
+
+### BUG-021 — Role Permissions Always Read-Only (No Edit Capability for Superuser/Platform Owner) [FIXED 2026-06-27]
+
+**File**: `frontend/src/components/settings/settings-admin-views.tsx` (`RoleDetailView`), `services/core-service/app/services/role_service.py`
+**Symptom**: Role detail page showed permission checkboxes as disabled for all users — no one could add/remove permissions from any role. Superuser and Platform Owner should be able to edit permissions on any role (except Superuser role itself).
+**Root cause**: `link_permission()` and `unlink_permission()` service methods blocked all roles with `is_editable=False` regardless of who is calling. Frontend disabled state also included `role.is_editable === false` unconditionally.
+**Fix (backend)**: Added `_can_manage_role_permissions(user, role)` helper — returns True if user.is_superuser or has platform_owner assignment, False if role.key == "superuser". Both service methods now only block if `not is_editable AND not _can_manage_role_permissions`. Added `assign_permission_by_id()` and new `POST /roles/{role_id}/permissions/{permission_id}` endpoint.
+**Fix (frontend)**: In `RoleDetailView`, detect `isSuperuserUser` via `currentUser.is_superuser`, `isPlatformOwner` via resolved roles. `canEditPermissions = canEditAnyRole || (canManageRoleMappings && is_editable !== false)`. Checkbox disabled only when `!canEditPermissions`. Superuser role always shows "Always Read-Only" card.
+
 ### BUG-020 — Assign Role + Remove Role Buttons Visible to Users Without settings.role.manage [FIXED 2026-06-27]
 
 **File**: `frontend/src/components/settings/settings-admin-views.tsx` (`MemberDetailView`)
