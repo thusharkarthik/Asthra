@@ -12,6 +12,7 @@ import { PlatformActivityFeed } from "@/components/platform/activity-feed";
 import { CrossModuleLinks } from "@/components/platform/cross-module-links";
 import { FavoritesList, RecentItemsList } from "@/components/platform/recent-favorites";
 import { CreateOrgDialog, PlatformSetupGuide } from "@/components/platform/platform-setup-guide";
+import { OrgSetupChecklist } from "@/components/platform/org-setup-checklist";
 import { WorkspaceDashboardSummaryCards } from "@/components/platform/workspace-dashboard-summary";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
@@ -156,6 +157,7 @@ export default function HomePage() {
     <>
       <PageHeader title="Home" description="One connected workspace for work, knowledge, operations, engineering, and intelligence." />
       {error && <div className="mb-4"><ErrorState title="Workspace context failed to load" description="The shell is still available. Check the API Gateway and core-service if counts look empty." /></div>}
+      <OrgSetupChecklist />
       {(organizations.length === 0 || workspaces.length === 0 || projects.length === 0) ? (
         <div className="mb-4">
           <PlatformSetupGuide moduleName="Home" hasOrganization={organizations.length > 0} hasWorkspace={workspaces.length > 0} hasProject={projects.length > 0} requiresProject />

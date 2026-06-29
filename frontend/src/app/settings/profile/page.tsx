@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormActions, FormField, SettingsCard, SettingsLayout, SettingsSectionHeader } from "@/components/settings/settings-components";
@@ -99,6 +99,7 @@ export default function ProfileSettingsPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const { organizations, workspaces } = usePlatformContext();
+  const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState(currentUser?.full_name ?? "");
   const [jobTitle, setJobTitle] = useState(currentUser?.job_title ?? "");
@@ -136,6 +137,14 @@ export default function ProfileSettingsPage() {
     mutationFn: (payload: { full_name: string; job_title: string; timezone: string; locale: string }) =>
       settingsApi.updateMyProfile(accessToken ?? "", payload),
     onSuccess: (updatedUser) => {
+      // Update form state immediately from API response — do not wait for query refetch
+      setFullName(updatedUser.full_name ?? "");
+      setJobTitle(updatedUser.job_title ?? "");
+      setTimezone(updatedUser.timezone ?? "UTC");
+      setLocale(updatedUser.locale ?? "en");
+      // Push updated user into the query cache so useEffect sees fresh data
+      queryClient.setQueryData(["me", "profile"], updatedUser);
+      // Update auth store so name/avatar update everywhere (header, bottom bar)
       useAuthStore.setState((state) => ({ ...state, currentUser: updatedUser }));
       addToast({ type: "success", title: "Profile updated", message: "Your profile has been saved." });
     },
