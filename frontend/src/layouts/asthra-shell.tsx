@@ -3,7 +3,7 @@
 import { Bell, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
@@ -27,6 +27,8 @@ import { useNotificationStore } from "@/stores/notification-store";
 import { useProgressStore } from "@/stores/progress-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import type { NavigationMode } from "@/lib/navigation-mode";
+import { detectNavigationMode, autoDetectModeFromPath } from "@/lib/navigation-mode";
 
 const publicPaths = new Set(["/login", "/register"]);
 const AUTH_LOGOUT_TRANSITION_MS = 1450;
@@ -41,7 +43,21 @@ function WorkspaceContextLoader() {
   return null;
 }
 
-function PermissionAwareSidebar({ collapsed, skippedUser }: { collapsed: boolean; skippedUser?: boolean }) {
+function PermissionAwareSidebar({
+  collapsed,
+  skippedUser,
+  navigationMode,
+  isSuperuser,
+  modeOverride,
+  onModeOverride,
+}: {
+  collapsed: boolean;
+  skippedUser?: boolean;
+  navigationMode: NavigationMode;
+  isSuperuser: boolean;
+  modeOverride: NavigationMode | null;
+  onModeOverride: (mode: NavigationMode | null) => void;
+}) {
   const permissions = useCurrentPermissions();
   return (
     <SidebarNav
@@ -49,6 +65,10 @@ function PermissionAwareSidebar({ collapsed, skippedUser }: { collapsed: boolean
       permissionCodes={permissions.permissionCodes}
       permissionsLoading={permissions.isLoading}
       skippedUser={skippedUser}
+      navigationMode={navigationMode}
+      isSuperuser={isSuperuser}
+      modeOverride={modeOverride}
+      onModeOverride={onModeOverride}
     />
   );
 }
@@ -70,6 +90,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [routeLoading, setRouteLoading] = useState(false);
   const [skippedOnboarding, setSkippedOnboarding] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [superuserModeOverride, setSuperuserModeOverride] = useState<NavigationMode | null>(null);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -85,6 +106,21 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const hasPlatformRole = (permissions?.roles?.length ?? 0) > 0;
   const needsOnboarding = !isPublicPath && !contextLoading && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
   const isSkippedUser = needsOnboarding && skippedOnboarding;
+  const isSuperuser = Boolean(currentUser?.is_superuser);
+
+  // Detect base navigation mode from roles
+  const baseNavigationMode = useMemo((): NavigationMode => {
+    return detectNavigationMode(isSuperuser, permissions?.roles ?? []);
+  }, [isSuperuser, permissions?.roles]);
+
+  // For superuser, auto-detect mode from current route when no manual override
+  const autoDetectedMode = useMemo((): NavigationMode => {
+    if (!isSuperuser) return baseNavigationMode;
+    return autoDetectModeFromPath(pathname);
+  }, [isSuperuser, baseNavigationMode, pathname]);
+
+  // Effective navigation mode: manual override beats auto-detection
+  const navigationMode: NavigationMode = superuserModeOverride ?? autoDetectedMode;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated && !isPublicPath) {
@@ -175,13 +211,25 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     setAuthTransition(null);
   };
 
+  // Bottom bar scope selectors depend on navigation mode
+  const showOrgSwitcher = navigationMode !== "platform";
+  const showWorkspaceSwitcher = navigationMode === "work";
+  const showProjectSwitcher = navigationMode === "work";
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <WorkspaceContextLoader />
       <div className="flex min-h-0 flex-1 pb-3">
         <aside className={cn("hidden min-h-0 shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <PermissionAwareSidebar collapsed={sidebarCollapsed} skippedUser={isSkippedUser} />
+            <PermissionAwareSidebar
+              collapsed={sidebarCollapsed}
+              skippedUser={isSkippedUser}
+              navigationMode={navigationMode}
+              isSuperuser={isSuperuser}
+              modeOverride={superuserModeOverride}
+              onModeOverride={setSuperuserModeOverride}
+            />
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -224,9 +272,12 @@ export function AsthraShell({ children }: { children: ReactNode }) {
               </Button>
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 lg:flex-nowrap">
-              <OrganizationSwitcher />
-              <WorkspaceSwitcher />
-              <ProjectSwitcher />
+              {showOrgSwitcher && <OrganizationSwitcher />}
+              {showWorkspaceSwitcher && <WorkspaceSwitcher />}
+              {showProjectSwitcher && <ProjectSwitcher />}
+              {navigationMode === "platform" && (
+                <span className="text-xs text-muted-foreground dark:text-white/50">Platform Mode</span>
+              )}
               <div className="min-w-[220px] flex-1 sm:min-w-[280px] lg:max-w-md">
                 <SearchBar />
               </div>
