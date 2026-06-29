@@ -244,6 +244,21 @@ Fixed 2026-06-26. `invalidateSettingsAndContext()` in `settings-admin-views.tsx`
 
 Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
 
+## Organization & Workspace Settings Pages (added 2026-06-29)
+
+Extended settings infrastructure to support org + workspace detail configuration.
+
+**Backend (`services/core-service/`)**:
+- `schemas/settings.py`: Extended `OrganizationSettingsRead/Update` with domain, website_url, industry, logo_url, primary_color, locale, date_format. Extended `WorkspaceSettingsRead/Update` with visibility, locale, enabled_modules (list[str]).
+- `services/settings_service.py`: Updated `DEFAULT_ORGANIZATION_SETTINGS` and `DEFAULT_WORKSPACE_SETTINGS` dicts to include all new fields. JSON column persists/reads new fields transparently — no DB migration needed.
+
+**Frontend (`frontend/src/`)**:
+- `services/api/settings-api.ts`: Added `OrgSettingsRecord` and `WorkspaceSettingsRecord` types. Added `getOrganizationSettings()`, `updateOrganizationSettings()`, `getWorkspaceSettings()`, `updateWorkspaceSettings()` API methods.
+- `app/settings/organizations/[id]/page.tsx`: Full client component (uses `useParams`, no server wrapper). Tabs navigation (Overview/Members/Workspaces/Roles/Permissions) built inline with `Link`. Sections: Overview card (slug, status, workspace count, domain, website, industry), General (name/description → PATCH /organizations/{id}), Identity & Contact (domain/website/industry), Branding (logo URL + color picker), Localization (timezone/locale/date format) — settings sections → PATCH /organizations/{id}/settings. Danger Zone: deactivate with inline confirm. Read-only when not authorized.
+- `app/settings/workspace/page.tsx`: Client component using `useWorkspaceStore` for selected workspace. Empty state if none selected. Sections: General (name/description), Access & Localization (visibility/timezone/locale), Module Visibility (7 toggleable modules: flow/docs/discover/desk/pulse/collab/automation). Danger Zone: archive. Two save buttons — one per form (general vs settings).
+
+**Authorization**: `isAuthorized` computed from `useSettingsAuthority().authorityLevel` — superuser/platform/org authority grants edit; workspace auth grants edit for the specific workspace. Backend enforces actual permissions.
+
 ## API Key Management (added 2026-06-29)
 
 `frontend/src/app/settings/api-keys/page.tsx` — full implementation (replaced placeholder re-export).
