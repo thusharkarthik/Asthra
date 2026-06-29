@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  Brain,
   Building2,
   Code2,
   Home,
@@ -151,6 +152,7 @@ export const WORK_NAV: ModeNavSection[] = [
     label: "Intelligence",
     items: [
       { label: "Insights", href: "/insights", icon: BarChart3 },
+      { label: "Memory", href: "/memory", icon: Brain },
       { label: "Assistant", href: "/assistant", icon: Bot },
     ],
   },

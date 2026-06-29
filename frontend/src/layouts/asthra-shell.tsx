@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useIsFetching, useIsMutating } from "@tanstack/react-query";
+import { useIsFetching, useIsMutating, useQuery } from "@tanstack/react-query";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
 import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { CommandPalette } from "@/components/navigation/command-palette";
@@ -23,6 +23,7 @@ import { useCurrentPermissions, usePlatformContext } from "@/context/platformCon
 import { OnboardingGate } from "@/components/platform/platform-setup-guide";
 import { ContextualHelpModal } from "@/components/platform/contextual-help";
 import { useAuthStore } from "@/stores/auth-store";
+import { settingsApi } from "@/services/api/settings-api";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useProgressStore } from "@/stores/progress-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -80,11 +81,21 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
   const { organizations, permissions, isLoading: contextLoading } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
-  const unreadNotifications = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
+  const zustandUnread = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
+  const coreNotificationsQuery = useQuery({
+    queryKey: ["core", "notifications"],
+    queryFn: () => settingsApi.listNotifications(accessToken ?? ""),
+    enabled: Boolean(accessToken && isAuthenticated),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const coreUnread = (coreNotificationsQuery.data ?? []).filter((n) => !n.is_read).length;
+  const unreadNotifications = zustandUnread + coreUnread;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
