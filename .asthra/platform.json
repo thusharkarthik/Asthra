@@ -16,21 +16,19 @@
     "Future cross-service coordination uses events.",
     "Ownership boundaries must be respected."
   ],
-  "currentPhase": "Core Stabilization — RBAC, Settings, Member Management, Notifications",
+  "currentPhase": "Phase B Core — Intelligence Layer",
   "targetUser": "Engineering and product teams at growing companies, 20–200 people, who need structured execution without enterprise tool overhead.",
   "currentPriority": [
-    "Core stabilization and RBAC hardening",
-    "Settings UX and access control enforcement",
-    "Flow maturity",
-    "Discover maturity",
-    "Docs maturity"
+    "Unified Platform Context API",
+    "Feature Flag Engine",
+    "Module Registry",
+    "Memory page",
+    "AI Context Registry"
   ],
   "doNotTouch": [
     "shared packages (shared-auth, shared-db, shared-events, shared-schemas, shared-platform) without explicit instruction",
     "alembic migration files without explicit instruction",
-    "docker-compose.yml service ports",
-    "UserRole vs RoleAssignment consolidation — deferred to Phase B",
-    "AI service and Memory service connection — deferred to Phase C"
+    "docker-compose.yml service ports"
   ],
   "agentInstructions": {
     "beforeStarting": [
