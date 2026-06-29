@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.api.v1.auth import get_current_user
 from app.core.permissions import require_permission
 from app.db.session import get_db
+from app.models.role import Role
 from app.models.user import User
+from app.schemas.access_control import CurrentUserPermissionsRead
 from app.schemas.role import PermissionGapRead
 from app.services.access_control_service import AccessControlService
 from app.services.permission_service import PermissionService
@@ -61,6 +63,52 @@ def get_role_mapping_suggestions(
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
     return PermissionService(db).role_mapping_suggestions()
+
+
+@router.get("/simulate", response_model=CurrentUserPermissionsRead)
+def simulate_permissions(
+    role_key: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    if not current_user.is_superuser:
+        access_check = AccessControlService(db)
+        platform_roles = access_check.get_effective_roles(current_user.id, "platform", None)
+        if not any(r["key"] in {"platform_owner", "platform_admin"} for r in platform_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only superusers and platform owners/admins can simulate permissions.",
+            )
+    if not role_key and not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide role_key or user_id.",
+        )
+    access = AccessControlService(db)
+    if role_key:
+        role = db.query(Role).filter(Role.key == role_key, Role.is_active.is_(True)).first()
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Role '{role_key}' not found or is inactive.",
+            )
+        permission_codes = sorted(access._permission_codes_for_roles([role.id]))
+        return {
+            "permission_codes": permission_codes,
+            "roles": [
+                {
+                    "id": role.id,
+                    "name": role.name,
+                    "key": role.key,
+                    "scope": role.scope,
+                    "source_scope_type": role.scope,
+                    "source_scope_id": None,
+                }
+            ],
+            "scope": {"scope_type": "platform", "scope_id": None},
+        }
+    return access.get_user_permissions(user_id, "platform", None)
 
 
 @router.get("/debug/effective-access")

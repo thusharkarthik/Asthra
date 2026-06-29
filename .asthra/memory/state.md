@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-29 (three-mode navigation — platform/org/work modes with auto-detection and superuser switching)
+Last updated: 2026-06-29 (permission simulator — superuser/platform owner View As panel with role simulation)
 
 ## Phase
 
@@ -9,6 +9,33 @@ Last updated: 2026-06-29 (three-mode navigation — platform/org/work modes with
 ## Branch
 
 Current branch: `feature/three-mode-navigation`. Clean build, no TypeScript errors.
+
+## Permission Simulator (added 2026-06-29)
+
+**Purpose**: Superuser and Platform Owner can "View As" any role to see exactly what the UI looks like, without changing real permissions.
+
+**Files**:
+- `frontend/src/lib/permission-simulator.ts` (new) — Zustand store (`useSimulationStore`), `roleKeyToNavigationMode()` helper
+- `frontend/src/components/navigation/sidebar-nav.tsx` (updated) — "View As" button + panel, active simulation indicator
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — simulation banner above content, `effectiveNavigationMode` passed to sidebar and bottom bar
+- `frontend/src/context/platformContext.tsx` (updated) — `can()` overrides to use simulated permissions
+- `frontend/src/services/api/settings-api.ts` (updated) — `simulatePermissions()` API method
+- `services/core-service/app/api/v1/access_control.py` (updated) — `GET /access-control/simulate` endpoint
+
+**How `can()` override works**:
+`PlatformContextProvider` subscribes to `useSimulationStore` (isSimulating, simulatedPermissions). When `isSimulating=true`, `can(code)` returns `simulatedPermissions.includes(code)` instead of the real permissions check. Included in `useMemo` deps so context re-renders on simulation change.
+
+**How navigation mode switches**:
+Shell computes `effectiveNavigationMode = isSimulating && simulatedMode ? simulatedMode : navigationMode`. Passed to `PermissionAwareSidebar` and used for bottom bar selectors. Superuser mode switcher hidden in sidebar during simulation.
+
+**How banner is implemented**:
+In `asthra-shell.tsx`, when `isSimulating`, renders a sticky amber `<div>` above the `<main>` content area: shows role name + "Exit Simulation" button. Always visible, cannot be dismissed without exiting.
+
+**Security**: Backend `GET /access-control/simulate` is read-only. Checks caller is superuser OR has platform_owner/platform_admin role. Real token always used for API calls. No actual permissions are modified.
+
+**`roleKeyToNavigationMode(key)`**: Maps role key → NavigationMode. Platform keys → "platform", org keys → "org", everything else → "work".
+
+**NOT implemented** (out of scope — settings page): "View As This User" button in `/settings/members/[id]` — settings pages are off limits per task spec. Can be added later as it just calls `simulatePermissions(token, { user_id })` + `startSimulation(...)`.
 
 ## Three-Mode Navigation (added 2026-06-29)
 

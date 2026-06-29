@@ -12,6 +12,7 @@ import {
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSimulationStore } from "@/lib/permission-simulator";
 import type { ContextVersionSnapshot } from "@/types/core";
 
 type CurrentScope = {
@@ -51,6 +52,8 @@ const PlatformContext = createContext<PlatformContextValue | null>(null);
 
 export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const isSimulating = useSimulationStore((state) => state.isSimulating);
+  const simulatedPermissions = useSimulationStore((state) => state.simulatedPermissions);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -126,7 +129,10 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     setSelectedOrganization,
     setSelectedWorkspace,
     setSelectedProject,
-    can: (permissionCode: string) => hasPermission(permissionCodes, permissionCode),
+    can: (permissionCode: string) => {
+      if (isSimulating) return simulatedPermissions.includes(permissionCode);
+      return hasPermission(permissionCodes, permissionCode);
+    },
     refetchPermissions: () => {
       void permissionsQuery.refetch();
     }
@@ -138,6 +144,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isError,
     isFetching,
     isLoading,
+    isSimulating,
     loadedAt,
     organizations,
     permissionCodes,
@@ -152,6 +159,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     setSelectedOrganization,
     setSelectedProject,
     setSelectedWorkspace,
+    simulatedPermissions,
     workspaces
   ]);
 

@@ -29,6 +29,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import type { NavigationMode } from "@/lib/navigation-mode";
 import { detectNavigationMode, autoDetectModeFromPath } from "@/lib/navigation-mode";
+import { useSimulationStore } from "@/lib/permission-simulator";
 
 const publicPaths = new Set(["/login", "/register"]);
 const AUTH_LOGOUT_TRANSITION_MS = 1450;
@@ -91,6 +92,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [skippedOnboarding, setSkippedOnboarding] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [superuserModeOverride, setSuperuserModeOverride] = useState<NavigationMode | null>(null);
+  const isSimulating = useSimulationStore((state) => state.isSimulating);
+  const simulatedMode = useSimulationStore((state) => state.simulatedMode);
+  const simulatedRoleName = useSimulationStore((state) => state.simulatedRoleName);
+  const exitSimulation = useSimulationStore((state) => state.exitSimulation);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -119,8 +124,9 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     return autoDetectModeFromPath(pathname);
   }, [isSuperuser, baseNavigationMode, pathname]);
 
-  // Effective navigation mode: manual override beats auto-detection
+  // Effective navigation mode: manual override beats auto-detection; simulation overrides both
   const navigationMode: NavigationMode = superuserModeOverride ?? autoDetectedMode;
+  const effectiveNavigationMode: NavigationMode = isSimulating && simulatedMode ? simulatedMode : navigationMode;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated && !isPublicPath) {
@@ -211,10 +217,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     setAuthTransition(null);
   };
 
-  // Bottom bar scope selectors depend on navigation mode
-  const showOrgSwitcher = navigationMode !== "platform";
-  const showWorkspaceSwitcher = navigationMode === "work";
-  const showProjectSwitcher = navigationMode === "work";
+  // Bottom bar scope selectors depend on effective navigation mode
+  const showOrgSwitcher = effectiveNavigationMode !== "platform";
+  const showWorkspaceSwitcher = effectiveNavigationMode === "work";
+  const showProjectSwitcher = effectiveNavigationMode === "work";
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -225,7 +231,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
             <PermissionAwareSidebar
               collapsed={sidebarCollapsed}
               skippedUser={isSkippedUser}
-              navigationMode={navigationMode}
+              navigationMode={effectiveNavigationMode}
               isSuperuser={isSuperuser}
               modeOverride={superuserModeOverride}
               onModeOverride={setSuperuserModeOverride}
@@ -233,6 +239,25 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {isSimulating && (
+            <div className="shrink-0 flex items-center justify-between border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm dark:border-amber-700 dark:bg-amber-950/60">
+              <span className="text-amber-800 dark:text-amber-300">
+                <span className="mr-1">👁</span>
+                <span className="font-semibold">Simulating:</span>{" "}
+                <span>{simulatedRoleName}</span>
+                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                  — API calls still use your real token
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={exitSimulation}
+                className="rounded px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800/50"
+              >
+                Exit Simulation
+              </button>
+            </div>
+          )}
           <div className="flex min-h-0 flex-1">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
           </div>
@@ -275,7 +300,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
               {showOrgSwitcher && <OrganizationSwitcher />}
               {showWorkspaceSwitcher && <WorkspaceSwitcher />}
               {showProjectSwitcher && <ProjectSwitcher />}
-              {navigationMode === "platform" && (
+              {effectiveNavigationMode === "platform" && (
                 <span className="text-xs text-muted-foreground dark:text-white/50">Platform Mode</span>
               )}
               <div className="min-w-[220px] flex-1 sm:min-w-[280px] lg:max-w-md">
