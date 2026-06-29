@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.activity_log import ActivityLog
+from app.models.api_key import APIKey
 from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
+from app.models.project import Project
 from app.models.role import Role
 from app.models.user import RoleAssignment, User
+from app.models.workspace import Workspace
 from app.repositories.organization_repository import OrganizationRepository
-from app.schemas.organization import OrganizationCreate, OrganizationUpdate, PlatformOnboardCreate
+from app.schemas.organization import OrgHealthCheck, OrgHealthScore, OrganizationCreate, OrganizationUpdate, PlatformOnboardCreate
 from app.services.access_control_service import AccessControlService
 from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
@@ -383,3 +387,154 @@ class OrganizationService:
     def _slugify(self, value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
         return slug or "organization"
+
+    def _can_view_health(self, org_id: int, current_user: User) -> bool:
+        if current_user.is_superuser:
+            return True
+        platform_role = (
+            self.db.query(RoleAssignment)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .filter(
+                RoleAssignment.user_id == current_user.id,
+                RoleAssignment.scope_type == "platform",
+                RoleAssignment.status == "active",
+                Role.key.in_(["platform_owner", "platform_admin"]),
+                Role.is_active.is_(True),
+            )
+            .first()
+        )
+        if platform_role is not None:
+            return True
+        org_admin_role = (
+            self.db.query(RoleAssignment)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .filter(
+                RoleAssignment.user_id == current_user.id,
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.scope_id == org_id,
+                RoleAssignment.status == "active",
+                Role.key.in_(["organization_owner", "organization_admin"]),
+                Role.is_active.is_(True),
+            )
+            .first()
+        )
+        return org_admin_role is not None
+
+    def calculate_health_score(self, org_id: int, current_user: User) -> OrgHealthScore:
+        self._ensure_active_user(current_user)
+        org = self.organization_repository.get_by_id(org_id)
+        if org is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+        if not self._can_view_health(org_id, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to view this organization's health score.")
+
+        checks: list[OrgHealthCheck] = []
+
+        workspace_count = (
+            self.db.query(Workspace)
+            .filter(Workspace.organization_id == org_id, Workspace.is_active.is_(True))
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_workspace", label="Has at least one active workspace", passed=workspace_count > 0, points=10))
+
+        project_count = (
+            self.db.query(Project)
+            .join(Workspace, Project.workspace_id == Workspace.id)
+            .filter(Workspace.organization_id == org_id, Project.is_active.is_(True))
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_project", label="Has at least one active project", passed=project_count > 0, points=10))
+
+        org_owner_count = (
+            self.db.query(RoleAssignment)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .filter(
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.scope_id == org_id,
+                RoleAssignment.status == "active",
+                Role.key == "organization_owner",
+                Role.is_active.is_(True),
+            )
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_org_owner", label="Has an organization owner assigned", passed=org_owner_count > 0, points=10))
+
+        member_count = (
+            self.db.query(RoleAssignment.user_id)
+            .filter(
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.scope_id == org_id,
+                RoleAssignment.status == "active",
+            )
+            .distinct()
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_multiple_members", label="Has more than one member", passed=member_count > 1, points=10))
+
+        ws_ids_subquery = (
+            self.db.query(Workspace.id)
+            .filter(Workspace.organization_id == org_id)
+            .subquery()
+        )
+        ws_admin_count = (
+            self.db.query(RoleAssignment)
+            .join(Role, Role.id == RoleAssignment.role_id)
+            .filter(
+                RoleAssignment.scope_type == "workspace",
+                RoleAssignment.scope_id.in_(ws_ids_subquery),
+                RoleAssignment.status == "active",
+                Role.key.in_(["workspace_admin", "workspace_manager"]),
+                Role.is_active.is_(True),
+            )
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_workspace_admin", label="Has at least one workspace admin", passed=ws_admin_count > 0, points=10))
+
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        recent_activity_count = (
+            self.db.query(ActivityLog)
+            .filter(ActivityLog.organization_id == org_id, ActivityLog.created_at >= thirty_days_ago)
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_recent_activity", label="Had activity in the last 30 days", passed=recent_activity_count > 0, points=10))
+
+        total_assignments = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.scope_id == org_id,
+                RoleAssignment.status == "active",
+            )
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_multiple_assignments", label="Has multiple role assignments", passed=total_assignments > 1, points=10))
+
+        checks.append(OrgHealthCheck(key="has_description", label="Organization has a description set", passed=bool(org.description and org.description.strip()), points=10))
+
+        org_settings = org.settings or {}
+        checks.append(OrgHealthCheck(key="has_domain", label="Organization has a domain configured", passed=bool(org_settings.get("domain")), points=10))
+
+        api_key_count = (
+            self.db.query(APIKey)
+            .filter(APIKey.organization_id == org_id)
+            .count()
+        )
+        checks.append(OrgHealthCheck(key="has_api_key", label="Has at least one API key created", passed=api_key_count > 0, points=10))
+
+        score = sum(c.points for c in checks if c.passed)
+        if score >= 91:
+            health_status = "excellent"
+        elif score >= 71:
+            health_status = "good"
+        elif score >= 41:
+            health_status = "needs_attention"
+        else:
+            health_status = "critical"
+
+        return OrgHealthScore(
+            organization_id=org_id,
+            score=score,
+            status=health_status,
+            checks=checks,
+            checked_at=datetime.now(timezone.utc),
+        )

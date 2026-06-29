@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.organization import Organization, OrganizationMember
 from app.models.user import User
 from app.schemas.organization import (
+    OrgHealthScore,
     OrganizationCreate,
     OrganizationMemberRead,
     OrganizationMemberUpdate,
@@ -89,6 +90,15 @@ def delete_organization(
 ) -> Response:
     OrganizationService(db).delete(organization_id, current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{organization_id}/health", response_model=OrgHealthScore)
+def get_organization_health(
+    organization_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrgHealthScore:
+    return OrganizationService(db).calculate_health_score(organization_id, current_user)
 
 
 @router.get("/{organization_id}/members", response_model=list[OrganizationMemberRead])

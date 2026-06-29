@@ -72,6 +72,21 @@ export type NamedCreatePayload = {
   description?: string;
 };
 
+export type OrgHealthCheckRecord = {
+  key: string;
+  label: string;
+  passed: boolean;
+  points: number;
+};
+
+export type OrgHealthRecord = {
+  organization_id: number;
+  score: number;
+  status: "critical" | "needs_attention" | "good" | "excellent";
+  checks: OrgHealthCheckRecord[];
+  checked_at: string;
+};
+
 export const settingsApi = {
   getMyProfile(token: string) {
     return apiRequest<CoreUser>(`${CORE_PREFIX}/me`, { method: "GET", authToken: token });
@@ -126,6 +141,9 @@ export const settingsApi = {
   },
   removeOrganizationMember(token: string, organizationId: number, userId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/organizations/${organizationId}/members/${userId}`, { method: "DELETE", authToken: token });
+  },
+  getOrgHealth(token: string, organizationId: number) {
+    return apiRequest<OrgHealthRecord>(`${CORE_PREFIX}/organizations/${organizationId}/health`, { method: "GET", authToken: token });
   },
 
   listWorkspaces(token: string, params: { organization_id?: number | null; status?: string; include_inactive?: boolean } = {}) {
