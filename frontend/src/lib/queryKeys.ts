@@ -91,6 +91,11 @@ export const queryKeys = {
     permissions: (orgId?: number | null, workspaceId?: number | null, projectId?: number | null) =>
       ["permissions", "current", orgId ?? null, workspaceId ?? null, projectId ?? null] as const
   },
+  platformContext: {
+    all: ["platform-context"] as const,
+    detail: (orgId?: number | null, workspaceId?: number | null, projectId?: number | null) =>
+      ["platform-context", orgId ?? null, workspaceId ?? null, projectId ?? null] as const
+  },
   settings: {
     all: ["settings"] as const,
     teams: ["settings", "teams"] as const,
