@@ -292,7 +292,7 @@ export const settingsApi = {
   listApiKeys(token: string) {
     return apiRequest<ApiKeyRecord[]>(`${CORE_PREFIX}/api-keys`, { method: "GET", authToken: token });
   },
-  createApiKey(token: string, payload: { name: string; organization_id?: number | null; workspace_id?: number | null; scopes?: string[] }) {
+  createApiKey(token: string, payload: { name: string; organization_id?: number | null; workspace_id?: number | null; scopes?: string[]; expires_at?: string | null }) {
     return apiRequest<ApiKeyRecord>(`${CORE_PREFIX}/api-keys`, { method: "POST", authToken: token, json: payload });
   },
   revokeApiKey(token: string, apiKeyId: number) {

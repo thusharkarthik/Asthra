@@ -244,6 +244,25 @@ Fixed 2026-06-26. `invalidateSettingsAndContext()` in `settings-admin-views.tsx`
 
 Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
 
+## API Key Management (added 2026-06-29)
+
+`frontend/src/app/settings/api-keys/page.tsx` — full implementation (replaced placeholder re-export).
+
+**Backend** (all pre-existing, nothing changed):
+- `POST /api-keys` → creates key, returns raw key once in `APIKeyCreateResponse.api_key`. Key format: `ak_{token_urlsafe(32)}`, prefix = first 12 chars, stored as SHA256 hash.
+- `GET /api-keys` → list user's own keys (never returns raw key). Filters by `user_id` via repo.
+- `GET /api-keys/{id}` → single key detail.
+- `PATCH /api-keys/{id}` → update name only (name strip enforced in service).
+- `DELETE /api-keys/{id}` → hard delete.
+- `POST /api-keys/{id}/revoke` → sets `is_active=False`, logs `api_key.revoked`.
+- Logs: `api_key.created`, `api_key.updated`, `api_key.revoked`, `api_key.deleted`.
+
+**Frontend**:
+- `settings-api.ts`: Added `expires_at?: string | null` to `createApiKey` payload.
+- `api-keys/page.tsx`: Full self-contained implementation. Scopes: read/write/admin. Expiry: 30d/90d/1yr/Never (computed as ISO datetime on frontend). Status: Active (green)/Expired (amber)/Revoked (rose) computed from `is_active` + `expires_at`. Table: Name, Prefix (with `…` suffix), Scope, Created, Expires (relative with tooltip), Last Used, Status, Actions. Key reveal modal: raw key shown once after create, copy-to-clipboard button, "I have saved" checkbox, close disabled until copied. Revoke: confirmation dialog with destructive button.
+
+**Key detail**: Raw key is only ever in `APIKeyCreateResponse.api_key` — subsequent `APIKeyRead` responses never include it. Frontend stores revealed key in React state (`revealedKey`) and clears on modal close.
+
 ## Audit Log Consistency (added 2026-06-29)
 
 All Core service actions now emit structured audit logs via `ActivityService.log_activity()`. Every log includes: `actor_user_id`, `action`, `entity_type`, `entity_id`, `organization_id` (where applicable), `workspace_id` (where applicable), and a human-readable `description` with actor name.
