@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import TimestampedRead
@@ -82,3 +84,18 @@ class OrganizationMemberUpdate(BaseModel):
         if not normalized:
             raise ValueError("Member role is required.")
         return normalized
+
+
+class OrgHealthCheck(BaseModel):
+    key: str
+    label: str
+    passed: bool
+    points: int
+
+
+class OrgHealthScore(BaseModel):
+    organization_id: int
+    score: int
+    status: str
+    checks: list[OrgHealthCheck]
+    checked_at: datetime

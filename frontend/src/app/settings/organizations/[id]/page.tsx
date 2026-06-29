@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
@@ -9,14 +9,12 @@ import { useToastStore } from "@/stores/toast-store";
 import { usePlatformContext } from "@/context/platformContext";
 import { useSettingsAuthority } from "@/app/settings/layout";
 import { settingsApi } from "@/services/api/settings-api";
-import type { OrgSettingsRecord } from "@/services/api/settings-api";
+import type { OrgHealthRecord, OrgSettingsRecord } from "@/services/api/settings-api";
 import {
   SettingsLayout,
-  SettingsSectionHeader,
   SettingsCard,
   SettingsDangerZone,
   FormField,
-  FormActions,
 } from "@/components/settings/settings-components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +52,64 @@ const INDUSTRIES = [
   "Manufacturing", "Media & Entertainment", "Consulting", "Non-profit", "Other",
 ];
 
+const STATUS_COLORS: Record<string, string> = {
+  excellent: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  good: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  needs_attention: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  excellent: "Excellent",
+  good: "Good",
+  needs_attention: "Needs Attention",
+  critical: "Critical",
+};
+
+function OrgHealthPanel({ healthQuery }: { healthQuery: UseQueryResult<OrgHealthRecord> }) {
+  const { data, isLoading, isError } = healthQuery;
+
+  return (
+    <SettingsCard title="Health Score">
+      {isLoading && (
+        <p className="text-sm text-muted-foreground">Loading health score…</p>
+      )}
+      {isError && (
+        <p className="text-sm text-muted-foreground">Unable to load health score.</p>
+      )}
+      {data && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl font-bold">{data.score}<span className="text-lg text-muted-foreground">%</span></span>
+            <span className={`rounded-full px-3 py-1 text-sm font-medium ${STATUS_COLORS[data.status] ?? ""}`}>
+              {STATUS_LABELS[data.status] ?? data.status}
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {data.checks.filter((c) => c.passed).length}/{data.checks.length} checks passing
+            </span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {data.checks.map((check) => (
+              <div
+                key={check.key}
+                className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${check.passed ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-border bg-muted/30"}`}
+              >
+                <span className={`mt-0.5 shrink-0 text-base leading-none ${check.passed ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                  {check.passed ? "✓" : "○"}
+                </span>
+                <span className={check.passed ? "text-foreground" : "text-muted-foreground"}>{check.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-right text-xs text-muted-foreground">
+            Last checked: {new Date(data.checked_at).toLocaleString()}
+          </p>
+        </div>
+      )}
+    </SettingsCard>
+  );
+}
+
 function OrgTabs({ orgId, active }: { orgId: number; active: "overview" | "members" | "workspaces" | "roles" | "permissions" }) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/settings/organizations/${orgId}` },
@@ -85,9 +141,10 @@ export default function OrganizationSettingsPage() {
   const params = useParams<{ id: string }>();
   const orgId = Number(params.id);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
-  const { organizations, workspaces } = usePlatformContext();
+  const { organizations, workspaces, permissions } = usePlatformContext();
   const { authorityLevel, orgId: authorityOrgId } = useSettingsAuthority();
 
   const org = organizations.find((o) => o.id === orgId);
@@ -102,6 +159,18 @@ export default function OrganizationSettingsPage() {
     queryKey: ["org-settings", orgId],
     queryFn: () => settingsApi.getOrganizationSettings(accessToken ?? "", orgId),
     enabled: Boolean(accessToken && orgId),
+  });
+
+  const canViewHealth = Boolean(
+    currentUser?.is_superuser ||
+      permissions?.roles?.some((r) => ["platform_owner", "platform_admin", "organization_owner", "organization_admin"].includes(r.key))
+  );
+
+  const healthQuery = useQuery({
+    queryKey: ["org-health", orgId],
+    queryFn: () => settingsApi.getOrgHealth(accessToken ?? "", orgId),
+    enabled: Boolean(accessToken && orgId && canViewHealth),
+    staleTime: 5 * 60 * 1000,
   });
 
   const s = settingsQuery.data;
@@ -240,6 +309,11 @@ export default function OrganizationSettingsPage() {
           {s?.industry && <div><dt className="text-muted-foreground">Industry</dt><dd>{s.industry}</dd></div>}
         </dl>
       </SettingsCard>
+
+      {/* Health Score panel */}
+      {canViewHealth && (
+        <OrgHealthPanel healthQuery={healthQuery} />
+      )}
 
       {/* General settings */}
       <SettingsCard title="General" description="Name and description shown across Asthra.">
