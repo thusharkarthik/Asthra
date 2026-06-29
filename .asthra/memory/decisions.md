@@ -207,3 +207,15 @@
 **Why**: Previously invitation actions used `invitation.*` prefix (inconsistent with the user-facing concept of "member management"). Standardizing on the user-facing entity (`member.*`) makes the audit log filterable in a way that matches how admins think about actions.
 
 **How to apply**: When adding new audit logs, always use `{entity}.{verb}`, pick the entity name from the user's perspective (not the internal model name), and include actor name in description.
+
+## 2026-06-29 — Permission Simulator: UI-Only Simulation, No Impersonation
+
+**Decision**: Permission Simulator only overrides the frontend `can()` function. Real token is always used for API calls. No backend session changes. No actual permission mutations.
+
+**Why**: Impersonation at the API level would require passing a user-id header or token swap, which creates security risks and audit trail problems. UI-only simulation is sufficient for the primary use case: debugging what a role sees without creating test accounts.
+
+**How**: `useSimulationStore` (Zustand) holds `isSimulating`, `simulatedPermissions`, `simulatedMode`. `PlatformContextProvider` subscribes to the store and overrides `can()` when simulating. `effectiveNavigationMode` in shell applies the simulated navigation mode to sidebar and bottom bar.
+
+**Access control**: Backend `GET /access-control/simulate` enforces superuser OR platform_owner/platform_admin. Frontend "View As" button checks the same roles client-side for visibility.
+
+**"View As This User" in member detail NOT implemented**: The spec mentions adding a button in `/settings/members/[id]` but the task explicitly excludes settings pages from scope. The backend endpoint already supports `user_id` param; the frontend only needs to call `simulatePermissions(token, { user_id })` when that button is wired up.

@@ -319,6 +319,12 @@ export const settingsApi = {
     (params.action_keys ?? []).forEach((actionKey) => search.append("action_keys", actionKey));
     return apiRequest<EffectiveAccessDebugRecord>(`${CORE_PREFIX}/access-control/debug/effective-access?${search.toString()}`, { method: "GET", authToken: token });
   },
+  simulatePermissions(token: string, params: { role_key?: string; user_id?: number }) {
+    const search = new URLSearchParams();
+    if (params.role_key) search.set("role_key", params.role_key);
+    if (params.user_id != null) search.set("user_id", String(params.user_id));
+    return apiRequest<CurrentUserPermissions>(`${CORE_PREFIX}/access-control/simulate?${search.toString()}`, { method: "GET", authToken: token });
+  },
   createPermission(token: string, payload: { code: string; name: string; description?: string; module?: string; scope?: string; status?: string }) {
     return apiRequest<PermissionRecord>(`${CORE_PREFIX}/permissions`, { method: "POST", authToken: token, json: payload });
   },
