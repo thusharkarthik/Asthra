@@ -158,6 +158,26 @@
 
 **Investigation finding**: None of the Category B functions were actually imported or called outside `rbac.ts` itself. The one consumer (`settings-admin-views.tsx`) only imported `normalizeRole` (Category A), so no call-site replacements were needed.
 
+## 2026-06-29 — accept_in_app: Skip Email Token When User Already Authenticated
+
+**Decision**: Added `POST /invitations/{id}/accept-in-app` that accepts an invitation without the email token.
+
+**Why**: Standard `POST /invitations/{id}/accept` requires `InvitationAccept { token: str }` from the email link. Storing the token in the notification payload would be a security leak. Since the user is already authenticated, the token check is redundant — email match (`current_user.email == invitation.email`) is still enforced to prevent accepting someone else's invite.
+
+**How to apply**: Use `accept_in_app` from authenticated UI contexts (notification center). Email link flow still uses standard `accept()`. Never skip the email match check.
+
+---
+
+## 2026-06-29 — RequestAccessButton Exported from settings/layout.tsx
+
+**Decision**: `RequestAccessButton` is an exported component from `app/settings/layout.tsx` rather than its own file.
+
+**Why**: Only used in 3 places within settings routes; small enough to coexist with `SettingsAuthorityContext` in the same file. Creating a new file adds indirection for minimal gain.
+
+**How to apply**: `import { RequestAccessButton } from "@/app/settings/layout"`. Extract to its own file only if the component grows or is needed outside settings.
+
+---
+
 ## 2026-06-29 — Audit Log Action Naming Convention Standardized
 
 **Decision**: All audit log actions follow `{entity}.{verb}` format. Verbs are past-tense, lowercase, underscore-separated for multi-word. Entity prefix determines color-coding in the audit log UI.

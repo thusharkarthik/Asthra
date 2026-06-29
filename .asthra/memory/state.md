@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-29 (profile page, account page, preferences page — fully functional)
+Last updated: 2026-06-29 (permission transparency, notification accept/decline wiring, checklist invite auto-open)
 
 ## Phase
 
@@ -8,7 +8,7 @@ Last updated: 2026-06-29 (profile page, account page, preferences page — fully
 
 ## Branch
 
-Current branch: `fix/role-permission-editing`. Uncommitted changes (7 files: bugs.md, decisions.md, state.md, sessions/2026-06-27.md, settings-admin-views.tsx, roles.py, role_service.py) plus onboarding gate changes pending commit.
+Current branch: `feature/api-key-management`. Actively modified files: `.asthra/memory/state.md`, `.asthra/sessions/2026-06-29.md`, `frontend/src/app/settings/api-keys/page.tsx`, `frontend/src/services/api/settings-api.ts`.
 
 ## Settings Auth Guard + Authority Context
 
@@ -220,9 +220,45 @@ Updated 2026-06-27. `MemberDetailView` in `settings-admin-views.tsx` now guards 
 - Remove Member: `canRemoveMembers = permissions.can("settings.member.remove")`
 - Resend/Cancel Invite: `PermissionButton` with respective action keys
 
+## Permission Transparency (added 2026-06-29)
+
+Users who hit an "Access Restricted" state now see WHY and can request access with one click.
+
+**Backend**:
+- `notification_service.py`: Added `send_access_request(page, message, current_user)` → creates `type="access_request"` notification to the appropriate admin. `_find_admin_for_user()` resolves admin via 3-priority chain: org admin/owner in user's orgs → platform admin/owner → any active superuser.
+- `schemas/notification.py`: Added `AccessRequestCreate { page: str, message: str | None }`.
+- `api/v1/notifications.py`: Added `POST /notifications/access-request` endpoint (before `GET ""` to avoid route collision).
+
+**Frontend**:
+- `app/settings/layout.tsx`: Exported `RequestAccessButton` component — self-contained modal with page label, optional message textarea, Cancel/Send buttons. On success shows confirmation. Uses `settingsApi.sendAccessRequest()`.
+- `app/settings/members/page.tsx` and `app/settings/members/[id]/page.tsx`: Updated restricted state `action` prop to `<RequestAccessButton page="/settings/members" />`.
+- `app/settings/layout.tsx` restricted state: `action={<RequestAccessButton page={pathname} />}`.
+
+**Notification routing**: `entity_type="user_profile"` + `entity_id=str(current_user.id)` → admin clicking the notification navigates to `/settings/members/{user_id}`.
+
+## Invitation Accept/Decline from Notification Center (added 2026-06-29)
+
+**Backend**:
+- `invitation_service.py`: Changed `type="invitation.created"` → `type="invitation.pending"` for invitee notifications. Added `accept_in_app(invitation_id, current_user)` — same as `accept()` but skips email token check (user already authenticated; email match still verified).
+- `api/v1/invitations.py`: Added `POST /{invitation_id}/accept-in-app` endpoint.
+
+**Frontend** (`notification-center.tsx`):
+- Added `entity_id: item.entity_id` to coreNotification map (accessed via `"entity_id" in item` TypeScript guard).
+- Added `acceptInvitationMutation` → `POST /invitations/{id}/accept-in-app`. On success: invalidates `["core", "notifications"]`, `["members-page"]`, `["organizations"]`, `["permissions.all"]`; shows success toast; closes panel.
+- Added `declineInvitationMutation` → calls existing `revokeInvitation`. Shows decline toast.
+- Type check: `item.type === "invitation.pending" || item.type === "invitation.created"` (backward compat for existing DB records).
+
+## Checklist Invite Auto-Open (added 2026-06-29)
+
+**`org-setup-checklist.tsx`**: Invite item href changed to `/settings/members?action=invite&orgId={orgId}`.
+
+**`settings-admin-views.tsx` (MembersView)**:
+- `useSearchParams` from `next/navigation` added.
+- `useEffect` on mount: if `?action=invite` → `setInviteOpen(true)`. If `?orgId=N` → `setInviteOrgId(N)`.
+
 ## Notification Center
 
-`frontend/src/components/platform/notification-center.tsx` — updated 2026-06-26.
+`frontend/src/components/platform/notification-center.tsx` — updated 2026-06-26, 2026-06-29.
 
 "Mark all read" button now hidden when there are no unread notifications. Condition: `allNotifications.some(n => n.unread)`. Empty state shows cleanly without the button.
 

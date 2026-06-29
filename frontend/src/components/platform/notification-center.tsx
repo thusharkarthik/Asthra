@@ -9,26 +9,31 @@ import { cn } from "@/lib/utils";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStore } from "@/stores/notification-store";
+import { useToastStore } from "@/stores/toast-store";
 
 export function NotificationCenter({ open, onClose, placement = "top" }: { open: boolean; onClose: () => void; placement?: "top" | "bottom" }) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const notifications = useNotificationStore((state) => state.notifications);
   const markRead = useNotificationStore((state) => state.markRead);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
   const dismissNotification = useNotificationStore((state) => state.dismissNotification);
   const panelRef = useRef<HTMLDivElement>(null);
+
   const coreNotificationsQuery = useQuery({
     queryKey: ["core", "notifications"],
     queryFn: () => settingsApi.listNotifications(accessToken ?? ""),
     enabled: Boolean(accessToken && open),
     retry: 1
   });
+
   const markCoreReadMutation = useMutation({
     mutationFn: (notificationId: number) => settingsApi.markNotificationRead(accessToken ?? "", notificationId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["core", "notifications"] })
   });
+
   const markAllCoreReadMutation = useMutation({
     mutationFn: () => settingsApi.markAllNotificationsRead(accessToken ?? ""),
     onSuccess: () => {
@@ -36,16 +41,45 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
       queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
     }
   });
+
   const deleteCoreMutation = useMutation({
     mutationFn: (notificationId: number) => settingsApi.deleteNotification(accessToken ?? "", notificationId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["core", "notifications"] })
   });
+
+  const acceptInvitationMutation = useMutation({
+    mutationFn: (invitationId: number) => settingsApi.acceptInvitationInApp(accessToken ?? "", invitationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
+      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await queryClient.invalidateQueries({ queryKey: ["permissions.all"] });
+      addToast({ type: "success", title: "Invitation accepted", message: "You've joined — your new role is now active." });
+      onClose();
+    },
+    onError: () => {
+      addToast({ type: "error", title: "Accept failed", message: "Could not accept invitation. It may have expired or already been accepted." });
+    }
+  });
+
+  const declineInvitationMutation = useMutation({
+    mutationFn: (invitationId: number) => settingsApi.revokeInvitation(accessToken ?? "", invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
+      addToast({ type: "success", title: "Invitation declined", message: "The invitation has been declined." });
+    },
+    onError: () => {
+      addToast({ type: "error", title: "Decline failed", message: "Could not decline invitation." });
+    }
+  });
+
   const coreNotifications = (coreNotificationsQuery.data ?? []).map((item) => ({
     id: `core-${item.id}`,
     coreId: item.id,
     type: item.type,
     title: item.title,
     message: item.message,
+    entity_id: item.entity_id,
     href: notificationHref(item.entity_type, item.entity_id),
     unread: !item.is_read,
     created_at: item.created_at ?? new Date().toISOString()
@@ -80,50 +114,75 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
         <div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={() => { markAllRead(); if (accessToken) markAllCoreReadMutation.mutate(); }}>Mark all read</Button></div>
       ) : null}
       <div className="max-h-80 space-y-2 overflow-y-auto">
-        {allNotifications.map((item) => (
-          <div key={item.id} className="block rounded-md border p-3 hover:bg-muted" onClick={() => {
-            if ("coreId" in item && typeof item.coreId === "number") markCoreReadMutation.mutate(item.coreId);
-            else markRead(item.id);
-            if (item.href) {
-              onClose();
-              router.push(item.href);
-            }
-          }}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="text-sm font-medium">{item.title}</div>
-              <div className="flex shrink-0 items-center gap-1">
-                {item.unread ? <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread" /> : null}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label="Dismiss notification"
-                  className="h-6 w-6"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if ("coreId" in item && typeof item.coreId === "number") deleteCoreMutation.mutate(item.coreId);
-                    else dismissNotification(item.id);
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+        {allNotifications.map((item) => {
+          const isInvitation = item.type === "invitation.pending" || item.type === "invitation.created";
+          const invitationId = isInvitation && "entity_id" in item && item.entity_id ? Number(item.entity_id) : null;
+          const isAccepting = acceptInvitationMutation.isPending;
+          const isDeclining = declineInvitationMutation.isPending;
+
+          return (
+            <div key={item.id} className="block rounded-md border p-3 hover:bg-muted" onClick={() => {
+              if ("coreId" in item && typeof item.coreId === "number") markCoreReadMutation.mutate(item.coreId);
+              else markRead(item.id);
+              if (item.href) {
+                onClose();
+                router.push(item.href);
+              }
+            }}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-sm font-medium">{item.title}</div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {item.unread ? <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread" /> : null}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Dismiss notification"
+                    className="h-6 w-6"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if ("coreId" in item && typeof item.coreId === "number") deleteCoreMutation.mutate(item.coreId);
+                      else dismissNotification(item.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">{item.message}</p>
+              {isInvitation && invitationId ? (
+                <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    type="button"
+                    disabled={isAccepting || isDeclining}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      acceptInvitationMutation.mutate(invitationId);
+                    }}
+                  >
+                    {isAccepting ? "Accepting…" : "Accept"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    disabled={isAccepting || isDeclining}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      declineInvitationMutation.mutate(invitationId);
+                    }}
+                  >
+                    {isDeclining ? "Declining…" : "Decline"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{item.message}</p>
-            {item.type === "invitation.pending" ? (
-              <div className="mt-2 flex gap-2">
-                <Button size="sm" variant="outline" type="button" onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}>Accept</Button>
-                <Button size="sm" variant="outline" type="button" onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}>Decline</Button>
-              </div>
-            ) : null}
-          </div>
-        ))}
+          );
+        })}
         {allNotifications.length === 0 ? <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">No notifications yet.</p> : null}
       </div>
     </div>
@@ -135,6 +194,7 @@ function notificationHref(entityType?: string | null, entityId?: string | null) 
   if (entityType === "organization" && id) return `/settings/organizations/${id}`;
   if (entityType === "workspace" && id) return `/settings/workspaces/${id}`;
   if (entityType === "project" && id) return `/settings/projects/${id}`;
+  if (entityType === "user_profile" && id) return `/settings/members/${id}`;
   if (entityType === "member" || entityType === "invitation" || entityType === "organization_member" || entityType === "workspace_member") return "/settings/members";
   if (entityType === "role" || entityType === "permission" || entityType === "role_assignment") return "/settings/access-control";
   if (entityType === "flow_work_item" && id) return `/flow/work-items/${id}`;

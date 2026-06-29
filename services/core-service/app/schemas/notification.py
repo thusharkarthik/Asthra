@@ -5,6 +5,11 @@ from pydantic import BaseModel, Field
 from app.schemas.base import TimestampedRead
 
 
+class AccessRequestCreate(BaseModel):
+    page: str
+    message: str | None = None
+
+
 class NotificationCreateInternal(BaseModel):
     user_id: int
     type: str
