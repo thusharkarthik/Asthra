@@ -1,12 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useToastStore } from "@/stores/toast-store";
 import { SettingsEmptyState, SettingsLayout as SettingsPageLayout } from "@/components/settings/settings-components";
+import { Button } from "@/components/ui/button";
 
 export type SettingsAuthorityValue = {
   authorityLevel: "superuser" | "platform" | "org" | "workspace" | "member" | null;
@@ -23,6 +25,90 @@ export const SettingsAuthorityContext = createContext<SettingsAuthorityValue>({
 // Convenience hook — avoids importing createContext/useContext in every consumer.
 export function useSettingsAuthority(): SettingsAuthorityValue {
   return useContext(SettingsAuthorityContext);
+}
+
+export function RequestAccessButton({ page }: { page: string }) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const addToast = useToastStore((state) => state.addToast);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    try {
+      await settingsApi.sendAccessRequest(accessToken ?? "", { page, message: message.trim() || undefined });
+      setSent(true);
+    } catch {
+      addToast({ type: "error", title: "Failed", message: "Could not send access request. Please try again." });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function handleClose() {
+    setOpen(false);
+    setSent(false);
+    setMessage("");
+  }
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Request Access
+      </Button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Request Access"
+          onClick={handleClose}
+        >
+          <div
+            className="flex w-full max-w-sm flex-col overflow-hidden rounded-lg border bg-card shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 border-b p-4">
+              <h2 className="text-sm font-semibold">Request Access</h2>
+            </div>
+            {sent ? (
+              <div className="space-y-4 p-4">
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/20 dark:text-emerald-400">
+                  Your request has been sent to your admin.
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleClose}>Close</Button>
+                </div>
+              </div>
+            ) : (
+              <form className="space-y-4 p-4" onSubmit={handleSubmit}>
+                <p className="text-sm text-muted-foreground">
+                  Send a request to your admin to grant you access to this area.
+                </p>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Message (optional)</label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Explain why you need access…"
+                    rows={3}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+                  <Button type="submit" disabled={pending}>{pending ? "Sending…" : "Send Request"}</Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
@@ -163,7 +249,8 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
     >
       <SettingsEmptyState
         title="Access Restricted"
-        description="You don't have permission to access this settings page."
+        description="You don't have permission to access this settings page. Contact your Organization Admin to request access."
+        action={<RequestAccessButton page={pathname} />}
       />
     </SettingsPageLayout>
   );

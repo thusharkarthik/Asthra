@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1525,6 +1526,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
 export function MembersView({ organizationId, workspaceId }: { organizationId?: number; workspaceId?: number }) {
   const { accessToken, organizations, workspaces } = useSettingsData();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const searchParams = useSearchParams();
   const isGlobalDirectory = !organizationId && !workspaceId;
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -1540,6 +1542,17 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const [inviteWsId, setInviteWsId] = useState<number | "">("");
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+
+  // Auto-open invite modal when navigated from checklist with ?action=invite&orgId=N
+  useEffect(() => {
+    if (searchParams.get("action") === "invite") {
+      const paramOrgId = searchParams.get("orgId");
+      if (paramOrgId) setInviteOrgId(Number(paramOrgId));
+      setInviteOpen(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const membersQuery = useQuery<Array<{ user_id: number; role_id?: number | null; member_role: string }>>({
     queryKey: ["settings", "members", organizationId, workspaceId],
     queryFn: async () => {

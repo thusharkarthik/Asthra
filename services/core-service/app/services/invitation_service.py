@@ -122,7 +122,7 @@ class InvitationService:
             role_name = role.name if role else "Member"
             NotificationService(self.db).create_notification(
                 user_id=invited_user.id,
-                type="invitation.created",
+                type="invitation.pending",
                 title="Asthra invitation",
                 message=f"You have been invited to Asthra as {role_name}.",
                 organization_id=invitation.organization_id,
@@ -160,6 +160,50 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found.")
         if invitation.token != invitation_accept.token:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invitation token.")
+        if invitation.status != "pending":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation is not pending.")
+        if self._as_aware_utc(invitation.expires_at) < datetime.now(timezone.utc):
+            self.repository.update_status(invitation, "expired")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation has expired.")
+        if current_user.email.lower() != invitation.email.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation email does not match user.")
+
+        if invitation.organization_id is None:
+            self._assign_platform_role(invitation.role_id, current_user.id, invitation.invited_by_id)
+            invitation.status = "accepted"
+        else:
+            self.repository.add_memberships(invitation, current_user.id)
+
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+            action="member.invitation_accepted",
+            description=f"{actor_name} accepted an invitation.",
+        )
+        NotificationService(self.db).create_notification(
+            user_id=invitation.invited_by_id,
+            type="invitation.accepted",
+            title="Invitation accepted",
+            message=f"{current_user.email} accepted an invitation.",
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+        )
+        self._bump_invitation_scope(invitation)
+        self.db.commit()
+        return invitation
+
+    def accept_in_app(self, invitation_id: int, current_user: User) -> Invitation:
+        """Accept a pending invitation from the in-app notification center (no email token required)."""
+        self._ensure_active_user(current_user)
+        invitation = self.repository.get_by_id(invitation_id)
+        if invitation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found.")
         if invitation.status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation is not pending.")
         if self._as_aware_utc(invitation.expires_at) < datetime.now(timezone.utc):

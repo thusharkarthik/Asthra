@@ -126,6 +126,20 @@
 **Root cause**: The "Current Roles" card read from `userRolesQuery` (`GET /users/{id}/roles` → `user_roles` table), but `assignRoleMutation` now calls `createRoleAssignment` which writes only to `role_assignments`. The two tables diverged after the dual-write change — new assignments from the frontend went to `role_assignments` only.
 **Fix**: Changed "Current Roles" data source from `userRolesQuery.data` to `activeAssignments` (from `roleAssignmentsQuery`, filtered to `status === "active"`). Updated `memberRoleIds`, `availableRoles`, and `removeRoleMutation` to use `roleAssignmentsQuery` data. `removeRoleMutation` now calls `deleteRoleAssignment(assignment.id)` instead of `removeUserRole(role_id)`.
 
+### BUG-025 — Invitation Type Mismatch: Backend "invitation.created" vs Frontend "invitation.pending" [FIXED 2026-06-29]
+
+**Files**: `services/core-service/app/services/invitation_service.py`, `frontend/src/components/platform/notification-center.tsx`
+**Symptom**: Accept/Decline buttons in notification center never appeared for invitation notifications.
+**Root cause**: Backend emitted `type="invitation.created"` but frontend checked `type === "invitation.pending"`.
+**Fix**: Backend changed to `type="invitation.pending"`. Frontend updated to check both types for backward compat with existing DB rows.
+
+### BUG-026 — entity_id Missing from Mapped Core Notifications [FIXED 2026-06-29]
+
+**File**: `frontend/src/components/platform/notification-center.tsx`
+**Symptom**: Accept/Decline buttons never rendered even when type matched — `invitationId` was always null.
+**Root cause**: `coreNotificationsQuery.data.map()` did not include `entity_id` in the output object.
+**Fix**: Added `entity_id: item.entity_id` to mapped object. Accessed via `"entity_id" in item` TS guard since store's `NotificationItem` type doesn't declare this field.
+
 ## Open
 
 ### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]

@@ -5,11 +5,20 @@ from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.notification import NotificationFilter, NotificationRead
+from app.schemas.notification import AccessRequestCreate, NotificationFilter, NotificationRead
 from app.services.notification_service import NotificationService
 
 
 router = APIRouter()
+
+
+@router.post("/access-request")
+def send_access_request(
+    payload: AccessRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, bool]:
+    return NotificationService(db).send_access_request(payload.page, payload.message, current_user)
 
 
 @router.get("", response_model=list[NotificationRead])

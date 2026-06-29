@@ -345,6 +345,9 @@ export const settingsApi = {
   revokeInvitation(token: string, invitationId: number) {
     return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/revoke`, { method: "POST", authToken: token });
   },
+  acceptInvitationInApp(token: string, invitationId: number) {
+    return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/accept-in-app`, { method: "POST", authToken: token });
+  },
   listNotifications(token: string) {
     return apiRequest<CoreNotificationRecord[]>(`${CORE_PREFIX}/notifications`, { method: "GET", authToken: token });
   },
@@ -356,6 +359,9 @@ export const settingsApi = {
   },
   deleteNotification(token: string, notificationId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/notifications/${notificationId}`, { method: "DELETE", authToken: token });
+  },
+  sendAccessRequest(token: string, payload: { page: string; message?: string }) {
+    return apiRequest<{ sent: boolean }>(`${CORE_PREFIX}/notifications/access-request`, { method: "POST", authToken: token, json: payload });
   },
   getUser(token: string, userId: number) {
     return apiRequest<CoreUser>(`${CORE_PREFIX}/users/${userId}`, { method: "GET", authToken: token });

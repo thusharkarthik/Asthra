@@ -6,6 +6,7 @@ import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { MemberDetailView } from "@/components/settings/settings-admin-views";
 import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
+import { RequestAccessButton } from "@/app/settings/layout";
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
@@ -101,7 +102,8 @@ export default function MemberDetailPage() {
     >
       <SettingsEmptyState
         title="Access Restricted"
-        description="You don't have permission to view member details."
+        description="You don't have permission to view member details. Contact your Organization Admin to request access."
+        action={<RequestAccessButton page="/settings/members" />}
       />
     </SettingsLayout>
   );

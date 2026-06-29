@@ -86,7 +86,7 @@ export function OrgSetupChecklist() {
     {
       id: "invite",
       label: "Invite your first team member",
-      href: "/settings/members",
+      href: `/settings/members?action=invite&orgId=${orgId}`,
       completed: hasMultipleMembers,
     },
     {
