@@ -1,5 +1,21 @@
 # Architectural Decisions
 
+## 2026-06-29 — Profile/Account Pages Implemented Directly in Page Files, Not in settings-admin-views.tsx
+
+**Decision**: Profile, Account, and Preferences pages are self-contained in their respective `page.tsx` files rather than as exported components in `settings-admin-views.tsx`.
+
+**Why**: `settings-admin-views.tsx` is already very large (3600+ lines) and hosts admin-facing views. Profile/Account/Preferences are personal user pages — they don't need org/workspace context, don't use admin permission guards, and have no business being alongside `RoleDetailView` or `MembersView`. Keeping them in page files makes them easier to find, test, and replace without scrolling 4000 lines.
+
+**How to apply**: Any future personal settings pages (notifications, API keys personal view, etc.) should follow the same pattern — implement directly in the page file. Admin management views (org detail, member detail, role detail) belong in `settings-admin-views.tsx`.
+
+## 2026-06-29 — Auth Store Updated via setState After Profile PATCH
+
+**Decision**: After a successful `PATCH /me`, the auth store's `currentUser` is updated using `useAuthStore.setState((state) => ({ ...state, currentUser: updatedUser }))` rather than calling `loadCurrentUser()` or adding a new store action.
+
+**Why**: `loadCurrentUser()` makes an extra network round-trip to `GET /auth/me`. The PATCH response already returns the full updated `UserProfileRead` which has all `CoreUser` fields. Direct `setState` is instant and avoids a second request. Adding a dedicated `updateCurrentUser` action to the store would require touching the auth store for what is a one-off concern.
+
+**How to apply**: Use `useAuthStore.setState((state) => ({ ...state, currentUser: updated }))` in any mutation that returns an updated user. Only call `loadCurrentUser()` when you genuinely need a fresh server state (e.g., after login, or in a paranoid consistency check).
+
 ## 2026-06-28 — Platform-Led Onboarding: Owner Assigned Directly, No Email
 
 **Decision**: `POST /organizations/platform-onboard` creates an org AND assigns the owner in one atomic transaction. Owner is an existing user identified by `owner_user_id`. No email invite flow is used.

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.base import TimestampedRead
 
@@ -30,3 +30,8 @@ class UserProfileUpdate(BaseModel):
     job_title: str | None = None
     timezone: str | None = None
     locale: str | None = None
+
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
