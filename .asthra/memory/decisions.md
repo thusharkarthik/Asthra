@@ -158,6 +158,18 @@
 
 **Investigation finding**: None of the Category B functions were actually imported or called outside `rbac.ts` itself. The one consumer (`settings-admin-views.tsx`) only imported `normalizeRole` (Category A), so no call-site replacements were needed.
 
+## 2026-06-29 — Three-Mode Navigation: Role-Based, Not Route-Based
+
+**Decision**: Navigation mode is derived from the user's highest authority role (platform > org > work), not from the current URL. Superusers additionally get route-based auto-detection and a manual override switcher.
+
+**Why**: Role-based detection means a user always sees the nav that matches what they can actually do — an org admin never sees the work module list as their primary nav just because they happen to be on `/flow`. Route-based auto-detection for superusers is an ergonomic addition: since superusers access all three contexts, they want the nav to reflect where they are, not just their maximum authority.
+
+**How to apply**: `detectNavigationMode(isSuperuser, roles)` in `navigation-mode.ts` is the single source of truth. Roles are from `permissions?.roles` (the current-scope permission resolution). If a new role scope is added, add its keys to the appropriate set in `navigation-mode.ts`. Never derive mode from the URL for regular users.
+
+**`nav-items.ts` retained**: `command-palette.tsx` and `app/page.tsx` quick-launch still consume the original `navSections` / `navItems` exports. These are not replaced — they serve a different purpose (command search, quick launch grid). The sidebar is the only consumer that switched to mode-based sections.
+
+---
+
 ## 2026-06-29 — accept_in_app: Skip Email Token When User Already Authenticated
 
 **Decision**: Added `POST /invitations/{id}/accept-in-app` that accepts an invitation without the email token.

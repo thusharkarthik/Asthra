@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-29 (permission transparency, notification accept/decline wiring, checklist invite auto-open)
+Last updated: 2026-06-29 (three-mode navigation — platform/org/work modes with auto-detection and superuser switching)
 
 ## Phase
 
@@ -8,7 +8,46 @@ Last updated: 2026-06-29 (permission transparency, notification accept/decline w
 
 ## Branch
 
-Current branch: `feature/api-key-management`. Actively modified files: `.asthra/memory/state.md`, `.asthra/sessions/2026-06-29.md`, `frontend/src/app/settings/api-keys/page.tsx`, `frontend/src/services/api/settings-api.ts`.
+Current branch: `feature/three-mode-navigation`. Clean build, no TypeScript errors.
+
+## Three-Mode Navigation (added 2026-06-29)
+
+**Files**:
+- `frontend/src/lib/navigation-mode.ts` (new) — `NavigationMode` type, detection logic, three nav configs
+- `frontend/src/components/navigation/sidebar-nav.tsx` (rewritten) — mode-aware sections, indicator, superuser switcher
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — mode computation, bottom bar per mode
+
+**Mode detection** (`detectNavigationMode(isSuperuser, roles)`):
+- `isSuperuser=true` → Platform Mode
+- `platform_owner | platform_admin | platform_support` role key → Platform Mode
+- `organization_owner | organization_admin | organization_auditor | organization_member` → Org Mode
+- Anything else → Work Mode
+
+**Auto-detect for superuser** (`autoDetectModeFromPath(pathname)`):
+- `/flow`, `/docs`, `/discover`, `/desk`, `/pulse`, `/automation`, `/dev`, `/connect`, `/insights`, `/collab`, `/media`, `/guard` and sub-paths → Work Mode
+- `/settings/organizations/{N}...` (org detail) → Org Mode
+- Everything else → Platform Mode
+
+**Superuser mode switching**: `superuserModeOverride` (`useState<NavigationMode | null>`) in `AsthraShell`. `null` = auto-detect. Manual select in sidebar dropdown overrides. Resets on logout (component re-mounts). Regular users never see the switcher.
+
+**Nav configs** (in `navigation-mode.ts`):
+- `PLATFORM_NAV`: Home, Organizations, Members, Access Control, Audit Logs, API Keys, Platform Health + Settings
+- `ORG_NAV`: Home, Workspaces, Members, Teams, Roles + Org Settings, Preferences, Profile
+- `WORK_NAV`: Home, Flow, Discover, Docs, Collab + Desk, Pulse, Automation + Dev, Connect + Insights, Assistant + Settings
+
+**Permission filtering in Work Mode**: Items with `permission` field → `can(permission)` from `usePlatformContext()`. False → item hidden. Items without `permission` → always shown.
+
+**Bottom bar per mode**:
+- Platform: only `<SearchBar />` + "Platform Mode" text (no org/workspace/project selectors)
+- Org: `<OrganizationSwitcher />` + `<SearchBar />`
+- Work: `<OrganizationSwitcher />` + `<WorkspaceSwitcher />` + `<ProjectSwitcher />` + `<SearchBar />`
+
+**Mode indicator** (top of sidebar):
+- Platform: Settings icon + "Platform Mode"
+- Org: Building2 icon + selected org name (or "Organization")
+- Work: Layers icon + selected workspace name (or "Workspace")
+
+**`nav-items.ts`** kept unchanged — still consumed by `command-palette.tsx` and `app/page.tsx` quick-launch grid.
 
 ## Settings Auth Guard + Authority Context
 

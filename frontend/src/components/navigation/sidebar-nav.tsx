@@ -2,86 +2,130 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Building2, Layers, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { navSections } from "@/components/navigation/nav-items";
-import { canAny } from "@/lib/permissions";
-import { useUIStore } from "@/stores/ui-store";
+import { usePlatformContext } from "@/context/platformContext";
+import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
+import { navSectionsForMode } from "@/lib/navigation-mode";
 
-function isActive(pathname: string, href?: string) {
-  if (!href) return false;
+function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function hasNavigationAccess(
-  requiredPermissions: string[] | undefined,
-  permissionCodes: string[] | undefined,
-  permissionsLoading: boolean
-) {
-  if (!requiredPermissions?.length) return true;
-  if (permissionsLoading) return true;
-  if (!permissionCodes) return true;
-  return canAny(permissionCodes, requiredPermissions);
 }
 
 const SKIPPED_ALLOWED_HREFS = new Set(["/", "/settings"]);
 
 export function SidebarNav({
   collapsed = false,
-  permissionCodes,
+  permissionCodes: _permissionCodes,
   permissionsLoading = false,
-  skippedUser = false
+  skippedUser = false,
+  navigationMode = "work",
+  isSuperuser = false,
+  modeOverride = null,
+  onModeOverride,
 }: {
   collapsed?: boolean;
   permissionCodes?: string[];
   permissionsLoading?: boolean;
   skippedUser?: boolean;
+  navigationMode?: NavigationMode;
+  isSuperuser?: boolean;
+  modeOverride?: NavigationMode | null;
+  onModeOverride?: (mode: NavigationMode | null) => void;
 }) {
   const pathname = usePathname();
-  const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
-  const setSearchOpen = useUIStore((state) => state.setSearchOpen);
+  const { selectedOrganization, selectedWorkspace, can } = usePlatformContext();
 
-  const runAction = (action?: "search" | "assistant") => {
-    if (action === "search") setSearchOpen(true);
-    if (action === "assistant") setAssistantOpen(true);
-  };
+  const effectiveMode: NavigationMode = modeOverride ?? navigationMode;
+  const sections = navSectionsForMode(effectiveMode);
+
+  function shouldShowItem(item: ModeNavItem): boolean {
+    if (skippedUser && !SKIPPED_ALLOWED_HREFS.has(item.href)) return false;
+    if (item.permission) {
+      if (permissionsLoading) return true;
+      return can(item.permission);
+    }
+    return true;
+  }
+
+  const modeLabel = (() => {
+    if (effectiveMode === "platform") return "Platform Mode";
+    if (effectiveMode === "org") return selectedOrganization?.name ?? "Organization";
+    return selectedWorkspace?.name ?? "Workspace";
+  })();
+
+  const ModeIcon =
+    effectiveMode === "platform" ? Settings : effectiveMode === "org" ? Building2 : Layers;
 
   return (
     <nav aria-label="Primary navigation" className="flex flex-col gap-4">
-      {navSections.map((section) => (
-        <section key={section.label} aria-label={section.label} className="space-y-1">
-          {!collapsed && <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{section.label}</div>}
-          {section.items.filter((item) => hasNavigationAccess(item.requiredPermissions, permissionCodes, permissionsLoading)).filter((item) => !skippedUser || SKIPPED_ALLOWED_HREFS.has(item.href ?? "")).map((item) => {
-            const Icon = item.icon;
-            const active = isActive(pathname, item.href);
-            const className = cn(
-              "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              active && "bg-muted font-medium text-foreground",
-              item.disabled && "cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted-foreground",
-              collapsed && "justify-center px-0"
-            );
+      {/* Mode indicator */}
+      {!collapsed && (
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+          <ModeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 truncate text-xs font-medium text-muted-foreground">
+            {modeLabel}
+          </span>
+        </div>
+      )}
 
-            if (item.href && !item.disabled) {
+      {/* Superuser mode switcher */}
+      {isSuperuser && !collapsed && (
+        <div className="flex flex-col gap-1">
+          <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Mode
+          </div>
+          <select
+            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            value={modeOverride ?? "auto"}
+            onChange={(e) => {
+              const val = e.target.value;
+              onModeOverride?.(val === "auto" ? null : (val as NavigationMode));
+            }}
+          >
+            <option value="auto">Auto ({navigationMode})</option>
+            <option value="platform">Platform Mode</option>
+            <option value="org">Organization Mode</option>
+            <option value="work">Work Mode</option>
+          </select>
+        </div>
+      )}
+
+      {/* Nav sections for current mode */}
+      {sections.map((section) => {
+        const visibleItems = section.items.filter(shouldShowItem);
+        if (visibleItems.length === 0) return null;
+        return (
+          <section key={section.label} aria-label={section.label} className="space-y-1">
+            {!collapsed && (
+              <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {section.label}
+              </div>
+            )}
+            {visibleItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(pathname, item.href);
               return (
-                <Link key={item.href} href={item.href} className={className} aria-current={active ? "page" : undefined} title={item.label}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                    active && "bg-muted font-medium text-foreground",
+                    collapsed && "justify-center px-0"
+                  )}
+                  aria-current={active ? "page" : undefined}
+                  title={item.label}
+                >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               );
-            }
-
-            return (
-              <button key={`${section.label}-${item.label}`} type="button" className={className} onClick={() => runAction(item.action)} disabled={item.disabled} title={item.label}>
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {!collapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
-        </section>
-      ))}
-      <div className={cn("rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground", collapsed && "sr-only")}>
-        Compact mode placeholder
-      </div>
+            })}
+          </section>
+        );
+      })}
     </nav>
   );
 }
