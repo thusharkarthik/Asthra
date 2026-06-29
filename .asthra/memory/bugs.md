@@ -191,3 +191,31 @@
 3. `test_permission_registry_sync_requires_permission_manage` — expects 403 from superuser on POST `/permission-registry/sync`. But superuser has all permissions (including `settings.permission.manage`), so it returns 200.
 **Pre-existing**: All 3 tests existed with these assertions on `main` before this branch. Not caused by `fix/remove-user-roles` changes.
 **Fix**: Update test assertions to match actual behavior, or add the `automation.workflow.view` permission to the permission seed data dedup check, or restrict sync endpoint to non-superuser roles.
+
+### BUG-027 — Memory Button Missing From Work Mode Navigation [FIXED 2026-06-29]
+
+**File**: `frontend/src/lib/navigation-mode.ts`
+**Symptom**: Memory link disappeared from sidebar after three-mode navigation was built. Never added to `WORK_NAV`.
+**Root cause**: `Intelligence` section in `WORK_NAV` only had Insights and Assistant. Memory not added during navigation rebuild.
+**Fix**: Added `Brain` import; added `{ label: "Memory", href: "/memory", icon: Brain }` to Intelligence section.
+
+### BUG-028 — Notification Bell Badge Showed Wrong Unread Count [FIXED 2026-06-29]
+
+**File**: `frontend/src/layouts/asthra-shell.tsx`
+**Symptom**: Badge on notification bell only counted Zustand seed/local notifications, not core API notifications. Most users had no seed notifications unread → badge always hidden.
+**Root cause**: `unreadNotifications` only read from `useNotificationStore`. Core API notifications are fetched inside `NotificationCenter` only when panel is open — badge never saw them.
+**Fix**: Added background `coreNotificationsQuery` (same key as NotificationCenter: `["core", "notifications"]`) enabled whenever accessToken exists. Combined `unreadNotifications = zustandUnread + coreUnread`. Cache shared so no duplicate fetch when panel opens.
+
+### BUG-029 — Setup Checklist Invite + Roles Checks Used Identical Condition [FIXED 2026-06-29]
+
+**File**: `frontend/src/components/platform/org-setup-checklist.tsx`
+**Symptom**: "Invite team member" and "Assign roles" both completed at the same time (when 2+ distinct users had org assignments). Impossible to complete one without the other.
+**Root cause**: Both items used `completed: hasMultipleMembers` (same variable = `uniqueUserIds.size > 1`).
+**Fix**: Added `rolesQuery` to get `organization_owner` role ID. `invitedMember = assignments.some(a => a.user_id !== currentUser?.id)`. `assignedRoles = orgOwnerRoleId != null ? assignments.some(a => a.role_id !== orgOwnerRoleId) : false`.
+
+### BUG-030 — Workspace Invite Accept Missing Org Membership + Org Role Assignment [FIXED 2026-06-29]
+
+**Files**: `services/core-service/app/repositories/invitation_repository.py`
+**Symptom**: Users who accepted workspace invitations weren't visible in org member lists and hit the onboarding gate on next login.
+**Root cause**: `add_memberships()` only created `OrganizationMember` if `invitation.organization_id is not None`. Workspace invitations with `organization_id=None` (legacy/edge case) skipped org membership. Also, no org-scope `RoleAssignment` was ever created — only workspace-scoped — leaving user without a valid org role.
+**Fix**: Added new block in `add_memberships()` for workspace invitations: look up workspace.organization_id, ensure OrganizationMember exists, look up `organization_member` role, create org-scope RoleAssignment if no active one exists for that user+org.

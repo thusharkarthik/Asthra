@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
 from app.models.organization import Organization, OrganizationMember
+from app.models.role import Role
 from app.models.user import RoleAssignment, User
 from app.models.workspace import Workspace, WorkspaceMember
 
@@ -148,6 +149,47 @@ class InvitationRepository:
                     member_role="member",
                 )
             )
+        # For workspace invitations, ensure the user also has org membership and an org-scope
+        # role assignment so they appear in org member lists and bypass the onboarding gate.
+        if invitation.workspace_id is not None:
+            workspace = self.get_workspace(invitation.workspace_id)
+            if workspace and workspace.organization_id:
+                if not self.is_organization_member(workspace.organization_id, user_id):
+                    self.db.add(
+                        OrganizationMember(
+                            organization_id=workspace.organization_id,
+                            user_id=user_id,
+                            member_role="member",
+                        )
+                    )
+                org_member_role = (
+                    self.db.query(Role)
+                    .filter(Role.key == "organization_member", Role.is_active.is_(True))
+                    .first()
+                )
+                if org_member_role:
+                    existing_org_assignment = (
+                        self.db.query(RoleAssignment)
+                        .filter(
+                            RoleAssignment.user_id == user_id,
+                            RoleAssignment.scope_type == "organization",
+                            RoleAssignment.scope_id == workspace.organization_id,
+                            RoleAssignment.status == "active",
+                        )
+                        .first()
+                    )
+                    if existing_org_assignment is None:
+                        self.db.add(
+                            RoleAssignment(
+                                user_id=user_id,
+                                role_id=org_member_role.id,
+                                scope_type="organization",
+                                scope_id=workspace.organization_id,
+                                status="active",
+                                assigned_by=invitation.invited_by_id,
+                                assigned_at=datetime.now(timezone.utc),
+                            )
+                        )
         if invitation.role_id is not None:
             scope_type = "workspace" if invitation.workspace_id is not None else "organization"
             scope_id = invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id

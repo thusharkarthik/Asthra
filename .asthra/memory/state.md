@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-29 (permission simulator — superuser/platform owner View As panel with role simulation)
+Last updated: 2026-06-29 (Phase A core bug bundle — Memory nav, notification badge, checklist checks, workspace invite membership)
 
 ## Phase
 
@@ -8,7 +8,7 @@ Last updated: 2026-06-29 (permission simulator — superuser/platform owner View
 
 ## Branch
 
-Current branch: `feature/three-mode-navigation`. Clean build, no TypeScript errors.
+Current branch: `fix/core-bug-bundle-1`. Clean build, no TypeScript errors.
 
 ## Permission Simulator (added 2026-06-29)
 

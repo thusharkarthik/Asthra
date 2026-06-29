@@ -56,13 +56,29 @@ export function OrgSetupChecklist() {
     enabled: Boolean(accessToken && orgId && isOrgAdmin && !dismissed),
   });
 
+  const rolesQuery = useQuery({
+    queryKey: ["settings", "roles"],
+    queryFn: () => settingsApi.listRoles(accessToken ?? ""),
+    enabled: Boolean(accessToken && orgId && isOrgAdmin && !dismissed),
+    staleTime: 5 * 60 * 1000,
+  });
+
   if (!hydrated || isLoading || !orgId || currentUser?.is_superuser || !isOrgAdmin || dismissed) {
     return null;
   }
 
   const assignments = assignmentsQuery.data ?? [];
-  const uniqueUserIds = new Set(assignments.map((a) => a.user_id));
-  const hasMultipleMembers = uniqueUserIds.size > 1;
+  const roles = rolesQuery.data ?? [];
+  const orgOwnerRoleId = roles.find((r) => r.key === "organization_owner")?.id;
+
+  // Invite check: at least one org-scope assignment belongs to someone other than the current user
+  const invitedMember = assignments.some((a) => a.user_id !== currentUser?.id);
+
+  // Roles check: at least one assignment uses a non-owner role (i.e., someone was explicitly assigned a member role)
+  const assignedRoles =
+    orgOwnerRoleId != null
+      ? assignments.some((a) => a.role_id !== orgOwnerRoleId)
+      : false;
 
   const items: Array<{
     id: string;
@@ -87,13 +103,13 @@ export function OrgSetupChecklist() {
       id: "invite",
       label: "Invite your first team member",
       href: `/settings/members?action=invite&orgId=${orgId}`,
-      completed: hasMultipleMembers,
+      completed: invitedMember,
     },
     {
       id: "roles",
       label: "Assign roles to members",
       href: "/settings/members",
-      completed: hasMultipleMembers,
+      completed: assignedRoles,
     },
     {
       id: "work-item",
