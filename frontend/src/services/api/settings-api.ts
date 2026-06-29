@@ -29,6 +29,28 @@ import type {
 
 const CORE_PREFIX = "/api/core/api/v1";
 
+export type OrgSettingsRecord = {
+  default_timezone: string | null;
+  allow_public_invites: boolean;
+  default_member_role: string;
+  domain: string | null;
+  website_url: string | null;
+  industry: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  locale: string | null;
+  date_format: string | null;
+};
+
+export type WorkspaceSettingsRecord = {
+  default_project_visibility: string;
+  default_timezone: string | null;
+  enable_activity_feed: boolean;
+  visibility: string;
+  locale: string | null;
+  enabled_modules: string[];
+};
+
 export type ActivityLogRecord = {
   id: number;
   created_at: string;
@@ -291,6 +313,18 @@ export const settingsApi = {
 
   listApiKeys(token: string) {
     return apiRequest<ApiKeyRecord[]>(`${CORE_PREFIX}/api-keys`, { method: "GET", authToken: token });
+  },
+  getOrganizationSettings(token: string, orgId: number) {
+    return apiRequest<OrgSettingsRecord>(`${CORE_PREFIX}/organizations/${orgId}/settings`, { method: "GET", authToken: token });
+  },
+  updateOrganizationSettings(token: string, orgId: number, payload: Partial<OrgSettingsRecord>) {
+    return apiRequest<OrgSettingsRecord>(`${CORE_PREFIX}/organizations/${orgId}/settings`, { method: "PATCH", authToken: token, json: payload });
+  },
+  getWorkspaceSettings(token: string, wsId: number) {
+    return apiRequest<WorkspaceSettingsRecord>(`${CORE_PREFIX}/workspaces/${wsId}/settings`, { method: "GET", authToken: token });
+  },
+  updateWorkspaceSettings(token: string, wsId: number, payload: Partial<WorkspaceSettingsRecord>) {
+    return apiRequest<WorkspaceSettingsRecord>(`${CORE_PREFIX}/workspaces/${wsId}/settings`, { method: "PATCH", authToken: token, json: payload });
   },
   createApiKey(token: string, payload: { name: string; organization_id?: number | null; workspace_id?: number | null; scopes?: string[]; expires_at?: string | null }) {
     return apiRequest<ApiKeyRecord>(`${CORE_PREFIX}/api-keys`, { method: "POST", authToken: token, json: payload });

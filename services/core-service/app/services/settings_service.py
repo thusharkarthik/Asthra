@@ -19,11 +19,21 @@ DEFAULT_ORGANIZATION_SETTINGS = {
     "default_timezone": None,
     "allow_public_invites": False,
     "default_member_role": "member",
+    "domain": None,
+    "website_url": None,
+    "industry": None,
+    "logo_url": None,
+    "primary_color": None,
+    "locale": None,
+    "date_format": None,
 }
 DEFAULT_WORKSPACE_SETTINGS = {
     "default_project_visibility": "private",
     "default_timezone": None,
     "enable_activity_feed": True,
+    "visibility": "private",
+    "locale": None,
+    "enabled_modules": ["flow", "docs", "discover", "desk", "pulse", "collab", "automation"],
 }
 
 
