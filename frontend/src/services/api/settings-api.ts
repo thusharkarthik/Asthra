@@ -35,6 +35,18 @@ export type NamedCreatePayload = {
 };
 
 export const settingsApi = {
+  getMyProfile(token: string) {
+    return apiRequest<CoreUser>(`${CORE_PREFIX}/me`, { method: "GET", authToken: token });
+  },
+  updateMyProfile(token: string, payload: { full_name?: string | null; job_title?: string | null; timezone?: string | null; locale?: string | null; avatar_url?: string | null }) {
+    return apiRequest<CoreUser>(`${CORE_PREFIX}/me`, { method: "PATCH", authToken: token, json: payload });
+  },
+  changePassword(token: string, payload: { current_password: string; new_password: string }) {
+    return apiRequest<void>(`${CORE_PREFIX}/me/change-password`, { method: "POST", authToken: token, json: payload });
+  },
+  deactivateMyAccount(token: string) {
+    return apiRequest<void>(`${CORE_PREFIX}/me/deactivate`, { method: "POST", authToken: token });
+  },
   getCurrentPermissions(token: string, params: { org_id?: number | null; workspace_id?: number | null; project_id?: number | null } = {}) {
     const search = new URLSearchParams();
     if (params.org_id) search.set("org_id", String(params.org_id));

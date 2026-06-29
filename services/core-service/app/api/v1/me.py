@@ -1,13 +1,49 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.access_control import CurrentUserPermissionsRead
+from app.schemas.user import ChangePasswordPayload, UserProfileRead, UserProfileUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.user_service import UserService
 
 router = APIRouter()
+
+
+@router.get("", response_model=UserProfileRead)
+def get_my_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return UserService(db).get_me(current_user)
+
+
+@router.patch("", response_model=UserProfileRead)
+def update_my_profile(
+    profile_update: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return UserService(db).update_me(profile_update, current_user)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    UserService(db).change_password(payload, current_user)
+
+
+@router.post("/deactivate", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    UserService(db).deactivate_me(current_user)
 
 
 @router.get("/permissions", response_model=CurrentUserPermissionsRead)

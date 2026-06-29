@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-28 (platform-led organization onboarding: POST /platform-onboard + owner assignment + org list owner column)
+Last updated: 2026-06-29 (profile page, account page, preferences page — fully functional)
 
 ## Phase
 
@@ -52,6 +52,26 @@ Fixed and working as of 2026-06-25 (updated 2026-06-26).
 - No access control functions
 
 `can()` from `usePlatformContext()` (backed by `lib/permissions.ts` + backend permission codes) is the **sole** frontend access control mechanism. Do not add role-rank checks for visibility/gating decisions — use `can("module.resource.action")` instead.
+
+## Profile, Account, Preferences Pages (added 2026-06-29)
+
+**Backend** (`services/core-service/`):
+- `schemas/user.py`: Added `ChangePasswordPayload { current_password: str, new_password: str = Field(min_length=8) }` (uses `Field` from pydantic).
+- `services/user_service.py`: Added `change_password()` (verifies current password via `verify_password`, rejects if same via second `verify_password` check, hashes new password, commits, logs activity). Added `deactivate_me()` (blocks last active superuser, sets `is_active=False`, commits, logs activity). Both import `hash_password, verify_password` from `app.core.security`.
+- `api/v1/me.py`: Rewrote to add `GET /me` → `UserProfileRead`, `PATCH /me` → `UserProfileRead`, `POST /me/change-password` → 204, `POST /me/deactivate` → 204. Existing `GET /me/permissions` kept in place (registered last to avoid path conflicts).
+
+**Frontend** (`frontend/src/`):
+- `services/api/settings-api.ts`: Added `getMyProfile()`, `updateMyProfile()`, `changePassword()`, `deactivateMyAccount()`.
+- `app/settings/profile/page.tsx`: Full implementation — Avatar (initials in deterministic color), Personal Info form (full_name editable, email read-only, job_title, timezone select, locale select), Role Assignments section (reads `listRoleAssignments` + `listRoles`, displays role name + scope badge + scope name using platform context for org/workspace lookups). On save: PATCH /me → updates auth store via `useAuthStore.setState`. Form initialized from `profileQuery.data ?? currentUser` via `useEffect`.
+- `app/settings/account/page.tsx`: Full implementation — Account Info card (email, name, status badge, member since, superuser badge), Change Password form (current + new + confirm, strength meter, client-side validation before API call), Danger Zone (deactivate button → inline modal with "DEACTIVATE" confirmation input). On deactivate success: logout().
+- `app/settings/preferences/page.tsx`: Replaced placeholder with theme toggle (Light/Dark/System via `next-themes`), notification toggles (in-app enabled/disabled via localStorage, email + digest as coming-soon disabled controls), language card linking to profile page.
+
+**Key patterns**:
+- Auth store update after profile save: `useAuthStore.setState((state) => ({ ...state, currentUser: updatedUser }))` — direct state mutation without a dedicated action.
+- Password strength: score-based (length + uppercase + digits + special chars), 5 levels → 4 labels (Weak/Fair/Good/Strong).
+- Avatar color: deterministic from `(name || email).charCodeAt(0) + charCodeAt(1)` mod 8 colors.
+- Preferences persist to localStorage under key `asthra-notification-prefs`.
+- Deactivation guard: backend checks `active_superuser_count ≤ 1` for superusers, returns 400 with clear message.
 
 ## Platform-Led Organization Onboarding (added 2026-06-28)
 
