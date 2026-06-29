@@ -243,3 +243,22 @@ Uses hidden `<input>` for form value compatibility. Shows filtered dropdown afte
 Fixed 2026-06-26. `invalidateSettingsAndContext()` in `settings-admin-views.tsx` now also invalidates `["settings", "members"]` and `["settings", "global-member-role-assignments"]` — the exact keys used by `membersQuery` in `MembersView`. Previously only `["members"]` was invalidated, which missed the `["settings", "members", orgId, wsId]` prefix.
 
 Same keys added to `useInviteMemberMutation` and `useAssignRoleMutation` in `use-settings-mutations.ts`.
+
+## Audit Log Consistency (added 2026-06-29)
+
+All Core service actions now emit structured audit logs via `ActivityService.log_activity()`. Every log includes: `actor_user_id`, `action`, `entity_type`, `entity_id`, `organization_id` (where applicable), `workspace_id` (where applicable), and a human-readable `description` with actor name.
+
+**Action naming convention**: `{entity}.{verb}` — e.g. `organization.created`, `member.invited`, `role.assigned`.
+
+**Services updated**:
+- `organization_service.py` — `create`, `onboard`, `platform_onboard`, `update` (archived/reactivated/updated), `delete`. Note: `create()` was missing `self.db.commit()` — fixed.
+- `workspace_service.py` — `create`, `update` (archived/restored/updated), `delete`.
+- `project_service.py` — `create`, `update` (archived/restored/updated), `delete`. Uses `project.workspace.organization_id` for org scope.
+- `team_service.py` — `create`, `update`, `delete`, `add_member` (`member.added`), `remove_member` (`member.removed`). Uses `team.workspace.organization_id`.
+- `invitation_service.py` — Existing logs renamed: `invitation.*` → `member.*` (member.invited, member.invitation_accepted, member.invitation_cancelled, member.invitation_resent). Descriptions improved to include actor names.
+- `role_service.py` — Added: `role.updated`, `role.deleted`, `role.assigned` (assign_user_role), `permission.assigned` (link_permission), `permission.removed` (unlink_permission). `assign_user_role` uses `self.db.flush()` before logging to ensure assignment.id is populated.
+- `user_service.py` — `update_me` description improved to include actor name + changed field names.
+
+**Frontend (Audit Logs Settings Page)**:
+- `settings-api.ts`: Added `ActivityLogRecord` type + `listActivityLogs()` method → `GET /api/core/api/v1/activity` with query params.
+- `app/settings/audit-logs/page.tsx`: Full implementation. Filters by action (predefined dropdown). Table: Timestamp (relative, absolute on hover), Actor (resolved from users list), Action (color badge by entity prefix), Description, Scope. Pagination: 25 per page, prev/next buttons. Access: `can("guard.audit.view")` OR org/platform authority. Scope: global for superuser/platform, org-scoped otherwise. Uses `SettingsLayout` + `SettingsSectionHeader`.

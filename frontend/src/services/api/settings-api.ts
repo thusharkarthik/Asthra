@@ -29,6 +29,22 @@ import type {
 
 const CORE_PREFIX = "/api/core/api/v1";
 
+export type ActivityLogRecord = {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  actor_user_id: number | null;
+  organization_id: number | null;
+  workspace_id: number | null;
+  project_id: number | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  description: string | null;
+  summary: string | null;
+  event_metadata: Record<string, unknown> | null;
+};
+
 export type NamedCreatePayload = {
   name: string;
   description?: string;
@@ -328,5 +344,27 @@ export const settingsApi = {
     if (params.scope_id) search.set("scope_id", String(params.scope_id));
     const query = search.toString();
     return apiRequest<EffectivePermissionsRecord>(`${CORE_PREFIX}/users/${userId}/effective-permissions${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
-  }
+  },
+  listActivityLogs(token: string, params: {
+    organization_id?: number;
+    workspace_id?: number;
+    project_id?: number;
+    actor_user_id?: number;
+    action?: string;
+    entity_type?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) {
+    const search = new URLSearchParams();
+    if (params.organization_id != null) search.set("organization_id", String(params.organization_id));
+    if (params.workspace_id != null) search.set("workspace_id", String(params.workspace_id));
+    if (params.project_id != null) search.set("project_id", String(params.project_id));
+    if (params.actor_user_id != null) search.set("actor_user_id", String(params.actor_user_id));
+    if (params.action) search.set("action", params.action);
+    if (params.entity_type) search.set("entity_type", params.entity_type);
+    if (params.limit != null) search.set("limit", String(params.limit));
+    if (params.offset != null) search.set("offset", String(params.offset));
+    const query = search.toString();
+    return apiRequest<ActivityLogRecord[]>(`${CORE_PREFIX}/activity${query ? `?${query}` : ""}`, { method: "GET", authToken: token });
+  },
 };

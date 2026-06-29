@@ -21,12 +21,15 @@ class UserService:
     def update_me(self, profile_update: UserProfileUpdate, current_user: User) -> User:
         self._ensure_active_user(current_user)
         user = self.user_repository.update_profile(current_user, profile_update)
+        changed_fields = [k for k in profile_update.model_dump(exclude_none=True)]
+        fields_label = ", ".join(changed_fields) if changed_fields else "profile"
+        actor_name = current_user.full_name or current_user.email
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             entity_type="user",
             entity_id=str(current_user.id),
             action="user.profile_updated",
-            description=f"User {current_user.id} profile was updated.",
+            description=f"{actor_name} updated their profile ({fields_label}).",
         )
         return user
 

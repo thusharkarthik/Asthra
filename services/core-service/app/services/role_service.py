@@ -300,6 +300,15 @@ class RoleService:
             )
         role = self.role_repository.update(role, role_update)
         ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role",
+            entity_id=str(role.id),
+            action="role.updated",
+            description=f"Role '{role.name}' was updated by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(role)
         return role
@@ -311,6 +320,15 @@ class RoleService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         self.role_repository.update(role, RoleUpdate(is_active=False))
         ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role",
+            entity_id=str(role.id),
+            action="role.deleted",
+            description=f"Role '{role.name}' was deactivated by {actor_name}.",
+        )
         self.db.commit()
 
     def assign_permission_by_id(self, role_id: int, permission_id: int, current_user: User) -> RolePermission:
@@ -336,6 +354,15 @@ class RoleService:
             )
         role_permission = self.role_repository.link_permission(role.id, permission.id)
         ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role",
+            entity_id=str(role.id),
+            action="permission.assigned",
+            description=f"Permission '{permission.code}' was added to role '{role.name}' by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(role_permission)
         return role_permission
@@ -375,8 +402,19 @@ class RoleService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Role permission link not found.",
             )
+        perm_obj = self.permission_repository.get_by_id(permission_id)
+        perm_label = perm_obj.code if perm_obj else str(permission_id)
         self.role_repository.unlink_permission(role_permission)
         ContextVersionService(self.db).bump_access("organization" if role.organization_id else "platform", role.organization_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role",
+            entity_id=str(role.id),
+            action="permission.removed",
+            description=f"Permission '{perm_label}' was removed from role '{role.name}' by {actor_name}.",
+        )
         self.db.commit()
 
     def assign_user_role(
@@ -441,6 +479,17 @@ class RoleService:
             entity_id=str(role.id),
         )
         ContextVersionService(self.db).bump_access(scope_type, scope_id)
+        self.db.flush()
+        actor_name = current_user.full_name or current_user.email
+        target_name = user.full_name or user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=role.organization_id,
+            entity_type="role_assignment",
+            entity_id=str(assignment.id),
+            action="role.assigned",
+            description=f"{actor_name} assigned role '{role.name}' to {target_name} at {scope_type} scope.",
+        )
         self.db.commit()
         self.db.refresh(assignment)
         return assignment

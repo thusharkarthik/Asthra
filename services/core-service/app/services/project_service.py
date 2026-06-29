@@ -11,6 +11,7 @@ from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectTeamCreate, ProjectUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 from app.services.notification_service import NotificationService
@@ -64,6 +65,16 @@ class ProjectService:
             entity_id=str(project.id),
         )
         ContextVersionService(self.db).bump_workspace_context(project.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=workspace.organization_id,
+            workspace_id=project.workspace_id,
+            entity_type="project",
+            entity_id=str(project.id),
+            action="project.created",
+            description=f"Project '{project.name}' was created by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(project)
         return project
@@ -101,16 +112,27 @@ class ProjectService:
     def update(self, project_id: int, project_update: ProjectUpdate, current_user: User) -> Project:
         project = self.get(project_id, current_user)
         permission_code = self._permission_for_project_update(project, project_update)
-        AccessControlService(self.db).require(
-            current_user,
-            permission_code,
-            "project",
-            project.id,
-        )
+        AccessControlService(self.db).require(current_user, permission_code, "project", project.id)
         if project_update.owner_id is not None:
             self._resolve_owner_id(project_update.owner_id, project.workspace_id)
         project = self.project_repository.update(project, project_update)
         ContextVersionService(self.db).bump_project_context(project.id)
+        actor_name = current_user.full_name or current_user.email
+        if permission_code == "settings.project.restore":
+            action, verb = "project.restored", "restored"
+        elif permission_code == "settings.project.archive":
+            action, verb = "project.archived", "archived"
+        else:
+            action, verb = "project.updated", "updated"
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=project.workspace.organization_id,
+            workspace_id=project.workspace_id,
+            entity_type="project",
+            entity_id=str(project.id),
+            action=action,
+            description=f"Project '{project.name}' was {verb} by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(project)
         return project
@@ -125,6 +147,16 @@ class ProjectService:
         )
         self.project_repository.update(project, ProjectUpdate(is_active=False))
         ContextVersionService(self.db).bump_project_context(project.id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=project.workspace.organization_id,
+            workspace_id=project.workspace_id,
+            entity_type="project",
+            entity_id=str(project.id),
+            action="project.archived",
+            description=f"Project '{project.name}' was archived by {actor_name}.",
+        )
         self.db.commit()
 
     def link_team(

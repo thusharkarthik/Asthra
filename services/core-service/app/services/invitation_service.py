@@ -107,14 +107,15 @@ class InvitationService:
             else:
                 self.repository.add_memberships(invitation, invited_user.id)
                 invitation = self.repository.get_by_id(invitation.id) or invitation
+        actor_name = current_user.full_name or current_user.email
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
             workspace_id=invitation.workspace_id,
             entity_type="invitation",
             entity_id=str(invitation.id),
-            action="invitation.created",
-            description=f"Invitation for {invitation.email} was created.",
+            action="member.invited",
+            description=f"{actor_name} invited {invitation.email}.",
         )
         if invited_user is not None:
             role = self.db.get(Role, invitation.role_id) if invitation.role_id else None
@@ -173,14 +174,15 @@ class InvitationService:
         else:
             self.repository.add_memberships(invitation, current_user.id)
 
+        actor_name = current_user.full_name or current_user.email
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
             workspace_id=invitation.workspace_id,
             entity_type="invitation",
             entity_id=str(invitation.id),
-            action="invitation.accepted",
-            description=f"Invitation for {invitation.email} was accepted.",
+            action="member.invitation_accepted",
+            description=f"{actor_name} accepted an invitation.",
         )
         NotificationService(self.db).create_notification(
             user_id=invitation.invited_by_id,
@@ -211,14 +213,15 @@ class InvitationService:
         if stale_cancelled is not None:
             self.repository.delete(stale_cancelled)
         invitation = self.repository.update_status(invitation, "cancelled")
+        actor_name = current_user.full_name or current_user.email
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
             workspace_id=invitation.workspace_id,
             entity_type="invitation",
             entity_id=str(invitation.id),
-            action="invitation.cancelled",
-            description=f"Invitation for {invitation.email} was cancelled.",
+            action="member.invitation_cancelled",
+            description=f"{actor_name} cancelled the invitation for {invitation.email}.",
         )
         self._bump_invitation_scope(invitation)
         self.db.commit()
@@ -231,14 +234,15 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending invitations can be resent.")
         invitation.token = token_urlsafe(32)
         invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        actor_name = current_user.full_name or current_user.email
         ActivityService(self.db).log_activity(
             actor_user_id=current_user.id,
             organization_id=invitation.organization_id,
             workspace_id=invitation.workspace_id,
             entity_type="invitation",
             entity_id=str(invitation.id),
-            action="invitation.resent",
-            description=f"Invitation for {invitation.email} was resent.",
+            action="member.invitation_resent",
+            description=f"{actor_name} resent the invitation for {invitation.email}.",
         )
         self._bump_invitation_scope(invitation)
         self.db.commit()
