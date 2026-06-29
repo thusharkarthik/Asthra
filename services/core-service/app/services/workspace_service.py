@@ -10,6 +10,7 @@ from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 
@@ -54,6 +55,16 @@ class WorkspaceService:
             entity_id=str(workspace.id),
         )
         ContextVersionService(self.db).bump_organization_context(workspace.organization_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            entity_type="workspace",
+            entity_id=str(workspace.id),
+            action="workspace.created",
+            description=f"Workspace '{workspace.name}' was created by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(workspace)
         return workspace
@@ -98,14 +109,26 @@ class WorkspaceService:
         current_user: User,
     ) -> Workspace:
         workspace = self.get(workspace_id, current_user)
-        AccessControlService(self.db).require(
-            current_user,
-            self._permission_for_workspace_update(workspace, workspace_update),
-            "workspace",
-            workspace.id,
-        )
+        permission_code = self._permission_for_workspace_update(workspace, workspace_update)
+        AccessControlService(self.db).require(current_user, permission_code, "workspace", workspace.id)
         workspace = self.workspace_repository.update(workspace, workspace_update)
         ContextVersionService(self.db).bump_workspace_context(workspace.id)
+        actor_name = current_user.full_name or current_user.email
+        if permission_code == "settings.workspace.archive":
+            action, verb = "workspace.archived", "archived"
+        elif permission_code == "settings.workspace.restore":
+            action, verb = "workspace.restored", "restored"
+        else:
+            action, verb = "workspace.updated", "updated"
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            entity_type="workspace",
+            entity_id=str(workspace.id),
+            action=action,
+            description=f"Workspace '{workspace.name}' was {verb} by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(workspace)
         return workspace
@@ -120,6 +143,16 @@ class WorkspaceService:
         )
         self.workspace_repository.update(workspace, WorkspaceUpdate(is_active=False))
         ContextVersionService(self.db).bump_workspace_context(workspace.id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=workspace.organization_id,
+            workspace_id=workspace.id,
+            entity_type="workspace",
+            entity_id=str(workspace.id),
+            action="workspace.archived",
+            description=f"Workspace '{workspace.name}' was archived by {actor_name}.",
+        )
         self.db.commit()
 
     def list_members(self, workspace_id: int, current_user: User) -> list[WorkspaceMember]:

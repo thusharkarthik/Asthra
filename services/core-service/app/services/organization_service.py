@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.activity_log import ActivityLog
 from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
 from app.models.role import Role
@@ -14,6 +13,7 @@ from app.models.user import RoleAssignment, User
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate, PlatformOnboardCreate
 from app.services.access_control_service import AccessControlService
+from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
 from app.services.event_publisher import publish_event
 
@@ -44,6 +44,17 @@ class OrganizationService:
             entity_type="organization",
             entity_id=str(organization.id),
         )
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=organization.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            action="organization.created",
+            description=f"Organization '{organization.name}' was created by {actor_name}.",
+        )
+        self.db.commit()
+        self.db.refresh(organization)
         return organization
 
     def onboard(
@@ -100,6 +111,15 @@ class OrganizationService:
                 entity_type="organization",
                 entity_id=str(organization.id),
             )
+        )
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=organization.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            action="organization.created",
+            description=f"Organization '{organization.name}' was created by {actor_name} via self-serve onboarding.",
         )
         self.db.commit()
         self.db.refresh(organization)
@@ -169,6 +189,7 @@ class OrganizationService:
                 )
             )
         admin_name = current_user.full_name or current_user.email
+        owner_name = owner.full_name or owner.email
         self.db.add(
             Notification(
                 user_id=owner.id,
@@ -183,16 +204,13 @@ class OrganizationService:
                 entity_id=str(organization.id),
             )
         )
-        self.db.add(
-            ActivityLog(
-                actor_user_id=current_user.id,
-                organization_id=organization.id,
-                action="organization.created",
-                entity_type="organization",
-                entity_id=str(organization.id),
-                description=f"Organization '{organization.name}' was created via platform onboarding.",
-                summary=f"Organization '{organization.name}' was created.",
-            )
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=organization.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            action="platform.org_onboarded",
+            description=f"Organization '{organization.name}' was created via platform onboarding by {admin_name}. Owner assigned: {owner_name}.",
         )
         self.db.commit()
         self.db.refresh(organization)
@@ -269,14 +287,29 @@ class OrganizationService:
         current_user: User,
     ) -> Organization:
         organization = self.get(organization_id, current_user)
-        AccessControlService(self.db).require(
-            current_user,
-            self._permission_for_organization_update(organization, organization_update),
-            "organization",
-            organization.id,
-        )
+        was_active = organization.is_active
+        permission_code = self._permission_for_organization_update(organization, organization_update)
+        AccessControlService(self.db).require(current_user, permission_code, "organization", organization.id)
         organization = self.organization_repository.update(organization, organization_update)
         ContextVersionService(self.db).bump_organization_context(organization.id)
+        actor_name = current_user.full_name or current_user.email
+        if permission_code == "settings.organization.archive":
+            action = "organization.deactivated"
+            verb = "deactivated"
+        elif permission_code == "settings.organization.restore":
+            action = "organization.reactivated"
+            verb = "reactivated"
+        else:
+            action = "organization.updated"
+            verb = "updated"
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=organization.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            action=action,
+            description=f"Organization '{organization.name}' was {verb} by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(organization)
         return organization
@@ -291,6 +324,15 @@ class OrganizationService:
         )
         self.organization_repository.update(organization, OrganizationUpdate(is_active=False))
         ContextVersionService(self.db).bump_organization_context(organization.id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=organization.id,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            action="organization.deactivated",
+            description=f"Organization '{organization.name}' was deactivated by {actor_name}.",
+        )
         self.db.commit()
 
     def list_members(

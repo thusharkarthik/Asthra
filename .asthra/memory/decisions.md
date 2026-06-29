@@ -157,3 +157,21 @@
 **Outcome**: `lib/rbac.ts` no longer exists. `lib/role-utils.ts` is the file for display/sorting only. `can()` from `usePlatformContext()` (or the `useCan()` hook) is the sole frontend access control mechanism.
 
 **Investigation finding**: None of the Category B functions were actually imported or called outside `rbac.ts` itself. The one consumer (`settings-admin-views.tsx`) only imported `normalizeRole` (Category A), so no call-site replacements were needed.
+
+## 2026-06-29 — Audit Log Action Naming Convention Standardized
+
+**Decision**: All audit log actions follow `{entity}.{verb}` format. Verbs are past-tense, lowercase, underscore-separated for multi-word. Entity prefix determines color-coding in the audit log UI.
+
+**Full action list**:
+- `organization.created`, `organization.updated`, `organization.deactivated`, `organization.reactivated`, `platform.org_onboarded`
+- `workspace.created`, `workspace.updated`, `workspace.archived`, `workspace.restored`
+- `project.created`, `project.updated`, `project.archived`, `project.restored`
+- `team.created`, `team.updated`, `team.deleted`
+- `member.invited`, `member.invitation_accepted`, `member.invitation_cancelled`, `member.invitation_resent`, `member.added`, `member.removed`
+- `role.created`, `role.assigned`, `role.updated`, `role.deleted`
+- `permission.assigned`, `permission.removed`
+- `user.profile_updated`, `user.password_changed`, `user.deactivated`
+
+**Why**: Previously invitation actions used `invitation.*` prefix (inconsistent with the user-facing concept of "member management"). Standardizing on the user-facing entity (`member.*`) makes the audit log filterable in a way that matches how admins think about actions.
+
+**How to apply**: When adding new audit logs, always use `{entity}.{verb}`, pick the entity name from the user's perspective (not the internal model name), and include actor name in description.

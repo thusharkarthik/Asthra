@@ -12,6 +12,7 @@ from app.models.workspace import Workspace
 from app.repositories.team_repository import TeamRepository
 from app.schemas.team import TeamCreate, TeamMemberCreate, TeamUpdate
 from app.services.access_control_service import AccessControlService
+from app.services.activity_service import ActivityService
 from app.services.context_version_service import ContextVersionService
 from app.services.notification_service import NotificationService
 
@@ -43,6 +44,16 @@ class TeamService:
             ) from exc
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
         ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+            action="team.created",
+            description=f"Team '{team.name}' was created by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(team)
         return team
@@ -69,6 +80,16 @@ class TeamService:
         AccessControlService(self.db).require(current_user, "settings.team.edit", "workspace", team.workspace_id)
         team = self.team_repository.update(team, team_update)
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+            action="team.updated",
+            description=f"Team '{team.name}' was updated by {actor_name}.",
+        )
         self.db.commit()
         self.db.refresh(team)
         return team
@@ -78,6 +99,16 @@ class TeamService:
         AccessControlService(self.db).require(current_user, "settings.team.delete", "workspace", team.workspace_id)
         self.team_repository.update(team, TeamUpdate(is_active=False))
         ContextVersionService(self.db).bump_workspace_context(team.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+            action="team.deleted",
+            description=f"Team '{team.name}' was deleted by {actor_name}.",
+        )
         self.db.commit()
 
     def add_member(
@@ -123,6 +154,17 @@ class TeamService:
             entity_id=str(team.id),
         )
         ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        target_name = target_user.full_name or target_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+            action="member.added",
+            description=f"{actor_name} added {target_name} to team '{team.name}'.",
+        )
         self.db.commit()
         return member
 
@@ -145,6 +187,16 @@ class TeamService:
             actor_user_id=current_user.id,
         )
         ContextVersionService(self.db).bump_access("workspace", team.workspace_id)
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=team.workspace.organization_id,
+            workspace_id=team.workspace_id,
+            entity_type="team",
+            entity_id=str(team.id),
+            action="member.removed",
+            description=f"{actor_name} removed user #{user_id} from team '{team.name}'.",
+        )
         self.db.commit()
 
     def _ensure_active_user(self, user: User) -> None:
