@@ -73,5 +73,6 @@ export function useClearContextCache() {
     queryClient.removeQueries({ queryKey: queryKeys.permissions.all });
     queryClient.removeQueries({ queryKey: queryKeys.auth.currentUser });
     queryClient.removeQueries({ queryKey: queryKeys.settings.all });
+    queryClient.removeQueries({ queryKey: queryKeys.platformContext.all });
   };
 }

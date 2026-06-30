@@ -243,3 +243,15 @@
 **Access control**: Backend `GET /access-control/simulate` enforces superuser OR platform_owner/platform_admin. Frontend "View As" button checks the same roles client-side for visibility.
 
 **"View As This User" in member detail NOT implemented**: The spec mentions adding a button in `/settings/members/[id]` but the task explicitly excludes settings pages from scope. The backend endpoint already supports `user_id` param; the frontend only needs to call `simulatePermissions(token, { user_id })` when that button is wired up.
+
+## 2026-06-29 — Unified Platform Context API: Single Endpoint Replaces 5 Separate Calls
+
+**Decision**: Replace 5 separate context queries (user, organizations, workspaces, projects, permissions) in `PlatformContextProvider` with a single `GET /context/platform` endpoint. Version polling (`GET /context/version` every 60s) kept separate as a lightweight background signal.
+
+**Why**: Startup latency — 5 parallel requests fire in the first render. Unified endpoint resolves all context server-side in one DB connection, returns in one round-trip. Version polling stays lean (small response) and triggers unified refetch when data changes.
+
+**How to apply**: 
+- New context data goes into `GET /context/platform` response schema (`context_version.py`)
+- `platformContext.tsx` is the single consumer; all downstream `usePlatformContext()` callers unchanged
+- When version polling detects a change, invalidate `queryKeys.platformContext.all`
+- `useClearContextCache()` in `use-smart-context-cache.ts` must also clear `platformContext.all`

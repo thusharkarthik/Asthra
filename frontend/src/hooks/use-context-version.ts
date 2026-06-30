@@ -65,6 +65,7 @@ export function useContextVersion(scope: { organizationId?: number | null; works
       queryClient.removeQueries({ queryKey: queryKeys.workspaces.all });
       queryClient.removeQueries({ queryKey: queryKeys.projects.all });
       queryClient.removeQueries({ queryKey: queryKeys.permissions.all });
+      queryClient.removeQueries({ queryKey: queryKeys.platformContext.all });
       setSnapshot(next);
       return;
     }
@@ -72,21 +73,25 @@ export function useContextVersion(scope: { organizationId?: number | null; works
     if (snapshot && snapshot.organization_version !== next.organization_version) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.list(next.organization_id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
     }
     if (snapshot && snapshot.workspace_version !== next.workspace_version) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.list(next.organization_id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.detail(next.workspace_id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.list(next.workspace_id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
     }
     if (snapshot && snapshot.project_version !== next.project_version) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.list(next.workspace_id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(next.project_id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
     }
     if (snapshot && snapshot.access_version !== next.access_version) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.permissions.current(next.organization_id, next.workspace_id, next.project_id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.roles.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
     }
 
     setSnapshot(next);
