@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.schemas.ai_context import AIContextMetadataRead
 from app.schemas.configuration import ConfigurationMetadataRead
+from app.schemas.search import SearchMetadataRead
 
 
 class ContextVersionRead(BaseModel):
@@ -98,4 +99,5 @@ class PlatformContextResponse(BaseModel):
     modules: list[ModuleContextRead]
     ai_context: AIContextMetadataRead
     configuration: ConfigurationMetadataRead
+    search: SearchMetadataRead
     preferences: dict[str, Any]

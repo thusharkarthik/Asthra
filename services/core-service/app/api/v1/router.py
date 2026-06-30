@@ -20,6 +20,7 @@ from app.api.v1 import (
     role_templates,
     role_assignments,
     roles,
+    search,
     system,
     teams,
     users,
@@ -52,6 +53,7 @@ api_router.include_router(role_templates.router, prefix="/role-templates", tags=
 api_router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
 api_router.include_router(context.router, prefix="/context", tags=["context"])
+api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(feature_flags.router, prefix="/feature-flags", tags=["feature-flags"])
 api_router.include_router(activity.router, prefix="/activity", tags=["activity"])

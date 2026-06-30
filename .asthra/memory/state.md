@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-30 (Phase B Core — Configuration Registry v1)
+Last updated: 2026-06-30 (Phase B Core — Global Search Registry v1)
 
 ## Phase
 
@@ -8,7 +8,24 @@ Last updated: 2026-06-30 (Phase B Core — Configuration Registry v1)
 
 ## Branch
 
-Current branch: active Core Phase B branch. Configuration Registry v1 is implemented; backend targeted tests pass and frontend build passes.
+Current branch: active Core Phase B branch. Global Search Registry v1 is implemented; backend targeted tests pass and frontend build passes.
+
+## Phase B Core Global Search Registry v1 (added 2026-06-30)
+
+**Purpose**: Core now owns a central search registry and Core-owned search provider for future universal search / CMD+K. V1 uses simple permission-safe SQL/string matching only — no embeddings, no vector search, no external search service, and no CMD+K UI.
+
+**Backend (`services/core-service/`)**:
+- `schemas/search.py`: Added searchable entity, result, response, scope, registry, and platform metadata schemas.
+- `services/global_search_registry.py`: Code-defined searchable entity registry plus Core search providers for organizations, workspaces, projects, teams, members, roles, modules, and settings.
+- `api/v1/search.py`: Added `GET /search` and `GET /search/registry`.
+- `api/v1/context.py`: Unified Platform Context now includes lightweight `search` metadata with endpoint, registry endpoint, categories, entity types, and shortcut.
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept optional `search` metadata.
+- `usePlatformContext()` exposes `search` with safe defaults.
+- No CMD+K UI, global shortcut, sidebar, navigation, or search box behavior changed.
+
+**Next Phase B item**: Organization Templates.
 
 ## Phase B Core Configuration Registry v1 (added 2026-06-30)
 
