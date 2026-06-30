@@ -219,3 +219,10 @@
 **Symptom**: Users who accepted workspace invitations weren't visible in org member lists and hit the onboarding gate on next login.
 **Root cause**: `add_memberships()` only created `OrganizationMember` if `invitation.organization_id is not None`. Workspace invitations with `organization_id=None` (legacy/edge case) skipped org membership. Also, no org-scope `RoleAssignment` was ever created — only workspace-scoped — leaving user without a valid org role.
 **Fix**: Added new block in `add_memberships()` for workspace invitations: look up workspace.organization_id, ensure OrganizationMember exists, look up `organization_member` role, create org-scope RoleAssignment if no active one exists for that user+org.
+
+### BUG-032 — Core Migration 0013 Failed When role_assignments Already Existed [FIXED 2026-06-30]
+
+**File**: `services/core-service/alembic/versions/0013_scoped_membership_foundation.py`
+**Symptom**: Core startup failed during Alembic upgrade from `0012_access_control_foundation` to `0013_scoped_membership_foundation` with `sqlite3.OperationalError: table role_assignments already exists`. API Gateway login returned 502 because Core was unavailable.
+**Root cause**: Migration 0013 unconditionally created scoped membership tables/indexes and altered `team_members`. Local SQLite dev databases can already contain those objects from model metadata/bootstrap partial startup while the Alembic version is still before 0013.
+**Fix**: Added inspector-based existence guards for tables, indexes, and `team_members` columns/indexes in migration 0013. Fresh DB creation remains supported, and existing local dev DBs with pre-created scoped membership objects no longer crash.
