@@ -1,5 +1,23 @@
 # Architectural Decisions
 
+## 2026-06-30 — All Alembic Migrations Must Use Idempotency Helpers for create_table / create_index
+
+**Decision**: Every migration that calls `op.create_table(...)` or `op.create_index(...)` MUST wrap the call with a `table_exists` or `index_exists` guard from `app.db.migration_utils`. No exceptions.
+
+**Why**: SQLite dev databases routinely drift ahead of `alembic_version` (due to `create_all()`, partial runs, or Docker volume reuse). Without guards, a single drifted migration causes an unrecoverable crash-loop on every container startup. This pattern hit twice (0013, 0014) within three weeks.
+
+**How to apply**:
+```python
+from app.db.migration_utils import table_exists, index_exists
+
+def upgrade() -> None:
+    if not table_exists("my_table"):
+        op.create_table("my_table", ...)
+    if not index_exists("my_table", op.f("ix_my_table_id")):
+        op.create_index(op.f("ix_my_table_id"), "my_table", ["id"], unique=False)
+```
+The helper lives at `services/core-service/app/db/migration_utils.py`. The `app` package is always on sys.path when alembic runs. `column_exists` is also available for `batch_alter_table` guards. Note: alembic/versions/ is baked into the Docker image, so migration changes require `docker compose build core-service`.
+
 ## 2026-06-30 — Feature Flags Are Availability Gates, RBAC Remains Usage Authority
 
 **Decision**: Feature flags decide whether a module/capability is available for a platform or organization scope. RBAC permissions continue to decide whether a specific user can use that available capability.
@@ -255,3 +273,18 @@
 - `platformContext.tsx` is the single consumer; all downstream `usePlatformContext()` callers unchanged
 - When version polling detects a change, invalidate `queryKeys.platformContext.all`
 - `useClearContextCache()` in `use-smart-context-cache.ts` must also clear `platformContext.all`
+
+## 2026-06-30 — Module Registry: Core Owns Module Metadata, Sidebar Filtering Deferred
+
+**Decision**: Core owns the Module Registry metadata: module key, label, route, icon key, navigation mode, required feature flag, required permissions, and sort order. Unified Platform Context includes resolved modules for the current user/context.
+
+**Separation of concerns**:
+- Module Registry = what modules exist and how they should appear.
+- Feature Flags = whether the module/capability is available for the current scope.
+- RBAC Permissions = whether the current user can access/use it.
+
+**Resolution rule**: A module is visible only when it is active, matches the requested navigation mode, its required feature flag is enabled, and the user has at least one required permission. Backend superuser bypass is honored through `User.is_superuser`, matching existing permission resolver behavior.
+
+**Frontend strategy**: Frontend platform context exposes `availableModules` and `hasModule(moduleKey)` safely, but sidebar filtering remains deferred. This avoids accidentally hiding all navigation if a deployment has not yet migrated/seeded module registry data or if dynamic nav needs QA.
+
+**How to apply**: Add new modules to `services/core-service/app/services/module_registry.py` defaults and wire their feature flag and permission codes there. Do not duplicate module metadata in unrelated services. Dynamic sidebar filtering should be a separate, tested pass.

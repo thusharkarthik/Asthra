@@ -30,6 +30,7 @@
     "alembic migration files without explicit instruction",
     "docker-compose.yml service ports"
   ],
+  "migrationRule": "All new Alembic migrations creating tables or indexes MUST wrap op.create_table with 'if not table_exists(...)' and op.create_index with 'if not index_exists(...)' using helpers from app.db.migration_utils. No exceptions. alembic/versions/ is baked into the Docker image — run 'docker compose build core-service' after changes.",
   "agentInstructions": {
     "beforeStarting": [
       "Read .asthra/platform.json",

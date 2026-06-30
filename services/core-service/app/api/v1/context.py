@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.context_version import ContextVersionRead, PlatformContextResponse
 from app.services.access_control_service import AccessControlService
 from app.services.context_version_service import ContextVersionService
+from app.services.module_registry import ModuleRegistryService
 from app.services.organization_service import OrganizationService
 from app.services.project_service import ProjectService
 from app.services.workspace_service import WorkspaceService
@@ -52,9 +53,20 @@ def get_platform_context(
     if project_id is not None:
         scope_type = "project"
         scope_id = project_id
+    navigation_mode = "platform"
+    if org_id is not None:
+        navigation_mode = "org"
+    if workspace_id is not None or project_id is not None:
+        navigation_mode = "work"
 
     # Permissions
     perms = AccessControlService(db).get_user_permissions(current_user.id, scope_type, scope_id)
+    modules = ModuleRegistryService(db).resolve_modules_for_context(
+        current_user,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        navigation_mode=navigation_mode,
+    )
 
     # Organizations (scoped to user access — superusers get all, others get their orgs)
     organizations = OrganizationService(db).list(current_user)
@@ -129,6 +141,8 @@ def get_platform_context(
         "current_project": _proj(current_proj) if current_proj else None,
         "context_version": version_data["access_version"],
         "generated_at": datetime.now(timezone.utc),
-        "feature_flags": {},
+        "feature_flags": perms.get("feature_flags", {}),
+        "enabled_modules": perms.get("enabled_modules", []),
+        "modules": modules,
         "preferences": {},
     }

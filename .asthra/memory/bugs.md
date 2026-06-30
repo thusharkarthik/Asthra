@@ -234,3 +234,26 @@
 **Symptom**: Core startup failed during Alembic upgrade from `0012_access_control_foundation` to `0013_scoped_membership_foundation` with `sqlite3.OperationalError: table role_assignments already exists`. API Gateway login returned 502 because Core was unavailable.
 **Root cause**: Migration 0013 unconditionally created scoped membership tables/indexes and altered `team_members`. Local SQLite dev databases can already contain those objects from model metadata/bootstrap partial startup while the Alembic version is still before 0013.
 **Fix**: Added inspector-based existence guards for tables, indexes, and `team_members` columns/indexes in migration 0013. Fresh DB creation remains supported, and existing local dev DBs with pre-created scoped membership objects no longer crash.
+
+### BUG-033 — Unified Platform Context Frontend Had Mixed Old/New Permission State [FIXED 2026-06-30]
+
+**File**: `frontend/src/context/platformContext.tsx`
+**Symptom**: Platform context still referenced stale split-query state (`permissionsQuery`) after the Unified Platform Context migration. It also had duplicate selected scope / permission-code declarations in the provider path.
+**Root cause**: Feature Flag Engine additions were layered onto the old context shape while the provider had already moved to `GET /context/platform`.
+**Fix**: Removed stale `permissionsQuery` references, used `contextQuery.data?.permissions`, `contextQuery.data?.feature_flags`, and `contextQuery.data?.enabled_modules` as the source of truth, and added safe defaults for module registry fields.
+
+### BUG-034 — Unified Platform Context Returned Empty Feature Flags [FIXED 2026-06-30]
+
+**File**: `services/core-service/app/api/v1/context.py`
+**Symptom**: `GET /context/platform` returned `feature_flags: {}` even though Feature Flag Engine v1 exposed effective flags through the permissions resolver.
+**Root cause**: The context endpoint had a hardcoded empty dict instead of forwarding the `feature_flags` / `enabled_modules` values returned by `AccessControlService.get_user_permissions()`.
+**Fix**: Context response now forwards effective `feature_flags` and `enabled_modules`, and includes resolved Module Registry modules.
+
+### BUG-035 — Recurring "Table Already Exists" Crash-Loop Pattern — Permanently Fixed [FIXED 2026-06-30]
+
+**Files**: `services/core-service/app/db/migration_utils.py` (new), all 9 migration files with `op.create_table` / `op.create_index`
+**Symptom**: Second occurrence of the crash-loop pattern — 0013 failed with "table role_assignments already exists", 0014 failed with "table feature_flags already exists". Every future migration creating a table or index was at risk.
+**Root cause pattern**: SQLite dev volumes can reach a state where `alembic_version` is behind the actual schema (partial runs, `create_all()`, container rebuild reusing named volumes). Alembic retries the failed migration on every startup → persistent crash loop.
+**Fix**: Created `app/db/migration_utils.py` with three shared helpers (`table_exists`, `index_exists`, `column_exists`). Retrofitted migrations 0001, 0005, 0006, 0008, 0010, 0011, 0013, 0014, 0015 — all `op.create_table` calls guarded with `if not table_exists(...)`, all `op.create_index` calls guarded with `if not index_exists(...)`.
+**Verification**: Double-upgrade test passed — first run applied 0014+0015 cleanly, second run was a silent no-op.
+**Standing rule**: All future migrations that create tables or indexes MUST use these guards. See `decisions.md`.

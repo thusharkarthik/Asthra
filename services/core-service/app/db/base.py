@@ -6,6 +6,7 @@ from app.models.api_key import APIKey  # noqa: E402,F401
 from app.models.dashboard_summary import ProjectSummary, WorkspaceSummary  # noqa: E402,F401
 from app.models.feature_flag import FeatureFlag, FeatureFlagOverride  # noqa: E402,F401
 from app.models.invitation import Invitation  # noqa: E402,F401
+from app.models.module_registry import ModuleRegistry  # noqa: E402,F401
 from app.models.notification import Notification  # noqa: E402,F401
 from app.models.organization import Organization, OrganizationMember  # noqa: E402,F401
 from app.models.permission import Permission  # noqa: E402,F401
