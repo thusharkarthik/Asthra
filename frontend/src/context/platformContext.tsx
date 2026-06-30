@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
+import type { AIContextMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -33,6 +33,7 @@ type PlatformContextValue = {
   featureFlags: Record<string, boolean>;
   enabledModules: string[];
   availableModules: ModuleRegistryItem[];
+  aiContext: AIContextMetadata;
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -113,6 +114,13 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const featureFlags: Record<string, boolean> = contextQuery.data?.feature_flags ?? {};
   const enabledModules: string[] = contextQuery.data?.enabled_modules ?? [];
   const availableModules: ModuleRegistryItem[] = contextQuery.data?.modules ?? [];
+  const aiContext: AIContextMetadata = contextQuery.data?.ai_context ?? {
+    available: false,
+    endpoint: "/api/v1/ai/context",
+    block_count: 0,
+    categories: [],
+    source_modules: [],
+  };
   const permissions: CurrentUserPermissions | null = contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
@@ -148,6 +156,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     featureFlags,
     enabledModules,
     availableModules,
+    aiContext,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -176,6 +185,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     }
   }), [
     availableModules,
+    aiContext,
     currentUser,
     contextVersionQuery.data,
     contextVersionQuery.snapshot,

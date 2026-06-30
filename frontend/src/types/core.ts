@@ -234,6 +234,14 @@ export type ModuleRegistryItem = {
   visible: boolean;
 };
 
+export type AIContextMetadata = {
+  available: boolean;
+  endpoint: string;
+  block_count: number;
+  categories: string[];
+  source_modules: string[];
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;

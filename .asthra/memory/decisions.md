@@ -288,3 +288,18 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Frontend strategy**: Frontend platform context exposes `availableModules` and `hasModule(moduleKey)` safely, but sidebar filtering remains deferred. This avoids accidentally hiding all navigation if a deployment has not yet migrated/seeded module registry data or if dynamic nav needs QA.
 
 **How to apply**: Add new modules to `services/core-service/app/services/module_registry.py` defaults and wire their feature flag and permission codes there. Do not duplicate module metadata in unrelated services. Dynamic sidebar filtering should be a separate, tested pass.
+
+## 2026-06-30 — AI Context Registry: Structured Context Only, No AI Execution
+
+**Decision**: AI Context Registry v1 is a Core-owned structured context assembly layer. It returns deterministic context blocks and lightweight platform-context metadata, but it does not call an LLM, create embeddings, build RAG, or introduce Assistant UI.
+
+**Why**: Asthra Assistant should eventually start with platform-aware context, but model execution and retrieval pipelines are separate concerns. Keeping v1 as structured context makes the data contract testable, permission-aware, and safe before any AI provider is introduced.
+
+**Context contract**:
+- Full context lives behind `GET /api/v1/ai/context`.
+- Registry metadata lives behind `GET /api/v1/ai/context/registry`.
+- Unified Platform Context includes only lightweight `ai_context` metadata: availability, endpoint, block count, categories, and source modules.
+
+**Access rule**: Context blocks must only include data the authenticated user can already access. V1 contributors are Core-owned and compact: identity, scope, access, feature flags, modules, notifications, recent activity, and onboarding.
+
+**How to apply**: Future module contributors should add compact context blocks through the registry contract instead of embedding large records or cross-service private data. Do not add external AI calls inside Core context resolution.
