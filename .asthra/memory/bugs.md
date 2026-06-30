@@ -231,6 +231,6 @@
 ### BUG-032 — Core Migration 0013 Failed When role_assignments Already Existed [FIXED 2026-06-30]
 
 **File**: `services/core-service/alembic/versions/0013_scoped_membership_foundation.py`
-**Symptom**: Core startup could fail during Alembic upgrade from `0012_access_control_foundation` to `0013_scoped_membership_foundation` with `sqlite3.OperationalError: table role_assignments already exists`, causing API Gateway login to return 502 because Core was unavailable.
+**Symptom**: Core startup failed during Alembic upgrade from `0012_access_control_foundation` to `0013_scoped_membership_foundation` with `sqlite3.OperationalError: table role_assignments already exists`. API Gateway login returned 502 because Core was unavailable.
 **Root cause**: Migration 0013 unconditionally created scoped membership tables/indexes and altered `team_members`. Local SQLite dev databases can already contain those objects from model metadata/bootstrap partial startup while the Alembic version is still before 0013.
-**Fix**: Added inspector-based existence guards for tables, indexes, and `team_members` columns/indexes in migration 0013. Fresh DB creation remains supported, and existing local dev DBs with pre-created scoped membership objects no longer crash before the Feature Flag Engine migration.
+**Fix**: Added inspector-based existence guards for tables, indexes, and `team_members` columns/indexes in migration 0013. Fresh DB creation remains supported, and existing local dev DBs with pre-created scoped membership objects no longer crash.
