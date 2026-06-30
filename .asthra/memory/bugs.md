@@ -140,6 +140,14 @@
 **Root cause**: `coreNotificationsQuery.data.map()` did not include `entity_id` in the output object.
 **Fix**: Added `entity_id: item.entity_id` to mapped object. Accessed via `"entity_id" in item` TS guard since store's `NotificationItem` type doesn't declare this field.
 
+### BUG-031 — Alembic Version Out of Sync: core-service Crash Loop on Startup [FIXED 2026-06-30]
+
+**File**: `services/core-service/alembic/versions/0013_scoped_membership_foundation.py`
+**Symptom**: `asthra-core-service` crash-looped on startup: `OperationalError: table role_assignments already exists`.
+**Root cause**: `alembic_version` table showed `0012_access_control_foundation` as the last applied migration. But the actual SQLite DB (in volume `asthra_core_service_data`) already had all tables from 0013 and later — `role_assignments`, `project_memberships`, etc., with live data. Alembic tried to run 0013 upgrade → `CREATE TABLE role_assignments` → crash. The schema was fully current but alembic didn't know it.
+**Fix**: `alembic stamp 0013_scoped_membership_foundation` — updates `alembic_version` to 0013 without executing any SQL. Since 0013 is the head, subsequent `alembic upgrade head` on startup is a no-op.
+**Data**: 5 rows in `role_assignments` preserved intact.
+
 ## Open
 
 ### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]

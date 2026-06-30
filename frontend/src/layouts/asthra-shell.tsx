@@ -45,6 +45,17 @@ function WorkspaceContextLoader() {
   return null;
 }
 
+function AppLoadingScreen({ label }: { label: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+        <AsthraLogo markClassName="h-12 w-12 rounded-2xl" />
+        <span>{label}</span>
+      </div>
+    </main>
+  );
+}
+
 function PermissionAwareSidebar({
   collapsed,
   skippedUser,
@@ -83,7 +94,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useAuthStore((state) => state.logout);
-  const { organizations, permissions, isLoading: contextLoading } = usePlatformContext();
+  const { organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const zustandUnread = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
@@ -202,14 +213,14 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   }
 
   if (!hasHydrated || !isAuthenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
-          <AsthraLogo markClassName="h-12 w-12 rounded-2xl" />
-          <span>Loading Asthra...</span>
-        </div>
-      </main>
-    );
+    return <AppLoadingScreen label="Loading Asthra..." />;
+  }
+
+  // Block the full shell from rendering until the first context fetch resolves.
+  // contextLoadedAt is set once on first success and never reset, so this gate
+  // only fires on initial load — not on background refetches or scope changes.
+  if (contextLoading && !contextLoadedAt) {
+    return <AppLoadingScreen label="Loading your workspace..." />;
   }
 
   if (needsOnboarding && !skippedOnboarding) {

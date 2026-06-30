@@ -1,19 +1,15 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { CoreUser, CurrentUserPermissions, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
-import {
-  useCurrentPermissions as useCurrentPermissionsQuery,
-  useCurrentUser,
-  useOrganizations,
-  useProjects,
-  useWorkspaces
-} from "@/hooks/use-platform-queries";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import type { ContextVersionSnapshot, CoreUser, CurrentUserPermissions, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSimulationStore } from "@/lib/permission-simulator";
-import type { ContextVersionSnapshot } from "@/types/core";
+import { useAuthStore } from "@/stores/auth-store";
+import { coreApi } from "@/services/api/core-api";
+import { queryKeys } from "@/lib/queryKeys";
 
 type CurrentScope = {
   organizationId: number | null;
@@ -52,6 +48,7 @@ const PlatformContext = createContext<PlatformContextValue | null>(null);
 
 export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const simulatedPermissions = useSimulationStore((state) => state.simulatedPermissions);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
@@ -60,57 +57,84 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const cachedOrganizations = useWorkspaceStore((state) => state.organizations);
   const cachedWorkspaces = useWorkspaceStore((state) => state.workspaces);
   const cachedProjects = useWorkspaceStore((state) => state.projects);
+  const setOrganizations = useWorkspaceStore((state) => state.setOrganizations);
+  const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
+  const setProjects = useWorkspaceStore((state) => state.setProjects);
   const setSelectedOrganization = useWorkspaceStore((state) => state.setSelectedOrganization);
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
 
-  const currentUserQuery = useCurrentUser();
-  const organizationsQuery = useOrganizations();
-  const workspacesQuery = useWorkspaces(selectedOrganizationId);
-  const projectsQuery = useProjects(selectedWorkspaceId);
-  const permissionsQuery = useCurrentPermissionsQuery({
-    orgId: selectedOrganizationId,
-    workspaceId: selectedWorkspaceId,
-    projectId: selectedProjectId
+  const contextQuery = useQuery({
+    queryKey: queryKeys.platformContext.detail(selectedOrganizationId, selectedWorkspaceId, selectedProjectId),
+    queryFn: () =>
+      coreApi.getPlatformContext(accessToken ?? "", {
+        org_id: selectedOrganizationId,
+        workspace_id: selectedWorkspaceId,
+        project_id: selectedProjectId,
+      }),
+    enabled: Boolean(accessToken),
+    staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   });
+
   const contextVersionQuery = useContextVersion({
     organizationId: selectedOrganizationId,
     workspaceId: selectedWorkspaceId,
     projectId: selectedProjectId
   });
 
-  const organizations = organizationsQuery.data ?? cachedOrganizations;
-  const workspaces = (workspacesQuery.data ?? cachedWorkspaces).filter((workspace) =>
-    selectedOrganizationId ? workspace.organization_id === selectedOrganizationId : true
-  );
-  const projects = (projectsQuery.data ?? cachedProjects).filter((project) =>
-    selectedWorkspaceId ? project.workspace_id === selectedWorkspaceId : true
-  );
-  const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
-  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const permissionCodes = permissionsQuery.data?.permission_codes ?? [];
+  // Sync unified context data into Zustand workspace store for downstream consumers
+  useEffect(() => {
+    if (!contextQuery.data) return;
+    const d = contextQuery.data;
+    if (d.organizations.length) setOrganizations(d.organizations as Organization[]);
+    if (d.workspaces.length) setWorkspaces(d.workspaces as WorkspaceRecord[]);
+    if (d.projects.length) setProjects(d.projects as ProjectRecord[]);
+  }, [contextQuery.data, setOrganizations, setWorkspaces, setProjects]);
 
-  const isLoading = currentUserQuery.isLoading || organizationsQuery.isLoading || workspacesQuery.isLoading || projectsQuery.isLoading || permissionsQuery.isLoading;
-  const isFetching = currentUserQuery.isFetching || organizationsQuery.isFetching || workspacesQuery.isFetching || projectsQuery.isFetching || permissionsQuery.isFetching;
-  const isError = currentUserQuery.isError || organizationsQuery.isError || workspacesQuery.isError || projectsQuery.isError || permissionsQuery.isError;
-  const error = currentUserQuery.error ?? organizationsQuery.error ?? workspacesQuery.error ?? projectsQuery.error ?? permissionsQuery.error;
+  const organizations: Organization[] = (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations;
+  const workspaces: WorkspaceRecord[] = ((contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces).filter(
+    (w) => (selectedOrganizationId ? w.organization_id === selectedOrganizationId : true)
+  );
+  const projects: ProjectRecord[] = ((contextQuery.data?.projects as ProjectRecord[] | undefined) ?? cachedProjects).filter(
+    (p) => (selectedWorkspaceId ? p.workspace_id === selectedWorkspaceId : true)
+  );
+
+  const selectedOrganization = organizations.find((o) => o.id === selectedOrganizationId) ?? null;
+  const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null;
+  const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null;
+
+  const currentUser: CoreUser | null = (contextQuery.data?.user as CoreUser | undefined) ?? null;
+  const permissionCodes: string[] = contextQuery.data?.permissions ?? [];
+  const permissions: CurrentUserPermissions | null = contextQuery.data
+    ? {
+        permission_codes: contextQuery.data.permissions,
+        roles: contextQuery.data.roles,
+        scope: {
+          scope_type: selectedWorkspaceId ? "workspace" : selectedOrganizationId ? "organization" : "platform",
+          scope_id: selectedWorkspaceId ?? selectedOrganizationId ?? null,
+        },
+      }
+    : null;
+
+  const isLoading = contextQuery.isLoading;
+  const isFetching = contextQuery.isFetching;
+  const isError = contextQuery.isError;
+  const error = contextQuery.error;
 
   useEffect(() => {
-    if (!loadedAt && (currentUserQuery.data || organizationsQuery.data || workspacesQuery.data || projectsQuery.data || permissionsQuery.data)) {
-      setLoadedAt(Date.now());
-    }
-  }, [currentUserQuery.data, loadedAt, organizationsQuery.data, permissionsQuery.data, projectsQuery.data, workspacesQuery.data]);
+    if (!loadedAt && contextQuery.data) setLoadedAt(Date.now());
+  }, [contextQuery.data, loadedAt]);
 
   const value = useMemo<PlatformContextValue>(() => ({
-    currentUser: currentUserQuery.data ?? null,
+    currentUser,
     organizations,
     selectedOrganization,
     workspaces,
     selectedWorkspace,
     projects,
     selectedProject,
-    permissions: permissionsQuery.data ?? null,
+    permissions,
     permissionCodes,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
@@ -134,10 +158,10 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       return hasPermission(permissionCodes, permissionCode);
     },
     refetchPermissions: () => {
-      void permissionsQuery.refetch();
+      void contextQuery.refetch();
     }
   }), [
-    currentUserQuery.data,
+    currentUser,
     contextVersionQuery.data,
     contextVersionQuery.snapshot,
     error,
@@ -148,7 +172,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     loadedAt,
     organizations,
     permissionCodes,
-    permissionsQuery,
+    permissions,
     projects,
     selectedOrganization,
     selectedOrganizationId,
@@ -160,7 +184,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     setSelectedProject,
     setSelectedWorkspace,
     simulatedPermissions,
-    workspaces
+    workspaces,
+    contextQuery,
   ]);
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;

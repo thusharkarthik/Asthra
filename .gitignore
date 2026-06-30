@@ -34,6 +34,7 @@ build/
 # Node and frontend tooling
 node_modules/
 .next/
+.next-*/
 out/
 coverage/
 
