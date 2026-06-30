@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-29 (Phase B start — Unified Platform Context API)
+Last updated: 2026-06-30 (Unified Platform Context API complete, Alembic crash loop fixed)
 
 ## Phase
 
@@ -8,7 +8,11 @@ Last updated: 2026-06-29 (Phase B start — Unified Platform Context API)
 
 ## Branch
 
-Current branch: `feature/org-health-score`. Clean build (137 static pages, 0 TypeScript errors).
+Current branch: `feature/platform-context-api`. All 18 containers Up. core-service Alembic at head (0013). Clean build.
+
+## Docker Access Note (WSL2)
+
+`docker` is not on PATH in this WSL2 distro. Use: `DOCKER_HOST=unix:///var/run/docker.sock docker ...` — the socket exists at `/var/run/docker.sock`.
 
 ## Permission Simulator (added 2026-06-29)
 
