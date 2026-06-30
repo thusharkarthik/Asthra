@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-30 (Phase B Core — Feature Flag Engine v1)
+Last updated: 2026-06-30 (Phase B Core — Module Registry v1)
 
 ## Phase
 
@@ -8,7 +8,26 @@ Last updated: 2026-06-30 (Phase B Core — Feature Flag Engine v1)
 
 ## Branch
 
-Current branch: active Core Phase B branch. Frontend build passes after Feature Flag Engine v1 context additions.
+Current branch: active Core Phase B branch. Frontend build passes after Module Registry v1 context additions.
+
+## Phase B Core Module Registry v1 (added 2026-06-30)
+
+**Purpose**: Core now owns central module/navigation metadata. Feature flags decide module availability, RBAC permissions decide user access, and the Module Registry describes how modules appear.
+
+**Backend (`services/core-service/`)**:
+- `models/module_registry.py`: Added `ModuleRegistry` with module key, label, route, icon, navigation mode, required feature flag, required permissions, sort order, and active/system flags.
+- `alembic/versions/0015_module_registry.py`: Adds `module_registry`.
+- `services/module_registry.py`: Default Asthra module catalog, idempotent seeding, module resolver, navigation-mode filtering, feature flag checks, permission checks, and superuser permission bypass.
+- `api/v1/modules.py`: Added `GET /modules` for catalog and `GET /modules/available` for user/context-visible modules.
+- `api/v1/context.py`: Unified Platform Context now includes effective `modules` alongside `feature_flags` and `enabled_modules`.
+- `services/access_control_bootstrap.py`: Seeds default module definitions on startup.
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept `modules` / `availableModules`.
+- `usePlatformContext()` exposes `availableModules` and `hasModule(moduleKey)` with safe defaults.
+- Sidebar filtering was intentionally not changed in this pass to avoid blank navigation until dynamic navigation is QA-verified.
+
+**Next Phase B item**: AI Context Registry.
 
 ## Phase B Core Feature Flag Engine v1 (added 2026-06-30)
 
@@ -39,7 +58,7 @@ Current branch: active Core Phase B branch. Frontend build passes after Feature 
 - `types/core.ts`: `CurrentUserPermissions` accepts optional `feature_flags` and `enabled_modules`.
 - `context/platformContext.tsx`: Exposes `featureFlags`, `enabledModules`, and `isFeatureEnabled(flagKey)` with safe defaults. Sidebar/module navigation behavior was not changed in this pass.
 
-**Next Phase B item**: Module Registry.
+**Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
 
 ## Permission Simulator (added 2026-06-29)
 

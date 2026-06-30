@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from alembic import op
 import sqlalchemy as sa
 
+from app.db.migration_utils import table_exists, index_exists
+
 
 revision: str = "0006_role_permission_management"
 down_revision: str | None = "0005_project_management_fields"
@@ -35,33 +37,37 @@ def upgrade() -> None:
         batch_op.alter_column("description", existing_type=sa.String(length=500), type_=sa.Text())
         batch_op.create_unique_constraint("uq_permissions_code", ["code"])
 
-    op.create_table(
-        "role_permissions",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("role_id", sa.Integer(), nullable=False),
-        sa.Column("permission_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["permission_id"], ["permissions.id"]),
-        sa.ForeignKeyConstraint(["role_id"], ["roles.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("role_id", "permission_id"),
-    )
-    op.create_index(op.f("ix_role_permissions_id"), "role_permissions", ["id"], unique=False)
+    if not table_exists("role_permissions"):
+        op.create_table(
+            "role_permissions",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("role_id", sa.Integer(), nullable=False),
+            sa.Column("permission_id", sa.Integer(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.ForeignKeyConstraint(["permission_id"], ["permissions.id"]),
+            sa.ForeignKeyConstraint(["role_id"], ["roles.id"]),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("role_id", "permission_id"),
+        )
+    if not index_exists("role_permissions", op.f("ix_role_permissions_id")):
+        op.create_index(op.f("ix_role_permissions_id"), "role_permissions", ["id"], unique=False)
 
-    op.create_table(
-        "user_roles",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("role_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["role_id"], ["roles.id"]),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", "role_id"),
-    )
-    op.create_index(op.f("ix_user_roles_id"), "user_roles", ["id"], unique=False)
+    if not table_exists("user_roles"):
+        op.create_table(
+            "user_roles",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("user_id", sa.Integer(), nullable=False),
+            sa.Column("role_id", sa.Integer(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.ForeignKeyConstraint(["role_id"], ["roles.id"]),
+            sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("user_id", "role_id"),
+        )
+    if not index_exists("user_roles", op.f("ix_user_roles_id")):
+        op.create_index(op.f("ix_user_roles_id"), "user_roles", ["id"], unique=False)
 
 
 def downgrade() -> None:

@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from alembic import op
 import sqlalchemy as sa
 
+from app.db.migration_utils import table_exists, index_exists
+
 
 revision: str = "0005_project_management_fields"
 down_revision: str | None = "0004_team_management_fields"
@@ -26,19 +28,21 @@ def upgrade() -> None:
         batch_op.create_foreign_key("fk_projects_owner_id_users", "users", ["owner_id"], ["id"])
         batch_op.create_foreign_key("fk_projects_created_by_id_users", "users", ["created_by_id"], ["id"])
 
-    op.create_table(
-        "project_teams",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("project_id", sa.Integer(), nullable=False),
-        sa.Column("team_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["project_id"], ["projects.id"]),
-        sa.ForeignKeyConstraint(["team_id"], ["teams.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("project_id", "team_id"),
-    )
-    op.create_index(op.f("ix_project_teams_id"), "project_teams", ["id"], unique=False)
+    if not table_exists("project_teams"):
+        op.create_table(
+            "project_teams",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("project_id", sa.Integer(), nullable=False),
+            sa.Column("team_id", sa.Integer(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.ForeignKeyConstraint(["project_id"], ["projects.id"]),
+            sa.ForeignKeyConstraint(["team_id"], ["teams.id"]),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("project_id", "team_id"),
+        )
+    if not index_exists("project_teams", op.f("ix_project_teams_id")):
+        op.create_index(op.f("ix_project_teams_id"), "project_teams", ["id"], unique=False)
 
 
 def downgrade() -> None:

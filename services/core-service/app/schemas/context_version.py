@@ -63,6 +63,21 @@ class ProjectContextRead(BaseModel):
     description: str | None = None
 
 
+class ModuleContextRead(BaseModel):
+    module_key: str
+    name: str
+    description: str | None = None
+    category: str
+    route: str
+    icon: str
+    navigation_mode: str
+    required_feature_flag: str | None = None
+    required_permissions: list[str]
+    sort_order: int
+    enabled: bool
+    visible: bool
+
+
 class PlatformContextResponse(BaseModel):
     user: UserContextRead
     permissions: list[str]
@@ -76,4 +91,6 @@ class PlatformContextResponse(BaseModel):
     context_version: int
     generated_at: datetime
     feature_flags: dict[str, bool]
+    enabled_modules: list[str]
+    modules: list[ModuleContextRead]
     preferences: dict[str, Any]

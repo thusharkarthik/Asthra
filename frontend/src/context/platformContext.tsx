@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { ContextVersionSnapshot, CoreUser, CurrentUserPermissions, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
+import type { ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -32,6 +32,7 @@ type PlatformContextValue = {
   permissionCodes: string[];
   featureFlags: Record<string, boolean>;
   enabledModules: string[];
+  availableModules: ModuleRegistryItem[];
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -44,6 +45,7 @@ type PlatformContextValue = {
   setSelectedProject: (projectId: number | null) => void;
   can: (permissionCode: string) => boolean;
   isFeatureEnabled: (flagKey: string) => boolean;
+  hasModule: (moduleKey: string) => boolean;
   refetchPermissions: () => void;
 };
 
@@ -105,16 +107,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const permissionCodes = permissionsQuery.data?.permission_codes ?? [];
-  const featureFlags = permissionsQuery.data?.feature_flags ?? {};
-  const enabledModules = permissionsQuery.data?.enabled_modules ?? [];
-
-  const selectedOrganization = organizations.find((o) => o.id === selectedOrganizationId) ?? null;
-  const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null;
-  const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null;
 
   const currentUser: CoreUser | null = (contextQuery.data?.user as CoreUser | undefined) ?? null;
   const permissionCodes: string[] = contextQuery.data?.permissions ?? [];
+  const featureFlags: Record<string, boolean> = contextQuery.data?.feature_flags ?? {};
+  const enabledModules: string[] = contextQuery.data?.enabled_modules ?? [];
+  const availableModules: ModuleRegistryItem[] = contextQuery.data?.modules ?? [];
   const permissions: CurrentUserPermissions | null = contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
@@ -123,6 +121,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
           scope_type: selectedWorkspaceId ? "workspace" : selectedOrganizationId ? "organization" : "platform",
           scope_id: selectedWorkspaceId ?? selectedOrganizationId ?? null,
         },
+        feature_flags: featureFlags,
+        enabled_modules: enabledModules,
       }
     : null;
 
@@ -147,6 +147,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     permissionCodes,
     featureFlags,
     enabledModules,
+    availableModules,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -169,10 +170,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       return hasPermission(permissionCodes, permissionCode);
     },
     isFeatureEnabled: (flagKey: string) => Boolean(featureFlags[flagKey]),
+    hasModule: (moduleKey: string) => availableModules.some((module) => module.module_key === moduleKey && module.visible),
     refetchPermissions: () => {
       void contextQuery.refetch();
     }
   }), [
+    availableModules,
     currentUser,
     contextVersionQuery.data,
     contextVersionQuery.snapshot,

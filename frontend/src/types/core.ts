@@ -219,6 +219,21 @@ export type CurrentUserPermissions = {
   enabled_modules?: string[];
 };
 
+export type ModuleRegistryItem = {
+  module_key: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  route: string;
+  icon: string;
+  navigation_mode: string;
+  required_feature_flag?: string | null;
+  required_permissions: string[];
+  sort_order: number;
+  enabled: boolean;
+  visible: boolean;
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;
