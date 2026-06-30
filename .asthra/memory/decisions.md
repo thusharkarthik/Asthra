@@ -1,5 +1,29 @@
 # Architectural Decisions
 
+## 2026-06-30 — Feature Flags Are Availability Gates, RBAC Remains Usage Authority
+
+**Decision**: Feature flags decide whether a module/capability is available for a platform or organization scope. RBAC permissions continue to decide whether a specific user can use that available capability.
+
+**Why**: Availability and authorization are different concerns. Example: `module.discover.enabled=false` for an organization means nobody should see or use Discover there. If it is enabled, users still need Discover permissions from scoped roles before they can act. Keeping these layers separate avoids encoding product rollout state into roles.
+
+**How to apply**: Use `FeatureFlagService.is_feature_enabled(...)` or effective flags for availability. Use `AccessControlService.require(...)` / frontend `can("permission.code")` for user action access. Do not replace permission checks with feature flags.
+
+## 2026-06-30 — Feature Flag v1 Scope Precedence
+
+**Decision**: Effective feature flags resolve in this order: default catalog value, platform override, organization override. Workspace and project scope fields are modeled now but are not required for v1 workflows.
+
+**Why**: Platform defaults give predictable behavior. Platform overrides allow local/global rollout control. Organization overrides support customer/org-specific rollout without introducing Module Registry or billing logic yet. Workspace/project support is represented in the data model so the resolver can grow without a schema redesign.
+
+**How to apply**: Inactive flags always resolve `false`. Unknown/missing flags should be treated as disabled by consumers. Do not add rollout percentages or billing plan checks until a later phase explicitly introduces them.
+
+## 2026-06-30 — Initial Feature Flag Defaults Preserve Current Core Product Expectations
+
+**Decision**: Flow, Docs, Discover, Memory, and Assistant module flags default enabled. Desk, Pulse, Collab, Automation, Connect, Insights, and Phase B beta flags default disabled.
+
+**Why**: Flow/Docs/Discover are already active product workflows and should not disappear after adding flags. Memory and Assistant already have navigation/shell affordances. Other modules are less central to the current QA path and can be enabled deliberately by override later. Beta Phase B features should stay hidden until each foundation is implemented.
+
+**How to apply**: Do not change sidebar/module visibility in this pass. Future Module Registry work should combine `feature_flags` availability with `can("module.resource.view")` permission checks.
+
 ## 2026-06-29 — Profile/Account Pages Implemented Directly in Page Files, Not in settings-admin-views.tsx
 
 **Decision**: Profile, Account, and Preferences pages are self-contained in their respective `page.tsx` files rather than as exported components in `settings-admin-views.tsx`.

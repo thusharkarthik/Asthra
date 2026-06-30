@@ -1,14 +1,45 @@
 # Platform State
 
-Last updated: 2026-06-29 (Phase A core bug bundle — Memory nav, notification badge, checklist checks, workspace invite membership)
+Last updated: 2026-06-30 (Phase B Core — Feature Flag Engine v1)
 
 ## Phase
 
-**Core Stabilization** — RBAC hardening, Settings access control, Settings UX polish, notification improvements.
+**Phase B Core Foundations** — Unified Platform Context API, Feature Flag Engine, Module Registry, AI Context Registry, Configuration Registry, Global Search Registry, and Organization Templates.
 
 ## Branch
 
-Current branch: `fix/core-bug-bundle-1`. Clean build, no TypeScript errors.
+Current branch: active Core Phase B branch. Frontend build passes after Feature Flag Engine v1 context additions.
+
+## Phase B Core Feature Flag Engine v1 (added 2026-06-30)
+
+**Purpose**: Feature flags decide whether modules/capabilities are available for a scope. RBAC permissions still decide whether a user may use an available feature.
+
+**Backend (`services/core-service/`)**:
+- `models/feature_flag.py`: Added `FeatureFlag` and `FeatureFlagOverride`.
+- `alembic/versions/0014_feature_flag_engine.py`: Adds `feature_flags` and `feature_flag_overrides`.
+- `services/feature_flags.py`: Default catalog seed, effective flag resolver, `is_feature_enabled`, and override upsert.
+- `api/v1/feature_flags.py`: Added `GET /feature-flags`, `GET /feature-flags/effective`, `PUT /feature-flags/overrides`.
+- `api/v1/me.py` / `AccessControlService.get_user_permissions()`: Current permissions response now includes `feature_flags` and `enabled_modules`, so existing platform context consumers get feature availability without a separate request.
+- `services/access_control_bootstrap.py`: Seeds default flags idempotently on startup.
+- `services/permission_registry.py`: Added `settings.feature_flags.view` and `settings.feature_flags.manage` via the `settings.feature_flags` registry resource.
+
+**Default flags**:
+- Enabled: `module.flow.enabled`, `module.docs.enabled`, `module.discover.enabled`, `module.memory.enabled`, `module.assistant.enabled`
+- Disabled: `module.desk.enabled`, `module.pulse.enabled`, `module.collab.enabled`, `module.automation.enabled`, `module.connect.enabled`, `module.insights.enabled`
+- Disabled beta flags: `beta.module_registry.enabled`, `beta.ai_context_registry.enabled`, `beta.global_search.enabled`, `beta.organization_templates.enabled`
+
+**Resolution order**:
+1. `FeatureFlag.default_enabled`
+2. Platform override
+3. Organization override
+4. Workspace/project override fields are supported for future use
+5. Inactive flag always resolves `false`
+
+**Frontend (`frontend/src/`)**:
+- `types/core.ts`: `CurrentUserPermissions` accepts optional `feature_flags` and `enabled_modules`.
+- `context/platformContext.tsx`: Exposes `featureFlags`, `enabledModules`, and `isFeatureEnabled(flagKey)` with safe defaults. Sidebar/module navigation behavior was not changed in this pass.
+
+**Next Phase B item**: Module Registry.
 
 ## Permission Simulator (added 2026-06-29)
 

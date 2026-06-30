@@ -3,6 +3,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
+from app.services.feature_flags import FeatureFlagService
 from app.services.permission_service import PermissionService
 from app.services.role_service import RoleService
 
@@ -11,9 +12,12 @@ def initialize_access_control(engine: Engine, db: Session) -> None:
     existing_tables = set(inspect(engine).get_table_names())
     if not {"users", "roles", "permissions"}.issubset(existing_tables):
         Base.metadata.create_all(bind=engine, checkfirst=bool(existing_tables))
+    if not {"feature_flags", "feature_flag_overrides"}.issubset(existing_tables):
+        Base.metadata.create_all(bind=engine, checkfirst=True)
     _ensure_rbac_columns(engine)
     PermissionService(db).ensure_permission_catalog()
     RoleService(db).ensure_role_catalog(sync_permissions=False)
+    FeatureFlagService(db).ensure_default_flags()
 
 
 def _ensure_rbac_columns(engine: Engine) -> None:

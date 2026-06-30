@@ -94,6 +94,7 @@ class AccessControlService:
                 "permission_codes": permissions,
                 "roles": role_payload,
                 "scope": {"scope_type": scope_type, "scope_id": scope_id},
+                **self._feature_flag_context(scope_type, scope_id),
             }
 
         roles = self._resolve_roles(user_id, scope_type, scope_id)
@@ -112,6 +113,7 @@ class AccessControlService:
                 for role in roles
             ],
             "scope": {"scope_type": scope_type, "scope_id": scope_id},
+            **self._feature_flag_context(scope_type, scope_id),
         }
 
     def can(
@@ -457,6 +459,15 @@ class AccessControlService:
             .all()
         )
         return [row[0] for row in rows]
+
+    def _feature_flag_context(self, scope_type: str, scope_id: int | None) -> dict:
+        from app.services.feature_flags import FeatureFlagService
+
+        effective = FeatureFlagService(self.db).get_effective_feature_flags(scope_type, scope_id)
+        return {
+            "feature_flags": effective["feature_flags"],
+            "enabled_modules": effective["enabled_modules"],
+        }
 
     def _scope_label(self, scope_type: str, scope_id: int | None) -> str:
         if scope_type == "platform" or scope_id is None:

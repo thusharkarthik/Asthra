@@ -100,6 +100,7 @@ REGISTRY_DEFINITIONS: dict[str, dict[str, tuple[str, list[str]]]] = {
         "access_control": ("organization", ["view", "manage"]),
         "notification": ("workspace", ["view", "delete", "manage"]),
         "audit": ("organization", ["view", "export"]),
+        "feature_flags": ("organization", ["view", "manage"]),
     },
     "flow": {
         "work_item": ("project", ["crud", "lifecycle", "assign", "transition", "comment", "linking", "manage"]),
