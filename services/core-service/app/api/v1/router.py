@@ -7,6 +7,7 @@ from app.api.v1 import (
     auth,
     context,
     dashboard,
+    feature_flags,
     invitations,
     me,
     notifications,
@@ -46,5 +47,6 @@ api_router.include_router(permissions.router, prefix="/permissions", tags=["perm
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
 api_router.include_router(context.router, prefix="/context", tags=["context"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(feature_flags.router, prefix="/feature-flags", tags=["feature-flags"])
 api_router.include_router(activity.router, prefix="/activity", tags=["activity"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])

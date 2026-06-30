@@ -30,6 +30,8 @@ type PlatformContextValue = {
   selectedProject: ProjectRecord | null;
   permissions: CurrentUserPermissions | null;
   permissionCodes: string[];
+  featureFlags: Record<string, boolean>;
+  enabledModules: string[];
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -41,6 +43,7 @@ type PlatformContextValue = {
   setSelectedWorkspace: (workspaceId: number | null) => void;
   setSelectedProject: (projectId: number | null) => void;
   can: (permissionCode: string) => boolean;
+  isFeatureEnabled: (flagKey: string) => boolean;
   refetchPermissions: () => void;
 };
 
@@ -99,6 +102,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const projects: ProjectRecord[] = ((contextQuery.data?.projects as ProjectRecord[] | undefined) ?? cachedProjects).filter(
     (p) => (selectedWorkspaceId ? p.workspace_id === selectedWorkspaceId : true)
   );
+  const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
+  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const permissionCodes = permissionsQuery.data?.permission_codes ?? [];
+  const featureFlags = permissionsQuery.data?.feature_flags ?? {};
+  const enabledModules = permissionsQuery.data?.enabled_modules ?? [];
 
   const selectedOrganization = organizations.find((o) => o.id === selectedOrganizationId) ?? null;
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId) ?? null;
@@ -136,6 +145,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     selectedProject,
     permissions,
     permissionCodes,
+    featureFlags,
+    enabledModules,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -157,6 +168,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       if (isSimulating) return simulatedPermissions.includes(permissionCode);
       return hasPermission(permissionCodes, permissionCode);
     },
+    isFeatureEnabled: (flagKey: string) => Boolean(featureFlags[flagKey]),
     refetchPermissions: () => {
       void contextQuery.refetch();
     }
@@ -169,6 +181,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isFetching,
     isLoading,
     isSimulating,
+    enabledModules,
+    featureFlags,
     loadedAt,
     organizations,
     permissionCodes,
