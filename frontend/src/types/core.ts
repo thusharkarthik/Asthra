@@ -215,6 +215,8 @@ export type CurrentUserPermissions = {
   permission_codes: string[];
   roles: CurrentUserResolvedRole[];
   scope: CurrentUserPermissionScope;
+  feature_flags?: Record<string, boolean>;
+  enabled_modules?: string[];
 };
 
 export type ContextVersionSnapshot = {
