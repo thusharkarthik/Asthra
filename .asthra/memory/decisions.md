@@ -303,3 +303,15 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Access rule**: Context blocks must only include data the authenticated user can already access. V1 contributors are Core-owned and compact: identity, scope, access, feature flags, modules, notifications, recent activity, and onboarding.
 
 **How to apply**: Future module contributors should add compact context blocks through the registry contract instead of embedding large records or cross-service private data. Do not add external AI calls inside Core context resolution.
+
+## 2026-06-30 — Configuration Registry: Behavior Settings, Not Availability or Authorization
+
+**Decision**: Configuration Registry owns behavior settings for enabled features/modules. Feature Flags remain the availability layer, and RBAC permissions remain the user authority layer.
+
+**Why**: These are separate questions. A module can be available for an organization, a user can be authorized to use it, and the module can still need scoped behavior settings such as default sprint length, Docs space visibility, or Assistant context limits. Keeping configuration separate prevents roles and feature flags from becoming overloaded with product behavior.
+
+**Inheritance rule**: Effective configuration resolves from definition default, then platform value, organization value, workspace value, and project value. The most specific scoped value wins. Inactive definitions are omitted from effective responses, and secret values are redacted unless an internal caller explicitly requests secrets.
+
+**Platform context contract**: Unified Platform Context includes only lightweight configuration metadata: availability, endpoint, definition count, categories, source modules, and supported inheritance order. Full effective configuration is fetched separately through `/api/v1/configuration/effective`.
+
+**How to apply**: Add future module settings as definitions in the Core Configuration Registry or through a future module contribution contract. Do not create per-module ad hoc settings tables unless the setting is operational domain data rather than configuration.

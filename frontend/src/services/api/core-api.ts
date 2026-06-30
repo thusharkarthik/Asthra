@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { AIContextMetadata, ContextVersionSnapshot, CoreUser, CurrentUserResolvedRole, ModuleRegistryItem, Organization } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserResolvedRole, ModuleRegistryItem, Organization } from "@/types/core";
 
 const CORE_PREFIX = "/api/core/api/v1";
 
@@ -57,6 +57,7 @@ export type PlatformContextData = {
   enabled_modules: string[];
   modules: ModuleRegistryItem[];
   ai_context?: AIContextMetadata;
+  configuration?: ConfigurationMetadata;
   preferences: Record<string, unknown>;
 };
 

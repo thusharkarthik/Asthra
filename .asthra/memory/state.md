@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-30 (Phase B Core — AI Context Registry v1)
+Last updated: 2026-06-30 (Phase B Core — Configuration Registry v1)
 
 ## Phase
 
@@ -8,7 +8,27 @@ Last updated: 2026-06-30 (Phase B Core — AI Context Registry v1)
 
 ## Branch
 
-Current branch: active Core Phase B branch. Frontend build passes after AI Context Registry v1 metadata additions.
+Current branch: active Core Phase B branch. Configuration Registry v1 is implemented; backend targeted tests pass and frontend build passes.
+
+## Phase B Core Configuration Registry v1 (added 2026-06-30)
+
+**Purpose**: Core now owns a unified settings registry for platform/module behavior configuration. Feature flags determine availability, RBAC determines authority, and configuration determines behavior for enabled features/modules.
+
+**Backend (`services/core-service/`)**:
+- `models/configuration.py`: Added `ConfigurationDefinition` and `ConfigurationValue` for typed setting definitions and scoped overrides.
+- `alembic/versions/0016_configuration_registry.py`: Adds `configuration_definitions` and `configuration_values` with idempotent table/index guards.
+- `services/configuration_registry.py`: Seeds default configuration definitions, validates values, resolves effective configuration, and applies platform -> organization -> workspace -> project inheritance.
+- `api/v1/configuration.py`: Added `GET /configuration/definitions`, `GET /configuration/effective`, `GET /configuration/effective/{config_key}`, and `PUT /configuration/values`.
+- `services/access_control_bootstrap.py`: Seeds default configuration definitions at startup.
+- `services/permission_registry.py`: Added `settings.configuration.view` and `settings.configuration.manage`.
+- `api/v1/context.py`: Unified Platform Context now includes lightweight `configuration` metadata with endpoint, definition count, categories, source modules, and inheritance order.
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept optional `configuration` metadata.
+- `usePlatformContext()` exposes `configuration` with safe defaults.
+- No UI, sidebar, navigation, Settings page, Assistant, or module behavior changed.
+
+**Next Phase B item**: Global Search Registry.
 
 ## Phase B Core AI Context Registry v1 (added 2026-06-30)
 

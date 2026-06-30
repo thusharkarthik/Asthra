@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { AIContextMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -34,6 +34,7 @@ type PlatformContextValue = {
   enabledModules: string[];
   availableModules: ModuleRegistryItem[];
   aiContext: AIContextMetadata;
+  configuration: ConfigurationMetadata;
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -121,6 +122,14 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     categories: [],
     source_modules: [],
   };
+  const configuration: ConfigurationMetadata = contextQuery.data?.configuration ?? {
+    available: false,
+    endpoint: "/api/v1/configuration/effective",
+    definition_count: 0,
+    categories: [],
+    source_modules: [],
+    scope_inheritance: [],
+  };
   const permissions: CurrentUserPermissions | null = contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
@@ -157,6 +166,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     enabledModules,
     availableModules,
     aiContext,
+    configuration,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -186,6 +196,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   }), [
     availableModules,
     aiContext,
+    configuration,
     currentUser,
     contextVersionQuery.data,
     contextVersionQuery.snapshot,

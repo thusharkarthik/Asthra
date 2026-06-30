@@ -242,6 +242,15 @@ export type AIContextMetadata = {
   source_modules: string[];
 };
 
+export type ConfigurationMetadata = {
+  available: boolean;
+  endpoint: string;
+  definition_count: number;
+  categories: string[];
+  source_modules: string[];
+  scope_inheritance: string[];
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;

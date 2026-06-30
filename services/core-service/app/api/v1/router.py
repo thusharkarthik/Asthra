@@ -6,6 +6,7 @@ from app.api.v1 import (
     ai,
     api_keys,
     auth,
+    configuration,
     context,
     dashboard,
     feature_flags,
@@ -32,6 +33,7 @@ api_router.include_router(access_control.router, prefix="/access-control", tags=
 api_router.include_router(ai.router, prefix="/ai", tags=["ai-context"])
 api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(configuration.router, prefix="/configuration", tags=["configuration"])
 api_router.include_router(invitations.router, prefix="/invitations", tags=["invitations"])
 api_router.include_router(me.router, prefix="/me", tags=["me"])
 api_router.include_router(modules.router, prefix="/modules", tags=["modules"])
