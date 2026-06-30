@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.context_version import ContextVersionRead, PlatformContextResponse
 from app.services.access_control_service import AccessControlService
+from app.services.ai_context_registry import AIContextRegistryService
 from app.services.context_version_service import ContextVersionService
 from app.services.module_registry import ModuleRegistryService
 from app.services.organization_service import OrganizationService
@@ -66,6 +67,12 @@ def get_platform_context(
         scope_type=scope_type,
         scope_id=scope_id,
         navigation_mode=navigation_mode,
+    )
+    ai_context = AIContextRegistryService(db).get_ai_context_metadata(
+        current_user,
+        organization_id=org_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
     )
 
     # Organizations (scoped to user access — superusers get all, others get their orgs)
@@ -144,5 +151,6 @@ def get_platform_context(
         "feature_flags": perms.get("feature_flags", {}),
         "enabled_modules": perms.get("enabled_modules", []),
         "modules": modules,
+        "ai_context": ai_context,
         "preferences": {},
     }

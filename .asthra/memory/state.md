@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-06-30 (Phase B Core — Module Registry v1)
+Last updated: 2026-06-30 (Phase B Core — AI Context Registry v1)
 
 ## Phase
 
@@ -8,7 +8,24 @@ Last updated: 2026-06-30 (Phase B Core — Module Registry v1)
 
 ## Branch
 
-Current branch: active Core Phase B branch. Frontend build passes after Module Registry v1 context additions.
+Current branch: active Core Phase B branch. Frontend build passes after AI Context Registry v1 metadata additions.
+
+## Phase B Core AI Context Registry v1 (added 2026-06-30)
+
+**Purpose**: Core now exposes structured, compact context blocks for future Assistant/AI use. This is context assembly only — no LLM provider, chat UI, RAG, embeddings, or external AI calls.
+
+**Backend (`services/core-service/`)**:
+- `schemas/ai_context.py`: Added context block, registry, response, scope, summary, and platform metadata schemas.
+- `services/ai_context_registry.py`: Code-defined context registry and resolver. Core contributors cover user, scope, access, feature flags, modules, notifications, recent activity, and onboarding.
+- `api/v1/ai.py`: Added `GET /ai/context` and `GET /ai/context/registry`.
+- `api/v1/context.py`: Unified Platform Context now includes lightweight `ai_context` metadata with endpoint, block count, categories, and source modules.
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept optional `ai_context` metadata.
+- `usePlatformContext()` exposes `aiContext` with safe defaults.
+- No UI, sidebar, Assistant, or navigation behavior changed.
+
+**Next Phase B item**: Configuration Registry.
 
 ## Phase B Core Module Registry v1 (added 2026-06-30)
 

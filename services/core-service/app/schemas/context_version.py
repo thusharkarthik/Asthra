@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.schemas.ai_context import AIContextMetadataRead
+
 
 class ContextVersionRead(BaseModel):
     user_id: int
@@ -93,4 +95,5 @@ class PlatformContextResponse(BaseModel):
     feature_flags: dict[str, bool]
     enabled_modules: list[str]
     modules: list[ModuleContextRead]
+    ai_context: AIContextMetadataRead
     preferences: dict[str, Any]

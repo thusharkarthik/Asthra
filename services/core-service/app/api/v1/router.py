@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     activity,
     access_control,
+    ai,
     api_keys,
     auth,
     context,
@@ -28,6 +29,7 @@ from app.api.v1 import (
 api_router = APIRouter()
 
 api_router.include_router(access_control.router, prefix="/access-control", tags=["access-control"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai-context"])
 api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(invitations.router, prefix="/invitations", tags=["invitations"])
