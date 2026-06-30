@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ContextVersionSnapshot, CoreUser, CurrentUserPermissions, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
@@ -74,6 +74,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       }),
     enabled: Boolean(accessToken),
     staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   });
 
   const contextVersionQuery = useContextVersion({
