@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.context_version import ContextVersionRead, PlatformContextResponse
 from app.services.access_control_service import AccessControlService
 from app.services.ai_context_registry import AIContextRegistryService
+from app.services.configuration_registry import ConfigurationRegistryService
 from app.services.context_version_service import ContextVersionService
 from app.services.module_registry import ModuleRegistryService
 from app.services.organization_service import OrganizationService
@@ -74,6 +75,7 @@ def get_platform_context(
         workspace_id=workspace_id,
         project_id=project_id,
     )
+    configuration = ConfigurationRegistryService(db).get_configuration_metadata()
 
     # Organizations (scoped to user access — superusers get all, others get their orgs)
     organizations = OrganizationService(db).list(current_user)
@@ -152,5 +154,6 @@ def get_platform_context(
         "enabled_modules": perms.get("enabled_modules", []),
         "modules": modules,
         "ai_context": ai_context,
+        "configuration": configuration,
         "preferences": {},
     }

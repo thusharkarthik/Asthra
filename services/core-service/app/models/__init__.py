@@ -1,5 +1,6 @@
 from app.models.activity_log import ActivityLog
 from app.models.api_key import APIKey
+from app.models.configuration import ConfigurationDefinition, ConfigurationValue
 from app.models.feature_flag import FeatureFlag, FeatureFlagOverride
 from app.models.invitation import Invitation
 from app.models.module_registry import ModuleRegistry
@@ -15,6 +16,8 @@ from app.models.workspace import Workspace, WorkspaceMember
 __all__ = [
     "ActivityLog",
     "APIKey",
+    "ConfigurationDefinition",
+    "ConfigurationValue",
     "FeatureFlag",
     "FeatureFlagOverride",
     "Invitation",

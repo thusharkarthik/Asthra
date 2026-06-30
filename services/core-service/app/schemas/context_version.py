@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.schemas.ai_context import AIContextMetadataRead
+from app.schemas.configuration import ConfigurationMetadataRead
 
 
 class ContextVersionRead(BaseModel):
@@ -96,4 +97,5 @@ class PlatformContextResponse(BaseModel):
     enabled_modules: list[str]
     modules: list[ModuleContextRead]
     ai_context: AIContextMetadataRead
+    configuration: ConfigurationMetadataRead
     preferences: dict[str, Any]
