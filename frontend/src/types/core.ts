@@ -251,6 +251,15 @@ export type ConfigurationMetadata = {
   scope_inheritance: string[];
 };
 
+export type SearchMetadata = {
+  available: boolean;
+  endpoint: string;
+  registry_endpoint: string;
+  categories: string[];
+  entity_types: string[];
+  shortcut: string;
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;

@@ -315,3 +315,15 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Platform context contract**: Unified Platform Context includes only lightweight configuration metadata: availability, endpoint, definition count, categories, source modules, and supported inheritance order. Full effective configuration is fetched separately through `/api/v1/configuration/effective`.
 
 **How to apply**: Add future module settings as definitions in the Core Configuration Registry or through a future module contribution contract. Do not create per-module ad hoc settings tables unless the setting is operational domain data rather than configuration.
+
+## 2026-06-30 — Global Search Registry: Search Contract First, Simple Execution Only
+
+**Decision**: Global Search Registry v1 defines searchable entity metadata and executes simple Core-owned search providers. It does not add embeddings, vector search, fuzzy ranking, an external search service, or a CMD+K UI.
+
+**Why**: The first platform need is a safe, typed contract for universal search: which entity types exist, which module owns them, which permissions protect them, and which route opens a result. Advanced ranking and cross-service indexing can be layered later without changing the frontend result shape.
+
+**Access rule**: Search providers must filter by backend permissions and scope before returning results. When access behavior is uncertain, providers should skip results rather than risk leaking data. Result metadata must stay compact and must not include secrets.
+
+**Platform context contract**: Unified Platform Context includes only lightweight `search` metadata: availability, endpoint, registry endpoint, categories, entity types, and shortcut. Search results are fetched separately through `/api/v1/search`.
+
+**How to apply**: Future module search providers should register searchable entity metadata and return the same stable result shape: id, entity_type, source_module, title, subtitle, description, route, icon, category, scope, matched_fields, score, and compact metadata.

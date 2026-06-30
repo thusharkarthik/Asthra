@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, WorkspaceRecord } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -35,6 +35,7 @@ type PlatformContextValue = {
   availableModules: ModuleRegistryItem[];
   aiContext: AIContextMetadata;
   configuration: ConfigurationMetadata;
+  search: SearchMetadata;
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -130,6 +131,14 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     source_modules: [],
     scope_inheritance: [],
   };
+  const search: SearchMetadata = contextQuery.data?.search ?? {
+    available: false,
+    endpoint: "/api/v1/search",
+    registry_endpoint: "/api/v1/search/registry",
+    categories: [],
+    entity_types: [],
+    shortcut: "CMD+K",
+  };
   const permissions: CurrentUserPermissions | null = contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
@@ -167,6 +176,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     availableModules,
     aiContext,
     configuration,
+    search,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -216,6 +226,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     selectedOrganizationId,
     selectedProject,
     selectedProjectId,
+    search,
     selectedWorkspace,
     selectedWorkspaceId,
     setSelectedOrganization,
