@@ -71,14 +71,30 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
   const hasAccessToken = Boolean(accessToken);
+  const confirmedOrganizationId =
+    selectedOrganizationId && cachedOrganizations.some((organization) => organization.id === selectedOrganizationId)
+      ? selectedOrganizationId
+      : null;
+  const confirmedWorkspaceId =
+    confirmedOrganizationId &&
+    selectedWorkspaceId &&
+    cachedWorkspaces.some((workspace) => workspace.id === selectedWorkspaceId && workspace.organization_id === confirmedOrganizationId)
+      ? selectedWorkspaceId
+      : null;
+  const confirmedProjectId =
+    confirmedWorkspaceId &&
+    selectedProjectId &&
+    cachedProjects.some((project) => project.id === selectedProjectId && project.workspace_id === confirmedWorkspaceId)
+      ? selectedProjectId
+      : null;
 
   const contextQuery = useQuery({
-    queryKey: queryKeys.platformContext.detail(selectedOrganizationId, selectedWorkspaceId, selectedProjectId),
+    queryKey: queryKeys.platformContext.detail(confirmedOrganizationId, confirmedWorkspaceId, confirmedProjectId),
     queryFn: () =>
       coreApi.getPlatformContext(accessToken ?? "", {
-        org_id: selectedOrganizationId,
-        workspace_id: selectedWorkspaceId,
-        project_id: selectedProjectId,
+        org_id: confirmedOrganizationId,
+        workspace_id: confirmedWorkspaceId,
+        project_id: confirmedProjectId,
       }),
     enabled: hasAccessToken,
     staleTime: 2 * 60_000,
@@ -128,15 +144,21 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const workspaceScopeLoaded = !selectedWorkspaceId || contextQuery.data?.current_workspace?.id === selectedWorkspaceId;
-  const projectScopeSettled = !selectedWorkspaceId || Boolean(selectedProjectId) || (workspaceScopeLoaded && projects.length === 0);
+  const workspaceScopeLoaded = !confirmedWorkspaceId || contextQuery.data?.current_workspace?.id === confirmedWorkspaceId;
+  const projectScopeSettled = !confirmedWorkspaceId || Boolean(confirmedProjectId) || (workspaceScopeLoaded && projects.length === 0);
+  const hasOrganizationContext = organizations.length > 0;
+  const platformContextScopeSettled = !contextQuery.data || (
+    (contextQuery.data.current_org?.id ?? null) === confirmedOrganizationId &&
+    (contextQuery.data.current_workspace?.id ?? null) === confirmedWorkspaceId &&
+    (contextQuery.data.current_project?.id ?? null) === confirmedProjectId
+  );
 
   const contextVersionQuery = useContextVersion({
-    organizationId: selectedOrganizationId,
-    workspaceId: selectedWorkspaceId,
-    projectId: selectedProjectId
+    organizationId: confirmedOrganizationId,
+    workspaceId: confirmedWorkspaceId,
+    projectId: confirmedProjectId
   }, {
-    enabled: Boolean(hasAccessToken && loadedAt && workspaceScopeLoaded && projectScopeSettled)
+    enabled: Boolean(hasAccessToken && loadedAt && hasOrganizationContext && workspaceScopeLoaded && projectScopeSettled && platformContextScopeSettled)
   });
 
   const currentUser: CoreUser | null = hasAccessToken ? (contextQuery.data?.user as CoreUser | undefined) ?? null : null;
@@ -178,8 +200,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
         permission_codes: contextQuery.data.permissions,
         roles: contextQuery.data.roles,
         scope: {
-          scope_type: selectedWorkspaceId ? "workspace" : selectedOrganizationId ? "organization" : "platform",
-          scope_id: selectedWorkspaceId ?? selectedOrganizationId ?? null,
+          scope_type: confirmedWorkspaceId ? "workspace" : confirmedOrganizationId ? "organization" : "platform",
+          scope_id: confirmedWorkspaceId ?? confirmedOrganizationId ?? null,
         },
         feature_flags: featureFlags,
         enabled_modules: enabledModules,
@@ -192,8 +214,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const error = contextQuery.error;
 
   useEffect(() => {
-    if (!loadedAt && contextQuery.data) setLoadedAt(Date.now());
-  }, [contextQuery.data, loadedAt]);
+    if (hasAccessToken && !loadedAt && contextQuery.data) setLoadedAt(Date.now());
+  }, [contextQuery.data, hasAccessToken, loadedAt]);
 
   const value = useMemo<PlatformContextValue>(() => ({
     currentUser,
@@ -219,9 +241,9 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isError,
     error,
     currentScope: {
-      organizationId: selectedOrganizationId,
-      workspaceId: selectedWorkspaceId,
-      projectId: selectedProjectId,
+      organizationId: confirmedOrganizationId,
+      workspaceId: confirmedWorkspaceId,
+      projectId: confirmedProjectId,
       organization: selectedOrganization,
       workspace: selectedWorkspace,
       project: selectedProject
@@ -252,11 +274,15 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isSimulating,
     enabledModules,
     featureFlags,
+    confirmedOrganizationId,
+    confirmedProjectId,
+    confirmedWorkspaceId,
     loadedAt,
     organizations,
     organizationTemplates,
     permissionCodes,
     permissions,
+    platformContextScopeSettled,
     projects,
     selectedOrganization,
     selectedOrganizationId,

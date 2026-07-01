@@ -370,3 +370,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: If logout only clears the token after a transition delay, or if query/store cleanup happens in a later effect, stale platform context can briefly make the shell think an authenticated no-org user exists. That can render Home or onboarding after logout.
 
 **How to apply**: Use the shared `useLogout()` hook for user-initiated logout paths. `PlatformContextProvider` must expose empty auth-dependent context when no token exists. Auth guards must run before onboarding/skipped-user checks.
+
+## 2026-07-01 — Persisted Work Scope Must Be Confirmed Before Scoped Context Requests
+
+**Decision**: Frontend work-scope IDs persisted in `asthra-workspace-context` are hints only. They must not be sent to `/context/platform` or `/context/version` until they are confirmed against the current authenticated user's platform context data.
+
+**Why**: Selected organization/workspace/project IDs can survive across logout/register/browser refresh. A newly registered no-org user must never send a previous user's work-scope IDs, even though the backend safely rejects or nulls them.
+
+**How to apply**: Clear session-scoped work context on login/register/logout. PlatformContext should bootstrap unscoped when persisted IDs cannot be confirmed by current cached organizations/workspaces/projects, then commit the backend-confirmed default scope. No-org users keep null work scope and should not run scoped context-version checks.
