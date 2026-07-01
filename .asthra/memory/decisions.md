@@ -327,3 +327,17 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Platform context contract**: Unified Platform Context includes only lightweight `search` metadata: availability, endpoint, registry endpoint, categories, entity types, and shortcut. Search results are fetched separately through `/api/v1/search`.
 
 **How to apply**: Future module search providers should register searchable entity metadata and return the same stable result shape: id, entity_type, source_module, title, subtitle, description, route, icon, category, scope, matched_fields, score, and compact metadata.
+
+## 2026-07-01 — Organization Templates: Core-Owned Preview/Apply, No Cross-Service Execution
+
+**Decision**: Organization Templates v1 is code-defined and Core-owned. It creates only Core structures (workspaces, projects, teams) and applies Core-controlled feature flag overrides and configuration values. It does not create Flow work items, Docs pages, Desk queues, Pulse incidents, or other service-owned records.
+
+**Why**: Templates need to make onboarding useful without duplicating ownership boundaries or forcing cross-service orchestration before those services expose template contributor contracts. Keeping v1 in Core preserves service ownership and keeps apply behavior testable.
+
+**Preview/apply split**: Preview returns the exact action report without mutating data. Apply uses the same action model, creates missing records, skips existing records by name within the same scope, and never deletes or overwrites unrelated data.
+
+**Authorization**: Preview requires `settings.organization_templates.view` at organization scope. Apply requires `settings.organization_templates.apply`; feature flag and configuration writes continue through their existing services and permission checks.
+
+**Platform context contract**: Unified Platform Context includes only lightweight `organization_templates` metadata: availability, endpoint, template count, and categories. Full template catalog and reports are fetched through `/api/v1/organization-templates`.
+
+**How to apply**: Future template work should add module-specific actions through explicit contributor contracts instead of directly writing another service's data from Core.

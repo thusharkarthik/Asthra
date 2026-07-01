@@ -1,5 +1,5 @@
 import { apiRequest } from "@/services/api/client";
-import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserResolvedRole, ModuleRegistryItem, Organization, SearchMetadata } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserResolvedRole, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, SearchMetadata } from "@/types/core";
 
 const CORE_PREFIX = "/api/core/api/v1";
 
@@ -59,6 +59,7 @@ export type PlatformContextData = {
   ai_context?: AIContextMetadata;
   configuration?: ConfigurationMetadata;
   search?: SearchMetadata;
+  organization_templates?: OrganizationTemplateMetadata;
   preferences: Record<string, unknown>;
 };
 

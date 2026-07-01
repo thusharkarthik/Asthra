@@ -1,14 +1,41 @@
 # Platform State
 
-Last updated: 2026-06-30 (Phase B Core — Global Search Registry v1)
+Last updated: 2026-07-01 (Phase B Core — Organization Templates v1 complete)
 
 ## Phase
 
-**Phase B Core Foundations** — Unified Platform Context API, Feature Flag Engine, Module Registry, AI Context Registry, Configuration Registry, Global Search Registry, and Organization Templates.
+**Phase B Core Foundations** — Unified Platform Context API, Feature Flag Engine, Module Registry, AI Context Registry, Configuration Registry, Global Search Registry, and Organization Templates are implemented.
 
 ## Branch
 
-Current branch: active Core Phase B branch. Global Search Registry v1 is implemented; backend targeted tests pass and frontend build passes.
+Current branch: active Core Phase B branch. Organization Templates v1 is implemented; backend targeted tests pass and frontend build passes. Phase B Core is complete pending manual QA.
+
+## Phase B Core Organization Templates v1 (added 2026-07-01)
+
+**Purpose**: Core now owns a code-defined Organization Template Registry for quickly setting up useful organization structures. V1 creates Core records only and applies Core-owned defaults; it does not create Flow, Docs, Desk, Pulse, or other service records.
+
+**Backend (`services/core-service/`)**:
+- `schemas/organization_template.py`: Added template catalog, preview/apply report, action, summary, request, and platform metadata schemas.
+- `services/organization_templates.py`: Code-defined template catalog plus preview/apply service. Templates are conservative and idempotent: existing workspaces/projects/teams are skipped by name within scope, no records are deleted, and apply returns an action report.
+- `api/v1/organization_templates.py`: Added `GET /organization-templates`, `GET /organization-templates/{template_key}`, `POST /organization-templates/{template_key}/preview`, and `POST /organization-templates/{template_key}/apply`.
+- `api/v1/context.py`: Unified Platform Context now includes lightweight `organization_templates` metadata with endpoint, template count, and categories.
+- `services/permission_registry.py`: Added `settings.organization_templates.view` and `settings.organization_templates.apply`.
+- `services/role_service.py`: Organization Owner/Admin templates can apply organization templates and the feature/config overrides used by template application.
+
+**Default templates**:
+- `startup`
+- `software_team`
+- `healthcare`
+- `support_desk`
+- `agency`
+- `enterprise_it`
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept optional `organization_templates` metadata.
+- `usePlatformContext()` exposes `organizationTemplates` with safe defaults.
+- No Organization Template UI, onboarding redesign, sidebar, or navigation behavior changed.
+
+**Phase B Core status**: Complete pending manual QA.
 
 ## Phase B Core Global Search Registry v1 (added 2026-06-30)
 

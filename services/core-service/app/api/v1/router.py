@@ -15,6 +15,7 @@ from app.api.v1 import (
     modules,
     notifications,
     organizations,
+    organization_templates,
     permissions,
     projects,
     role_templates,
@@ -45,6 +46,7 @@ api_router.include_router(
     prefix="/organizations",
     tags=["organizations"],
 )
+api_router.include_router(organization_templates.router, prefix="/organization-templates", tags=["organization-templates"])
 api_router.include_router(workspaces.router, prefix="/workspaces", tags=["workspaces"])
 api_router.include_router(teams.router, prefix="/teams", tags=["teams"])
 api_router.include_router(roles.router, prefix="/roles", tags=["roles"])

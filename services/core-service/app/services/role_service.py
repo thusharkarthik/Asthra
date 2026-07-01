@@ -54,14 +54,14 @@ ASTHRA_ROLE_TEMPLATES = [
         "key": "organization_owner",
         "scope": "organization",
         "description": "Full organization administration and last-owner protected access.",
-        "permission_patterns": ["settings.organization.*", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.*", "settings.permission.*", "settings.team.*", "guard.audit.view", "insights.report.view"],
+        "permission_patterns": ["settings.organization.*", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.*", "settings.permission.*", "settings.team.*", "settings.feature_flags.manage", "settings.configuration.manage", "settings.organization_templates.*", "guard.audit.view", "insights.report.view"],
     },
     {
         "name": "Organization Admin",
         "key": "organization_admin",
         "scope": "organization",
         "description": "Manage organization settings, workspaces, and members.",
-        "permission_patterns": ["settings.organization.view", "settings.organization.manage", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.view", "settings.permission.view", "settings.team.*", "guard.audit.view", "insights.report.view"],
+        "permission_patterns": ["settings.organization.view", "settings.organization.manage", "settings.workspace.*", "settings.project.*", "settings.member.*", "settings.role.view", "settings.permission.view", "settings.team.*", "settings.feature_flags.manage", "settings.configuration.manage", "settings.organization_templates.view", "settings.organization_templates.apply", "guard.audit.view", "insights.report.view"],
     },
     {
         "name": "Organization Auditor",
