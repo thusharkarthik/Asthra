@@ -107,7 +107,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
-  const [skippedOnboarding, setSkippedOnboarding] = useState(false);
+  const [skippedOnboardingUserId, setSkippedOnboardingUserId] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [superuserModeOverride, setSuperuserModeOverride] = useState<NavigationMode | null>(null);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
@@ -128,6 +128,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const showBottomProgress = progressActive || hasShellLoading;
   const hasPlatformRole = (permissions?.roles?.length ?? 0) > 0;
   const needsOnboarding = !isPublicPath && !contextLoading && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
+  const skippedOnboarding = currentUser?.id != null && skippedOnboardingUserId === currentUser.id;
   const isSkippedUser = needsOnboarding && skippedOnboarding;
   const isSuperuser = Boolean(currentUser?.is_superuser);
 
@@ -200,6 +201,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     if (!isAllowed) router.replace("/");
   }, [isSkippedUser, pathname, router]);
 
+  useEffect(() => {
+    if (organizations.length > 0) setSkippedOnboardingUserId(null);
+  }, [organizations.length]);
+
   if (isPublicPath) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
@@ -220,7 +225,18 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   }
 
   if (needsOnboarding && !skippedOnboarding) {
-    return <OnboardingGate onSkip={() => setSkippedOnboarding(true)} />;
+    return (
+      <OnboardingGate
+        onSkip={() => {
+          if (currentUser?.id != null) setSkippedOnboardingUserId(currentUser.id);
+          router.replace("/");
+        }}
+        onCreated={() => {
+          setSkippedOnboardingUserId(null);
+          router.replace("/");
+        }}
+      />
+    );
   }
 
   const handleLogout = async () => {
