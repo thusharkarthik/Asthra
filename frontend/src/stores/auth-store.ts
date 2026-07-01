@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { authApi, type LoginPayload, type RegisterPayload } from "@/services/api/auth-api";
 import { useContextVersionStore } from "@/stores/context-version-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSimulationStore } from "@/lib/permission-simulator";
 import type { CoreUser } from "@/types/core";
 
 type AuthState = {
@@ -18,6 +20,12 @@ type AuthState = {
   setHasHydrated: (value: boolean) => void;
 };
 
+function clearSessionScopedState() {
+  useWorkspaceStore.getState().resetContext();
+  useContextVersionStore.getState().clearSnapshot();
+  useSimulationStore.getState().exitSimulation();
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -32,7 +40,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const token = await authApi.login(payload);
-          useContextVersionStore.getState().clearSnapshot();
+          clearSessionScopedState();
           set({
             accessToken: token.access_token,
             currentUser: null,
@@ -53,7 +61,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           await authApi.register(payload);
           const token = await authApi.login({ email: payload.email, password: payload.password });
-          useContextVersionStore.getState().clearSnapshot();
+          clearSessionScopedState();
           set({
             accessToken: token.access_token,
             currentUser: null,
@@ -70,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       logout: () => {
-        useContextVersionStore.getState().clearSnapshot();
+        clearSessionScopedState();
         set({
           accessToken: null,
           currentUser: null,

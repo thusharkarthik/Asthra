@@ -2,6 +2,13 @@
 
 ## Fixed
 
+### BUG-038 — Register No-Org Flow Reused Previous Work Scope [FIXED 2026-07-01]
+
+**Files**: `frontend/src/stores/auth-store.ts`, `frontend/src/context/platformContext.tsx`
+**Symptom**: During register + no-org onboarding QA, a newly registered user with no organization still triggered `GET /context/platform?org_id=1&workspace_id=1&project_id=1` from a previous user/session. `/context/version` could also run with stale scoped IDs.
+**Root cause**: `asthra-workspace-context` persisted selected organization/workspace/project IDs, while `PlatformContextProvider` used those IDs in its first platform-context query before the current user's context had validated them. Register/login only cleared the context-version snapshot, not the selected work scope.
+**Fix**: Login/register/logout now clear session-scoped workspace selections, context-version snapshot, and permission simulation state before setting the new token. PlatformContext now only sends selected scope IDs after they are confirmed against cached current-session organizations/workspaces/projects, and context-version checks wait for a confirmed settled scope. No-org users keep null scope and do not run scoped platform/version requests.
+
 ### BUG-037 — Logout Leaves Stale Shell/Home/Onboarding State [FIXED 2026-07-01]
 
 **Files**: `frontend/src/hooks/use-logout.ts`, `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/settings/account/page.tsx`, `frontend/src/context/platformContext.tsx`, `frontend/src/providers/auth-provider.tsx`
