@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-01 — Authenticated No-Org Onboarding Owns the Initial Home Flow
+
+**Decision**: Once platform context settles with an authenticated user and `organizations: []`, the shell/onboarding path owns the first-run experience. Home/dashboard data queries must stay disabled until the user either creates an organization or explicitly skips onboarding.
+
+**Why**: A registered no-org user is validly authenticated but not yet scoped to work. Letting Home dashboard/activity queries fire before onboarding creates confusing network noise and can render a normal home experience before the platform is ready.
+
+**How to apply**: No-org users may see onboarding or a limited skipped Home state only. Successful self-serve organization creation must invalidate/refetch Unified Platform Context before leaving onboarding. Skip-for-now state is user-scoped and must not imply an organization exists.
+
 ## 2026-06-30 — All Alembic Migrations Must Use Idempotency Helpers for create_table / create_index
 
 **Decision**: Every migration that calls `op.create_table(...)` or `op.create_index(...)` MUST wrap the call with a `table_exists` or `index_exists` guard from `app.db.migration_utils`. No exceptions.

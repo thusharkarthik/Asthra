@@ -2,6 +2,13 @@
 
 ## Fixed
 
+### BUG-039 — Self-Serve Organization Onboarding Did Not Own No-Org Flow [FIXED 2026-07-01]
+
+**Files**: `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/page.tsx`, `frontend/src/components/platform/platform-setup-guide.tsx`
+**Symptom**: After register, an authenticated no-org user could still cause Home dashboard/activity requests. After `POST /organizations/onboard` succeeded, the UI stayed in the create organization form. Double-submit could send a second onboard request and receive 400 "You already have access to an organization."
+**Root cause**: The Home page declared dashboard/activity queries before its no-org branch, so those requests fired even when no-org UI rendered. The onboarding form only invalidated old split-query keys, not unified platform context, and had no success-completed submit guard. Skip state was also shell-local but not tied to the authenticated user.
+**Fix**: Home dashboard/activity queries are disabled for no-org users. Organization onboarding now disables duplicate submits, treats the already-created 400 as recoverable, invalidates/refetches `platform-context`, context version, organizations, and permissions, and then leaves onboarding. Skip-for-now state is scoped to the current user and cleared once an organization appears.
+
 ### BUG-038 — Register No-Org Flow Reused Previous Work Scope [FIXED 2026-07-01]
 
 **Files**: `frontend/src/stores/auth-store.ts`, `frontend/src/context/platformContext.tsx`

@@ -88,16 +88,25 @@ const BENEFIT_CARDS = [
 export default function HomePage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { currentUser, organizations, workspaces, projects, isLoading, error } = usePlatformContext();
-  const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: () => getWorkspaceActivity(accessToken), retry: 0 });
-  const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: () => getWorkspaceDashboardSummary(accessToken), retry: 0 });
+  const isNoOrgUser = organizations.length === 0 && !currentUser?.is_superuser;
+  const activityQuery = useQuery({
+    queryKey: ["platform", "activity"],
+    queryFn: () => getWorkspaceActivity(accessToken),
+    enabled: Boolean(accessToken && !isNoOrgUser),
+    retry: 0
+  });
+  const summaryQuery = useQuery({
+    queryKey: ["platform", "dashboard-summary"],
+    queryFn: () => getWorkspaceDashboardSummary(accessToken),
+    enabled: Boolean(accessToken && !isNoOrgUser),
+    retry: 0
+  });
   const favorites = useFavoritesStore((state) => state.favorites);
   const viewed = useRecentItemsStore((state) => state.viewed);
   const modified = useRecentItemsStore((state) => state.modified);
   const setSearchOpen = useUIStore((state) => state.setSearchOpen);
   const setAssistantOpen = useUIStore((state) => state.setAssistantOpen);
   const [createOrgOpen, setCreateOrgOpen] = useState(false);
-
-  const isNoOrgUser = organizations.length === 0 && !currentUser?.is_superuser;
 
   if (isNoOrgUser) {
     return (

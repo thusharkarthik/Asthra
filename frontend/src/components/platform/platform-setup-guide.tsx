@@ -6,14 +6,16 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AsthraLogo } from "@/components/brand/asthra-logo";
 import { queryKeys } from "@/lib/queryKeys";
+import { ApiError } from "@/services/api/client";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
+import type { Organization } from "@/types/core";
 
 function OrgCreateForm({
   onSuccess,
   submitLabel = "Create Organization"
 }: {
-  onSuccess?: () => void;
+  onSuccess?: (organization?: Organization) => void | Promise<void>;
   submitLabel?: string;
 }) {
   const queryClient = useQueryClient();
@@ -21,6 +23,17 @@ function OrgCreateForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [submitCompleted, setSubmitCompleted] = useState(false);
+
+  const refreshPlatformContext = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
+    ]);
+    await queryClient.refetchQueries({ queryKey: queryKeys.platformContext.all, type: "active" });
+  };
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -30,18 +43,25 @@ function OrgCreateForm({
         description: description.trim() || null,
       });
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
-      onSuccess?.();
+    onSuccess: async (organization) => {
+      setSubmitCompleted(true);
+      await refreshPlatformContext();
+      await onSuccess?.(organization);
     },
-    onError: (error: Error) => {
+    onError: async (error: Error) => {
+      if (error instanceof ApiError && error.status === 400 && error.message.toLowerCase().includes("already have access")) {
+        setSubmitCompleted(true);
+        await refreshPlatformContext();
+        await onSuccess?.();
+        return;
+      }
       setFormError(error.message ?? "Something went wrong. Please try again.");
     },
   });
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mutation.isPending || submitCompleted) return;
     setFormError(null);
     if (!name.trim()) {
       setFormError("Organization name is required.");
@@ -58,14 +78,14 @@ function OrgCreateForm({
         </label>
         <input
           id="org-name"
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Acme Corp"
-          required
-          disabled={mutation.isPending}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        />
+        type="text"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder="Acme Corp"
+        required
+        disabled={mutation.isPending || submitCompleted}
+        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      />
       </div>
       <div className="space-y-1.5">
         <label htmlFor="org-description" className="text-sm font-medium leading-none">
@@ -77,17 +97,17 @@ function OrgCreateForm({
           onChange={(event) => setDescription(event.target.value)}
           placeholder="A short description of your organization"
           rows={3}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || submitCompleted}
           className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y min-h-[72px]"
         />
       </div>
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
       <button
         type="submit"
-        disabled={mutation.isPending || !name.trim()}
+        disabled={mutation.isPending || submitCompleted || !name.trim()}
         className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
       >
-        {mutation.isPending ? "Creating…" : submitLabel}
+        {mutation.isPending || submitCompleted ? "Creating…" : submitLabel}
       </button>
     </form>
   );
@@ -112,7 +132,7 @@ export function CreateOrgDialog({ open, onOpenChange }: { open: boolean; onOpenC
   );
 }
 
-export function OnboardingGate({ onSkip }: { onSkip?: () => void }) {
+export function OnboardingGate({ onSkip, onCreated }: { onSkip?: () => void; onCreated?: () => void }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md space-y-8">
@@ -124,7 +144,7 @@ export function OnboardingGate({ onSkip }: { onSkip?: () => void }) {
           </div>
         </div>
         <div className="space-y-4 rounded-lg border bg-card p-6 shadow-sm">
-          <OrgCreateForm />
+          <OrgCreateForm onSuccess={onCreated} />
         </div>
         {onSkip ? (
           <div className="text-center">
