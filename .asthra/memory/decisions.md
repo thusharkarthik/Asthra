@@ -341,3 +341,32 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Platform context contract**: Unified Platform Context includes only lightweight `organization_templates` metadata: availability, endpoint, template count, and categories. Full template catalog and reports are fetched through `/api/v1/organization-templates`.
 
 **How to apply**: Future template work should add module-specific actions through explicit contributor contracts instead of directly writing another service's data from Core.
+
+## 2026-07-01 — Unified Platform Context Is the Frontend Shell Source of Truth
+
+**Decision**: The application shell must use `GET /context/platform` as the primary source for current user, permissions, organizations, workspaces, projects, selected scope, feature flags, modules, AI context metadata, configuration metadata, search metadata, and organization template metadata.
+
+**Why**: After the Unified Platform Context migration, keeping old split shell queries caused request storms after login: duplicate platform context/version calls plus separate `/auth/me`, `/organizations`, `/workspaces`, `/projects`, and `/me/permissions` requests. The shell should load one context payload and reuse it.
+
+**How to apply**:
+- Do not mount `useWorkspaceContextQueries()` or `useSmartContextCache()` in the app shell or home page.
+- Do not call `/auth/me` during normal login shell initialization; PlatformContext hydrates the auth store's `currentUser` from `/context/platform`.
+- Use batched workspace-store hydration from platform context to avoid org/workspace/project selection cascades.
+- Keep context-version validation as a background invalidation mechanism only after initial platform context has loaded; do not refetch it on every route change.
+- Settings/admin detail pages may still call specific endpoints when they need detail data or scoped admin workflows.
+
+## 2026-07-01 — Platform Context Provides Default Work Scope for Atomic Settlement
+
+**Decision**: `GET /context/platform` should return deterministic default `current_org`, `current_workspace`, `current_project`, and projects for the default workspace when the request does not provide explicit scope IDs.
+
+**Why**: The frontend cannot settle org/workspace/project atomically if the unscoped context contains workspaces but no projects. That forces a transient workspace-only context request before the final project-scoped request. Returning the default work scope lets the workspace store commit org, workspace, and project in one update, reducing login from an unscoped → workspace-only → project cascade to an unscoped → final scoped load when a project exists.
+
+**How to apply**: Keep explicit scope IDs authoritative. When IDs are omitted, Core may choose the first accessible organization, first workspace in that organization, and first project in that workspace as default shell context. Context-version checks should wait for this settled scope and avoid validating transient partial scopes.
+
+## 2026-07-01 — Logout Clears Auth-Dependent State Before Navigation Settles
+
+**Decision**: Frontend logout must synchronously clear token/auth state, platform/workspace context, context-version snapshots, permission simulation state, and authenticated React Query cache before relying on route guards or onboarding decisions.
+
+**Why**: If logout only clears the token after a transition delay, or if query/store cleanup happens in a later effect, stale platform context can briefly make the shell think an authenticated no-org user exists. That can render Home or onboarding after logout.
+
+**How to apply**: Use the shared `useLogout()` hook for user-initiated logout paths. `PlatformContextProvider` must expose empty auth-dependent context when no token exists. Auth guards must run before onboarding/skipped-user checks.

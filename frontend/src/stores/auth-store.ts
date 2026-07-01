@@ -32,11 +32,10 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const token = await authApi.login(payload);
-          const user = await authApi.me(token.access_token);
           useContextVersionStore.getState().clearSnapshot();
           set({
             accessToken: token.access_token,
-            currentUser: user,
+            currentUser: null,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -54,11 +53,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           await authApi.register(payload);
           const token = await authApi.login({ email: payload.email, password: payload.password });
-          const user = await authApi.me(token.access_token);
           useContextVersionStore.getState().clearSnapshot();
           set({
             accessToken: token.access_token,
-            currentUser: user,
+            currentUser: null,
             isAuthenticated: true,
             isLoading: false,
             error: null

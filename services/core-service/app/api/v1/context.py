@@ -84,11 +84,17 @@ def get_platform_context(
     # Organizations (scoped to user access — superusers get all, others get their orgs)
     organizations = OrganizationService(db).list(current_user)
 
-    # Workspaces scoped to org if provided
-    workspaces = WorkspaceService(db).list(current_user, organization_id=org_id)
+    # Resolve a stable default scope so the frontend can settle org/workspace/project
+    # in one store update instead of fetching transient partial scopes.
+    effective_org_id = org_id if org_id is not None else organizations[0].id if organizations else None
 
-    # Projects scoped to workspace if provided; empty list when no workspace given
-    projects = ProjectService(db).list(current_user, workspace_id=workspace_id) if workspace_id else []
+    # Workspaces scoped to the requested/default organization.
+    workspaces = WorkspaceService(db).list(current_user, organization_id=effective_org_id)
+    effective_workspace_id = workspace_id if workspace_id is not None else workspaces[0].id if workspaces else None
+
+    # Projects scoped to the requested/default workspace.
+    projects = ProjectService(db).list(current_user, workspace_id=effective_workspace_id) if effective_workspace_id else []
+    effective_project_id = project_id if project_id is not None else projects[0].id if projects else None
 
     # Context version for cache busting
     version_data = ContextVersionService(db).get_version(
@@ -98,10 +104,11 @@ def get_platform_context(
         project_id=project_id,
     )
 
-    # Resolve current_* from requested scope IDs
-    current_org = next((o for o in organizations if o.id == org_id), None) if org_id else None
-    current_ws = next((w for w in workspaces if w.id == workspace_id), None) if workspace_id else None
-    current_proj = next((p for p in projects if p.id == project_id), None) if project_id else None
+    # Resolve current_* from requested IDs, or from deterministic defaults when no
+    # IDs were provided. Invalid requested IDs still resolve to None.
+    current_org = next((o for o in organizations if o.id == effective_org_id), None) if effective_org_id else None
+    current_ws = next((w for w in workspaces if w.id == effective_workspace_id), None) if effective_workspace_id else None
+    current_proj = next((p for p in projects if p.id == effective_project_id), None) if effective_project_id else None
 
     def _org(o: object) -> dict:
         return {

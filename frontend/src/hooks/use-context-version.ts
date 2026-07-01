@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { coreApi } from "@/services/api/core-api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,8 +24,10 @@ function versionsMatch(previous: ContextVersionSnapshot | null, next: ContextVer
   );
 }
 
-export function useContextVersion(scope: { organizationId?: number | null; workspaceId?: number | null; projectId?: number | null }) {
-  const pathname = usePathname();
+export function useContextVersion(
+  scope: { organizationId?: number | null; workspaceId?: number | null; projectId?: number | null },
+  options: { enabled?: boolean } = {}
+) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const snapshot = useContextVersionStore((state) => state.snapshot);
@@ -40,18 +41,14 @@ export function useContextVersion(scope: { organizationId?: number | null; works
         workspace_id: scope.workspaceId,
         project_id: scope.projectId
       }),
-    enabled: Boolean(accessToken),
-    staleTime: 30_000,
+    enabled: Boolean(accessToken && (options.enabled ?? true)),
+    staleTime: 60_000,
     refetchInterval: VERSION_CHECK_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     retry: 1
   });
-
-  useEffect(() => {
-    if (accessToken) void query.refetch();
-    // Route changes are a cheap point to revalidate the version snapshot.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, pathname]);
 
   useEffect(() => {
     const next = query.data;

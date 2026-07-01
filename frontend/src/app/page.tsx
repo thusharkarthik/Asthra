@@ -15,13 +15,12 @@ import { CreateOrgDialog, PlatformSetupGuide } from "@/components/platform/platf
 import { OrgSetupChecklist } from "@/components/platform/org-setup-checklist";
 import { WorkspaceDashboardSummaryCards } from "@/components/platform/workspace-dashboard-summary";
 import { Button } from "@/components/ui/button";
-import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
+import { usePlatformContext } from "@/context/platformContext";
 import { getWorkspaceActivity, getWorkspaceDashboardSummary } from "@/services/platform/activity-service";
 import { useFavoritesStore } from "@/stores/favorites-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRecentItemsStore } from "@/stores/recent-items-store";
 import { useUIStore } from "@/stores/ui-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 const quickLaunch = navSections
   .flatMap((section) => section.items.map((item) => ({ ...item, section: section.label })))
@@ -87,10 +86,8 @@ const BENEFIT_CARDS = [
 ];
 
 export default function HomePage() {
-  const { isLoading, error } = useWorkspaceContextQueries();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const { organizations, workspaces, projects } = useWorkspaceStore();
+  const { currentUser, organizations, workspaces, projects, isLoading, error } = usePlatformContext();
   const activityQuery = useQuery({ queryKey: ["platform", "activity"], queryFn: () => getWorkspaceActivity(accessToken), retry: 0 });
   const summaryQuery = useQuery({ queryKey: ["platform", "dashboard-summary"], queryFn: () => getWorkspaceDashboardSummary(accessToken), retry: 0 });
   const favorites = useFavoritesStore((state) => state.favorites);

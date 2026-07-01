@@ -66,12 +66,11 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const cachedOrganizations = useWorkspaceStore((state) => state.organizations);
   const cachedWorkspaces = useWorkspaceStore((state) => state.workspaces);
   const cachedProjects = useWorkspaceStore((state) => state.projects);
-  const setOrganizations = useWorkspaceStore((state) => state.setOrganizations);
-  const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
-  const setProjects = useWorkspaceStore((state) => state.setProjects);
+  const setPlatformContext = useWorkspaceStore((state) => state.setPlatformContext);
   const setSelectedOrganization = useWorkspaceStore((state) => state.setSelectedOrganization);
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const setSelectedProject = useWorkspaceStore((state) => state.setSelectedProject);
+  const hasAccessToken = Boolean(accessToken);
 
   const contextQuery = useQuery({
     queryKey: queryKeys.platformContext.detail(selectedOrganizationId, selectedWorkspaceId, selectedProjectId),
@@ -81,50 +80,78 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
         workspace_id: selectedWorkspaceId,
         project_id: selectedProjectId,
       }),
-    enabled: Boolean(accessToken),
+    enabled: hasAccessToken,
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,
-  });
-
-  const contextVersionQuery = useContextVersion({
-    organizationId: selectedOrganizationId,
-    workspaceId: selectedWorkspaceId,
-    projectId: selectedProjectId
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Sync unified context data into Zustand workspace store for downstream consumers
   useEffect(() => {
-    if (!contextQuery.data) return;
+    if (!accessToken || !contextQuery.data) return;
     const d = contextQuery.data;
-    if (d.organizations.length) setOrganizations(d.organizations as Organization[]);
-    if (d.workspaces.length) setWorkspaces(d.workspaces as WorkspaceRecord[]);
-    if (d.projects.length) setProjects(d.projects as ProjectRecord[]);
-  }, [contextQuery.data, setOrganizations, setWorkspaces, setProjects]);
+    setPlatformContext({
+      organizations: d.organizations as Organization[],
+      workspaces: d.workspaces as WorkspaceRecord[],
+      projects: d.projects as ProjectRecord[],
+      currentOrganizationId: d.current_org?.id ?? null,
+      currentWorkspaceId: d.current_workspace?.id ?? null,
+      currentProjectId: d.current_project?.id ?? null,
+    });
+    useAuthStore.setState((state) => {
+      const nextUser = d.user as CoreUser;
+      if (
+        state.currentUser?.id === nextUser.id &&
+        state.currentUser?.email === nextUser.email &&
+        state.currentUser?.full_name === nextUser.full_name &&
+        state.currentUser?.is_superuser === nextUser.is_superuser
+      ) {
+        return state;
+      }
+      return { ...state, currentUser: nextUser, isAuthenticated: true };
+    });
+  }, [accessToken, contextQuery.data, setPlatformContext]);
 
-  const organizations: Organization[] = (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations;
-  const workspaces: WorkspaceRecord[] = ((contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces).filter(
+  useEffect(() => {
+    if (!accessToken) setLoadedAt(null);
+  }, [accessToken]);
+
+  const organizations: Organization[] = hasAccessToken ? (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations : [];
+  const workspaces: WorkspaceRecord[] = (hasAccessToken ? (contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces : []).filter(
     (w) => (selectedOrganizationId ? w.organization_id === selectedOrganizationId : true)
   );
-  const projects: ProjectRecord[] = ((contextQuery.data?.projects as ProjectRecord[] | undefined) ?? cachedProjects).filter(
+  const projects: ProjectRecord[] = (hasAccessToken ? (contextQuery.data?.projects as ProjectRecord[] | undefined) ?? cachedProjects : []).filter(
     (p) => (selectedWorkspaceId ? p.workspace_id === selectedWorkspaceId : true)
   );
   const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const workspaceScopeLoaded = !selectedWorkspaceId || contextQuery.data?.current_workspace?.id === selectedWorkspaceId;
+  const projectScopeSettled = !selectedWorkspaceId || Boolean(selectedProjectId) || (workspaceScopeLoaded && projects.length === 0);
 
-  const currentUser: CoreUser | null = (contextQuery.data?.user as CoreUser | undefined) ?? null;
-  const permissionCodes: string[] = contextQuery.data?.permissions ?? [];
-  const featureFlags: Record<string, boolean> = contextQuery.data?.feature_flags ?? {};
-  const enabledModules: string[] = contextQuery.data?.enabled_modules ?? [];
-  const availableModules: ModuleRegistryItem[] = contextQuery.data?.modules ?? [];
-  const aiContext: AIContextMetadata = contextQuery.data?.ai_context ?? {
+  const contextVersionQuery = useContextVersion({
+    organizationId: selectedOrganizationId,
+    workspaceId: selectedWorkspaceId,
+    projectId: selectedProjectId
+  }, {
+    enabled: Boolean(hasAccessToken && loadedAt && workspaceScopeLoaded && projectScopeSettled)
+  });
+
+  const currentUser: CoreUser | null = hasAccessToken ? (contextQuery.data?.user as CoreUser | undefined) ?? null : null;
+  const permissionCodes: string[] = hasAccessToken ? contextQuery.data?.permissions ?? [] : [];
+  const featureFlags: Record<string, boolean> = hasAccessToken ? contextQuery.data?.feature_flags ?? {} : {};
+  const enabledModules: string[] = hasAccessToken ? contextQuery.data?.enabled_modules ?? [] : [];
+  const availableModules: ModuleRegistryItem[] = hasAccessToken ? contextQuery.data?.modules ?? [] : [];
+  const aiContext: AIContextMetadata = hasAccessToken && contextQuery.data?.ai_context ? contextQuery.data.ai_context : {
     available: false,
     endpoint: "/api/v1/ai/context",
     block_count: 0,
     categories: [],
     source_modules: [],
   };
-  const configuration: ConfigurationMetadata = contextQuery.data?.configuration ?? {
+  const configuration: ConfigurationMetadata = hasAccessToken && contextQuery.data?.configuration ? contextQuery.data.configuration : {
     available: false,
     endpoint: "/api/v1/configuration/effective",
     definition_count: 0,
@@ -132,7 +159,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     source_modules: [],
     scope_inheritance: [],
   };
-  const search: SearchMetadata = contextQuery.data?.search ?? {
+  const search: SearchMetadata = hasAccessToken && contextQuery.data?.search ? contextQuery.data.search : {
     available: false,
     endpoint: "/api/v1/search",
     registry_endpoint: "/api/v1/search/registry",
@@ -140,13 +167,13 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     entity_types: [],
     shortcut: "CMD+K",
   };
-  const organizationTemplates: OrganizationTemplateMetadata = contextQuery.data?.organization_templates ?? {
+  const organizationTemplates: OrganizationTemplateMetadata = hasAccessToken && contextQuery.data?.organization_templates ? contextQuery.data.organization_templates : {
     available: false,
     endpoint: "/api/v1/organization-templates",
     template_count: 0,
     categories: [],
   };
-  const permissions: CurrentUserPermissions | null = contextQuery.data
+  const permissions: CurrentUserPermissions | null = hasAccessToken && contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
         roles: contextQuery.data.roles,

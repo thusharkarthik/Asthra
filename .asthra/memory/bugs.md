@@ -2,6 +2,22 @@
 
 ## Fixed
 
+### BUG-037 — Logout Leaves Stale Shell/Home/Onboarding State [FIXED 2026-07-01]
+
+**Files**: `frontend/src/hooks/use-logout.ts`, `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/settings/account/page.tsx`, `frontend/src/context/platformContext.tsx`, `frontend/src/providers/auth-provider.tsx`
+**Symptom**: After logout, the app could show Home instead of Login. After refresh, the logged-out user could see organization onboarding before a second logout reached Login.
+**Root cause**: Shell logout delayed clearing auth state until after the logout transition delay, while React Query and workspace/platform cleanup happened later in `AuthProvider`. During that gap, stale platform context query data and persisted selected scope could still participate in shell/onboarding decisions.
+**Fix**: Added a shared `useLogout()` hook that synchronously clears authenticated React Query cache, workspace scope, context-version snapshot, permission simulation, and auth state before navigating to `/login`. `PlatformContextProvider` now exposes empty auth-dependent context whenever no token exists, even if cached query data remains. `AuthProvider` also clears query cache and workspace state on any no-token hydrated state.
+
+### BUG-036 — Duplicate Core Context Calls After Login [FIXED 2026-07-01]
+
+**Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/page.tsx`, `frontend/src/providers/auth-provider.tsx`, `frontend/src/stores/auth-store.ts`, `frontend/src/stores/workspace-store.ts`, `frontend/src/hooks/use-context-version.ts`, `frontend/src/components/platform/notification-center.tsx`
+**Symptom**: After login, the frontend called the same Core context endpoints repeatedly: scoped `/context/platform` 5 times, `/context/version` 7 times, `/auth/me` twice, `/notifications` twice, plus old split-query endpoints (`/organizations`, `/workspaces`, `/projects`, `/me/permissions`).
+**Root cause**: The shell still mounted `WorkspaceContextLoader`, which used the old Smart Context Cache split queries. Login/register and `AuthProvider` also called `/auth/me` even though Unified Platform Context already returns the current user. Context version refetched immediately on token/path changes and focus, and scope hydration updated org/workspace/project in separate store writes.
+**Fix**: Removed the shell/home old split-query loader, made PlatformContext hydrate the workspace store in one batched action, synced auth store `currentUser` from `/context/platform`, removed login/register/provider `/auth/me` calls from the normal login path, delayed context-version checks until after initial platform context load, disabled aggressive refetch triggers, and made notification queries share cache without polling.
+
+**Follow-up 2026-07-01**: The remaining login cascade was `/context/platform` → `/context/platform?org_id=...&workspace_id=...` → `/context/platform?org_id=...&workspace_id=...&project_id=...`. Root cause: the unscoped platform context returned organizations/workspaces but no default projects/current project, so the frontend could only commit org+workspace first and had to fetch again to discover a project. Fixed by returning deterministic default current org/workspace/project and projects for the default workspace from `/context/platform`, and by gating context-version checks until the selected scope is settled.
+
 ### BUG-001 — Settings Members Page Tied to Bottom Bar [FIXED 2026-06-25]
 
 **File**: `frontend/src/app/settings/members/page.tsx`
