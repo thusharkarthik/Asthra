@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -36,6 +36,7 @@ type PlatformContextValue = {
   aiContext: AIContextMetadata;
   configuration: ConfigurationMetadata;
   search: SearchMetadata;
+  organizationTemplates: OrganizationTemplateMetadata;
   contextVersions: ContextVersionSnapshot | null;
   loadedAt: number | null;
   isLoading: boolean;
@@ -139,6 +140,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     entity_types: [],
     shortcut: "CMD+K",
   };
+  const organizationTemplates: OrganizationTemplateMetadata = contextQuery.data?.organization_templates ?? {
+    available: false,
+    endpoint: "/api/v1/organization-templates",
+    template_count: 0,
+    categories: [],
+  };
   const permissions: CurrentUserPermissions | null = contextQuery.data
     ? {
         permission_codes: contextQuery.data.permissions,
@@ -177,6 +184,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     aiContext,
     configuration,
     search,
+    organizationTemplates,
     contextVersions: contextVersionQuery.data ?? contextVersionQuery.snapshot ?? null,
     loadedAt,
     isLoading,
@@ -219,6 +227,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     featureFlags,
     loadedAt,
     organizations,
+    organizationTemplates,
     permissionCodes,
     permissions,
     projects,

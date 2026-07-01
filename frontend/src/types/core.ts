@@ -260,6 +260,13 @@ export type SearchMetadata = {
   shortcut: string;
 };
 
+export type OrganizationTemplateMetadata = {
+  available: boolean;
+  endpoint: string;
+  template_count: number;
+  categories: string[];
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;

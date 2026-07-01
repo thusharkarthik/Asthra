@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.schemas.ai_context import AIContextMetadataRead
 from app.schemas.configuration import ConfigurationMetadataRead
+from app.schemas.organization_template import OrganizationTemplateMetadataRead
 from app.schemas.search import SearchMetadataRead
 
 
@@ -100,4 +101,5 @@ class PlatformContextResponse(BaseModel):
     ai_context: AIContextMetadataRead
     configuration: ConfigurationMetadataRead
     search: SearchMetadataRead
+    organization_templates: OrganizationTemplateMetadataRead
     preferences: dict[str, Any]

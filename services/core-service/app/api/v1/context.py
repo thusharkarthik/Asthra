@@ -14,6 +14,7 @@ from app.services.context_version_service import ContextVersionService
 from app.services.global_search_registry import GlobalSearchRegistryService
 from app.services.module_registry import ModuleRegistryService
 from app.services.organization_service import OrganizationService
+from app.services.organization_templates import OrganizationTemplateService
 from app.services.project_service import ProjectService
 from app.services.workspace_service import WorkspaceService
 
@@ -78,6 +79,7 @@ def get_platform_context(
     )
     configuration = ConfigurationRegistryService(db).get_configuration_metadata()
     search = GlobalSearchRegistryService(db).get_search_metadata()
+    organization_templates = OrganizationTemplateService(db).get_template_metadata()
 
     # Organizations (scoped to user access — superusers get all, others get their orgs)
     organizations = OrganizationService(db).list(current_user)
@@ -158,5 +160,6 @@ def get_platform_context(
         "ai_context": ai_context,
         "configuration": configuration,
         "search": search,
+        "organization_templates": organization_templates,
         "preferences": {},
     }
