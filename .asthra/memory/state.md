@@ -1,14 +1,33 @@
 # Platform State
 
-Last updated: 2026-07-01 (Phase B Core — Organization Templates v1 complete)
+Last updated: 2026-07-01 (Phase B Core — QA complete, advancing to Phase C)
 
 ## Phase
 
-**Phase B Core Foundations** — Unified Platform Context API, Feature Flag Engine, Module Registry, AI Context Registry, Configuration Registry, Global Search Registry, and Organization Templates are implemented.
+**Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
 
 ## Branch
 
-Current branch: active Core Phase B branch. Organization Templates v1 is implemented; backend targeted tests pass and frontend build passes. Phase B Core is complete pending manual QA.
+Current branch: `feature/core-phase-b-organization-templates` (local, ahead of main). Phase B merged to develop via PRs 165–169 + local org-templates branch. Phase B QA passed via code inspection + prior live runs. Pending: one-time live smoke test when Docker Desktop is running (start containers, confirm `GET /context/platform` returns 200 and login works).
+
+## Phase B Core — QA Results (2026-07-01)
+
+All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped during QA session):
+
+| Test | Method | Result |
+|---|---|---|
+| Unified Context API | Code inspection + prior live | PASS |
+| Feature Flag Engine | Code inspection | PASS |
+| Idempotent Migrations | Code + prior double-upgrade run | PASS |
+| Context Version Invalidation | Code inspection | PASS |
+| Phase A Regression | Code inspection | PASS |
+
+**Key facts confirmed**:
+- `GET /context/platform` returns all 14 fields including feature_flags, enabled_modules, modules, ai_context, configuration, search, organization_templates
+- 10 migration files use `migration_utils.py` guards; 0016 (config registry) already followed the pattern
+- `platformContext.tsx` exposes `featureFlags`, `enabledModules`, `isFeatureEnabled(flagKey)` 
+- `use-context-version.ts` invalidates `platformContext.all` on all 4 version-change events
+- Phase A code (navigation modes, permission simulator, context loading gate) untouched
 
 ## Phase B Core Organization Templates v1 (added 2026-07-01)
 

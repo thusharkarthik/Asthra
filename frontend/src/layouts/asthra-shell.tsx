@@ -18,11 +18,11 @@ import { SearchDialog } from "@/components/search/search-dialog";
 import { ThemeToggle } from "@/components/navigation/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/navigation/workspace-switcher";
 import { Button } from "@/components/ui/button";
-import { useWorkspaceContextQueries } from "@/hooks/use-workspace-context";
 import { useCurrentPermissions, usePlatformContext } from "@/context/platformContext";
 import { OnboardingGate } from "@/components/platform/platform-setup-guide";
 import { ContextualHelpModal } from "@/components/platform/contextual-help";
 import { useAuthStore } from "@/stores/auth-store";
+import { useLogout } from "@/hooks/use-logout";
 import { settingsApi } from "@/services/api/settings-api";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useProgressStore } from "@/stores/progress-store";
@@ -38,11 +38,6 @@ const AUTH_ROUTE_SWAP_DELAY_MS = 220;
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function WorkspaceContextLoader() {
-  useWorkspaceContextQueries();
-  return null;
 }
 
 function AppLoadingScreen({ label }: { label: string }) {
@@ -91,10 +86,9 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const currentUser = useAuthStore((state) => state.currentUser);
   const accessToken = useAuthStore((state) => state.accessToken);
-  const logout = useAuthStore((state) => state.logout);
-  const { organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt } = usePlatformContext();
+  const logout = useLogout();
+  const { currentUser, organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const zustandUnread = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
@@ -103,7 +97,9 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     queryFn: () => settingsApi.listNotifications(accessToken ?? ""),
     enabled: Boolean(accessToken && isAuthenticated),
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const coreUnread = (coreNotificationsQuery.data ?? []).filter((n) => !n.is_read).length;
   const unreadNotifications = zustandUnread + coreUnread;
@@ -231,8 +227,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     setUserMenuOpen(false);
     startProgress();
     setAuthTransition("logout");
-    await wait(AUTH_ROUTE_SWAP_DELAY_MS);
     logout();
+    await wait(AUTH_ROUTE_SWAP_DELAY_MS);
     router.replace("/login");
     await wait(AUTH_LOGOUT_TRANSITION_MS - AUTH_ROUTE_SWAP_DELAY_MS + 100);
     completeProgress();
@@ -246,7 +242,6 @@ export function AsthraShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <WorkspaceContextLoader />
       <div className="flex min-h-0 flex-1 pb-3">
         <aside className={cn("hidden min-h-0 shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">

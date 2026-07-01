@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField, SettingsCard, SettingsDangerZone, SettingsLayout, SettingsSectionHeader } from "@/components/settings/settings-components";
 import { useAuthStore } from "@/stores/auth-store";
+import { useLogout } from "@/hooks/use-logout";
 import { useToastStore } from "@/stores/toast-store";
 import { settingsApi } from "@/services/api/settings-api";
 
@@ -31,7 +32,7 @@ function formatDate(dateStr: string | null | undefined): string {
 export default function AccountSettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
-  const logout = useAuthStore((state) => state.logout);
+  const logout = useLogout();
   const addToast = useToastStore((state) => state.addToast);
 
   const [currentPassword, setCurrentPassword] = useState("");

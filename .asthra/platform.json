@@ -16,14 +16,14 @@
     "Future cross-service coordination uses events.",
     "Ownership boundaries must be respected."
   ],
-  "currentPhase": "Phase B Core — Intelligence Layer",
+  "currentPhase": "Phase C Core — Enterprise Grade",
   "targetUser": "Engineering and product teams at growing companies, 20–200 people, who need structured execution without enterprise tool overhead.",
   "currentPriority": [
-    "Unified Platform Context API",
-    "Feature Flag Engine",
-    "Module Registry",
-    "Memory page",
-    "AI Context Registry"
+    "Policy Engine",
+    "Labels system",
+    "Global Search Registry (runtime)",
+    "Organization Templates (UI)",
+    "AI Context Registry (UI)"
   ],
   "doNotTouch": [
     "shared packages (shared-auth, shared-db, shared-events, shared-schemas, shared-platform) without explicit instruction",

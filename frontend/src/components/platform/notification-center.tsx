@@ -26,6 +26,10 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
     queryKey: ["core", "notifications"],
     queryFn: () => settingsApi.listNotifications(accessToken ?? ""),
     enabled: Boolean(accessToken && open),
+    staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1
   });
 

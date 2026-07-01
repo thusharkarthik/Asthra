@@ -12,6 +12,14 @@ type WorkspaceState = {
   setOrganizations: (organizations: Organization[]) => void;
   setWorkspaces: (workspaces: WorkspaceRecord[]) => void;
   setProjects: (projects: ProjectRecord[]) => void;
+  setPlatformContext: (context: {
+    organizations: Organization[];
+    workspaces: WorkspaceRecord[];
+    projects: ProjectRecord[];
+    currentOrganizationId?: number | null;
+    currentWorkspaceId?: number | null;
+    currentProjectId?: number | null;
+  }) => void;
   setSelectedOrganization: (organizationId: number | null) => void;
   setSelectedWorkspace: (workspaceId: number | null) => void;
   setSelectedProject: (projectId: number | null) => void;
@@ -62,6 +70,50 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const current = get().selectedProjectId;
         const selectedProjectId = scopedProjects.some((project) => project.id === current) ? current : scopedProjects[0]?.id ?? null;
         set({ projects, selectedProjectId });
+      },
+      setPlatformContext: ({ organizations, workspaces, projects, currentOrganizationId, currentWorkspaceId, currentProjectId }) => {
+        const state = get();
+        const selectedOrganizationId = currentOrganizationId ?? (
+          organizations.some((organization) => organization.id === state.selectedOrganizationId)
+            ? state.selectedOrganizationId
+            : organizations[0]?.id ?? null
+        );
+        const scopedWorkspaces = selectedOrganizationId
+          ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
+          : workspaces;
+        const selectedWorkspaceId = currentWorkspaceId ?? (
+          scopedWorkspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)
+            ? state.selectedWorkspaceId
+            : scopedWorkspaces[0]?.id ?? null
+        );
+        const scopedProjects = selectedWorkspaceId
+          ? projects.filter((project) => project.workspace_id === selectedWorkspaceId)
+          : projects;
+        const selectedProjectId = currentProjectId ?? (
+          scopedProjects.some((project) => project.id === state.selectedProjectId)
+            ? state.selectedProjectId
+            : scopedProjects[0]?.id ?? null
+        );
+        const sameIds = (left: { id: number }[], right: { id: number }[]) =>
+          left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
+        if (
+          state.selectedOrganizationId === selectedOrganizationId &&
+          state.selectedWorkspaceId === selectedWorkspaceId &&
+          state.selectedProjectId === selectedProjectId &&
+          sameIds(state.organizations, organizations) &&
+          sameIds(state.workspaces, workspaces) &&
+          sameIds(state.projects, projects)
+        ) {
+          return;
+        }
+        set({
+          organizations,
+          workspaces,
+          projects,
+          selectedOrganizationId,
+          selectedWorkspaceId,
+          selectedProjectId
+        });
       },
       setSelectedOrganization: (organizationId) =>
         set({ selectedOrganizationId: organizationId, selectedWorkspaceId: null, selectedProjectId: null }),
