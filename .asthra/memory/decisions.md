@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-02 — Settings Scoped Admin Routes Must Authorize With Scoped Permission Codes
+
+**Decision**: Settings scoped admin routes must not deny access from empty unscoped permissions. Routes for organization, workspace, and project settings must use explicit backend permission codes resolved for the route scope. Broad Settings layout authority can protect general admin pages, but it must not render a denied state before route-specific context/scoped permissions have completed.
+
+**Why**: Organization owners/admins can receive valid scoped permissions immediately after organization/workspace/project creation while the layout's unscoped permission or role-assignment authority cache is still empty/stale. Showing "Request Access" from the parent layout creates a false denial even though scoped platform context and `GET /me/permissions?...` return the correct `settings.<resource>.*` permissions.
+
+**How to apply**: Route pages should show loading while scoped permissions are pending, render content when one of the accepted permission codes is present, and show denied only after the scoped query resolves without access. Edit actions should use `settings.<resource>.edit` or `settings.<resource>.manage`, not role names or adjacent archive/restore permissions.
+
 ## 2026-07-01 — Authenticated No-Org Onboarding Owns the Initial Home Flow
 
 **Decision**: Once platform context settles with an authenticated user and `organizations: []`, the shell/onboarding path owns the first-run experience. Home/dashboard data queries must stay disabled until the user either creates an organization or explicitly skips onboarding.
@@ -386,3 +394,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: Selected organization/workspace/project IDs can survive across logout/register/browser refresh. A newly registered no-org user must never send a previous user's work-scope IDs, even though the backend safely rejects or nulls them.
 
 **How to apply**: Clear session-scoped work context on login/register/logout. PlatformContext should bootstrap unscoped when persisted IDs cannot be confirmed by current cached organizations/workspaces/projects, then commit the backend-confirmed default scope. No-org users keep null work scope and should not run scoped context-version checks.
+
+## 2026-07-01 — Settings Core Structure Mutations Use Targeted Invalidation
+
+**Decision**: Organization, workspace, and project create/edit mutations should invalidate only the affected core structure queries plus Unified Platform Context and context version. They should not invalidate all Settings, roles, permissions, members, teams, and invitations unless the mutation actually changes access or member state.
+
+**Why**: Broad invalidation after core structure mutations caused repeated Settings/Admin API calls and stale authority flicker. Core structure changes need fresh org/workspace/project/context data, while role/member/access mutations remain responsible for authority-wide invalidation.
+
+**How to apply**: Use targeted invalidation for `organizations`, `workspaces`, `projects`, `platform-context`, and `context.versionRoot`. Refetch active access state after organization creation because owner/admin role assignments must unlock Settings immediately.

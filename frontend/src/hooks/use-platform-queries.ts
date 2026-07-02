@@ -121,14 +121,18 @@ export function usePermissions() {
   });
 }
 
-export function useCurrentPermissions(scopeOverride?: { orgId?: number | null; workspaceId?: number | null; projectId?: number | null }) {
+export function useCurrentPermissions(
+  scopeOverride?: { orgId?: number | null; workspaceId?: number | null; projectId?: number | null },
+  options?: { enabled?: boolean }
+) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
-  const orgId = scopeOverride?.orgId ?? selectedOrganizationId ?? undefined;
-  const workspaceId = scopeOverride?.workspaceId ?? selectedWorkspaceId ?? undefined;
-  const projectId = scopeOverride?.projectId ?? selectedProjectId ?? undefined;
+  const hasScopeOverride = scopeOverride != null;
+  const orgId = hasScopeOverride ? scopeOverride.orgId ?? undefined : selectedOrganizationId ?? undefined;
+  const workspaceId = hasScopeOverride ? scopeOverride.workspaceId ?? undefined : selectedWorkspaceId ?? undefined;
+  const projectId = hasScopeOverride ? scopeOverride.projectId ?? undefined : selectedProjectId ?? undefined;
 
   return useQuery({
     queryKey: queryKeys.permissions.current(orgId, workspaceId, projectId),
@@ -137,7 +141,7 @@ export function useCurrentPermissions(scopeOverride?: { orgId?: number | null; w
       workspace_id: workspaceId,
       project_id: projectId
     }),
-    enabled: Boolean(accessToken),
+    enabled: Boolean(accessToken && (options?.enabled ?? true)),
     staleTime: 60_000
   });
 }

@@ -7,13 +7,18 @@ import { useParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { usePlatformContext } from "@/context/platformContext";
-import { useSettingsAuthority } from "@/app/settings/layout";
+import { RequestAccessButton } from "@/app/settings/layout";
 import { settingsApi } from "@/services/api/settings-api";
 import type { OrgHealthRecord, OrgSettingsRecord } from "@/services/api/settings-api";
+import { SETTINGS_ACTIONS } from "@/access/actionRegistry";
+import { can as hasPermission } from "@/lib/permissions";
+import { queryKeys } from "@/lib/queryKeys";
+import { useCurrentPermissions as useScopedCurrentPermissions } from "@/hooks/use-platform-queries";
 import {
   SettingsLayout,
   SettingsCard,
   SettingsDangerZone,
+  SettingsEmptyState,
   FormField,
 } from "@/components/settings/settings-components";
 import { Button } from "@/components/ui/button";
@@ -140,36 +145,57 @@ function OrgTabs({ orgId, active }: { orgId: number; active: "overview" | "membe
 export default function OrganizationSettingsPage() {
   const params = useParams<{ id: string }>();
   const orgId = Number(params.id);
+  const hasValidOrgId = Number.isFinite(orgId) && orgId > 0;
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
-  const { organizations, workspaces, permissions } = usePlatformContext();
-  const { authorityLevel, orgId: authorityOrgId } = useSettingsAuthority();
+  const { organizations, workspaces } = usePlatformContext();
+  const orgPermissionsQuery = useScopedCurrentPermissions(
+    { orgId: hasValidOrgId ? orgId : null, workspaceId: null, projectId: null },
+    { enabled: hasValidOrgId && !currentUser?.is_superuser }
+  );
 
   const org = organizations.find((o) => o.id === orgId);
   const scopedWorkspaces = workspaces.filter((w) => w.organization_id === orgId);
-
-  const isAuthorized =
-    authorityLevel === "superuser" ||
-    authorityLevel === "platform" ||
-    (authorityLevel === "org" && authorityOrgId === orgId);
+  const scopedPermissionCodes = orgPermissionsQuery.data?.permission_codes ?? [];
+  const canManageOrganization = hasPermission(scopedPermissionCodes, "settings.organization.manage");
+  const canViewOrganization = Boolean(
+    currentUser?.is_superuser ||
+      canManageOrganization ||
+      hasPermission(scopedPermissionCodes, "settings.organization.view") ||
+      hasPermission(scopedPermissionCodes, SETTINGS_ACTIONS.organizationEdit.permissionCode)
+  );
+  const canEditOrganization = Boolean(
+    currentUser?.is_superuser ||
+      canManageOrganization ||
+      hasPermission(scopedPermissionCodes, SETTINGS_ACTIONS.organizationEdit.permissionCode)
+  );
+  const canArchiveOrganization = Boolean(
+    currentUser?.is_superuser ||
+      canManageOrganization ||
+      hasPermission(scopedPermissionCodes, SETTINGS_ACTIONS.organizationArchive.permissionCode)
+  );
+  const canRestoreOrganization = Boolean(
+    currentUser?.is_superuser ||
+      canManageOrganization ||
+      hasPermission(scopedPermissionCodes, SETTINGS_ACTIONS.organizationRestore.permissionCode)
+  );
+  const organizationInactive = org?.is_active === false;
+  const canChangeOrganizationStatus = organizationInactive ? canRestoreOrganization : canArchiveOrganization;
 
   const settingsQuery = useQuery({
     queryKey: ["org-settings", orgId],
     queryFn: () => settingsApi.getOrganizationSettings(accessToken ?? "", orgId),
-    enabled: Boolean(accessToken && orgId),
+    enabled: Boolean(accessToken && hasValidOrgId && canViewOrganization),
   });
 
-  const canViewHealth = Boolean(
-    currentUser?.is_superuser ||
-      permissions?.roles?.some((r) => ["platform_owner", "platform_admin", "organization_owner", "organization_admin"].includes(r.key))
-  );
+  const canViewHealth = canViewOrganization;
 
   const healthQuery = useQuery({
     queryKey: ["org-health", orgId],
     queryFn: () => settingsApi.getOrgHealth(accessToken ?? "", orgId),
-    enabled: Boolean(accessToken && orgId && canViewHealth),
+    enabled: Boolean(accessToken && hasValidOrgId && canViewHealth),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -216,7 +242,12 @@ export default function OrganizationSettingsPage() {
     mutationFn: (payload: { name: string; description?: string }) =>
       settingsApi.updateOrganization(accessToken ?? "", orgId, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+      ]);
+      await queryClient.refetchQueries({ queryKey: queryKeys.platformContext.all, type: "active" });
       addToast({ type: "success", title: "Saved", message: "Organization details updated." });
     },
     onError: () => addToast({ type: "error", title: "Save failed", message: "Could not update organization." }),
@@ -237,7 +268,12 @@ export default function OrganizationSettingsPage() {
       settingsApi.updateOrganization(accessToken ?? "", orgId, { is_active: false }),
     onSuccess: async () => {
       setDeactivateConfirm(false);
-      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+      ]);
+      await queryClient.refetchQueries({ queryKey: queryKeys.platformContext.all, type: "active" });
       addToast({ type: "success", title: "Deactivated", message: "Organization has been deactivated." });
     },
     onError: () => addToast({ type: "error", title: "Failed", message: "Could not deactivate organization." }),
@@ -268,6 +304,48 @@ export default function OrganizationSettingsPage() {
     { label: "Organizations", href: "/settings/organizations" },
     { label: org?.name ?? "Organization" },
   ];
+
+  if (!hasValidOrgId) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
+        <EmptyModuleState title="Organization not found" description="This organization route is invalid." />
+      </SettingsLayout>
+    );
+  }
+
+  if (orgPermissionsQuery.isLoading || (orgPermissionsQuery.isFetching && !orgPermissionsQuery.data)) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
+        <SettingsEmptyState
+          title="Checking access"
+          description="Verifying your organization permissions."
+        />
+      </SettingsLayout>
+    );
+  }
+
+  if (orgPermissionsQuery.isError) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
+        <SettingsEmptyState
+          title="Unable to verify access"
+          description="We could not verify your organization permissions. Try refreshing this page."
+        />
+      </SettingsLayout>
+    );
+  }
+
+  if (!canViewOrganization) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
+        <SettingsEmptyState
+          title="Access Restricted"
+          description="You don't have permission to access this organization settings page."
+          action={<RequestAccessButton page={`/settings/organizations/${orgId}`} />}
+        />
+      </SettingsLayout>
+    );
+  }
 
   if (!org && organizations.length > 0) {
     return (
@@ -316,10 +394,18 @@ export default function OrganizationSettingsPage() {
       )}
 
       {/* General settings */}
-      <SettingsCard title="General" description="Name and description shown across Asthra.">
-        <form className="space-y-4" onSubmit={handleSaveGeneral}>
+      <SettingsCard
+        title="General"
+        description="Name and description shown across Asthra."
+        actions={canEditOrganization ? (
+          <Button type="submit" form="organization-general-form" disabled={updateOrgMutation.isPending}>
+            {updateOrgMutation.isPending ? "Saving…" : "Edit Organization"}
+          </Button>
+        ) : null}
+      >
+        <form id="organization-general-form" className="space-y-4" onSubmit={handleSaveGeneral}>
           <FormField label="Organization Name" required>
-            <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} disabled={!isAuthorized} />
+            <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} disabled={!canEditOrganization} />
           </FormField>
           <FormField label="Description">
             <textarea
@@ -327,16 +413,9 @@ export default function OrganizationSettingsPage() {
               onChange={(e) => setOrgDesc(e.target.value)}
               className={DESCRIPTION_CLASS}
               rows={3}
-              disabled={!isAuthorized}
+              disabled={!canEditOrganization}
             />
           </FormField>
-          {isAuthorized && (
-            <div className="flex justify-end">
-              <Button type="submit" disabled={updateOrgMutation.isPending}>
-                {updateOrgMutation.isPending ? "Saving…" : "Save General"}
-              </Button>
-            </div>
-          )}
         </form>
       </SettingsCard>
 
@@ -350,7 +429,7 @@ export default function OrganizationSettingsPage() {
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder="mycompany.com"
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               />
             </FormField>
             <FormField label="Website URL">
@@ -359,7 +438,7 @@ export default function OrganizationSettingsPage() {
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 placeholder="https://mycompany.com"
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               />
             </FormField>
             <FormField label="Industry">
@@ -367,7 +446,7 @@ export default function OrganizationSettingsPage() {
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
                 className={SELECT_CLASS}
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               >
                 <option value="">Select industry…</option>
                 {INDUSTRIES.map((ind) => (
@@ -389,7 +468,7 @@ export default function OrganizationSettingsPage() {
                   setLogoValid(false);
                 }}
                 placeholder="https://cdn.example.com/logo.png"
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               />
             </FormField>
             {logoUrl && (
@@ -424,7 +503,7 @@ export default function OrganizationSettingsPage() {
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
                   className="h-9 w-12 rounded border cursor-pointer disabled:cursor-not-allowed"
-                  disabled={!isAuthorized}
+                  disabled={!canEditOrganization}
                 />
                 <Input
                   type="text"
@@ -432,7 +511,7 @@ export default function OrganizationSettingsPage() {
                   onChange={(e) => setPrimaryColor(e.target.value)}
                   placeholder="#000000"
                   className="w-32"
-                  disabled={!isAuthorized}
+                  disabled={!canEditOrganization}
                 />
               </div>
             </FormField>
@@ -446,7 +525,7 @@ export default function OrganizationSettingsPage() {
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
                 className={SELECT_CLASS}
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               >
                 {TIMEZONES.map((tz) => (
                   <option key={tz} value={tz}>{tz}</option>
@@ -458,7 +537,7 @@ export default function OrganizationSettingsPage() {
                 value={locale}
                 onChange={(e) => setLocale(e.target.value)}
                 className={SELECT_CLASS}
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               >
                 {LOCALES.map((l) => (
                   <option key={l.value} value={l.value}>{l.label}</option>
@@ -470,7 +549,7 @@ export default function OrganizationSettingsPage() {
                 value={dateFormat}
                 onChange={(e) => setDateFormat(e.target.value)}
                 className={SELECT_CLASS}
-                disabled={!isAuthorized}
+                disabled={!canEditOrganization}
               >
                 {DATE_FORMATS.map((df) => (
                   <option key={df.value} value={df.value}>{df.label}</option>
@@ -480,7 +559,7 @@ export default function OrganizationSettingsPage() {
           </div>
         </SettingsCard>
 
-        {isAuthorized && (
+        {canEditOrganization && (
           <div className="flex justify-end">
             <Button type="submit" disabled={updateSettingsMutation.isPending}>
               {updateSettingsMutation.isPending ? "Saving…" : "Save Settings"}
@@ -490,7 +569,7 @@ export default function OrganizationSettingsPage() {
       </form>
 
       {/* Danger Zone */}
-      {isAuthorized && (
+      {canChangeOrganizationStatus && (
         <SettingsDangerZone
           description="Deactivating the organization will suspend access for all members. This can be reversed by a platform admin."
           actions={

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { usePlatformContext } from "@/context/platformContext";
+import { RequestAccessButton } from "@/app/settings/layout";
 import { settingsApi } from "@/services/api/settings-api";
 import { queryKeys } from "@/lib/queryKeys";
 import { normalizeRole } from "@/lib/role-utils";
@@ -30,6 +31,8 @@ import {
   SettingsLayout,
   SettingsSectionHeader
 } from "@/components/settings/settings-components";
+
+const SETTINGS_QUERY_STALE_TIME = 60_000;
 
 function SettingsLinkButton({ href, children, variant = "default" }: { href: string; children: ReactNode; variant?: "default" | "outline" }) {
   return (
@@ -53,17 +56,29 @@ function useSettingsData() {
   const organizationsQuery = useQuery({
     queryKey: [...queryKeys.organizations.list, "settings-all"],
     queryFn: () => settingsApi.listOrganizations(accessToken ?? "", { include_inactive: true }),
-    enabled: Boolean(accessToken)
+    enabled: Boolean(accessToken),
+    staleTime: SETTINGS_QUERY_STALE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const workspacesQuery = useQuery({
     queryKey: [...queryKeys.workspaces.list(null), "settings-all"],
     queryFn: () => settingsApi.listWorkspaces(accessToken ?? "", { include_inactive: true }),
-    enabled: Boolean(accessToken)
+    enabled: Boolean(accessToken),
+    staleTime: SETTINGS_QUERY_STALE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const projectsQuery = useQuery({
     queryKey: [...queryKeys.projects.list(null), "settings-all"],
     queryFn: () => settingsApi.listProjects(accessToken ?? "", { include_inactive: true }),
-    enabled: Boolean(accessToken)
+    enabled: Boolean(accessToken),
+    staleTime: SETTINGS_QUERY_STALE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -86,14 +101,18 @@ function useSettingsData() {
   };
 }
 
-function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: number; projectId?: number }) {
+function useCurrentPermissions(
+  scopeOverride?: { orgId?: number; workspaceId?: number; projectId?: number },
+  options?: { enabled?: boolean }
+) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
-  const orgId = scopeOverride?.orgId ?? selectedOrganizationId ?? undefined;
-  const workspaceId = scopeOverride?.workspaceId ?? selectedWorkspaceId ?? undefined;
-  const projectId = scopeOverride?.projectId ?? selectedProjectId ?? undefined;
+  const hasScopeOverride = scopeOverride != null;
+  const orgId = hasScopeOverride ? scopeOverride.orgId ?? undefined : selectedOrganizationId ?? undefined;
+  const workspaceId = hasScopeOverride ? scopeOverride.workspaceId ?? undefined : selectedWorkspaceId ?? undefined;
+  const projectId = hasScopeOverride ? scopeOverride.projectId ?? undefined : selectedProjectId ?? undefined;
   const query = useQuery<CurrentUserPermissions>({
     queryKey: queryKeys.permissions.current(orgId, workspaceId, projectId),
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {
@@ -101,7 +120,11 @@ function useCurrentPermissions(scopeOverride?: { orgId?: number; workspaceId?: n
       workspace_id: workspaceId,
       project_id: projectId
     }),
-    enabled: Boolean(accessToken)
+    enabled: Boolean(accessToken && (options?.enabled ?? true)),
+    staleTime: SETTINGS_QUERY_STALE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const permissionCodes = query.data?.permission_codes ?? [];
   return {
@@ -116,6 +139,33 @@ function permissionActionScope(permissions: ReturnType<typeof useCurrentPermissi
     permissionCodes: permissions.permissionCodes,
     isLoading: permissions.isLoading || permissions.isFetching
   };
+}
+
+async function refreshActiveAccessState(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
+    queryClient.invalidateQueries({ queryKey: ["members-page"] }),
+  ]);
+  await Promise.all([
+    queryClient.refetchQueries({ queryKey: queryKeys.platformContext.all, type: "active" }),
+    queryClient.refetchQueries({ queryKey: ["members-page"], type: "active" }),
+  ]);
+}
+
+function invalidateCoreStructureQueries(
+  queryClient: QueryClient,
+  affected: { organizations?: boolean; workspaces?: boolean; projects?: boolean }
+) {
+  const invalidations: Array<Promise<unknown>> = [
+    queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+  ];
+  if (affected.organizations) invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }));
+  if (affected.workspaces) invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all }));
+  if (affected.projects) invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.projects.all }));
+  return Promise.all(invalidations);
 }
 
 function getFormValue(form: HTMLFormElement, name: string) {
@@ -441,9 +491,13 @@ function ConfirmActionButton({
   );
 }
 
+function SetupSummaryView({ organizations, workspaces, projects }: { organizations: unknown[]; workspaces: unknown[]; projects: unknown[] }) {
+  return <PlatformSetupSteps hasOrganization={organizations.length > 0} hasWorkspace={workspaces.length > 0} hasProject={projects.length > 0} />;
+}
+
 function SetupSummary() {
   const { organizations, workspaces, projects } = useSettingsData();
-  return <PlatformSetupSteps hasOrganization={organizations.length > 0} hasWorkspace={workspaces.length > 0} hasProject={projects.length > 0} />;
+  return <SetupSummaryView organizations={organizations} workspaces={workspaces} projects={projects} />;
 }
 
 export function SettingsHomeView() {
@@ -469,7 +523,7 @@ export function SettingsHomeView() {
         title="Settings"
         description="Admin center for account preferences, organizations, workspaces, projects, members, roles, and platform setup."
       />
-      <SetupSummary />
+      <SetupSummaryView organizations={organizations} workspaces={workspaces} projects={projects} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <Link key={card.title} href={card.href} className="rounded-lg border bg-card p-4 hover:bg-muted/60">
@@ -616,7 +670,8 @@ export function OrganizationsView() {
       setOpen(false);
       setFormError(null);
       setSelectedOrganization(organization.id);
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { organizations: true, workspaces: true, projects: true });
+      await refreshActiveAccessState(queryClient);
       addToast({ type: "success", title: "Organization created", message: `${organization.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create organization.")
@@ -630,7 +685,8 @@ export function OrganizationsView() {
       setOnboardFormError(null);
       const owner = (usersQuery.data ?? []).find((u) => u.id === variables.owner_user_id);
       const ownerName = owner ? (owner.full_name || owner.email) : "the selected user";
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { organizations: true, workspaces: true, projects: true });
+      await refreshActiveAccessState(queryClient);
       addToast({ type: "success", title: "Organization onboarded", message: `${organization.name} created. ${ownerName} has been assigned as Owner.` });
     },
     onError: (error) => setOnboardFormError(error instanceof Error ? error.message : "Unable to onboard organization."),
@@ -761,8 +817,15 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   const setSelectedWorkspace = useWorkspaceStore((state) => state.setSelectedWorkspace);
   const targetOrganizationId = organizationId ?? selectedOrganizationId ?? organizations[0]?.id;
   const targetOrganization = organizations.find((organization) => organization.id === targetOrganizationId);
-  const permissions = useCurrentPermissions({ orgId: targetOrganizationId ?? undefined });
-  const canCreateWorkspace = permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode);
+  const permissions = useCurrentPermissions(
+    { orgId: targetOrganizationId ?? undefined },
+    { enabled: Boolean(targetOrganizationId) }
+  );
+  const isWorkspacePermissionLoading = Boolean(targetOrganizationId && (permissions.isLoading || (permissions.isFetching && !permissions.data)));
+  const canCreateWorkspace =
+    permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode) ||
+    permissions.can("settings.workspace.manage") ||
+    permissions.can("settings.organization.manage");
   const visibleWorkspaces = organizationId ? workspaces.filter((workspace) => workspace.organization_id === organizationId) : workspaces;
 
   const mutation = useMutation({
@@ -771,7 +834,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       setOpen(false);
       setFormError(null);
       setSelectedWorkspace(workspace.id);
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { workspaces: true, projects: true });
       addToast({ type: "success", title: "Workspace created", message: `${workspace.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create workspace.")
@@ -830,7 +893,12 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
         description="Workspaces connect teams, projects, and module data under an organization."
         actions={canCreateWorkspace ? <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton> : undefined}
       />
-      {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.create to create workspaces in this scope." /> : null}
+      {isWorkspacePermissionLoading ? (
+        <SettingsCard title="Checking access" description="Loading workspace permissions for this Settings scope." />
+      ) : null}
+      {!isWorkspacePermissionLoading && targetOrganizationId && !canCreateWorkspace ? (
+        <SettingsCard title="Limited access" description="You need settings.workspace.create or settings.workspace.manage to create workspaces in this scope." />
+      ) : null}
       {!organizations.length ? (
         <SettingsEmptyState title="Create an organization first" description="A workspace must belong to an organization." action={<SettingsLinkButton href="/settings/organizations">Create Organization</SettingsLinkButton>} />
       ) : (
@@ -890,8 +958,15 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
     : workspaces;
   const targetWorkspaceId = workspaceId ?? visibleWorkspaces[0]?.id;
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
-  const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
-  const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
+  const permissions = useCurrentPermissions(
+    { workspaceId: targetWorkspaceId ?? undefined },
+    { enabled: Boolean(targetWorkspaceId) }
+  );
+  const isProjectPermissionLoading = Boolean(targetWorkspaceId && (permissions.isLoading || (permissions.isFetching && !permissions.data)));
+  const canCreateProject =
+    permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode) ||
+    permissions.can("settings.project.manage") ||
+    permissions.can("settings.workspace.manage");
   const visibleProjects = (workspaceId ? projects.filter((project) => project.workspace_id === workspaceId) : projects).filter((project) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
@@ -904,7 +979,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       setOpen(false);
       setFormError(null);
       setSelectedProject(project.id);
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { projects: true });
       addToast({ type: "success", title: "Project created", message: `${project.name} is now selected.` });
     },
     onError: (error) => setFormError(error instanceof Error ? error.message : "Unable to create project.")
@@ -962,7 +1037,12 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
         description="Projects scope Flow work, Docs knowledge, discovery, tickets, and operations."
         actions={canCreateProject ? <QuickCreateButton onClick={() => setOpen(true)}>Create Project</QuickCreateButton> : undefined}
       />
-      {!canCreateProject ? <SettingsCard title="Limited access" description="You need settings.project.create to create projects in this scope." /> : null}
+      {isProjectPermissionLoading ? (
+        <SettingsCard title="Checking access" description="Loading project permissions for this Settings scope." />
+      ) : null}
+      {!isProjectPermissionLoading && targetWorkspaceId && !canCreateProject ? (
+        <SettingsCard title="Limited access" description="You need settings.project.create or settings.project.manage to create projects in this scope." />
+      ) : null}
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
       ) : (
@@ -1029,14 +1109,13 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
   const permissions = useCurrentPermissions({ orgId: organizationId });
   const canEditOrganization =
     permissions.can(SETTINGS_ACTIONS.organizationEdit.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.organizationArchive.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.organizationRestore.permissionCode);
+    permissions.can("settings.organization.manage");
   const updateMutation = useMutation({
     mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateOrganization(accessToken ?? "", organizationId, payload),
     onSuccess: async (updatedOrganization) => {
       setEditOpen(false);
       setFormError(null);
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { organizations: true });
       addToast({
         type: "success",
         title: "Organization updated",
@@ -1141,17 +1220,19 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const scopedProjects = projects.filter((project) => project.workspace_id === workspaceId);
   const permissions = useCurrentPermissions({ workspaceId });
-  const workspaceActionScope = permissionActionScope(permissions);
+  const canViewWorkspace =
+    permissions.can("settings.workspace.view") ||
+    permissions.can(SETTINGS_ACTIONS.workspaceEdit.permissionCode) ||
+    permissions.can("settings.workspace.manage");
   const canEditWorkspace =
     permissions.can(SETTINGS_ACTIONS.workspaceEdit.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.workspaceArchive.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.workspaceRestore.permissionCode);
+    permissions.can("settings.workspace.manage");
   const updateMutation = useMutation({
     mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateWorkspace(accessToken ?? "", workspaceId, payload),
     onSuccess: async (updatedWorkspace) => {
       setEditOpen(false);
       setFormError(null);
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { workspaces: true, projects: true });
       addToast({ type: "success", title: "Workspace updated", message: `${updatedWorkspace.name} was saved.` });
     },
     onError: (error) => {
@@ -1163,6 +1244,24 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
 
   if (!workspace) {
     return <SettingsEmptyState title="Workspace not found" description="Refresh the page or open the workspaces list." action={<SettingsLinkButton href="/settings/workspaces">Workspaces</SettingsLinkButton>} />;
+  }
+
+  if (permissions.isLoading || (permissions.isFetching && !permissions.data)) {
+    return <SettingsEmptyState title="Checking access" description="Verifying your workspace permissions." />;
+  }
+
+  if (permissions.isError) {
+    return <SettingsEmptyState title="Unable to verify access" description="We could not verify your workspace permissions. Try refreshing this page." />;
+  }
+
+  if (!canViewWorkspace) {
+    return (
+      <SettingsEmptyState
+        title="Access Restricted"
+        description="You don't have permission to access this workspace settings page."
+        action={<RequestAccessButton page={`/settings/workspaces/${workspaceId}`} />}
+      />
+    );
   }
 
   return (
@@ -1180,11 +1279,7 @@ export function WorkspaceDetailView({ workspaceId }: { workspaceId: number }) {
       <SettingsSectionHeader
         title={workspace.name}
         description={workspace.description ?? "Workspace administration and project setup."}
-        actions={
-          <PermissionAction actionKey={SETTINGS_ACTIONS.workspaceEdit.actionKey} scope={workspaceActionScope}>
-            <Button type="button" onClick={() => setEditOpen(true)}>Edit Workspace</Button>
-          </PermissionAction>
-        }
+        actions={canEditWorkspace ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Workspace</Button> : undefined}
       />
       <AdminTabs
         tabs={[
@@ -1260,22 +1355,35 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
   const isProjectArchived = project?.is_active === false || project?.status === "archived" || project?.status === "inactive";
   const projectWorkspace = project ? workspaces.find((workspace) => workspace.id === project.workspace_id) : undefined;
   const projectOrganizationId = project?.organization_id ?? projectWorkspace?.organization_id;
-  const permissions = useCurrentPermissions({ orgId: projectOrganizationId, workspaceId: project?.workspace_id, projectId });
+  const permissions = useCurrentPermissions(
+    { orgId: projectOrganizationId, workspaceId: project?.workspace_id, projectId },
+    { enabled: Boolean(project) }
+  );
   const projectActionScope = permissionActionScope(permissions);
-  const canEditProject = permissions.can(SETTINGS_ACTIONS.projectEdit.permissionCode);
-  const canArchiveProject = permissions.can(SETTINGS_ACTIONS.projectArchive.permissionCode);
-  const canRestoreProject = permissions.can(SETTINGS_ACTIONS.projectRestore.permissionCode);
+  const canViewProject =
+    permissions.can("settings.project.view") ||
+    permissions.can(SETTINGS_ACTIONS.projectEdit.permissionCode) ||
+    permissions.can("settings.project.manage");
+  const canEditProject =
+    permissions.can(SETTINGS_ACTIONS.projectEdit.permissionCode) ||
+    permissions.can("settings.project.manage");
+  const canArchiveProject =
+    permissions.can(SETTINGS_ACTIONS.projectArchive.permissionCode) ||
+    permissions.can("settings.project.manage");
+  const canRestoreProject =
+    permissions.can(SETTINGS_ACTIONS.projectRestore.permissionCode) ||
+    permissions.can("settings.project.manage");
   const workspaceMembersQuery = useQuery({
     queryKey: ["settings", "project-owner-members", project?.workspace_id],
     queryFn: () => settingsApi.listWorkspaceMembers(accessToken ?? "", project?.workspace_id ?? 0),
-    enabled: Boolean(accessToken && project?.workspace_id)
+    enabled: Boolean(accessToken && project?.workspace_id && canViewProject)
   });
   const projectMembersQuery = useQuery({
     queryKey: ["settings", "project-members", projectId],
     queryFn: () => settingsApi.listProjectMembers(accessToken ?? "", projectId),
-    enabled: Boolean(accessToken && projectId)
+    enabled: Boolean(accessToken && projectId && canViewProject)
   });
-  const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
+  const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken && canViewProject) });
   const ownerProfiles = useUserProfiles([
     ...(workspaceMembersQuery.data ?? []).map((member) => member.user_id),
     ...(projectMembersQuery.data ?? []).map((member) => member.user_id),
@@ -1288,7 +1396,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       setOwnerOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { projects: true });
       addToast({ type: "success", title: "Project owner updated" });
     },
     onError: (error) => addToast({ type: "error", title: "Owner update failed", message: error instanceof Error ? error.message : "Unable to update owner." })
@@ -1300,7 +1408,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
       setEditFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { projects: true });
       addToast({ type: "success", title: "Project updated", message: `${updatedProject.name} was saved.` });
     },
     onError: (error) => {
@@ -1314,7 +1422,7 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "projects"] });
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
-      await invalidateSettingsAndContext(queryClient);
+      await invalidateCoreStructureQueries(queryClient, { projects: true });
       addToast({
         type: "success",
         title: isProjectArchived ? "Project restored" : "Project archived",
@@ -1354,6 +1462,24 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
     return <SettingsEmptyState title="Project not found" description="Refresh the page or open the projects list." action={<SettingsLinkButton href="/settings/projects">Projects</SettingsLinkButton>} />;
   }
 
+  if (permissions.isLoading || (permissions.isFetching && !permissions.data)) {
+    return <SettingsEmptyState title="Checking access" description="Verifying your project permissions." />;
+  }
+
+  if (permissions.isError) {
+    return <SettingsEmptyState title="Unable to verify access" description="We could not verify your project permissions. Try refreshing this page." />;
+  }
+
+  if (!canViewProject) {
+    return (
+      <SettingsEmptyState
+        title="Access Restricted"
+        description="You don't have permission to access this project settings page."
+        action={<RequestAccessButton page={`/settings/projects/${projectId}`} />}
+      />
+    );
+  }
+
   function submitProjectMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const userId = Number(getFormValue(event.currentTarget, "user_id"));
@@ -1381,8 +1507,8 @@ export function ProjectDetailView({ projectId }: { projectId: number }) {
         title={project.name}
         description={project.description ?? "Project settings and operational metadata."}
         actions={<>
-          <PermissionButton actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope} type="button" onClick={() => setEditOpen(true)}>Edit Project</PermissionButton>
-          <PermissionButton actionKey={SETTINGS_ACTIONS.projectEdit.actionKey} scope={projectActionScope} type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</PermissionButton>
+          {canEditProject ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Project</Button> : null}
+          {canEditProject ? <Button type="button" variant="outline" onClick={() => setOwnerOpen(true)}>Assign Owner</Button> : null}
           <SettingsLinkButton href="/flow">Open Flow</SettingsLinkButton>
         </>}
       />

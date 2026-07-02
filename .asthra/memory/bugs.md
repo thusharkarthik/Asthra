@@ -2,6 +2,20 @@
 
 ## Fixed
 
+### BUG-042 — Workspace/Project Settings False Request Access From Broad Settings Gate [FIXED 2026-07-02]
+
+**Files**: `frontend/src/app/settings/layout.tsx`, `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: After the organization settings fix, navigating from organization settings into workspace settings could show Request Access until a browser refresh. Project settings had the same risk because broad Settings authority and stale/unscoped permissions could deny before workspace/project-scoped permissions resolved.
+**Root cause**: The parent Settings layout still made final access decisions for workspace/project settings routes using broad authority. Shared workspace/project views also rendered limited-access states from permission hooks before the intended scoped permission query had finished, and workspace edit visibility treated archive/restore as edit authority.
+**Fix**: Workspace/project settings routes now bypass the broad layout gate and let page-level scoped permission readiness decide access. Workspace and project list views show "Checking access" while scoped create permissions load. Workspace/project detail views wait for scoped permissions, show Request Access only after scoped denial, and use `settings.workspace.edit/manage` and `settings.project.edit/manage` for edit actions.
+
+### BUG-041 — Organization Settings False Request Access and Missing Edit Action [FIXED 2026-07-02]
+
+**Files**: `frontend/src/app/settings/layout.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/hooks/use-platform-queries.ts`
+**Symptom**: After creating an organization, opening `/settings/organizations` or `/settings/organizations/{id}` could show "Request Access" until a hard reload. The organization edit action was hidden even when the scoped org permission response contained `settings.organization.view`, `settings.organization.edit`, and `settings.organization.manage`.
+**Root cause**: The `/settings` layout blocked organization settings routes using broad role-assignment authority and the earlier empty unscoped `/me/permissions` result before organization-scoped context/permissions could resolve. The organization detail page also fell back to current platform-context permissions and treated archive/restore as edit authority instead of checking explicit `settings.organization.edit` / `settings.organization.manage`.
+**Fix**: Organization settings list/detail routes now bypass the broad layout authority gate. The detail page renders its own route-scoped loading/error/denied states, fetches organization-scoped permissions by route ID, grants view for `settings.organization.view/manage/edit`, grants edit for `settings.organization.edit/manage`, and only shows "Request Access" after the scoped permission query resolves as denied.
+
 ### BUG-039 — Self-Serve Organization Onboarding Did Not Own No-Org Flow [FIXED 2026-07-01]
 
 **Files**: `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/page.tsx`, `frontend/src/components/platform/platform-setup-guide.tsx`
@@ -287,3 +301,10 @@
 **Fix**: Created `app/db/migration_utils.py` with three shared helpers (`table_exists`, `index_exists`, `column_exists`). Retrofitted migrations 0001, 0005, 0006, 0008, 0010, 0011, 0013, 0014, 0015 — all `op.create_table` calls guarded with `if not table_exists(...)`, all `op.create_index` calls guarded with `if not index_exists(...)`.
 **Verification**: Double-upgrade test passed — first run applied 0014+0015 cleanly, second run was a silent no-op.
 **Standing rule**: All future migrations that create tables or indexes MUST use these guards. See `decisions.md`.
+
+### BUG-040 — Settings/Admin Core Structure Refresh Storm and Stale Access [FIXED 2026-07-01]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/app/settings/layout.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`, `frontend/src/hooks/use-platform-queries.ts`, `frontend/src/hooks/use-settings-mutations.ts`
+**Symptom**: After creating an organization, Settings could show Request Access until hard reload. Core Settings QA also showed repeated `/organizations`, `/workspaces`, `/projects`, `/roles`, `/role-assignments`, `/me/permissions`, and `/context/platform` calls after organization/workspace/project creation. Organization edit action was not clearly visible on the routed organization settings page.
+**Root cause**: Settings list/permission queries were immediately stale and refetched on remount/focus. Core structure mutations used broad `settings`/role/member/permission invalidations, causing unrelated settings queries to refetch. Scoped permission overrides accidentally inherited bottom-bar workspace/project IDs, so an org-level permission check could become a mixed org/workspace/project check. The routed organization settings page used authority-style gating instead of an explicit org-scope permission-code check for edit controls.
+**Fix**: Added stable cache settings for shared Settings queries, narrowed organization/workspace/project mutation invalidation to affected core structure plus platform context/version, actively refetched access state after organization creation, fixed scoped permission override semantics, and made routed organization edit controls use `settings.organization.edit/archive/restore` permission codes.

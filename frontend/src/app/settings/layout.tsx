@@ -124,6 +124,9 @@ const PERSONAL_ROUTES = new Set([
   "/settings/account",
 ]);
 
+const SCOPED_SETTINGS_ROUTE =
+  /^\/settings\/(?:organizations(?:\/\d+)?|organizations\/\d+\/workspaces|workspaces(?:\/\d+)?|workspaces\/\d+\/projects|projects(?:\/\d+)?)$/;
+
 export default function SettingsGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -132,6 +135,7 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isSuperuser = Boolean(currentUser?.is_superuser);
+  const isScopedSettingsRoute = SCOPED_SETTINGS_ROUTE.test(pathname);
 
   // Belt-and-suspenders redirect — AsthraShell also handles this at the top level.
   useEffect(() => {
@@ -145,8 +149,11 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
   const platformPermsQuery = useQuery({
     queryKey: ["members-page", "platform-permissions"],
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {}),
-    enabled: Boolean(accessToken && !isSuperuser),
+    enabled: Boolean(accessToken && !isSuperuser && !isScopedSettingsRoute),
     staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const myAssignmentsQuery = useQuery({
@@ -155,16 +162,22 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
       settingsApi.listRoleAssignments(accessToken ?? "", {
         user_id: currentUser?.id,
         status: "active",
-      }),
-    enabled: Boolean(accessToken && currentUser?.id && !isSuperuser),
+    }),
+    enabled: Boolean(accessToken && currentUser?.id && !isSuperuser && !isScopedSettingsRoute),
     staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const rolesQuery = useQuery({
     queryKey: ["settings", "roles"],
     queryFn: () => settingsApi.listRoles(accessToken ?? ""),
-    enabled: Boolean(accessToken && !isSuperuser),
+    enabled: Boolean(accessToken && !isSuperuser && !isScopedSettingsRoute),
     staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Not yet hydrated or no token — AsthraShell renders the loading state; no children here.
@@ -176,6 +189,16 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
   if (isSuperuser) {
     return (
       <SettingsAuthorityContext.Provider value={{ authorityLevel: "superuser", orgId: null, workspaceId: null }}>
+        {children}
+      </SettingsAuthorityContext.Provider>
+    );
+  }
+
+  // Scoped settings routes use route-specific permission codes. Let the page
+  // render its own loading/denied states instead of blocking on broad authority.
+  if (isScopedSettingsRoute) {
+    return (
+      <SettingsAuthorityContext.Provider value={{ authorityLevel: "member", orgId: null, workspaceId: null }}>
         {children}
       </SettingsAuthorityContext.Provider>
     );
