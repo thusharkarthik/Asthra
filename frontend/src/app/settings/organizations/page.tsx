@@ -5,7 +5,10 @@ import Link from "next/link";
 import { OrganizationsView } from "@/components/settings/settings-admin-views";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePlatformContext } from "@/context/platformContext";
+import { useSettingsAuthority, RequestAccessButton } from "@/app/settings/layout";
 import { settingsApi } from "@/services/api/settings-api";
+import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
+import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import type { OrgHealthRecord } from "@/services/api/settings-api";
 
 function healthBadge(health: OrgHealthRecord | undefined, loading: boolean) {
@@ -88,12 +91,39 @@ function OrgHealthSummary({ canViewHealth }: { canViewHealth: boolean }) {
 
 export default function OrganizationsSettingsPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
-  const { permissions } = usePlatformContext();
+  const isSuperuser = Boolean(currentUser?.is_superuser);
+  const { permissions, can, isLoading: ctxIsLoading } = usePlatformContext();
+  const { authorityLevel } = useSettingsAuthority();
+
+  // Admin users bypass all hierarchy checks.
+  const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
+
+  // Level 1: settings.organization.view is the root permission for all org pages.
+  const canViewOrganizations = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view");
 
   const canViewHealth = Boolean(
-    currentUser?.is_superuser ||
+    isSuperuser ||
       permissions?.roles?.some((r) => ["platform_owner", "platform_admin"].includes(r.key))
   );
+
+  // Hold rendering for non-admin users until platform context settles with org-scoped permissions.
+  if (!isAdminUser && ctxIsLoading) return null;
+
+  if (!canViewOrganizations) {
+    return (
+      <SettingsLayout
+        breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Organizations" }]}
+        backHref="/settings"
+        backLabel="Back to Settings"
+      >
+        <SettingsEmptyState
+          title="Access Restricted"
+          description="You don't have permission to view organizations. Contact your Organization Admin to request access."
+          action={<RequestAccessButton page="/settings/organizations" />}
+        />
+      </SettingsLayout>
+    );
+  }
 
   return (
     <>

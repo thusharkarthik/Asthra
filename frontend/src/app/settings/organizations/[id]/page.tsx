@@ -14,11 +14,14 @@ import {
   SettingsLayout,
   SettingsCard,
   SettingsDangerZone,
+  SettingsEmptyState,
   FormField,
 } from "@/components/settings/settings-components";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
+import { RequestAccessButton } from "@/app/settings/layout";
+import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 
 const SELECT_CLASS =
   "w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
@@ -110,14 +113,22 @@ function OrgHealthPanel({ healthQuery }: { healthQuery: UseQueryResult<OrgHealth
   );
 }
 
-function OrgTabs({ orgId, active }: { orgId: number; active: "overview" | "members" | "workspaces" | "roles" | "permissions" }) {
+function OrgTabs({
+  orgId,
+  active,
+  hiddenTabs = new Set<string>(),
+}: {
+  orgId: number;
+  active: string;
+  hiddenTabs?: Set<string>;
+}) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/settings/organizations/${orgId}` },
     { key: "members", label: "Members", href: `/settings/organizations/${orgId}/members` },
     { key: "workspaces", label: "Workspaces", href: `/settings/organizations/${orgId}/workspaces` },
     { key: "roles", label: "Roles", href: `/settings/organizations/${orgId}/roles` },
     { key: "permissions", label: "Permissions", href: `/settings/organizations/${orgId}/permissions` },
-  ];
+  ].filter((tab) => !hiddenTabs.has(tab.key));
   return (
     <nav className="flex gap-1 border-b pb-0">
       {tabs.map((tab) => (
@@ -144,17 +155,18 @@ export default function OrganizationSettingsPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
-  const { organizations, workspaces, permissions, can } = usePlatformContext();
-  const { authorityLevel, orgId: authorityOrgId } = useSettingsAuthority();
+  const { organizations, workspaces, permissions, can, isLoading: ctxIsLoading } = usePlatformContext();
+  const { authorityLevel } = useSettingsAuthority();
+
+  const isSuperuser = Boolean(currentUser?.is_superuser);
+  const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
+  const canViewOrgPage = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view");
+  const isAuthorized =
+    isAdminUser ||
+    hasHierarchicalPermission(can, "settings.organization.view", "settings.organization.edit");
 
   const org = organizations.find((o) => o.id === orgId);
   const scopedWorkspaces = workspaces.filter((w) => w.organization_id === orgId);
-
-  const isAuthorized =
-    authorityLevel === "superuser" ||
-    authorityLevel === "platform" ||
-    (authorityLevel === "org" && authorityOrgId === orgId) ||
-    can("settings.organization.edit");
 
   const settingsQuery = useQuery({
     queryKey: ["org-settings", orgId],
@@ -270,6 +282,20 @@ export default function OrganizationSettingsPage() {
     { label: org?.name ?? "Organization" },
   ];
 
+  if (!isAdminUser && ctxIsLoading) return null;
+
+  if (!canViewOrgPage) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
+        <SettingsEmptyState
+          title="Access Restricted"
+          description="You don't have permission to view this organization. Contact your Organization Admin to request access."
+          action={<RequestAccessButton page={`/settings/organizations/${orgId}`} />}
+        />
+      </SettingsLayout>
+    );
+  }
+
   if (!org && organizations.length > 0) {
     return (
       <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
@@ -279,6 +305,13 @@ export default function OrganizationSettingsPage() {
   }
 
   const displayOrg = org ?? { id: orgId, name: "Organization", description: null, is_active: true, slug: "" };
+
+  const canViewMembersTab = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view", "settings.member.view");
+  const canViewWorkspacesTab = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view", "settings.workspace.view");
+  const hiddenTabs = new Set<string>([
+    ...(!canViewMembersTab ? ["members"] : []),
+    ...(!canViewWorkspacesTab ? ["workspaces"] : []),
+  ]);
 
   return (
     <SettingsLayout
@@ -292,7 +325,7 @@ export default function OrganizationSettingsPage() {
         meta: `Status: ${displayOrg.is_active === false ? "Inactive" : "Active"}`,
       }}
     >
-      <OrgTabs orgId={orgId} active="overview" />
+      <OrgTabs orgId={orgId} active="overview" hiddenTabs={hiddenTabs} />
 
       {/* Overview card */}
       <SettingsCard title="Overview">
@@ -491,7 +524,7 @@ export default function OrganizationSettingsPage() {
       </form>
 
       {/* Danger Zone */}
-      {isAuthorized && (
+      {(isSuperuser || permissions?.roles?.some((r) => r.key === "organization_owner")) && (
         <SettingsDangerZone
           description="Deactivating the organization will suspend access for all members. This can be reversed by a platform admin."
           actions={

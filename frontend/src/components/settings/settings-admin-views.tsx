@@ -14,6 +14,7 @@ import { settingsApi } from "@/services/api/settings-api";
 import { queryKeys } from "@/lib/queryKeys";
 import { normalizeRole } from "@/lib/role-utils";
 import { can as hasPermission } from "@/lib/permissions";
+import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
 import { PermissionAction, PermissionButton } from "@/access/permission-components";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
@@ -1586,9 +1587,9 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
   const memberActionScope = permissionActionScope(permissions);
   const visibleRoles = filterVisibleRoles(roles, canViewProtectedRoles(currentUser, permissions));
-  const canInvite = permissions.can(SETTINGS_ACTIONS.memberInvite.permissionCode);
-  const canChangeRoles = permissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
-  const canRemoveMembers = permissions.can(SETTINGS_ACTIONS.memberRemove.permissionCode);
+  const canInvite = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberInvite.permissionCode);
+  const canChangeRoles = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.roleManage.permissionCode);
+  const canRemoveMembers = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
   // Invite modal role list: global directory shows platform-only; org/ws context shows non-platform only.

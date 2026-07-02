@@ -310,3 +310,19 @@
 3. **Org settings page** (`settings/organizations/[id]/page.tsx`): Added `can("settings.organization.edit")` to `isAuthorized` so users with that permission can edit even if not an org admin by role key.
 4. **Workspace settings page** (`settings/workspace/page.tsx`): Added `can("settings.workspace.edit")` to `isAuthorized`.
 **Design rule**: `useSettingsAuthority()` / `authorityLevel` is kept for scope context (which org/workspace to query) and navigation mode only. Permission checks MUST use `can()` from the scoped query — never role keys alone.
+
+### BUG-042 — Settings Pages Did Not Enforce Permission Hierarchy [FIXED 2026-07-02]
+
+**Files**: `frontend/src/app/settings/members/page.tsx`, `frontend/src/app/settings/organizations/page.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`, `frontend/src/app/settings/workspaces/page.tsx`, `frontend/src/app/settings/workspace/page.tsx`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/lib/settings-permissions.ts` (new)
+**Symptom**: Child permissions (e.g., `settings.member.view`, `settings.workspace.view`) were checked independently. A user with only `settings.member.view` but without `settings.organization.view` could potentially reach member pages. Action buttons inside `MembersView` (`canInvite`, `canChangeRoles`, `canRemoveMembers`) did not chain parent permissions.
+**Root cause**: Page-level and component-level permission checks used flat `can(code)` calls without verifying that all parent permissions in the hierarchy were also granted.
+**Fix**:
+1. **`frontend/src/lib/settings-permissions.ts`** (new): Created `hasHierarchicalPermission(can, ...permissions)` helper — returns true only when `permissions.every(p => can(p))`.
+2. **Admin bypass pattern**: All pages compute `isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org"`. Admin users bypass all hierarchy checks.
+3. **`settings/organizations/page.tsx`**: Gates on `isAdminUser || hasHierarchicalPermission(can, "settings.organization.view")`.
+4. **`settings/organizations/[id]/page.tsx`**: Same page-level gate; `isAuthorized` uses full `org.view + org.edit` chain; `OrgTabs` now accepts `hiddenTabs` to hide Members/Workspaces tabs when sub-permissions are absent.
+5. **`settings/workspaces/page.tsx`**: Rewritten from trivial wrapper; gates on `org.view + workspace.view` hierarchy.
+6. **`settings/workspace/page.tsx`**: Added page-level `canViewWorkspace` gate; `isAuthorized` chains `org.view + workspace.view + workspace.edit`.
+7. **`settings/members/page.tsx`**: Updated `canViewMembers` to chain `org.view + member.view` via `memberPermQuery` scoped codes.
+8. **`settings-admin-views.tsx` MembersView**: `canInvite`, `canChangeRoles`, `canRemoveMembers` now use `hasHierarchicalPermission` chaining `org.view + member.view + action-permission`.
+**Permission hierarchy**: `organization.view` (root) → `member.view` / `workspace.view` (level 2) → `member.invite` / `member.remove` / `role.manage` / `workspace.create` / `workspace.edit` / `workspace.delete` (level 3).

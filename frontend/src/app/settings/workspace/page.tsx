@@ -6,7 +6,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { usePlatformContext } from "@/context/platformContext";
-import { useSettingsAuthority } from "@/app/settings/layout";
+import { useSettingsAuthority, RequestAccessButton } from "@/app/settings/layout";
+import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import { settingsApi } from "@/services/api/settings-api";
 import type { WorkspaceSettingsRecord } from "@/services/api/settings-api";
 import {
@@ -14,6 +15,7 @@ import {
   SettingsSectionHeader,
   SettingsCard,
   SettingsDangerZone,
+  SettingsEmptyState,
   FormField,
 } from "@/components/settings/settings-components";
 import { Button } from "@/components/ui/button";
@@ -59,21 +61,29 @@ const MODULES: { key: string; label: string; description: string }[] = [
 
 export default function WorkspaceSettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
-  const { workspaces, can } = usePlatformContext();
-  const { authorityLevel, workspaceId: authorityWsId } = useSettingsAuthority();
+  const { workspaces, can, isLoading: ctxIsLoading } = usePlatformContext();
+  const { authorityLevel } = useSettingsAuthority();
+
+  const isSuperuser = Boolean(currentUser?.is_superuser);
+  const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
+  const canViewWorkspace =
+    isAdminUser ||
+    hasHierarchicalPermission(can, "settings.organization.view", "settings.workspace.view");
+  const isAuthorized =
+    isAdminUser ||
+    hasHierarchicalPermission(
+      can,
+      "settings.organization.view",
+      "settings.workspace.view",
+      "settings.workspace.edit"
+    );
 
   const workspace = workspaces.find((w) => w.id === selectedWorkspaceId);
   const wsId = workspace?.id;
-
-  const isAuthorized =
-    authorityLevel === "superuser" ||
-    authorityLevel === "platform" ||
-    authorityLevel === "org" ||
-    (authorityLevel === "workspace" && authorityWsId === wsId) ||
-    can("settings.workspace.edit");
 
   const [wsName, setWsName] = useState(workspace?.name ?? "");
   const [wsDesc, setWsDesc] = useState(workspace?.description ?? "");
@@ -156,6 +166,20 @@ export default function WorkspaceSettingsPage() {
   }
 
   const breadcrumbs = [{ label: "Settings", href: "/settings" }, { label: "Workspace" }];
+
+  if (!isAdminUser && ctxIsLoading) return null;
+
+  if (!canViewWorkspace) {
+    return (
+      <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings" backLabel="Back to Settings">
+        <SettingsEmptyState
+          title="Access Restricted"
+          description="You need organization view and workspace view permissions to see this page. Contact your Organization Admin to request access."
+          action={<RequestAccessButton page="/settings/workspace" />}
+        />
+      </SettingsLayout>
+    );
+  }
 
   if (!selectedWorkspaceId || !workspace) {
     return (
