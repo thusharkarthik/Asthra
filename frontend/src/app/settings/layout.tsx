@@ -1,13 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type FormEvent } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
-import { SettingsEmptyState, SettingsLayout as SettingsPageLayout } from "@/components/settings/settings-components";
 import { Button } from "@/components/ui/button";
 
 export type SettingsAuthorityValue = {
@@ -115,17 +114,7 @@ const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_ad
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
 const WORKSPACE_ADMIN_KEYS = new Set(["workspace_admin", "workspace_manager"]);
 
-// Routes accessible to any authenticated user regardless of admin authority.
-const PERSONAL_ROUTES = new Set([
-  "/settings",
-  "/settings/profile",
-  "/settings/preferences",
-  "/settings/notifications",
-  "/settings/account",
-]);
-
 export default function SettingsGuard({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -231,27 +220,10 @@ export default function SettingsGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  // No admin authority — personal routes remain accessible as member-level.
-  if (PERSONAL_ROUTES.has(pathname)) {
-    return (
-      <SettingsAuthorityContext.Provider value={{ authorityLevel: "member", orgId: null, workspaceId: null }}>
-        {children}
-      </SettingsAuthorityContext.Provider>
-    );
-  }
-
-  // Everything else is blocked for users with no admin authority.
+  // No admin authority — each settings page controls its own access via can().
   return (
-    <SettingsPageLayout
-      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Restricted" }]}
-      backHref="/settings"
-      backLabel="Back to Settings"
-    >
-      <SettingsEmptyState
-        title="Access Restricted"
-        description="You don't have permission to access this settings page. Contact your Organization Admin to request access."
-        action={<RequestAccessButton page={pathname} />}
-      />
-    </SettingsPageLayout>
+    <SettingsAuthorityContext.Provider value={{ authorityLevel: "member", orgId: null, workspaceId: null }}>
+      {children}
+    </SettingsAuthorityContext.Provider>
   );
 }

@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-01 (Phase B Core — QA complete, advancing to Phase C)
+Last updated: 2026-07-02 (BUG-040 fixed: direct role assignment now creates membership records)
 
 ## Phase
 

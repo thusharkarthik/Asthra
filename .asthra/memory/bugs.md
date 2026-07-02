@@ -287,3 +287,26 @@
 **Fix**: Created `app/db/migration_utils.py` with three shared helpers (`table_exists`, `index_exists`, `column_exists`). Retrofitted migrations 0001, 0005, 0006, 0008, 0010, 0011, 0013, 0014, 0015 — all `op.create_table` calls guarded with `if not table_exists(...)`, all `op.create_index` calls guarded with `if not index_exists(...)`.
 **Verification**: Double-upgrade test passed — first run applied 0014+0015 cleanly, second run was a silent no-op.
 **Standing rule**: All future migrations that create tables or indexes MUST use these guards. See `decisions.md`.
+
+### BUG-040 — Direct Role Assignment Missing OrganizationMember/WorkspaceMember Records [FIXED 2026-07-02]
+
+**Files**: `services/core-service/app/services/scoped_membership_service.py`, `services/core-service/app/repositories/organization_repository.py`, `services/core-service/app/api/v1/system.py`
+**Symptom**: Users assigned a role directly via Settings → Members (i.e., `POST /role-assignments`) had a `RoleAssignment` record but no `OrganizationMember` or `WorkspaceMember` record. `/context/platform` calls `OrganizationService.list()` which queries `OrganizationMember` → user gets empty `organizations[]` and is stuck in the onboarding gate or sees an empty UI despite having a role.
+**Root cause**: `ScopedMembershipService.create_role_assignment()` only created the `RoleAssignment` row. The `OrganizationMember`/`WorkspaceMember` creation happened in the invitation flow (`invitation_repository.add_memberships()`) but not in the direct assignment flow. `OrganizationRepository.list_for_user()` also only queried `OrganizationMember`, with no fallback to `role_assignments`.
+**Fix (3 parts)**:
+1. **Membership creation on assignment** (`scoped_membership_service.py`): Added `_ensure_memberships_for_assignment()`. For org-scope assignments: creates `OrganizationMember` if missing. For workspace-scope: creates `WorkspaceMember` + `OrganizationMember` for the workspace's org + org-scope `organization_member` `RoleAssignment` if none exists (matching BUG-030 invitation pattern).
+2. **Resilient context query** (`organization_repository.py`): `list_for_user()` now unions `OrganizationMember` records + active org-scoped `RoleAssignment` records, so users with only role assignments (pre-existing or edge cases) still see their organizations.
+3. **Backfill endpoint** (`system.py`): Added `POST /system/backfill-memberships` (superuser-only) to create missing `OrganizationMember`/`WorkspaceMember` records for all existing direct role assignments.
+**Tests**: Added `test_direct_org_role_assignment_creates_org_member` and `test_direct_workspace_role_assignment_creates_workspace_and_org_member` to `tests/test_scoped_membership.py`. Both pass (5/5 total in file).
+
+### BUG-041 — Settings Pages Showed "Access Restricted" for Users with Explicit Permissions [FIXED 2026-07-02]
+
+**Files**: `frontend/src/app/settings/layout.tsx`, `frontend/src/app/settings/members/page.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`, `frontend/src/app/settings/workspace/page.tsx`
+**Symptom**: Users with explicitly granted settings permissions (e.g., `settings.member.view` on `organization_member` role) received "Access Restricted" on all non-personal settings pages, including the Members page they were meant to access.
+**Root cause**: `settings/layout.tsx` checked for known admin ROLE KEYS (`PLATFORM_ADMIN_KEYS`, `ORG_ADMIN_KEYS`, `WORKSPACE_ADMIN_KEYS`) and blocked all non-personal routes for users without any of those keys — before any permission code (`can()`) check could run. `settings/members/page.tsx` had the same role-key gate duplicated.
+**Fix**:
+1. **Layout** (`settings/layout.tsx`): Removed the PERSONAL_ROUTES check and the blanket "Access Restricted" block. All non-superuser, non-platform, non-org-admin, non-workspace-admin users now receive `authorityLevel: "member"` and `{children}` renders. Each page controls its own access via `can()`.
+2. **Members page** (`settings/members/page.tsx`): After admin role checks, added a 4th query (`memberPermQuery`) that fetches scoped permissions at the user's first org/workspace scope. If `permission_codes` includes `settings.member.view`, shows `MembersView` scoped to that org/workspace.
+3. **Org settings page** (`settings/organizations/[id]/page.tsx`): Added `can("settings.organization.edit")` to `isAuthorized` so users with that permission can edit even if not an org admin by role key.
+4. **Workspace settings page** (`settings/workspace/page.tsx`): Added `can("settings.workspace.edit")` to `isAuthorized`.
+**Design rule**: `useSettingsAuthority()` / `authorityLevel` is kept for scope context (which org/workspace to query) and navigation mode only. Permission checks MUST use `can()` from the scoped query — never role keys alone.

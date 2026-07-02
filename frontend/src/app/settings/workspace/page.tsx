@@ -62,7 +62,7 @@ export default function WorkspaceSettingsPage() {
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
-  const { workspaces } = usePlatformContext();
+  const { workspaces, can } = usePlatformContext();
   const { authorityLevel, workspaceId: authorityWsId } = useSettingsAuthority();
 
   const workspace = workspaces.find((w) => w.id === selectedWorkspaceId);
@@ -72,7 +72,8 @@ export default function WorkspaceSettingsPage() {
     authorityLevel === "superuser" ||
     authorityLevel === "platform" ||
     authorityLevel === "org" ||
-    (authorityLevel === "workspace" && authorityWsId === wsId);
+    (authorityLevel === "workspace" && authorityWsId === wsId) ||
+    can("settings.workspace.edit");
 
   const [wsName, setWsName] = useState(workspace?.name ?? "");
   const [wsDesc, setWsDesc] = useState(workspace?.description ?? "");
