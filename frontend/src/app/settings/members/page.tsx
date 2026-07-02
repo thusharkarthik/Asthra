@@ -3,9 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSettingsAuthority, RequestAccessButton } from "@/app/settings/layout";
 import { MembersView } from "@/components/settings/settings-admin-views";
 import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
-import { RequestAccessButton } from "@/app/settings/layout";
+import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
@@ -15,13 +16,14 @@ export default function MembersSettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const isSuperuser = Boolean(currentUser?.is_superuser);
+  const { authorityLevel } = useSettingsAuthority();
 
   // Shared query keys with layout so TanStack Query serves one cached result.
   const platformPermsQuery = useQuery({
     queryKey: ["members-page", "platform-permissions"],
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", {}),
     enabled: Boolean(accessToken && !isSuperuser),
-    staleTime: 60_000
+    staleTime: 60_000,
   });
 
   const myAssignmentsQuery = useQuery({
@@ -29,17 +31,17 @@ export default function MembersSettingsPage() {
     queryFn: () =>
       settingsApi.listRoleAssignments(accessToken ?? "", {
         user_id: currentUser?.id,
-        status: "active"
+        status: "active",
       }),
     enabled: Boolean(accessToken && currentUser?.id && !isSuperuser),
-    staleTime: 60_000
+    staleTime: 60_000,
   });
 
   const rolesQuery = useQuery({
     queryKey: ["settings", "roles"],
     queryFn: () => settingsApi.listRoles(accessToken ?? ""),
     enabled: Boolean(accessToken && !isSuperuser),
-    staleTime: 60_000
+    staleTime: 60_000,
   });
 
   // Pre-compute admin role detection for the conditional hook below.
@@ -61,13 +63,20 @@ export default function MembersSettingsPage() {
         .find((a) => { const role = roleById.get(a.role_id); return role?.key != null && WORKSPACE_ADMIN_KEYS.has(role.key); })
     : undefined;
 
-  const hasAdminRole = isSuperuser || isPlatformAdmin || orgAdminAssignment != null || wsAdminAssignment != null;
+  // Admin bypass: superusers, platform admins, and org admins always get full access.
+  const isAdminUser =
+    isSuperuser ||
+    isPlatformAdmin ||
+    authorityLevel === "platform" ||
+    authorityLevel === "org" ||
+    orgAdminAssignment != null ||
+    wsAdminAssignment != null;
 
-  // For non-admin users: find their first org or workspace scope to check permissions.
-  const firstNonAdminOrgId = (queriesResolved && !hasAdminRole)
+  // For non-admin members: find their first org or workspace scope to check permissions.
+  const firstNonAdminOrgId = (queriesResolved && !isAdminUser)
     ? assignments.find((a) => a.scope_type === "organization" && a.scope_id != null)?.scope_id
     : undefined;
-  const firstNonAdminWsId = (queriesResolved && !hasAdminRole && firstNonAdminOrgId == null)
+  const firstNonAdminWsId = (queriesResolved && !isAdminUser && firstNonAdminOrgId == null)
     ? assignments.find((a) => a.scope_type === "workspace" && a.scope_id != null)?.scope_id
     : undefined;
 
@@ -77,7 +86,7 @@ export default function MembersSettingsPage() {
     ? { workspace_id: firstNonAdminWsId }
     : {};
 
-  // Fetch scoped permissions to check if the user's role grants settings.member.view.
+  // Fetch scoped permissions to check the permission hierarchy for non-admin users.
   const memberPermQuery = useQuery({
     queryKey: ["members-page", "member-scope-perm", firstNonAdminOrgId ?? firstNonAdminWsId ?? null],
     queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", memberScopeParams),
@@ -93,7 +102,7 @@ export default function MembersSettingsPage() {
     return null;
   }
 
-  if (isPlatformAdmin) {
+  if (isPlatformAdmin || authorityLevel === "platform") {
     return <MembersView />;
   }
 
@@ -110,7 +119,12 @@ export default function MembersSettingsPage() {
     return null;
   }
 
-  const canViewMembers = memberPermQuery.data?.permission_codes?.includes("settings.member.view") ?? false;
+  const scopedCodes = memberPermQuery.data?.permission_codes ?? [];
+  const scopedCan = (code: string) => scopedCodes.includes(code);
+
+  // Hierarchy: settings.organization.view is the root permission required by all member permissions.
+  const canViewOrg = hasHierarchicalPermission(scopedCan, "settings.organization.view");
+  const canViewMembers = hasHierarchicalPermission(scopedCan, "settings.organization.view", "settings.member.view");
 
   if (canViewMembers) {
     if (firstNonAdminOrgId != null) {
@@ -121,15 +135,16 @@ export default function MembersSettingsPage() {
     }
   }
 
+  const breadcrumbs = [{ label: "Settings", href: "/settings" }, { label: "Members" }];
+  const description = canViewOrg
+    ? "You need member view permission to see this page. Contact your Organization Admin to request access."
+    : "You don't have permission to access this area. Contact your Organization Admin to request access.";
+
   return (
-    <SettingsLayout
-      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members" }]}
-      backHref="/settings"
-      backLabel="Back to Settings"
-    >
+    <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings" backLabel="Back to Settings">
       <SettingsEmptyState
         title="Access Restricted"
-        description="You don't have permission to view or manage members. Contact your Organization Admin to request access."
+        description={description}
         action={<RequestAccessButton page="/settings/members" />}
       />
     </SettingsLayout>

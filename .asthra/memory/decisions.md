@@ -394,3 +394,18 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: RBAC permissions are the source of truth. Checking role keys hard-codes authority assumptions and breaks as soon as a permission is granted to a role that isn't in the known key set (e.g., `organization_member` with `settings.member.view`). The authority gate in the layout was blocking users before any permission check could run.
 
 **How to apply**: Settings layout passes `authorityLevel: "member"` and renders children for all non-admin users — no blanket block. Each settings page adds its own `can("settings.X.view")` / `can("settings.X.edit")` gate. The members page fetches scoped permissions (`settingsApi.getCurrentPermissions` with `org_id` or `workspace_id`) as a 4th query when no admin role is found, enabling `settings.member.view` access. `authorityLevel` is still read by pages to determine which org/workspace scope to pass to downstream views.
+
+## 2026-07-02 — Settings Pages Enforce a Parent → Child Permission Hierarchy
+
+**Decision**: Settings permissions form a strict hierarchy where each child permission requires all ancestors to also be granted. `settings.organization.view` is the root of all organizational settings access. The `hasHierarchicalPermission(can, ...permissions)` helper (in `@/lib/settings-permissions`) enforces this by requiring every permission in the chain to return true.
+
+**Hierarchy**:
+- Level 1 (root): `settings.organization.view` — required for any org-area page
+- Level 2: `settings.member.view`, `settings.workspace.view` — each requires Level 1
+- Level 3: `settings.member.invite`, `settings.member.remove`, `settings.role.manage`, `settings.workspace.edit`, etc. — each requires Level 1 + its Level 2 parent
+
+**Admin bypass**: `isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org"` always grants full access, bypassing hierarchy checks entirely.
+
+**Why**: A permission like `settings.member.invite` is meaningless without also having `settings.member.view` and `settings.organization.view`. Flat checks allow partial access that the UX can't handle (blank page, broken state). The hierarchy makes the access model explicit and consistent.
+
+**How to apply**: Use `hasHierarchicalPermission(can, "settings.organization.view", "settings.X.view")` for page-level view gates, and extend the chain for action buttons. Always check `isAdminUser` first and short-circuit. Apply `if (!isAdminUser && ctxIsLoading) return null;` before any access gate to avoid premature "Access Restricted" flashes while the platform context is loading org-scoped permissions.
