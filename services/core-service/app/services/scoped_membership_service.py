@@ -94,6 +94,7 @@ class ScopedMembershipService:
             self.db.refresh(assignment)
         self._log("role.assigned", current_user.id, assignment.scope_type, assignment.scope_id, "role_assignment", assignment.id)
         ContextVersionService(self.db).bump_access(assignment.scope_type, assignment.scope_id)
+        self._ensure_memberships_for_assignment(assignment, current_user.id)
         self.db.commit()
         return assignment
 
@@ -507,6 +508,86 @@ class ScopedMembershipService:
             if membership is not None:
                 membership.role_id = role.id
                 membership.member_role = role.key
+
+    def _ensure_memberships_for_assignment(self, assignment: RoleAssignment, actor_id: int) -> None:
+        """Ensure OrganizationMember / WorkspaceMember records exist after a direct role assignment."""
+        if assignment.scope_type == "organization" and assignment.scope_id is not None:
+            exists = (
+                self.db.query(OrganizationMember)
+                .filter(
+                    OrganizationMember.organization_id == assignment.scope_id,
+                    OrganizationMember.user_id == assignment.user_id,
+                )
+                .first()
+            )
+            if exists is None:
+                self.db.add(
+                    OrganizationMember(
+                        organization_id=assignment.scope_id,
+                        user_id=assignment.user_id,
+                        role_id=assignment.role_id,
+                        member_role="member",
+                    )
+                )
+        elif assignment.scope_type == "workspace" and assignment.scope_id is not None:
+            workspace = self.db.get(Workspace, assignment.scope_id)
+            if workspace is None:
+                return
+            ws_exists = (
+                self.db.query(WorkspaceMember)
+                .filter(
+                    WorkspaceMember.workspace_id == workspace.id,
+                    WorkspaceMember.user_id == assignment.user_id,
+                )
+                .first()
+            )
+            if ws_exists is None:
+                self.db.add(
+                    WorkspaceMember(
+                        workspace_id=workspace.id,
+                        user_id=assignment.user_id,
+                        member_role="member",
+                    )
+                )
+            if workspace.organization_id:
+                org_exists = (
+                    self.db.query(OrganizationMember)
+                    .filter(
+                        OrganizationMember.organization_id == workspace.organization_id,
+                        OrganizationMember.user_id == assignment.user_id,
+                    )
+                    .first()
+                )
+                if org_exists is None:
+                    self.db.add(
+                        OrganizationMember(
+                            organization_id=workspace.organization_id,
+                            user_id=assignment.user_id,
+                            member_role="member",
+                        )
+                    )
+                org_member_role = (
+                    self.db.query(Role)
+                    .filter(Role.key == "organization_member", Role.is_active.is_(True))
+                    .first()
+                )
+                if org_member_role and not self.db.query(RoleAssignment).filter(
+                    RoleAssignment.user_id == assignment.user_id,
+                    RoleAssignment.scope_type == "organization",
+                    RoleAssignment.scope_id == workspace.organization_id,
+                    RoleAssignment.status == "active",
+                ).first():
+                    self.db.add(
+                        RoleAssignment(
+                            user_id=assignment.user_id,
+                            role_id=org_member_role.id,
+                            scope_type="organization",
+                            scope_id=workspace.organization_id,
+                            status="active",
+                            assigned_by=actor_id,
+                            assigned_at=datetime.now(timezone.utc),
+                        )
+                    )
 
     def _log(self, action: str, actor_user_id: int, scope_type: str, scope_id: int | None, entity_type: str, entity_id: int) -> None:
         organization_id = scope_id if scope_type == "organization" else None

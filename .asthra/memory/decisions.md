@@ -386,3 +386,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: Selected organization/workspace/project IDs can survive across logout/register/browser refresh. A newly registered no-org user must never send a previous user's work-scope IDs, even though the backend safely rejects or nulls them.
 
 **How to apply**: Clear session-scoped work context on login/register/logout. PlatformContext should bootstrap unscoped when persisted IDs cannot be confirmed by current cached organizations/workspaces/projects, then commit the backend-confirmed default scope. No-org users keep null work scope and should not run scoped context-version checks.
+
+## 2026-07-02 — Settings Pages Use can() for Access Gates, Not Role Keys
+
+**Decision**: Settings page access and edit gates must use `can(permissionCode)` from the scoped permissions query rather than role-key sets (`ORG_ADMIN_KEYS`, etc.). `useSettingsAuthority()` and `authorityLevel` are kept for scope context (which org/workspace to query data from) and navigation mode detection only.
+
+**Why**: RBAC permissions are the source of truth. Checking role keys hard-codes authority assumptions and breaks as soon as a permission is granted to a role that isn't in the known key set (e.g., `organization_member` with `settings.member.view`). The authority gate in the layout was blocking users before any permission check could run.
+
+**How to apply**: Settings layout passes `authorityLevel: "member"` and renders children for all non-admin users — no blanket block. Each settings page adds its own `can("settings.X.view")` / `can("settings.X.edit")` gate. The members page fetches scoped permissions (`settingsApi.getCurrentPermissions` with `org_id` or `workspace_id`) as a 4th query when no admin role is found, enabling `settings.member.view` access. `authorityLevel` is still read by pages to determine which org/workspace scope to pass to downstream views.

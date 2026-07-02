@@ -144,7 +144,7 @@ export default function OrganizationSettingsPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
-  const { organizations, workspaces, permissions } = usePlatformContext();
+  const { organizations, workspaces, permissions, can } = usePlatformContext();
   const { authorityLevel, orgId: authorityOrgId } = useSettingsAuthority();
 
   const org = organizations.find((o) => o.id === orgId);
@@ -153,7 +153,8 @@ export default function OrganizationSettingsPage() {
   const isAuthorized =
     authorityLevel === "superuser" ||
     authorityLevel === "platform" ||
-    (authorityLevel === "org" && authorityOrgId === orgId);
+    (authorityLevel === "org" && authorityOrgId === orgId) ||
+    can("settings.organization.edit");
 
   const settingsQuery = useQuery({
     queryKey: ["org-settings", orgId],

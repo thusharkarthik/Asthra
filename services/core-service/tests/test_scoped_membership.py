@@ -1,4 +1,5 @@
 from app.db.session import SessionLocal
+from app.models.organization import OrganizationMember
 from app.models.project import ProjectMembership
 from app.models.role import Role
 from app.models.team import Team, TeamMember
@@ -6,11 +7,13 @@ from app.models.user import RoleAssignment, User
 from app.models.workspace import WorkspaceMember
 from app.schemas.organization import OrganizationCreate
 from app.schemas.project import ProjectCreate
+from app.schemas.scoped_membership import RoleAssignmentCreate
 from app.schemas.workspace import WorkspaceCreate
 from app.services.access_control_service import AccessControlService
 from app.services.organization_service import OrganizationService
 from app.services.project_service import ProjectService
 from app.services.role_service import RoleService
+from app.services.scoped_membership_service import ScopedMembershipService
 from app.services.workspace_service import WorkspaceService
 
 
@@ -78,6 +81,82 @@ def test_project_role_does_not_apply_to_unrelated_project():
 
         assert "flow.work_item.edit" in project_one_permissions
         assert "flow.work_item.edit" not in project_two_permissions
+    finally:
+        db.close()
+
+
+def test_direct_org_role_assignment_creates_org_member():
+    """BUG-040: Assigning an org-scoped role directly must create an OrganizationMember record."""
+    db = SessionLocal()
+    try:
+        admin = _create_user(db, "admin-bug040-org@example.com", superuser=True)
+        user = _create_user(db, "user-bug040-org@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Bug040 Org"), admin)
+        RoleService(db).ensure_role_catalog()
+        org_admin = _role(db, "organization_admin")
+
+        ScopedMembershipService(db).create_role_assignment(
+            RoleAssignmentCreate(
+                user_id=user.id,
+                role_id=org_admin.id,
+                scope_type="organization",
+                scope_id=organization.id,
+            ),
+            admin,
+        )
+
+        org_member = (
+            db.query(OrganizationMember)
+            .filter(OrganizationMember.organization_id == organization.id, OrganizationMember.user_id == user.id)
+            .first()
+        )
+        assert org_member is not None, "OrganizationMember must be created on direct role assignment"
+
+        user_orgs = OrganizationService(db).list(user)
+        org_ids = [o.id for o in user_orgs]
+        assert organization.id in org_ids, "Org must appear in list() after direct role assignment"
+    finally:
+        db.close()
+
+
+def test_direct_workspace_role_assignment_creates_workspace_and_org_member():
+    """BUG-040: Assigning a workspace-scoped role must create WorkspaceMember and OrganizationMember."""
+    db = SessionLocal()
+    try:
+        admin = _create_user(db, "admin-bug040-ws@example.com", superuser=True)
+        user = _create_user(db, "user-bug040-ws@example.com")
+        organization = OrganizationService(db).create(OrganizationCreate(name="Bug040 Workspace Org"), admin)
+        workspace = WorkspaceService(db).create(WorkspaceCreate(organization_id=organization.id, name="Bug040 WS"), admin)
+        RoleService(db).ensure_role_catalog()
+        ws_admin = _role(db, "workspace_admin")
+
+        ScopedMembershipService(db).create_role_assignment(
+            RoleAssignmentCreate(
+                user_id=user.id,
+                role_id=ws_admin.id,
+                scope_type="workspace",
+                scope_id=workspace.id,
+            ),
+            admin,
+        )
+
+        ws_member = (
+            db.query(WorkspaceMember)
+            .filter(WorkspaceMember.workspace_id == workspace.id, WorkspaceMember.user_id == user.id)
+            .first()
+        )
+        assert ws_member is not None, "WorkspaceMember must be created on direct workspace role assignment"
+
+        org_member = (
+            db.query(OrganizationMember)
+            .filter(OrganizationMember.organization_id == organization.id, OrganizationMember.user_id == user.id)
+            .first()
+        )
+        assert org_member is not None, "OrganizationMember must be created for the workspace's org"
+
+        user_orgs = OrganizationService(db).list(user)
+        org_ids = [o.id for o in user_orgs]
+        assert organization.id in org_ids, "Org must appear in list() after direct workspace role assignment"
     finally:
         db.close()
 

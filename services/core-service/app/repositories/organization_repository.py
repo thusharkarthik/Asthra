@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.activity_log import ActivityLog
 from app.models.organization import Organization, OrganizationMember
+from app.models.user import RoleAssignment
 from app.schemas.organization import OrganizationUpdate
 
 
@@ -18,10 +19,23 @@ class OrganizationRepository:
         return self.db.scalar(statement)
 
     def list_for_user(self, user_id: int, *, include_inactive: bool = False) -> list[Organization]:
+        from_membership = (
+            select(OrganizationMember.organization_id.label("org_id"))
+            .where(OrganizationMember.user_id == user_id)
+        )
+        from_role_assignment = (
+            select(RoleAssignment.scope_id.label("org_id"))
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.status == "active",
+                RoleAssignment.scope_id.is_not(None),
+            )
+        )
+        org_ids = from_membership.union(from_role_assignment)
         statement = (
             select(Organization)
-            .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
-            .where(OrganizationMember.user_id == user_id)
+            .where(Organization.id.in_(org_ids))
             .order_by(Organization.created_at.desc())
         )
         if not include_inactive:
