@@ -5,6 +5,7 @@ import { Minus, Plus } from "lucide-react";
 import { usePlatformContext } from "@/context/platformContext";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { getPermissionDefinition } from "@/lib/permission-registry";
+import { usePermissionRegistryStore } from "@/stores/permission-registry-store";
 import { cn } from "@/lib/utils";
 
 interface PermissionGateProps {
@@ -42,11 +43,19 @@ export function PermissionGate({
   const markForRemoval = useSimulationStore((s) => s.markForRemoval);
   const undoChange = useSimulationStore((s) => s.undoChange);
 
-  const definition = getPermissionDefinition(permission);
-  const displayLabel = label ?? definition?.label ?? permission;
-  const tooltip = definition
-    ? `${displayLabel}\n${permission}\nAffects: ${definition.affects}`
-    : `${displayLabel} · ${permission}`;
+  const getRegistryPermission = usePermissionRegistryStore((s) => s.getPermission);
+  const dynamicDef = getRegistryPermission(permission);
+  const staticDef = getPermissionDefinition(permission);
+
+  const displayLabel = label ?? dynamicDef?.label ?? staticDef?.label ?? permission;
+  const displayAffects = dynamicDef?.affects ?? staticDef?.affects;
+  const riskLevel = dynamicDef?.risk_level;
+  const tooltip = [
+    displayLabel,
+    permission,
+    displayAffects ? `Affects: ${displayAffects}` : null,
+    riskLevel ? `Risk: ${riskLevel}` : null,
+  ].filter(Boolean).join("\n");
 
   // Normal / View mode — simple pass-through
   if (!isSimulating || !isEditMode) {
