@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
 import { RequestAccessButton } from "@/app/settings/layout";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
+import { PermissionGate } from "@/components/platform/permission-gate";
 
 const SELECT_CLASS =
   "w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
@@ -113,37 +114,39 @@ function OrgHealthPanel({ healthQuery }: { healthQuery: UseQueryResult<OrgHealth
   );
 }
 
-function OrgTabs({
-  orgId,
-  active,
-  hiddenTabs = new Set<string>(),
-}: {
-  orgId: number;
-  active: string;
-  hiddenTabs?: Set<string>;
-}) {
-  const tabs = [
-    { key: "overview", label: "Overview", href: `/settings/organizations/${orgId}` },
-    { key: "members", label: "Members", href: `/settings/organizations/${orgId}/members` },
-    { key: "workspaces", label: "Workspaces", href: `/settings/organizations/${orgId}/workspaces` },
-    { key: "roles", label: "Roles", href: `/settings/organizations/${orgId}/roles` },
-    { key: "permissions", label: "Permissions", href: `/settings/organizations/${orgId}/permissions` },
-  ].filter((tab) => !hiddenTabs.has(tab.key));
+const ORG_TABS = [
+  { key: "overview", label: "Overview", permission: null },
+  { key: "members", label: "Members", permission: "settings.member.view" },
+  { key: "workspaces", label: "Workspaces", permission: "settings.workspace.view" },
+  { key: "roles", label: "Roles", permission: null },
+  { key: "permissions", label: "Permissions", permission: null },
+] as const;
+
+function OrgTabs({ orgId, active }: { orgId: number; active: string }) {
   return (
-    <nav className="flex gap-1 border-b pb-0">
-      {tabs.map((tab) => (
-        <Link
-          key={tab.key}
-          href={tab.href}
-          className={`px-3 py-2 text-sm font-medium transition-colors ${
-            active === tab.key
-              ? "border-b-2 border-primary text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {tab.label}
-        </Link>
-      ))}
+    <nav className="flex items-center gap-1 border-b pb-0">
+      {ORG_TABS.map((tab) => {
+        const link = (
+          <Link
+            href={`/settings/organizations/${orgId}${tab.key === "overview" ? "" : `/${tab.key}`}`}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              active === tab.key
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        );
+        if (tab.permission) {
+          return (
+            <PermissionGate key={tab.key} permission={tab.permission} label={`${tab.label} Tab`}>
+              {link}
+            </PermissionGate>
+          );
+        }
+        return <span key={tab.key}>{link}</span>;
+      })}
     </nav>
   );
 }
@@ -306,13 +309,6 @@ export default function OrganizationSettingsPage() {
 
   const displayOrg = org ?? { id: orgId, name: "Organization", description: null, is_active: true, slug: "" };
 
-  const canViewMembersTab = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view", "settings.member.view");
-  const canViewWorkspacesTab = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view", "settings.workspace.view");
-  const hiddenTabs = new Set<string>([
-    ...(!canViewMembersTab ? ["members"] : []),
-    ...(!canViewWorkspacesTab ? ["workspaces"] : []),
-  ]);
-
   return (
     <SettingsLayout
       breadcrumbs={breadcrumbs}
@@ -325,7 +321,7 @@ export default function OrganizationSettingsPage() {
         meta: `Status: ${displayOrg.is_active === false ? "Inactive" : "Active"}`,
       }}
     >
-      <OrgTabs orgId={orgId} active="overview" hiddenTabs={hiddenTabs} />
+      <OrgTabs orgId={orgId} active="overview" />
 
       {/* Overview card */}
       <SettingsCard title="Overview">
@@ -364,13 +360,13 @@ export default function OrganizationSettingsPage() {
               disabled={!isAuthorized}
             />
           </FormField>
-          {isAuthorized && (
+          <PermissionGate permission="settings.organization.edit" label="Save General Settings">
             <div className="flex justify-end">
               <Button type="submit" disabled={updateOrgMutation.isPending}>
                 {updateOrgMutation.isPending ? "Saving…" : "Save General"}
               </Button>
             </div>
-          )}
+          </PermissionGate>
         </form>
       </SettingsCard>
 
@@ -514,13 +510,13 @@ export default function OrganizationSettingsPage() {
           </div>
         </SettingsCard>
 
-        {isAuthorized && (
+        <PermissionGate permission="settings.organization.edit" label="Save Organization Settings">
           <div className="flex justify-end">
             <Button type="submit" disabled={updateSettingsMutation.isPending}>
               {updateSettingsMutation.isPending ? "Saving…" : "Save Settings"}
             </Button>
           </div>
-        )}
+        </PermissionGate>
       </form>
 
       {/* Danger Zone */}

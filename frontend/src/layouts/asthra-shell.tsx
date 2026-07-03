@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
+import { Bell, HelpCircle, Info, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useCurrentPermissions, usePlatformContext } from "@/context/platformContext";
 import { OnboardingGate } from "@/components/platform/platform-setup-guide";
 import { ContextualHelpModal } from "@/components/platform/contextual-help";
+import { VisualPermissionEditor } from "@/components/platform/visual-permission-editor";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/use-logout";
 import { settingsApi } from "@/services/api/settings-api";
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 import type { NavigationMode } from "@/lib/navigation-mode";
 import { detectNavigationMode, autoDetectModeFromPath } from "@/lib/navigation-mode";
 import { useSimulationStore } from "@/lib/permission-simulator";
+import { getPermissionsForRoute } from "@/lib/permission-registry";
 
 const publicPaths = new Set(["/login", "/register"]);
 const AUTH_LOGOUT_TRANSITION_MS = 1450;
@@ -114,6 +116,11 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const simulatedMode = useSimulationStore((state) => state.simulatedMode);
   const simulatedRoleName = useSimulationStore((state) => state.simulatedRoleName);
   const exitSimulation = useSimulationStore((state) => state.exitSimulation);
+  const isEditMode = useSimulationStore((state) => state.isEditMode);
+  const enterEditMode = useSimulationStore((state) => state.enterEditMode);
+  const exitEditMode = useSimulationStore((state) => state.exitEditMode);
+  const pendingChangeCount = useSimulationStore((state) => state.pendingChangeCount);
+  const [hintsOpen, setHintsOpen] = useState(false);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -273,26 +280,128 @@ export function AsthraShell({ children }: { children: ReactNode }) {
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {isSimulating && (
-            <div className="shrink-0 flex items-center justify-between border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm dark:border-amber-700 dark:bg-amber-950/60">
-              <span className="text-amber-800 dark:text-amber-300">
-                <span className="mr-1">👁</span>
-                <span className="font-semibold">Simulating:</span>{" "}
-                <span>{simulatedRoleName}</span>
-                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
-                  — API calls still use your real token
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={exitSimulation}
-                className="rounded px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800/50"
+            <div
+              className={cn(
+                "shrink-0 flex items-center justify-between border-b px-4 py-2 text-sm",
+                isEditMode
+                  ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/60"
+                  : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/60"
+              )}
+            >
+              <span
+                className={
+                  isEditMode
+                    ? "text-blue-800 dark:text-blue-300"
+                    : "text-amber-800 dark:text-amber-300"
+                }
               >
-                Exit Simulation
-              </button>
+                <span className="mr-1">{isEditMode ? "✏️" : "👁"}</span>
+                <span className="font-semibold">
+                  {isEditMode ? "Editing permissions for:" : "Simulating:"}
+                </span>{" "}
+                <span>{simulatedRoleName}</span>
+                {!isEditMode && (
+                  <span
+                    className="ml-2 text-xs text-amber-600 dark:text-amber-400"
+                  >
+                    — API calls still use your real token
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2">
+                {/* View / Edit mode toggle */}
+                <div className="flex items-center rounded-md border border-current/20 overflow-hidden text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={exitEditMode}
+                    className={cn(
+                      "px-2.5 py-1 transition-colors",
+                      !isEditMode
+                        ? "bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-100"
+                        : "text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                    )}
+                  >
+                    View Mode
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterEditMode}
+                    className={cn(
+                      "px-2.5 py-1 transition-colors",
+                      isEditMode
+                        ? "bg-blue-200 text-blue-900 dark:bg-blue-700 dark:text-blue-100"
+                        : "text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                    )}
+                  >
+                    ✏️ Edit Mode{isEditMode && pendingChangeCount > 0 ? ` · ${pendingChangeCount}` : ""}
+                  </button>
+                </div>
+                {/* Route-aware permission hints */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setHintsOpen((v) => !v)}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded transition-colors",
+                      isEditMode
+                        ? "text-blue-700 hover:bg-blue-200 dark:text-blue-300 dark:hover:bg-blue-800/50"
+                        : "text-amber-700 hover:bg-amber-200 dark:text-amber-400 dark:hover:bg-amber-800/50"
+                    )}
+                    title="Permissions on this page"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                  {hintsOpen && (() => {
+                    const routePerms = getPermissionsForRoute(pathname);
+                    return (
+                      <div className="absolute right-0 top-8 z-50 w-80 rounded-md border bg-card p-3 shadow-lg text-foreground">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-semibold">Permissions on this page</span>
+                          <button
+                            type="button"
+                            onClick={() => setHintsOpen(false)}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {routePerms.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No registered permissions for this route.</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {routePerms.map((def) => (
+                              <li key={def.code} className="text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] text-muted-foreground">{def.code}</span>
+                                </div>
+                                <div className="font-medium">{def.label}</div>
+                                <div className="text-muted-foreground">{def.affects}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <button
+                  type="button"
+                  onClick={exitSimulation}
+                  className={cn(
+                    "rounded px-2 py-0.5 text-xs font-medium",
+                    isEditMode
+                      ? "text-blue-800 hover:bg-blue-200 dark:text-blue-300 dark:hover:bg-blue-800/50"
+                      : "text-amber-800 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800/50"
+                  )}
+                >
+                  Exit
+                </button>
+              </div>
             </div>
           )}
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 relative">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+            {isSimulating && isEditMode && <VisualPermissionEditor />}
           </div>
         </div>
       </div>

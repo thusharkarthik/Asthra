@@ -132,6 +132,32 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 
 ---
 
+## 2026-07-03 — PermissionGate Is the Sole UI Gating Mechanism; PermissionAction/Button Are Inner-Layer Only
+
+**Decision**: `PermissionGate` is the canonical way to gate any UI element by a permission code. `PermissionAction` and `PermissionButton` (action-registry-based, scope-aware) are allowed as an inner layer inside `PermissionGate`, but must not be the only mechanism — they don't participate in God Mode.
+
+**Why**: God Mode (Visual Permission Editor) requires `PermissionGate` wrappers to work. `PermissionAction`/`PermissionButton` use the settings-scoped permission context (`useCurrentPermissions`), which does not reflect simulation state. `PermissionGate` uses `usePlatformContext().can()` which does. Wrapping an existing `PermissionAction` with `PermissionGate` adds God Mode overlays without breaking the inner scope check.
+
+**How to apply**: New settings UI elements → always wrap the leaf button/element with `PermissionGate`. Existing elements that use `PermissionAction`/`PermissionButton` → add `PermissionGate` as an outer wrapper. Never duplicate the permission code check — `PermissionGate` owns the visibility decision.
+
+## 2026-07-03 — PERMISSION_REGISTRY: Central Permission Metadata, Not Runtime Enforcement
+
+**Decision**: `PERMISSION_REGISTRY` in `frontend/src/lib/permission-registry.ts` is metadata for God Mode tooling only. It drives: (a) auto-resolved labels in `PermissionGate`, (b) rich tooltips with `affects` text, (c) route-aware hints panel in the simulation banner. It does NOT drive actual permission enforcement.
+
+**Why**: Runtime enforcement is the backend's job (core-service RBAC). The frontend gate (`can()` from platformContext) already has the resolved permission codes — it doesn't need the registry to make access decisions. The registry gives human-readable context to God Mode users, not machine-readable gates.
+
+**How to apply**: When adding a new permission-gated element: (1) add a `PermissionDefinition` to `PERMISSION_REGISTRY` with accurate `affects` and `routes`, (2) wrap the element with `PermissionGate`. Never read `PERMISSION_REGISTRY` for access decisions — only for metadata.
+
+## 2026-07-03 — PermissionGate Uses Leaf Permission Code, Not Full Hierarchy
+
+**Decision**: When wrapping an element that requires a permission hierarchy (e.g. `org.view` + `workspace.view` + `workspace.edit`), use only the leaf permission code in `PermissionGate`. The full hierarchy chain (`requires` array) is stored in PERMISSION_REGISTRY for documentation purposes only.
+
+**Why**: Checking only the leaf permission is correct behavior in simulation mode. When a user is simulating a role that has `settings.workspace.edit` in its simulatedPermissions, `can("settings.workspace.edit")` returns true — the parent permissions are implied by the role design. Requiring all 3 levels in the gate would make God Mode harder to use (you'd have to grant 3 permissions to reveal one button). The backend enforces the full hierarchy at API call time anyway.
+
+**How to apply**: `<PermissionGate permission="settings.workspace.edit">` — not `hasHierarchicalPermission(can, "org.view", "ws.view", "ws.edit")`. The old `{isAuthorized && ...}` pattern using `hasHierarchicalPermission` remains valid for page-level gates (show/hide the entire page), but individual leaf elements should use `PermissionGate` with the leaf code only.
+
+---
+
 ## 2026-06-27 — platform_member Retired; organization_member Added
 
 **Decision**: Remove `platform_member` (platform-scoped) from the role catalog. Add `organization_member` (organization-scoped) as the base org membership role.
@@ -409,3 +435,18 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: A permission like `settings.member.invite` is meaningless without also having `settings.member.view` and `settings.organization.view`. Flat checks allow partial access that the UX can't handle (blank page, broken state). The hierarchy makes the access model explicit and consistent.
 
 **How to apply**: Use `hasHierarchicalPermission(can, "settings.organization.view", "settings.X.view")` for page-level view gates, and extend the chain for action buttons. Always check `isAdminUser` first and short-circuit. Apply `if (!isAdminUser && ctxIsLoading) return null;` before any access gate to avoid premature "Access Restricted" flashes while the platform context is loading org-scoped permissions.
+
+## 2026-07-02 — Visual Permission Editor: PermissionGate as Standard Wrapper
+
+**Decision**: All permission-gated UI elements (buttons, tabs, action menus, form save buttons) should be wrapped with `<PermissionGate>` from `@/components/platform/permission-gate.tsx`. Page-level access gates (show/hide entire page) continue to use `can()` directly.
+
+**Architecture**:
+- `PermissionGate(permission, label, children, fallback?)` — wraps any leaf element. In normal/view mode behaves as `can(p) ? children : fallback`. In edit mode shows green ring + minus button (visible) or ghost placeholder + plus button (hidden).
+- `useSimulationStore` extended with: `simulatedRoleId`, `isEditMode`, `originalSimulatedPermissions`, `pendingAdditions`, `pendingRemovals`, `hasUnsavedChanges`, `pendingChangeCount`. New actions: `enterEditMode`, `exitEditMode`, `markForAddition`, `markForRemoval`, `undoChange`, `clearPendingChanges`, `commitChanges`.
+- Instant preview: `markForAddition(p)` adds to `simulatedPermissions` immediately so `can(p)` returns true and components appear. `markForRemoval(p)` removes from `simulatedPermissions` immediately so components disappear. User sees live effect before saving.
+- `VisualPermissionEditor` — floating save bar, renders when `hasUnsavedChanges`. On save: calls `listPermissions()` to resolve codes→IDs, then `addRolePermission` / `removeRolePermission` per change. On success: `commitChanges()` (new permissions become baseline). On discard: `clearPendingChanges()` (reverts to `originalSimulatedPermissions`).
+- Shell banner: amber (view mode) or blue (edit mode). View/Edit mode toggle buttons inline.
+
+**Why**: The Goal Mode / Visual Permission Editor needs a standard component so any developer can make any UI element editable in simulation edit mode without re-implementing the overlay logic. PermissionGate is the hook point — it knows both the permission code (for API save) and the label (for ghost placeholder display).
+
+**How to apply**: Wrap leaf elements with `<PermissionGate permission="settings.X.action" label="Human Readable Label">`. Do NOT wrap page-level access gates — those remain as direct `can()` or `hasHierarchicalPermission()` checks. Do NOT use PermissionGate for non-permission-driven visibility (loading states, data-dependent rendering, etc.).

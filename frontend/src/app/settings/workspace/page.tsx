@@ -18,6 +18,7 @@ import {
   SettingsEmptyState,
   FormField,
 } from "@/components/settings/settings-components";
+import { PermissionGate } from "@/components/platform/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
@@ -223,13 +224,13 @@ export default function WorkspaceSettingsPage() {
               disabled={!isAuthorized}
             />
           </FormField>
-          {isAuthorized && (
+          <PermissionGate permission="settings.workspace.edit">
             <div className="flex justify-end">
               <Button type="submit" disabled={updateWsMutation.isPending}>
                 {updateWsMutation.isPending ? "Saving…" : "Save General"}
               </Button>
             </div>
-          )}
+          </PermissionGate>
         </form>
       </SettingsCard>
 
@@ -298,16 +299,16 @@ export default function WorkspaceSettingsPage() {
           </div>
         </SettingsCard>
 
-        {isAuthorized && (
+        <PermissionGate permission="settings.workspace.edit">
           <div className="flex justify-end">
             <Button type="submit" disabled={updateSettingsMutation.isPending}>
               {updateSettingsMutation.isPending ? "Saving…" : "Save Settings"}
             </Button>
           </div>
-        )}
+        </PermissionGate>
       </form>
 
-      {isAuthorized && (
+      <PermissionGate permission="settings.workspace.edit">
         <SettingsDangerZone
           description="Archiving the workspace suspends access for all members. Projects and data are preserved. This can be reversed by an org admin."
           actions={
@@ -337,7 +338,7 @@ export default function WorkspaceSettingsPage() {
             )
           }
         />
-      )}
+      </PermissionGate>
     </SettingsLayout>
   );
 }

@@ -17,6 +17,7 @@ import { can as hasPermission } from "@/lib/permissions";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
 import { PermissionAction, PermissionButton } from "@/access/permission-components";
+import { PermissionGate } from "@/components/platform/permission-gate";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
@@ -675,9 +676,11 @@ export function OrganizationsView() {
             {organizations.length === 0 ? (
               <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
             ) : (
-              <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
-                <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
-              </PermissionAction>
+              <PermissionGate permission="settings.organization.create">
+                <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
+                  <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+                </PermissionAction>
+              </PermissionGate>
             )}
           </div>
         }
@@ -829,7 +832,11 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       <SettingsSectionHeader
         title="Workspaces"
         description="Workspaces connect teams, projects, and module data under an organization."
-        actions={canCreateWorkspace ? <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton> : undefined}
+        actions={
+          <PermissionGate permission="settings.workspace.create">
+            <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton>
+          </PermissionGate>
+        }
       />
       {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.create to create workspaces in this scope." /> : null}
       {!organizations.length ? (
@@ -1588,8 +1595,6 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const memberActionScope = permissionActionScope(permissions);
   const visibleRoles = filterVisibleRoles(roles, canViewProtectedRoles(currentUser, permissions));
   const canInvite = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberInvite.permissionCode);
-  const canChangeRoles = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.roleManage.permissionCode);
-  const canRemoveMembers = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
   // Invite modal role list: global directory shows platform-only; org/ws context shows non-platform only.
@@ -1787,9 +1792,11 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         title="Members"
         description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
-          <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-            <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
-          </PermissionAction>
+          <PermissionGate permission="settings.member.invite">
+            <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
+              <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
+            </PermissionAction>
+          </PermissionGate>
         }
       />
       {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Admin, Platform Support) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
@@ -1864,13 +1871,19 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             "Not tracked yet",
             <div key={row.userId} className="flex flex-wrap gap-2">
               <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
-              {!isGlobalDirectory ? <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton> : null}
-              {!isGlobalDirectory && canRemoveMembers ? (
-                <ConfirmActionButton
-                  label="Remove"
-                  message={`Remove ${row.name} from ${row.scopeLabel}?`}
-                  onConfirm={() => removeMutation.mutate(row.userId)}
-                />
+              {!isGlobalDirectory ? (
+                <PermissionGate permission="settings.role.manage">
+                  <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton>
+                </PermissionGate>
+              ) : null}
+              {!isGlobalDirectory ? (
+                <PermissionGate permission="settings.member.remove">
+                  <ConfirmActionButton
+                    label="Remove"
+                    message={`Remove ${row.name} from ${row.scopeLabel}?`}
+                    onConfirm={() => removeMutation.mutate(row.userId)}
+                  />
+                </PermissionGate>
               ) : null}
             </div>
           ];
