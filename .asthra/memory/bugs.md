@@ -326,3 +326,41 @@
 7. **`settings/members/page.tsx`**: Updated `canViewMembers` to chain `org.view + member.view` via `memberPermQuery` scoped codes.
 8. **`settings-admin-views.tsx` MembersView**: `canInvite`, `canChangeRoles`, `canRemoveMembers` now use `hasHierarchicalPermission` chaining `org.view + member.view + action-permission`.
 **Permission hierarchy**: `organization.view` (root) → `member.view` / `workspace.view` (level 2) → `member.invite` / `member.remove` / `role.manage` / `workspace.create` / `workspace.edit` / `workspace.delete` (level 3).
+
+### BUG-043 — Hard Reset Shows Onboarding Gate Instead of Redirecting to /login [FIXED 2026-07-03]
+
+**File**: `frontend/src/layouts/asthra-shell.tsx`
+**Symptom**: After a hard reset (or with an expired/invalid token), `GET /context/platform` returns 401. Instead of redirecting to `/login`, the app shows the onboarding gate (Create Your First Organization).
+**Root cause**: `isAuthenticated` is persisted to localStorage — on reload with a stale/expired token, it is `true`. The existing auth redirect effect only fires when `isAuthenticated === false`, so it misses the expired-token case. With `contextIsError = true, contextLoading = false, contextLoadedAt = null, organizations = []`, the `needsOnboarding` condition evaluated to `true` (all conditions met), showing the onboarding gate.
+**Fix (4 changes to `asthra-shell.tsx`)**:
+1. Destructured `isError: contextIsError, error: contextError` from `usePlatformContext()`.
+2. Added `!contextIsError` to `needsOnboarding` condition — prevents onboarding gate from showing when context is in any error state.
+3. Added `useEffect` that detects `contextError.status === 401` and calls `logout()` (which clears all stores and redirects to `/login`).
+4. Added synchronous `return null` guard between the context-loading gate and the onboarding gate — renders nothing while the useEffect redirect fires.
+**Guard order after fix**: public path → hydration/auth → context loading → 401 null guard → onboarding gate.
+
+### BUG-044 — Member Detail Sections Used Broad settings.member.view Instead of Granular Codes [FIXED 2026-07-03]
+
+**Files**: `services/core-service/app/services/permission_registry.py`, `frontend/src/lib/permission-registry.ts`, `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: In God Mode, all four detail section cards (Scoped Role Assignments, Effective Permissions, Current Roles, Teams) were gated by the same broad `settings.member.view` code. Toggling this code in simulation hid/showed ALL sections at once — no way to independently control each section.
+**Root cause**: Phase 3 wrapped each section with `PermissionGate permission="settings.member.view"` — the right approach for Phase 3, but the permission codes weren't granular enough for section-level control.
+**Fix (hybrid granular model)**:
+1. Added `"view.roles"`, `"view.permissions"`, `"view.teams"` to `ACTION_NAMES` in `permission_registry.py` with descriptive names.
+2. Added these 3 actions to the `"member"` entry in `REGISTRY_DEFINITIONS` (produces `settings.member.view.roles`, `.view.permissions`, `.view.teams`).
+3. Added 3 new entries to `PERMISSION_REGISTRY` in `permission-registry.ts` with `requires: ["settings.organization.view", "settings.member.view"]`.
+4. Updated `settings.member.view` `affects` description to remove sections now covered by granular codes.
+5. Updated PermissionGate codes: Scoped Role Assignments → `view.roles`, Effective Permissions → `view.permissions`, Current Roles → `view.roles`, Teams → `view.teams`.
+**Design**: `settings.member.view` remains the page/list gate. Granular sub-codes gate individual sections on the detail page. They have `settings.member.view` as a required parent.
+
+### BUG-045 — Actions Column Header Shown Even When User Has No Action Permissions [FIXED 2026-07-03]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: In `MembersView`, the "Actions" column header was always shown. When a user had no `settings.member.view`, `settings.role.manage`, or `settings.member.remove` permissions, the Actions column appeared as an empty ghost-only column (with `PermissionGate` placeholders visible but no real buttons).
+**Root cause**: The columns array was hardcoded: `["Name", ..., "Actions"]`. No logic checked whether the user actually had any action permissions before showing the header.
+**Fix**:
+1. Added `useSimulationStore` import to `settings-admin-views.tsx`.
+2. In `MembersView`: call `usePlatformContext()` to get `can()`, and `useSimulationStore` to get `isEditMode`.
+3. Compute `hasAnyAction = isEditMode || can("settings.member.view") || can("settings.member.resend") || can("settings.member.cancel") || (!isGlobalDirectory && (can("settings.role.manage") || can("settings.member.remove")))`.
+4. Change columns to `[..., ...(hasAnyAction ? ["Actions"] : [])]`.
+5. Change invitation and member row arrays to conditionally include the actions cell via spread.
+**God Mode rule**: `isEditMode` always keeps `hasAnyAction = true` so God Mode +/- overlays remain accessible even when the user has no real permissions.

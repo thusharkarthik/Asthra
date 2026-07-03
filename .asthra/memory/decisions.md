@@ -234,6 +234,22 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 
 **Investigation finding**: None of the Category B functions were actually imported or called outside `rbac.ts` itself. The one consumer (`settings-admin-views.tsx`) only imported `normalizeRole` (Category A), so no call-site replacements were needed.
 
+## 2026-07-03 — settings.member.view Scope: List, Filters, Detail, and Sections
+
+**Decision**: `settings.member.view` gates the entire member surface — not just the list table, but also the search/filter bar, the View button per row, the member detail page, the Effective Permissions section, the Role Assignment History table, the Current Roles section, and the Teams placeholder. Each is wrapped individually with `PermissionGate` for God Mode overlay coverage.
+
+**Why**: God Mode must show an overlay on EVERY permission-controlled element. If the search bar is logically behind `member.view` (you can't search members if you can't see them), it must have a `PermissionGate` — not just a page-level gate. Each wrapped element gets its own + / − toggle in edit mode.
+
+**How to apply**: For any new element on `/settings/members` or `/settings/members/[id]` that should be visible to users with `settings.member.view`, wrap it with `<PermissionGate permission="settings.member.view">`. Informational placeholder cards (Projects, Activity) that carry no permission-sensitive data may be left unwrapped.
+
+## 2026-07-03 — settings.member.manage Scope: Assign and Remove Role Controls in Member Detail
+
+**Decision**: `settings.member.manage` gates the Assign Role controls (role selector, org selector, workspace selector, Assign Role button) and the Remove button per role row inside `MemberDetailView`. These replace the previous `canManageRoles ? ... : undefined` conditional pattern.
+
+**Why**: The old `canManageRoles` pattern hid elements in normal mode but was invisible to God Mode (no `PermissionGate` → no overlay). Replacing with `<PermissionGate permission="settings.member.manage">` makes these controls appear as ghost placeholders in edit mode when the simulated role lacks this permission, and as green-ringed live elements when it has it. The old `canManageRoles` variable was removed since both its uses are now PermissionGate wrappers.
+
+**How to apply**: For any new role-management action in member detail (e.g., future "Transfer Ownership"), wrap with `<PermissionGate permission="settings.member.manage">`. The outer `settings.member.view` gate (on Current Roles card) and the inner `settings.member.manage` gate (on Assign/Remove controls) work independently — a user with only `member.view` sees the roles list but not the edit controls; a user with both sees everything.
+
 ## 2026-06-29 — Three-Mode Navigation: Role-Based, Not Route-Based
 
 **Decision**: Navigation mode is derived from the user's highest authority role (platform > org > work), not from the current URL. Superusers additionally get route-based auto-detection and a manual override switcher.
@@ -450,3 +466,21 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: The Goal Mode / Visual Permission Editor needs a standard component so any developer can make any UI element editable in simulation edit mode without re-implementing the overlay logic. PermissionGate is the hook point — it knows both the permission code (for API save) and the label (for ghost placeholder display).
 
 **How to apply**: Wrap leaf elements with `<PermissionGate permission="settings.X.action" label="Human Readable Label">`. Do NOT wrap page-level access gates — those remain as direct `can()` or `hasHierarchicalPermission()` checks. Do NOT use PermissionGate for non-permission-driven visibility (loading states, data-dependent rendering, etc.).
+
+---
+
+## Decision: Hybrid Granular Permission Model for Member Detail Sections [2026-07-03]
+
+**Rule**: Member detail page sections use granular sub-permission codes (`settings.member.view.roles`, `settings.member.view.permissions`, `settings.member.view.teams`) rather than the broad `settings.member.view` code. The broad code remains as the page/list gate.
+
+**Rationale**: With God Mode, each section card on a detail page needs to be independently togglable in simulation. Sharing a single broad code means toggling it hides/shows all sections simultaneously — no section-level granularity. Granular codes are produced by listing `"view.roles"` etc. as actions in `REGISTRY_DEFINITIONS` (the `PermissionRegistryItem.code` property computes `settings.member.view.roles` from module=settings, resource=member, action=view.roles). They carry `requires: ["settings.organization.view", "settings.member.view"]` in the frontend registry.
+
+**Pattern**: `{module}.{resource}.view` = page access + list. `{module}.{resource}.view.{section}` = section-specific on the detail page. Only add granular sub-codes when a detail page has multiple independently controllable sections.
+
+## Decision: Actions Column Hidden When User Has No Action Permissions [2026-07-03]
+
+**Rule**: The "Actions" column in `MembersView` (and any similar table) is conditionally rendered using a `hasAnyAction` flag. The flag is `true` when the user has any of the action permissions for that table, OR when God Mode is in edit mode.
+
+**Rationale**: Showing the "Actions" header with only empty/ghost cells is noisy and confusing. When no action is available, the column adds nothing. God Mode edit mode always shows the column so that `PermissionGate` +/- overlays inside it remain accessible for simulation.
+
+**Pattern**: Use simulation-aware `can()` from `usePlatformContext()` (not `useCurrentPermissions()`) and `isEditMode` from `useSimulationStore`. Combine as: `hasAnyAction = isEditMode || can(A) || can(B) || ...`. Spread into the columns array: `[..., ...(hasAnyAction ? ["Actions"] : [])]`. Spread into each row array: `[..., ...(hasAnyAction ? [<actionsDiv>] : [])]`.

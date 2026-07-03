@@ -90,7 +90,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useLogout();
-  const { currentUser, organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt } = usePlatformContext();
+  const { currentUser, organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt, isError: contextIsError, error: contextError } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const zustandUnread = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
@@ -134,7 +134,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const hasShellLoading = routeLoading || isFetching > 0 || isMutating > 0;
   const showBottomProgress = progressActive || hasShellLoading;
   const hasPlatformRole = (permissions?.roles?.length ?? 0) > 0;
-  const needsOnboarding = !isPublicPath && !contextLoading && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
+  const needsOnboarding = !isPublicPath && !contextLoading && !contextIsError && !currentUser?.is_superuser && !hasPlatformRole && organizations.length === 0;
   const skippedOnboarding = currentUser?.id != null && skippedOnboardingUserId === currentUser.id;
   const isSkippedUser = needsOnboarding && skippedOnboarding;
   const isSuperuser = Boolean(currentUser?.is_superuser);
@@ -159,6 +159,16 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       router.replace("/login");
     }
   }, [hasHydrated, isAuthenticated, isPublicPath, router]);
+
+  // When platform context returns 401, the stored token is invalid/expired.
+  // Call logout() so it clears all stores and redirects to /login.
+  useEffect(() => {
+    if (isPublicPath || !contextIsError) return;
+    const status = (contextError as { status?: number })?.status ?? 0;
+    if (status === 401) {
+      logout();
+    }
+  }, [isPublicPath, contextIsError, contextError, logout]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -229,6 +239,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   // only fires on initial load — not on background refetches or scope changes.
   if (contextLoading && !contextLoadedAt) {
     return <AppLoadingScreen label="Loading your workspace..." />;
+  }
+
+  // If context returned 401, the token is invalid — render nothing while the
+  // useEffect above calls logout() and redirects to /login.
+  if (!isPublicPath && contextIsError) {
+    const status = (contextError as { status?: number })?.status ?? 0;
+    if (status === 401) return null;
   }
 
   if (needsOnboarding && !skippedOnboarding) {
