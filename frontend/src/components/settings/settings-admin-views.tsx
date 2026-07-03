@@ -17,6 +17,8 @@ import { can as hasPermission } from "@/lib/permissions";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
 import { PermissionAction, PermissionButton } from "@/access/permission-components";
+import { PermissionGate } from "@/components/platform/permission-gate";
+import { useSimulationStore } from "@/lib/permission-simulator";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
   FormActions,
@@ -675,9 +677,11 @@ export function OrganizationsView() {
             {organizations.length === 0 ? (
               <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
             ) : (
-              <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
-                <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
-              </PermissionAction>
+              <PermissionGate permission="settings.organization.create">
+                <PermissionAction actionKey={SETTINGS_ACTIONS.organizationCreate.actionKey} scope={createOrganizationScope}>
+                  <QuickCreateButton onClick={() => setOpen(true)}>Create Organization</QuickCreateButton>
+                </PermissionAction>
+              </PermissionGate>
             )}
           </div>
         }
@@ -829,7 +833,11 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       <SettingsSectionHeader
         title="Workspaces"
         description="Workspaces connect teams, projects, and module data under an organization."
-        actions={canCreateWorkspace ? <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton> : undefined}
+        actions={
+          <PermissionGate permission="settings.workspace.create">
+            <QuickCreateButton onClick={() => setOpen(true)}>Create Workspace</QuickCreateButton>
+          </PermissionGate>
+        }
       />
       {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.create to create workspaces in this scope." /> : null}
       {!organizations.length ? (
@@ -1543,6 +1551,14 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const [inviteWsId, setInviteWsId] = useState<number | "">("");
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+  const { can } = usePlatformContext();
+  const isEditMode = useSimulationStore((s) => s.isEditMode);
+  const hasAnyAction =
+    isEditMode ||
+    can("settings.member.view") ||
+    can("settings.member.resend") ||
+    can("settings.member.cancel") ||
+    (!isGlobalDirectory && (can("settings.role.manage") || can("settings.member.remove")));
 
   // Auto-open invite modal when navigated from checklist with ?action=invite&orgId=N
   useEffect(() => {
@@ -1588,8 +1604,6 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const memberActionScope = permissionActionScope(permissions);
   const visibleRoles = filterVisibleRoles(roles, canViewProtectedRoles(currentUser, permissions));
   const canInvite = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberInvite.permissionCode);
-  const canChangeRoles = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.roleManage.permissionCode);
-  const canRemoveMembers = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberRemove.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
   // Invite modal role list: global directory shows platform-only; org/ws context shows non-platform only.
@@ -1787,9 +1801,11 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         title="Members"
         description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
-          <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-            <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
-          </PermissionAction>
+          <PermissionGate permission="settings.member.invite">
+            <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
+              <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
+            </PermissionAction>
+          </PermissionGate>
         }
       />
       {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Admin, Platform Support) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
@@ -1804,36 +1820,38 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           ))}
         </div>
       </SettingsCard>
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_160px_160px_180px]">
-        <SearchBox value={search} onChange={setSearch} placeholder="Search name or email" />
-        <select aria-label="Role filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-          <option value="">All roles</option>
-          {Array.from(new Set(memberRows.map((row) => normalizeRole(row.role)))).sort().map((role) => <option key={role} value={role}>{roleDisplayName(role)}</option>)}
-        </select>
-        <select aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <select aria-label="Scope filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-          <option value="">All scopes</option>
-          <option value="platform">Platform</option>
-          <option value="organization">Organization</option>
-          <option value="workspace">Workspace</option>
-          <option value="project">Project</option>
-          <option value="team">Team</option>
-        </select>
-        <select aria-label="Sort members" value={sortKey} onChange={(event) => setSortKey(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-          <option value="name">Sort by name</option>
-          <option value="email">Sort by email</option>
-          <option value="role">Sort by role</option>
-          <option value="status">Sort by status</option>
-          <option value="date">Sort by joined/invited</option>
-        </select>
-      </div>
+      <PermissionGate permission="settings.member.view" label="Member Search and Filters">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_160px_160px_180px]">
+          <SearchBox value={search} onChange={setSearch} placeholder="Search name or email" />
+          <select aria-label="Role filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+            <option value="">All roles</option>
+            {Array.from(new Set(memberRows.map((row) => normalizeRole(row.role)))).sort().map((role) => <option key={role} value={role}>{roleDisplayName(role)}</option>)}
+          </select>
+          <select aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select aria-label="Scope filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+            <option value="">All scopes</option>
+            <option value="platform">Platform</option>
+            <option value="organization">Organization</option>
+            <option value="workspace">Workspace</option>
+            <option value="project">Project</option>
+            <option value="team">Team</option>
+          </select>
+          <select aria-label="Sort members" value={sortKey} onChange={(event) => setSortKey(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+            <option value="name">Sort by name</option>
+            <option value="email">Sort by email</option>
+            <option value="role">Sort by role</option>
+            <option value="status">Sort by status</option>
+            <option value="date">Sort by joined/invited</option>
+          </select>
+        </div>
+      </PermissionGate>
       <SettingsDataTable
-        columns={["Name", "Email", "Role", "Scope", "Status", "Joined / Invited", "Last Active", "Actions"]}
+        columns={["Name", "Email", "Role", "Scope", "Status", "Joined / Invited", "Last Active", ...(hasAnyAction ? ["Actions"] : [])]}
         rows={filteredRows.map((row) => {
           if (row.kind === "invitation") {
             return [
@@ -1844,14 +1862,14 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
               roleDisplayName(row.status),
               row.status === "pending" ? `Last sent: ${formatDate(row.date)}` : formatDate(row.date),
               "Not tracked yet",
-              <div key={`${row.id}-actions`} className="flex flex-wrap gap-2">
+              ...(hasAnyAction ? [<div key={`${row.id}-actions`} className="flex flex-wrap gap-2">
                 {row.status === "pending" ? (
                   <PermissionButton actionKey={SETTINGS_ACTIONS.memberResend.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => resendMutation.mutate(row.id)}>Resend Invite</PermissionButton>
                 ) : null}
                 {row.status === "pending" ? (
                   <PermissionButton actionKey={SETTINGS_ACTIONS.memberCancel.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => cancelInviteMutation.mutate(row.id)}>Cancel Invite</PermissionButton>
                 ) : null}
-              </div>
+              </div>] : [])
             ];
           }
           return [
@@ -1862,17 +1880,25 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             row.status,
             formatDate(row.date),
             "Not tracked yet",
-            <div key={row.userId} className="flex flex-wrap gap-2">
-              <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
-              {!isGlobalDirectory ? <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton> : null}
-              {!isGlobalDirectory && canRemoveMembers ? (
-                <ConfirmActionButton
-                  label="Remove"
-                  message={`Remove ${row.name} from ${row.scopeLabel}?`}
-                  onConfirm={() => removeMutation.mutate(row.userId)}
-                />
+            ...(hasAnyAction ? [<div key={row.userId} className="flex flex-wrap gap-2">
+              <PermissionGate permission="settings.member.view" label="View Member Detail">
+                <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
+              </PermissionGate>
+              {!isGlobalDirectory ? (
+                <PermissionGate permission="settings.role.manage">
+                  <PermissionButton actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={memberActionScope} type="button" size="sm" variant="outline" onClick={() => { setRoleOpen(row.userId); setRoleFormError(null); }}>Change Role</PermissionButton>
+                </PermissionGate>
               ) : null}
-            </div>
+              {!isGlobalDirectory ? (
+                <PermissionGate permission="settings.member.remove">
+                  <ConfirmActionButton
+                    label="Remove"
+                    message={`Remove ${row.name} from ${row.scopeLabel}?`}
+                    onConfirm={() => removeMutation.mutate(row.userId)}
+                  />
+                </PermissionGate>
+              ) : null}
+            </div>] : [])
           ];
         })}
         emptyMessage="No members found"
@@ -2110,7 +2136,6 @@ export function MemberDetailView({ userId }: { userId: number }) {
     enabled: Boolean(accessToken && userId)
   });
   const currentPermissions = useCurrentPermissions();
-  const canManageRoles = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const effectiveScope = selectedProjectId
     ? { scope_type: "project", scope_id: selectedProjectId }
     : selectedWorkspaceId
@@ -2189,125 +2214,137 @@ export function MemberDetailView({ userId }: { userId: number }) {
           <div><dt className="text-muted-foreground">Effective Permissions Count</dt><dd>{effectivePermissionsQuery.data?.permission_codes.length ?? 0}</dd></div>
         </dl>
       </SettingsCard>
-      <SettingsCard title="Scoped Role Assignments" description="Roles are assigned to this user at platform, organization, workspace, project, or team scope. Permissions come from the assigned roles.">
-        <SettingsDataTable
-          columns={["Role", "Scope Type", "Scope ID", "Status", "Assigned", "Revoked"]}
-          rows={(roleAssignmentsQuery.data ?? []).map((assignment: RoleAssignmentRecord) => [
-            roleNameById(visibleRoles, assignment.role_id),
-            roleDisplayName(assignment.scope_type),
-            assignment.scope_id ?? "Global",
-            roleDisplayName(assignment.status),
-            formatDate(assignment.assigned_at),
-            formatDate(assignment.revoked_at)
-          ])}
-          emptyMessage="No scoped role assignments"
-        />
-      </SettingsCard>
-      <SettingsCard title="Effective Permissions" description={`Resolved for ${roleDisplayName(effectiveScope.scope_type)} ${effectiveScope.scope_id ?? "global"}. Higher-scope roles are inherited where applicable.`}>
-        <div className="space-y-3">
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div>
-              <div className="font-medium">Direct roles</div>
-              <div className="mt-1 text-muted-foreground">
-                {(effectivePermissionsQuery.data?.active_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No direct roles"}
-              </div>
-            </div>
-            <div>
-              <div className="font-medium">Inherited roles</div>
-              <div className="mt-1 text-muted-foreground">
-                {(effectivePermissionsQuery.data?.inherited_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No inherited roles"}
-              </div>
-            </div>
-          </div>
-          {Object.entries(groupPermissionCodesByModule(effectivePermissionsQuery.data?.permission_codes ?? [])).map(([module, codes]) => (
-            <div key={module} className="rounded-md border p-3">
-              <div className="mb-2 text-sm font-medium">{moduleLabel(module)}</div>
-              <div className="flex flex-wrap gap-2">
-                {codes.map((code) => <span key={code} className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">{code}</span>)}
-              </div>
-            </div>
-          ))}
-          {!effectivePermissionsQuery.data?.permission_codes.length ? <p className="text-sm text-muted-foreground">No effective permissions resolved for this scope.</p> : null}
-        </div>
-      </SettingsCard>
-      <SettingsCard
-        title="Current Roles"
-        description="Users receive roles. Inherited permissions are calculated from assigned role mappings."
-        actions={
-          canManageRoles ? <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Assign member role"
-              value={assignRoleId}
-              onChange={(event) => { setAssignRoleId(event.target.value); setAssignOrgId(""); setAssignWsId(""); }}
-              className="h-9 rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">Select role</option>
-              {availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-            </select>
-            {assignScopeCategory !== "platform" ? (
-              <select
-                aria-label="Assign organization"
-                value={assignOrgId}
-                onChange={(e) => { setAssignOrgId(Number(e.target.value) || ""); setAssignWsId(""); }}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="">Select org</option>
-                {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-              </select>
-            ) : null}
-            {(assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") ? (
-              <select
-                aria-label="Assign workspace"
-                value={assignWsId}
-                onChange={(e) => setAssignWsId(Number(e.target.value) || "")}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="">Select workspace</option>
-                {workspaces
-                  .filter((ws) => !assignOrgId || ws.organization_id === Number(assignOrgId))
-                  .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
-              </select>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              disabled={
-                !assignRoleId ||
-                (assignScopeCategory !== "platform" && !assignOrgId) ||
-                ((assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") && !assignWsId) ||
-                assignRoleMutation.isPending
-              }
-              onClick={() => {
-                const scopeId =
-                  assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team"
-                    ? Number(assignWsId) || null
-                    : assignScopeCategory === "organization"
-                      ? Number(assignOrgId) || null
-                      : null;
-                assignRoleMutation.mutate({ role_id: Number(assignRoleId), scope_type: assignScopeCategory, scope_id: scopeId });
-              }}
-            >
-              Assign Role
-            </Button>
-          </div> : undefined
-        }
-      >
-        <SettingsDataTable
-          columns={["Role", "Scope", "System Role", "Assigned", "Actions"]}
-          rows={activeAssignments.map((assignment) => {
-            const role = visibleRoles.find((item) => item.id === assignment.role_id);
-            return [
-              role?.name ?? `Role ${assignment.role_id}`,
-              scopeLabelForAssignment(assignment, organizations, workspaces),
-              role?.is_system ? "Yes" : "No",
+      <PermissionGate permission="settings.member.view.roles" label="Role Assignment History">
+        <SettingsCard title="Scoped Role Assignments" description="Roles are assigned to this user at platform, organization, workspace, project, or team scope. Permissions come from the assigned roles.">
+          <SettingsDataTable
+            columns={["Role", "Scope Type", "Scope ID", "Status", "Assigned", "Revoked"]}
+            rows={(roleAssignmentsQuery.data ?? []).map((assignment: RoleAssignmentRecord) => [
+              roleNameById(visibleRoles, assignment.role_id),
+              roleDisplayName(assignment.scope_type),
+              assignment.scope_id ?? "Global",
+              roleDisplayName(assignment.status),
               formatDate(assignment.assigned_at),
-              canManageRoles ? <Button key={assignment.id} type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.id)} disabled={removeRoleMutation.isPending}>Remove</Button> : null
-            ];
-          })}
-          emptyMessage="No assigned roles"
-        />
-      </SettingsCard>
-      <SettingsCard title="Teams" description="Team membership is shown from team detail pages in this pass. Assignment is available under team administration." />
+              formatDate(assignment.revoked_at)
+            ])}
+            emptyMessage="No scoped role assignments"
+          />
+        </SettingsCard>
+      </PermissionGate>
+      <PermissionGate permission="settings.member.view.permissions" label="Effective Permissions Panel">
+        <SettingsCard title="Effective Permissions" description={`Resolved for ${roleDisplayName(effectiveScope.scope_type)} ${effectiveScope.scope_id ?? "global"}. Higher-scope roles are inherited where applicable.`}>
+          <div className="space-y-3">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div>
+                <div className="font-medium">Direct roles</div>
+                <div className="mt-1 text-muted-foreground">
+                  {(effectivePermissionsQuery.data?.active_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No direct roles"}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium">Inherited roles</div>
+                <div className="mt-1 text-muted-foreground">
+                  {(effectivePermissionsQuery.data?.inherited_roles ?? []).map((role) => String(role.name ?? role.key ?? "Role")).join(", ") || "No inherited roles"}
+                </div>
+              </div>
+            </div>
+            {Object.entries(groupPermissionCodesByModule(effectivePermissionsQuery.data?.permission_codes ?? [])).map(([module, codes]) => (
+              <div key={module} className="rounded-md border p-3">
+                <div className="mb-2 text-sm font-medium">{moduleLabel(module)}</div>
+                <div className="flex flex-wrap gap-2">
+                  {codes.map((code) => <span key={code} className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">{code}</span>)}
+                </div>
+              </div>
+            ))}
+            {!effectivePermissionsQuery.data?.permission_codes.length ? <p className="text-sm text-muted-foreground">No effective permissions resolved for this scope.</p> : null}
+          </div>
+        </SettingsCard>
+      </PermissionGate>
+      <PermissionGate permission="settings.member.view.roles" label="Current Roles List">
+        <SettingsCard
+          title="Current Roles"
+          description="Users receive roles. Inherited permissions are calculated from assigned role mappings."
+          actions={
+            <PermissionGate permission="settings.member.manage" label="Assign Role Controls">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  aria-label="Assign member role"
+                  value={assignRoleId}
+                  onChange={(event) => { setAssignRoleId(event.target.value); setAssignOrgId(""); setAssignWsId(""); }}
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">Select role</option>
+                  {availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                </select>
+                {assignScopeCategory !== "platform" ? (
+                  <select
+                    aria-label="Assign organization"
+                    value={assignOrgId}
+                    onChange={(e) => { setAssignOrgId(Number(e.target.value) || ""); setAssignWsId(""); }}
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">Select org</option>
+                    {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+                  </select>
+                ) : null}
+                {(assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") ? (
+                  <select
+                    aria-label="Assign workspace"
+                    value={assignWsId}
+                    onChange={(e) => setAssignWsId(Number(e.target.value) || "")}
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">Select workspace</option>
+                    {workspaces
+                      .filter((ws) => !assignOrgId || ws.organization_id === Number(assignOrgId))
+                      .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+                  </select>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    !assignRoleId ||
+                    (assignScopeCategory !== "platform" && !assignOrgId) ||
+                    ((assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") && !assignWsId) ||
+                    assignRoleMutation.isPending
+                  }
+                  onClick={() => {
+                    const scopeId =
+                      assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team"
+                        ? Number(assignWsId) || null
+                        : assignScopeCategory === "organization"
+                          ? Number(assignOrgId) || null
+                          : null;
+                    assignRoleMutation.mutate({ role_id: Number(assignRoleId), scope_type: assignScopeCategory, scope_id: scopeId });
+                  }}
+                >
+                  Assign Role
+                </Button>
+              </div>
+            </PermissionGate>
+          }
+        >
+          <SettingsDataTable
+            columns={["Role", "Scope", "System Role", "Assigned", "Actions"]}
+            rows={activeAssignments.map((assignment) => {
+              const role = visibleRoles.find((item) => item.id === assignment.role_id);
+              return [
+                role?.name ?? `Role ${assignment.role_id}`,
+                scopeLabelForAssignment(assignment, organizations, workspaces),
+                role?.is_system ? "Yes" : "No",
+                formatDate(assignment.assigned_at),
+                <PermissionGate key={assignment.id} permission="settings.member.manage" label="Remove Role from Member">
+                  <Button type="button" size="sm" variant="outline" onClick={() => removeRoleMutation.mutate(assignment.id)} disabled={removeRoleMutation.isPending}>Remove</Button>
+                </PermissionGate>
+              ];
+            })}
+            emptyMessage="No assigned roles"
+          />
+        </SettingsCard>
+      </PermissionGate>
+      <PermissionGate permission="settings.member.view.teams" label="Member Teams">
+        <SettingsCard title="Teams" description="Team membership is shown from team detail pages in this pass. Assignment is available under team administration." />
+      </PermissionGate>
       <SettingsCard title="Projects" description="Project ownership can be assigned from project detail pages." />
       <SettingsCard title="Activity Placeholder" description="Member audit and activity stream integration is planned for a later platform pass." />
     </SettingsLayout>

@@ -132,6 +132,32 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 
 ---
 
+## 2026-07-03 — PermissionGate Is the Sole UI Gating Mechanism; PermissionAction/Button Are Inner-Layer Only
+
+**Decision**: `PermissionGate` is the canonical way to gate any UI element by a permission code. `PermissionAction` and `PermissionButton` (action-registry-based, scope-aware) are allowed as an inner layer inside `PermissionGate`, but must not be the only mechanism — they don't participate in God Mode.
+
+**Why**: God Mode (Visual Permission Editor) requires `PermissionGate` wrappers to work. `PermissionAction`/`PermissionButton` use the settings-scoped permission context (`useCurrentPermissions`), which does not reflect simulation state. `PermissionGate` uses `usePlatformContext().can()` which does. Wrapping an existing `PermissionAction` with `PermissionGate` adds God Mode overlays without breaking the inner scope check.
+
+**How to apply**: New settings UI elements → always wrap the leaf button/element with `PermissionGate`. Existing elements that use `PermissionAction`/`PermissionButton` → add `PermissionGate` as an outer wrapper. Never duplicate the permission code check — `PermissionGate` owns the visibility decision.
+
+## 2026-07-03 — PERMISSION_REGISTRY: Central Permission Metadata, Not Runtime Enforcement
+
+**Decision**: `PERMISSION_REGISTRY` in `frontend/src/lib/permission-registry.ts` is metadata for God Mode tooling only. It drives: (a) auto-resolved labels in `PermissionGate`, (b) rich tooltips with `affects` text, (c) route-aware hints panel in the simulation banner. It does NOT drive actual permission enforcement.
+
+**Why**: Runtime enforcement is the backend's job (core-service RBAC). The frontend gate (`can()` from platformContext) already has the resolved permission codes — it doesn't need the registry to make access decisions. The registry gives human-readable context to God Mode users, not machine-readable gates.
+
+**How to apply**: When adding a new permission-gated element: (1) add a `PermissionDefinition` to `PERMISSION_REGISTRY` with accurate `affects` and `routes`, (2) wrap the element with `PermissionGate`. Never read `PERMISSION_REGISTRY` for access decisions — only for metadata.
+
+## 2026-07-03 — PermissionGate Uses Leaf Permission Code, Not Full Hierarchy
+
+**Decision**: When wrapping an element that requires a permission hierarchy (e.g. `org.view` + `workspace.view` + `workspace.edit`), use only the leaf permission code in `PermissionGate`. The full hierarchy chain (`requires` array) is stored in PERMISSION_REGISTRY for documentation purposes only.
+
+**Why**: Checking only the leaf permission is correct behavior in simulation mode. When a user is simulating a role that has `settings.workspace.edit` in its simulatedPermissions, `can("settings.workspace.edit")` returns true — the parent permissions are implied by the role design. Requiring all 3 levels in the gate would make God Mode harder to use (you'd have to grant 3 permissions to reveal one button). The backend enforces the full hierarchy at API call time anyway.
+
+**How to apply**: `<PermissionGate permission="settings.workspace.edit">` — not `hasHierarchicalPermission(can, "org.view", "ws.view", "ws.edit")`. The old `{isAuthorized && ...}` pattern using `hasHierarchicalPermission` remains valid for page-level gates (show/hide the entire page), but individual leaf elements should use `PermissionGate` with the leaf code only.
+
+---
+
 ## 2026-06-27 — platform_member Retired; organization_member Added
 
 **Decision**: Remove `platform_member` (platform-scoped) from the role catalog. Add `organization_member` (organization-scoped) as the base org membership role.
@@ -207,6 +233,22 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Outcome**: `lib/rbac.ts` no longer exists. `lib/role-utils.ts` is the file for display/sorting only. `can()` from `usePlatformContext()` (or the `useCan()` hook) is the sole frontend access control mechanism.
 
 **Investigation finding**: None of the Category B functions were actually imported or called outside `rbac.ts` itself. The one consumer (`settings-admin-views.tsx`) only imported `normalizeRole` (Category A), so no call-site replacements were needed.
+
+## 2026-07-03 — settings.member.view Scope: List, Filters, Detail, and Sections
+
+**Decision**: `settings.member.view` gates the entire member surface — not just the list table, but also the search/filter bar, the View button per row, the member detail page, the Effective Permissions section, the Role Assignment History table, the Current Roles section, and the Teams placeholder. Each is wrapped individually with `PermissionGate` for God Mode overlay coverage.
+
+**Why**: God Mode must show an overlay on EVERY permission-controlled element. If the search bar is logically behind `member.view` (you can't search members if you can't see them), it must have a `PermissionGate` — not just a page-level gate. Each wrapped element gets its own + / − toggle in edit mode.
+
+**How to apply**: For any new element on `/settings/members` or `/settings/members/[id]` that should be visible to users with `settings.member.view`, wrap it with `<PermissionGate permission="settings.member.view">`. Informational placeholder cards (Projects, Activity) that carry no permission-sensitive data may be left unwrapped.
+
+## 2026-07-03 — settings.member.manage Scope: Assign and Remove Role Controls in Member Detail
+
+**Decision**: `settings.member.manage` gates the Assign Role controls (role selector, org selector, workspace selector, Assign Role button) and the Remove button per role row inside `MemberDetailView`. These replace the previous `canManageRoles ? ... : undefined` conditional pattern.
+
+**Why**: The old `canManageRoles` pattern hid elements in normal mode but was invisible to God Mode (no `PermissionGate` → no overlay). Replacing with `<PermissionGate permission="settings.member.manage">` makes these controls appear as ghost placeholders in edit mode when the simulated role lacks this permission, and as green-ringed live elements when it has it. The old `canManageRoles` variable was removed since both its uses are now PermissionGate wrappers.
+
+**How to apply**: For any new role-management action in member detail (e.g., future "Transfer Ownership"), wrap with `<PermissionGate permission="settings.member.manage">`. The outer `settings.member.view` gate (on Current Roles card) and the inner `settings.member.manage` gate (on Assign/Remove controls) work independently — a user with only `member.view` sees the roles list but not the edit controls; a user with both sees everything.
 
 ## 2026-06-29 — Three-Mode Navigation: Role-Based, Not Route-Based
 
@@ -409,3 +451,36 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: A permission like `settings.member.invite` is meaningless without also having `settings.member.view` and `settings.organization.view`. Flat checks allow partial access that the UX can't handle (blank page, broken state). The hierarchy makes the access model explicit and consistent.
 
 **How to apply**: Use `hasHierarchicalPermission(can, "settings.organization.view", "settings.X.view")` for page-level view gates, and extend the chain for action buttons. Always check `isAdminUser` first and short-circuit. Apply `if (!isAdminUser && ctxIsLoading) return null;` before any access gate to avoid premature "Access Restricted" flashes while the platform context is loading org-scoped permissions.
+
+## 2026-07-02 — Visual Permission Editor: PermissionGate as Standard Wrapper
+
+**Decision**: All permission-gated UI elements (buttons, tabs, action menus, form save buttons) should be wrapped with `<PermissionGate>` from `@/components/platform/permission-gate.tsx`. Page-level access gates (show/hide entire page) continue to use `can()` directly.
+
+**Architecture**:
+- `PermissionGate(permission, label, children, fallback?)` — wraps any leaf element. In normal/view mode behaves as `can(p) ? children : fallback`. In edit mode shows green ring + minus button (visible) or ghost placeholder + plus button (hidden).
+- `useSimulationStore` extended with: `simulatedRoleId`, `isEditMode`, `originalSimulatedPermissions`, `pendingAdditions`, `pendingRemovals`, `hasUnsavedChanges`, `pendingChangeCount`. New actions: `enterEditMode`, `exitEditMode`, `markForAddition`, `markForRemoval`, `undoChange`, `clearPendingChanges`, `commitChanges`.
+- Instant preview: `markForAddition(p)` adds to `simulatedPermissions` immediately so `can(p)` returns true and components appear. `markForRemoval(p)` removes from `simulatedPermissions` immediately so components disappear. User sees live effect before saving.
+- `VisualPermissionEditor` — floating save bar, renders when `hasUnsavedChanges`. On save: calls `listPermissions()` to resolve codes→IDs, then `addRolePermission` / `removeRolePermission` per change. On success: `commitChanges()` (new permissions become baseline). On discard: `clearPendingChanges()` (reverts to `originalSimulatedPermissions`).
+- Shell banner: amber (view mode) or blue (edit mode). View/Edit mode toggle buttons inline.
+
+**Why**: The Goal Mode / Visual Permission Editor needs a standard component so any developer can make any UI element editable in simulation edit mode without re-implementing the overlay logic. PermissionGate is the hook point — it knows both the permission code (for API save) and the label (for ghost placeholder display).
+
+**How to apply**: Wrap leaf elements with `<PermissionGate permission="settings.X.action" label="Human Readable Label">`. Do NOT wrap page-level access gates — those remain as direct `can()` or `hasHierarchicalPermission()` checks. Do NOT use PermissionGate for non-permission-driven visibility (loading states, data-dependent rendering, etc.).
+
+---
+
+## Decision: Hybrid Granular Permission Model for Member Detail Sections [2026-07-03]
+
+**Rule**: Member detail page sections use granular sub-permission codes (`settings.member.view.roles`, `settings.member.view.permissions`, `settings.member.view.teams`) rather than the broad `settings.member.view` code. The broad code remains as the page/list gate.
+
+**Rationale**: With God Mode, each section card on a detail page needs to be independently togglable in simulation. Sharing a single broad code means toggling it hides/shows all sections simultaneously — no section-level granularity. Granular codes are produced by listing `"view.roles"` etc. as actions in `REGISTRY_DEFINITIONS` (the `PermissionRegistryItem.code` property computes `settings.member.view.roles` from module=settings, resource=member, action=view.roles). They carry `requires: ["settings.organization.view", "settings.member.view"]` in the frontend registry.
+
+**Pattern**: `{module}.{resource}.view` = page access + list. `{module}.{resource}.view.{section}` = section-specific on the detail page. Only add granular sub-codes when a detail page has multiple independently controllable sections.
+
+## Decision: Actions Column Hidden When User Has No Action Permissions [2026-07-03]
+
+**Rule**: The "Actions" column in `MembersView` (and any similar table) is conditionally rendered using a `hasAnyAction` flag. The flag is `true` when the user has any of the action permissions for that table, OR when God Mode is in edit mode.
+
+**Rationale**: Showing the "Actions" header with only empty/ghost cells is noisy and confusing. When no action is available, the column adds nothing. God Mode edit mode always shows the column so that `PermissionGate` +/- overlays inside it remain accessible for simulation.
+
+**Pattern**: Use simulation-aware `can()` from `usePlatformContext()` (not `useCurrentPermissions()`) and `isEditMode` from `useSimulationStore`. Combine as: `hasAnyAction = isEditMode || can(A) || can(B) || ...`. Spread into the columns array: `[..., ...(hasAnyAction ? ["Actions"] : [])]`. Spread into each row array: `[..., ...(hasAnyAction ? [<actionsDiv>] : [])]`.

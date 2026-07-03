@@ -93,8 +93,9 @@ export function SidebarNav({
       const result = await settingsApi.simulatePermissions(accessToken, { role_key: selectedRoleKey });
       const role = rolesQuery.data?.find((r) => r.key === selectedRoleKey);
       const roleName = role?.name ?? selectedRoleKey;
+      const roleId = role?.id ?? null;
       const mode = roleKeyToNavigationMode(selectedRoleKey);
-      startSimulation(selectedRoleKey, roleName, result.permission_codes, mode);
+      startSimulation(selectedRoleKey, roleName, roleId, result.permission_codes, mode);
       setViewAsOpen(false);
       setSelectedRoleKey("");
     } catch (err) {

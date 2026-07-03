@@ -160,6 +160,90 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 
 **Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
 
+## Visual Permission Editor — Phase 2 (added 2026-07-03)
+
+**Purpose**: Full God Mode coverage across all settings pages. Every permission-gated UI element is visible and editable in simulator edit mode.
+
+**Files changed**:
+- `frontend/src/lib/permission-registry.ts` (new) — `PERMISSION_REGISTRY` (40+ definitions), `getPermissionDefinition(code)`, `getPermissionsForRoute(pathname)`
+- `frontend/src/components/platform/permission-gate.tsx` (updated) — `label` prop now optional; auto-resolved from PERMISSION_REGISTRY; richer tooltip: `${label}\n${code}\nAffects: ${definition.affects}`
+- `frontend/src/components/settings/settings-admin-views.tsx` (updated) — PermissionGate import added; Invite Member, Change Role, Remove Member in MembersView wrapped; Create Organization in OrganizationsView wrapped; Create Workspace in WorkspacesView wrapped
+- `frontend/src/app/settings/workspace/page.tsx` (updated) — Save General, Save Settings, and Archive danger zone wrapped in PermissionGate (replaced `{isAuthorized &&}` conditionals for those elements)
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — Route-aware permission hints panel: ℹ icon in simulation banner opens dropdown listing all permissions registered for the current route
+
+**PermissionGate API (updated)**:
+- `<PermissionGate permission="code">children</PermissionGate>` — label now optional, auto-looked up from registry
+- Tooltip: `Label\ncode\nAffects: description`
+
+**PERMISSION_REGISTRY structure**:
+```typescript
+type PermissionDefinition = {
+  code: string;
+  label: string;
+  category: string;
+  affects: string;
+  requires?: string[];  // hierarchy chain
+  routes?: string[];    // route patterns (supports [id] segments)
+};
+```
+Categories: Organizations, Members, Workspaces, Roles & Permissions, Projects, Teams, Audit & Compliance.
+38 permissions defined. `getPermissionsForRoute` does pattern-based matching for dynamic segments.
+
+**Route hints panel**:
+- ℹ button in amber/blue simulation banner (to the right of View/Edit toggle)
+- Click opens dropdown listing permission code + label + affects for current route
+- Close via ✕ or clicking ℹ again
+
+**Convention (Rules)**:
+1. Use `PermissionGate` for all UI elements gated by a permission code — never `{can(x) && <Button>}`
+2. Label optional — if in PERMISSION_REGISTRY, auto-resolved
+3. For hierarchy-gated elements, use the leaf permission code (e.g. `settings.workspace.edit`, not all 3 parents)
+4. Existing `PermissionAction`/`PermissionButton` can stay inside `PermissionGate` as inner layer
+5. `getPermissionsForRoute` drives hints panel — update PERMISSION_REGISTRY when adding new gated routes
+6. Do not duplicate PERMISSION_REGISTRY in any component — import from `@/lib/permission-registry`
+
+**NOT wrapped** (by design):
+- `audit-logs/page.tsx` — no leaf action buttons to wrap (page gate exists, no per-element buttons)
+- `api-keys/page.tsx` — personal settings page (user's own keys, no org permission codes)
+- Onboard Organization button — platform-admin-only superuser check, not a `can()` code
+
+## Visual Permission Editor — Phase 1 (added 2026-07-02)
+
+**Purpose**: God Mode foundation — makes every permission-gated UI element visible and editable while in simulator edit mode. Admins can click [+/-] to add/remove permissions from the simulated role and save changes back to the role permanently.
+
+**Files**:
+- `frontend/src/components/platform/permission-gate.tsx` (new) — `PermissionGate` component
+- `frontend/src/components/platform/visual-permission-editor.tsx` (new) — floating save bar
+- `frontend/src/lib/permission-simulator.ts` (extended) — edit mode state + instant preview
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — banner with View/Edit mode toggle + VPE mount
+- `frontend/src/components/navigation/sidebar-nav.tsx` (updated) — passes `roleId` to `startSimulation`
+- `frontend/src/app/settings/organizations/[id]/page.tsx` (migrated) — OrgTabs and save buttons
+
+**PermissionGate API**:
+- `<PermissionGate permission="code" label="Human Name" fallback={...}>children</PermissionGate>`
+- Normal/View: `can(permission) ? children : fallback ?? null` (no DOM change)
+- Edit mode visible: thin green ring + absolute minus button top-right (blue ring if pending addition)
+- Edit mode hidden: dashed ghost placeholder with label + permission code + plus button (orange if pending removal)
+- Clicking +/- updates `simulatedPermissions` immediately for instant preview
+
+**Store additions to `useSimulationStore`**:
+- `simulatedRoleId: number | null` — needed for API save
+- `isEditMode`, `enterEditMode`, `exitEditMode`
+- `originalSimulatedPermissions` — baseline for discard
+- `pendingAdditions`, `pendingRemovals`, `hasUnsavedChanges`, `pendingChangeCount`
+- `markForAddition(p)`, `markForRemoval(p)`, `undoChange(p)`, `clearPendingChanges()`, `commitChanges()`
+
+**Save flow**: `VisualPermissionEditor` calls `listPermissions()` to resolve codes→IDs, then `addRolePermission`/`removeRolePermission` per change. On success: `commitChanges()` makes new permissions the baseline.
+
+**Banner**: Amber (view mode) ↔ Blue (edit mode). Toggle row shows View Mode / Edit Mode buttons with pending count badge. Exit button always visible.
+
+**Migrated**: `organizations/[id]/page.tsx` — OrgTabs Members/Workspaces tabs use PermissionGate (replaced `hiddenTabs` prop); edit form save buttons wrapped in PermissionGate.
+
+**Backend API methods** (all pre-existing, none added):
+- `settingsApi.listPermissions(token)` → `GET /permissions` (all permissions with IDs)
+- `settingsApi.addRolePermission(token, roleId, permId)` → `POST /roles/{roleId}/permissions`
+- `settingsApi.removeRolePermission(token, roleId, permId)` → `DELETE /roles/{roleId}/permissions/{permId}`
+
 ## Permission Simulator (added 2026-06-29)
 
 **Purpose**: Superuser and Platform Owner can "View As" any role to see exactly what the UI looks like, without changing real permissions.
