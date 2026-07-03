@@ -33,6 +33,7 @@ import type { NavigationMode } from "@/lib/navigation-mode";
 import { detectNavigationMode, autoDetectModeFromPath } from "@/lib/navigation-mode";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { getPermissionsForRoute } from "@/lib/permission-registry";
+import { usePermissionRegistryStore } from "@/stores/permission-registry-store";
 
 const publicPaths = new Set(["/login", "/register"]);
 const AUTH_LOGOUT_TRANSITION_MS = 1450;
@@ -121,6 +122,11 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const exitEditMode = useSimulationStore((state) => state.exitEditMode);
   const pendingChangeCount = useSimulationStore((state) => state.pendingChangeCount);
   const [hintsOpen, setHintsOpen] = useState(false);
+  const registryIsLoaded = usePermissionRegistryStore((s) => s.isLoaded);
+  const registryIsLoading = usePermissionRegistryStore((s) => s.isLoading);
+  const loadRegistryFn = usePermissionRegistryStore((s) => s.loadRegistry);
+  const resetRegistryFn = usePermissionRegistryStore((s) => s.reset);
+  const registryGetByRoute = usePermissionRegistryStore((s) => s.getByRoute);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -166,9 +172,26 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     if (isPublicPath || !contextIsError) return;
     const status = (contextError as { status?: number })?.status ?? 0;
     if (status === 401) {
+      resetRegistryFn();
       logout();
     }
-  }, [isPublicPath, contextIsError, contextError, logout]);
+  }, [isPublicPath, contextIsError, contextError, logout, resetRegistryFn]);
+
+  // Load the full permission registry from the backend when God Mode opens.
+  // Cached for the session — only fetches once per login.
+  useEffect(() => {
+    if (isSimulating && accessToken && !registryIsLoaded && !registryIsLoading) {
+      void loadRegistryFn(accessToken);
+    }
+  }, [isSimulating, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
+
+  // Belt-and-suspenders: also trigger when entering edit mode in case the
+  // isSimulating effect fired while isLoading was transiently true.
+  useEffect(() => {
+    if (isEditMode && accessToken && !registryIsLoaded && !registryIsLoading) {
+      void loadRegistryFn(accessToken);
+    }
+  }, [isEditMode, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -222,6 +245,12 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     if (organizations.length > 0) setSkippedOnboardingUserId(null);
   }, [organizations.length]);
 
+  // Route hints: use dynamic registry when loaded, fall back to static registry
+  const routePerms = useMemo(
+    () => (registryIsLoaded ? registryGetByRoute(pathname) : getPermissionsForRoute(pathname)),
+    [pathname, registryIsLoaded, registryGetByRoute]
+  );
+
   if (isPublicPath) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
@@ -267,6 +296,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     setUserMenuOpen(false);
     startProgress();
     setAuthTransition("logout");
+    resetRegistryFn();
     logout();
     await wait(AUTH_ROUTE_SWAP_DELAY_MS);
     router.replace("/login");
@@ -368,38 +398,40 @@ export function AsthraShell({ children }: { children: ReactNode }) {
                   >
                     <Info className="h-3.5 w-3.5" />
                   </button>
-                  {hintsOpen && (() => {
-                    const routePerms = getPermissionsForRoute(pathname);
-                    return (
-                      <div className="absolute right-0 top-8 z-50 w-80 rounded-md border bg-card p-3 shadow-lg text-foreground">
-                        <div className="mb-2 flex items-center justify-between">
+                  {hintsOpen && (
+                    <div className="absolute right-0 top-8 z-50 w-80 rounded-md border bg-card p-3 shadow-lg text-foreground">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
                           <span className="text-xs font-semibold">Permissions on this page</span>
-                          <button
-                            type="button"
-                            onClick={() => setHintsOpen(false)}
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            ✕
-                          </button>
+                          {registryIsLoaded && (
+                            <span className="ml-2 text-[10px] text-muted-foreground">({routePerms.length} from backend)</span>
+                          )}
                         </div>
-                        {routePerms.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">No registered permissions for this route.</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            {routePerms.map((def) => (
-                              <li key={def.code} className="text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono text-[10px] text-muted-foreground">{def.code}</span>
-                                </div>
-                                <div className="font-medium">{def.label}</div>
-                                <div className="text-muted-foreground">{def.affects}</div>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setHintsOpen(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          ✕
+                        </button>
                       </div>
-                    );
-                  })()}
+                      {routePerms.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No registered permissions for this route.</p>
+                      ) : (
+                        <ul className="space-y-2 max-h-64 overflow-y-auto">
+                          {routePerms.map((def) => (
+                            <li key={def.code} className="text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-muted-foreground">{def.code}</span>
+                              </div>
+                              <div className="font-medium">{def.label}</div>
+                              <div className="text-muted-foreground">{def.affects}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -418,7 +450,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           )}
           <div className="flex min-h-0 flex-1 relative">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
-            {isSimulating && isEditMode && <VisualPermissionEditor />}
+            {isSimulating && <VisualPermissionEditor />}
           </div>
         </div>
       </div>

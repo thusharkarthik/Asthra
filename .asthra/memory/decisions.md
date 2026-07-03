@@ -484,3 +484,46 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Rationale**: Showing the "Actions" header with only empty/ghost cells is noisy and confusing. When no action is available, the column adds nothing. God Mode edit mode always shows the column so that `PermissionGate` +/- overlays inside it remain accessible for simulation.
 
 **Pattern**: Use simulation-aware `can()` from `usePlatformContext()` (not `useCurrentPermissions()`) and `isEditMode` from `useSimulationStore`. Combine as: `hasAnyAction = isEditMode || can(A) || can(B) || ...`. Spread into the columns array: `[..., ...(hasAnyAction ? ["Actions"] : [])]`. Spread into each row array: `[..., ...(hasAnyAction ? [<actionsDiv>] : [])]`.
+
+---
+
+## Decision: Backend is Source of Truth for Permission Registry (313 permissions) [2026-07-03]
+
+**Rule**: `permission_registry.py` (backend) defines ALL permissions. `permission-registry.ts` (frontend static) is the enrichment layer only — it annotates the subset that currently have `PermissionGate` UI wrappers with human labels, UI descriptions, and route hints.
+
+**Rationale**: The static frontend file had 41 manually maintained entries. Backend has 313 auto-generated ones. New permissions added to the backend would never surface in God Mode tooling unless someone also manually added a frontend entry. The dynamic store eliminates this drift by fetching all 313 and merging enrichment from the 41-entry static file.
+
+**Pattern**:
+- Backend registry endpoint: `GET /api/core/api/v1/permissions/registry` → `PermissionRegistryItem[]`
+- Dynamic store: `usePermissionRegistryStore` (Zustand, lazy-loaded, session-cached)
+- Enrichment: `EnrichedPermissionDefinition extends PermissionRegistryItem` — adds label, category, affects, requires, routes, hasUIGate
+- Static file `permission-registry.ts` is NOT deleted — it's the UI metadata source for the 41 gated entries
+
+## Decision: Permission Registry Loads Lazily on God Mode Open [2026-07-03]
+
+**Rule**: The dynamic permission registry only fetches from the backend when God Mode (simulation) is first activated. It does not load on app startup or normal page loads. Cached for the session — no re-fetch on navigation or God Mode re-enter.
+
+**Rationale**: Normal users never need the 313-permission registry. Loading it on startup would add an unnecessary network request for all users. The data is only needed for God Mode overlays, the Coverage Panel, and the hints panel.
+
+**Pattern**: In `asthra-shell.tsx`, a `useEffect` watches `isSimulating` + `accessToken`. When simulation starts and registry not yet loaded, calls `loadRegistryFn(accessToken)`. The store guards `loadRegistry` with `if (state.isLoaded || state.isLoading) return` to prevent duplicate fetches.
+
+## Decision: Coverage Panel as Side Drawer in VisualPermissionEditor [2026-07-03]
+
+**Rule**: The Permission Coverage panel (showing all 313 permissions by module with ✓/○ UI gate indicators) is a fixed right-side drawer inside `VisualPermissionEditor`. Toggle: 📊 button in the floating bottom bar.
+
+**Rationale**: The coverage panel is informational and God-Mode-only. A side drawer is non-obstructive (doesn't cover the main content fully) and allows scrolling through all 313 permissions while still seeing the page underneath. The floating bar approach keeps it consistent with the existing save bar UX.
+
+**Coverage priority order** (modules with most permissions to wrap next):
+1. settings (59) — partially done (~41 gated)
+2. flow (60) — highest user impact
+3. docs (28) — second priority
+4. discover (36) — third
+5. desk (20) — fourth
+6. pulse (25) — fifth
+7. collab (17) — sixth
+8. automation (14) — seventh
+9. connect (12) — eighth
+10. insights (7) — ninth
+11. media (5) — tenth
+12. guard (5) — eleventh
+13. dev (25) — twelfth

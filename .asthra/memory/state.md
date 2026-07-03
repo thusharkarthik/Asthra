@@ -632,3 +632,32 @@ All Core service actions now emit structured audit logs via `ActivityService.log
 **Frontend (Audit Logs Settings Page)**:
 - `settings-api.ts`: Added `ActivityLogRecord` type + `listActivityLogs()` method → `GET /api/core/api/v1/activity` with query params.
 - `app/settings/audit-logs/page.tsx`: Full implementation. Filters by action (predefined dropdown). Table: Timestamp (relative, absolute on hover), Actor (resolved from users list), Action (color badge by entity prefix), Description, Scope. Pagination: 25 per page, prev/next buttons. Access: `can("guard.audit.view")` OR org/platform authority. Scope: global for superuser/platform, org-scoped otherwise. Uses `SettingsLayout` + `SettingsSectionHeader`.
+
+## Dynamic Permission Registry (added 2026-07-03)
+
+**Purpose**: Replace static handwritten 41-entry `permission-registry.ts` with a dynamic registry that auto-syncs from the backend (313 permissions). New backend permissions appear in God Mode automatically without any frontend code changes.
+
+**Architecture**:
+- `frontend/src/stores/permission-registry-store.ts` (new) — Zustand store. Holds all 313 backend permissions, enriched with metadata from the static registry. Lazy: only loads when God Mode (`isSimulating`) opens. Cached for the session. `loadRegistry(token)` guarded by `isLoaded || isLoading` checks.
+- `frontend/src/hooks/use-permission-registry.ts` (new) — convenience hook. `usePermissionRegistry()` auto-triggers load when token + simulation are active. `usePermissionDefinition(code)` for single-code lookups.
+- Static `permission-registry.ts` kept as the **enrichment layer** — not deleted. Maps permission codes → `{ label, category, affects, requires, routes }`. Only contains permissions that have `PermissionGate` wrappers (41 of 313). Backend is source of truth for ALL 313.
+
+**Enrichment model**:
+Backend `PermissionRegistryItem` (code, name, description, module, resource, action, scope, risk_level, exists, status) is merged with the static `PermissionDefinition` (label, category, affects, requires, routes) to produce `EnrichedPermissionDefinition`. `hasUIGate: true` when a static entry exists for that code.
+
+**Coverage tracking**: `getCoverageStats()` returns `{ total, withUIGate, coverage }`. Coverage panel in God Mode shows live stats (e.g. 41/313 = 13%).
+
+**Files changed**:
+- `frontend/src/stores/permission-registry-store.ts` (new)
+- `frontend/src/hooks/use-permission-registry.ts` (new)
+- `frontend/src/components/platform/permission-gate.tsx` (updated) — uses dynamic registry for label/affects/risk_level in tooltip; falls back to static registry; tooltip now includes `Risk: {risk_level}` from backend
+- `frontend/src/components/platform/visual-permission-editor.tsx` (extended) — added Permission Coverage side panel (all 313 permissions by module, collapsible, ✓/○ for UI gate status); floating bar now shows coverage button `📊 41/313 13%` always during simulation (not only when edits pending); save bar still shows only when `isEditMode && hasUnsavedChanges`
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — triggers `loadRegistry` when God Mode opens; hints panel (`ℹ`) now shows all route permissions from backend (falls back to static when registry not loaded); VPE now mounted for entire simulation (not just edit mode)
+
+**Coverage workflow**:
+When a developer adds a new `PermissionGate`:
+1. Add entry to `permission-registry.ts` (enrichment: label, affects, routes)
+2. Permission code already exists in backend registry
+3. Dynamic store picks up the enrichment on next load
+4. `hasUIGate: true` for that code — coverage % increases
+5. Coverage panel in God Mode shows green ✓ instead of ○
