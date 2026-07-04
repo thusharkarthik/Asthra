@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { matchHelpContent, type HelpStep } from "@/lib/help-registry";
+import { buildHelpRegistry, findHelpContent, type HelpStep } from "@/lib/convention-help-registry";
+import { usePlatformContext } from "@/context/platformContext";
 import { cn } from "@/lib/utils";
 
 function AnimatedArrow({ visible }: { visible: boolean }) {
@@ -70,7 +71,10 @@ export function ContextualHelpModal({
   onClose: () => void;
   pathname: string;
 }) {
-  const content = matchHelpContent(pathname);
+  const { availableModules } = usePlatformContext();
+  const helpRegistry = useMemo(() => buildHelpRegistry(availableModules), [availableModules]);
+  const content = useMemo(() => findHelpContent(helpRegistry, pathname), [helpRegistry, pathname]);
+
   const [headerVisible, setHeaderVisible] = useState(false);
   const [visibleSteps, setVisibleSteps] = useState(0);
   const [arrowsVisible, setArrowsVisible] = useState<boolean[]>([]);

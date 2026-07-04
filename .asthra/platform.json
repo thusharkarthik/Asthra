@@ -45,6 +45,7 @@
       "Append to .asthra/memory/decisions.md if any architectural choice was made",
       "Update .asthra/memory/bugs.md for any bug fixed or discovered",
       "Append to .asthra/sessions/YYYY-MM-DD.md",
+      "Run npm run generate:api before build if OpenAPI types may have changed (requires core-service at localhost:8000)",
       "Run npm run build if frontend was touched",
       "Report summary of files changed and tests run"
     ]

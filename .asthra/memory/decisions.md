@@ -571,3 +571,19 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 - Org owners: seed = "work" → one extra refetch when roles arrive and mode updates to "org"
 
 **Limitation**: Superuser manual mode override (via sidebar dropdown) does not change the context API's `navigation_mode`. The sidebar uses the shell's `effectiveNavigationMode` to call `buildNavSections`, but the `availableModules` from the API are for "platform" mode. For overridden modes, the sidebar falls back to static nav. Resolving this would require syncing the shell's override to the context provider (future work).
+
+## 2026-07-04 — OpenAPI Client: @hey-api/openapi-ts v0.49 with Built-in Fetch Client
+
+**Rule**: Use `@hey-api/openapi-ts@0.49.0` with `client: 'fetch'` (built-in) for code generation. Do NOT use `@hey-api/client-fetch` as the client.
+
+**Why**: v0.99+ of openapi-ts hard-enforces Node >=22 at runtime (throws `ConfigError: Unsupported Node version`). v0.49 supports `^18.0.0 || >=20.0.0`. The `@hey-api/client-fetch` external package has API-breaking changes — v0.13.x exports `createClient` not the `client` singleton that v0.49 generates code for. The built-in `fetch` client is self-contained (copies `core/` files into the output) and has no external runtime dependency.
+
+**How to apply**: When adding or updating the OpenAPI generator, pin to `@hey-api/openapi-ts@0.49.x` until Node is upgraded to 22+. Use `client: 'fetch'` not `client: '@hey-api/client-fetch'`.
+
+## 2026-07-04 — Convention-Based Help Registry (separation of content from registration)
+
+**Rule**: Help content (title, description, steps) lives in `HELP_CONTENT` in `convention-help-registry.ts`. The registration loop (`buildHelpRegistry`) is separate and auto-fills placeholders for any module route not in `HELP_CONTENT`. `findHelpContent` handles route matching (exact → parent chain → root → generic).
+
+**Why**: `help-registry.ts` was a static list that required manual updates every time a new module was added. It drifted silently — no build failure, just a missing Info modal entry. The convention-based approach makes gaps visible (dev console warning) and ensures the Info button always works on any route.
+
+**How to apply**: When adding a new page, add its route to `HELP_CONTENT` in `convention-help-registry.ts`. The backend module_registry handles auto-discovery; human content enriches what auto-discovery can't provide. Never edit `help-registry.ts` (deprecated). Never import `matchHelpContent` (removed — use `findHelpContent` with an explicit registry).

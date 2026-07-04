@@ -5,3 +5,4 @@ out
 coverage
 .env*.local
 npm-debug.log*
+src/services/api/generated/
