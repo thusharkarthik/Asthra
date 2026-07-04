@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
+import { detectNavigationMode } from "@/lib/navigation-mode";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { useAuthStore } from "@/stores/auth-store";
@@ -58,6 +59,7 @@ const PlatformContext = createContext<PlatformContextValue | null>(null);
 export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const cachedCurrentUser = useAuthStore((state) => state.currentUser);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const simulatedPermissions = useSimulationStore((state) => state.simulatedPermissions);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
@@ -88,13 +90,26 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       ? selectedProjectId
       : null;
 
+  // Track navigation mode in state so queryKey and queryFn stay in sync.
+  // Seed from auth store's is_superuser (persisted — correct on first render without
+  // any API call). Roles arrive from the first context response and the effect below
+  // updates the mode; for superusers the seed is already "platform" so no extra call.
+  const [navigationMode, setNavigationMode] = useState<"platform" | "org" | "work">(() => {
+    if (cachedCurrentUser?.is_superuser) return "platform";
+    // CoreUser has no cached roles field — safe fallback to "platform".
+    // Sidebar uses static nav as fallback when dynamic modules don't match the
+    // current mode, so the first-load experience is always non-empty.
+    return "platform";
+  });
+
   const contextQuery = useQuery({
-    queryKey: queryKeys.platformContext.detail(confirmedOrganizationId, confirmedWorkspaceId, confirmedProjectId),
+    queryKey: [...queryKeys.platformContext.detail(confirmedOrganizationId, confirmedWorkspaceId, confirmedProjectId), navigationMode],
     queryFn: () =>
       coreApi.getPlatformContext(accessToken ?? "", {
         org_id: confirmedOrganizationId,
         workspace_id: confirmedWorkspaceId,
         project_id: confirmedProjectId,
+        navigation_mode: navigationMode,
       }),
     enabled: hasAccessToken,
     staleTime: 2 * 60_000,
@@ -133,6 +148,18 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!accessToken) setLoadedAt(null);
   }, [accessToken]);
+
+  // Update navigation mode from roles once the first context response arrives.
+  // This triggers a queryKey change → context refetches with the correct mode.
+  // Superusers: never runs (seed is already "platform"). Work users: no-op (stays "work").
+  // Org owners/admins: fires once, changes "work" → "org", causing one extra refetch.
+  useEffect(() => {
+    if (!contextQuery.data) return;
+    const isSuperuser = contextQuery.data.user?.is_superuser ?? false;
+    const roles = contextQuery.data.roles ?? [];
+    const resolved = detectNavigationMode(isSuperuser, roles);
+    setNavigationMode((prev) => (prev === resolved ? prev : resolved));
+  }, [contextQuery.data]);
 
   const organizations: Organization[] = hasAccessToken ? (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations : [];
   const workspaces: WorkspaceRecord[] = (hasAccessToken ? (contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces : []).filter(

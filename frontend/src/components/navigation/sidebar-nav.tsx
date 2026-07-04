@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, Eye, Layers, Settings, X } from "lucide-react";
@@ -10,7 +10,9 @@ import { usePlatformContext } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
 import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
 import { navSectionsForMode } from "@/lib/navigation-mode";
+import { buildNavSections } from "@/lib/module-nav-registry";
 import { useSimulationStore, roleKeyToNavigationMode } from "@/lib/permission-simulator";
+import { PermissionGate } from "@/components/platform/permission-gate";
 import { settingsApi } from "@/services/api/settings-api";
 
 function isActive(pathname: string, href: string) {
@@ -40,10 +42,11 @@ export function SidebarNav({
   onModeOverride?: (mode: NavigationMode | null) => void;
 }) {
   const pathname = usePathname();
-  const { selectedOrganization, selectedWorkspace, can, permissions } = usePlatformContext();
+  const { selectedOrganization, selectedWorkspace, can, permissions, availableModules } = usePlatformContext();
   const accessToken = useAuthStore((state) => state.accessToken);
 
   const isSimulating = useSimulationStore((state) => state.isSimulating);
+  const isEditMode = useSimulationStore((state) => state.isEditMode);
   const simulatedRoleName = useSimulationStore((state) => state.simulatedRoleName);
   const exitSimulation = useSimulationStore((state) => state.exitSimulation);
   const startSimulation = useSimulationStore((state) => state.startSimulation);
@@ -65,11 +68,22 @@ export function SidebarNav({
   });
 
   const effectiveMode: NavigationMode = modeOverride ?? navigationMode;
-  const sections = navSectionsForMode(effectiveMode);
+  // Dynamic nav: use when modules loaded for the correct mode.
+  // buildNavSections returns [] when modules are cached for a different mode
+  // (e.g., platform modules in cache while user needs "org") — fall through to
+  // static nav so the sidebar is never empty during mode transitions.
+  const dynamicSections = availableModules.length > 0
+    ? buildNavSections(availableModules, effectiveMode)
+    : [];
+  const sections = dynamicSections.length > 0
+    ? dynamicSections
+    : navSectionsForMode(effectiveMode);
 
   function shouldShowItem(item: ModeNavItem): boolean {
     if (skippedUser && !SKIPPED_ALLOWED_HREFS.has(item.href)) return false;
     if (item.permission) {
+      // In edit mode, always show — PermissionGate renders the overlay UI
+      if (isEditMode) return true;
       if (permissionsLoading) return true;
       return can(item.permission);
     }
@@ -153,9 +167,8 @@ export function SidebarNav({
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(pathname, item.href);
-              return (
+              const link = (
                 <Link
-                  key={item.href}
                   href={item.href}
                   className={cn(
                     "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
@@ -169,6 +182,14 @@ export function SidebarNav({
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               );
+              if (item.permission && isEditMode) {
+                return (
+                  <PermissionGate key={item.href} permission={item.permission} label={`${item.label} (sidebar)`}>
+                    {link}
+                  </PermissionGate>
+                );
+              }
+              return <Fragment key={item.href}>{link}</Fragment>;
             })}
           </section>
         );

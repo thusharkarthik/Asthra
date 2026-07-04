@@ -92,12 +92,13 @@ export const coreApi = {
   },
   getPlatformContext(
     accessToken: string,
-    params: { org_id?: number | null; workspace_id?: number | null; project_id?: number | null } = {}
+    params: { org_id?: number | null; workspace_id?: number | null; project_id?: number | null; navigation_mode?: string } = {}
   ) {
     const search = new URLSearchParams();
     if (params.org_id) search.set("org_id", String(params.org_id));
     if (params.workspace_id) search.set("workspace_id", String(params.workspace_id));
     if (params.project_id) search.set("project_id", String(params.project_id));
+    if (params.navigation_mode) search.set("navigation_mode", params.navigation_mode);
     const query = search.toString();
     return apiRequest<PlatformContextData>(`${CORE_PREFIX}/context/platform${query ? `?${query}` : ""}`, {
       method: "GET",

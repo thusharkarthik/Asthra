@@ -527,3 +527,47 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 11. media (5) — tenth
 12. guard (5) — eleventh
 13. dev (25) — twelfth
+
+## Decision: Dynamic Navigation Registry — Backend Modules Drive Sidebar [2026-07-04]
+
+**Rule**: `availableModules[]` from `GET /context/platform` is the primary source of sidebar navigation. Static `PLATFORM_NAV / ORG_NAV / WORK_NAV` in `navigation-mode.ts` are fallbacks only — used when `availableModules` is empty (first render / context loading / backend not seeded).
+
+**Rationale**: Adding a new module to the backend previously required a matching frontend code change to `navigation-mode.ts`. The dynamic registry eliminates this gap: the backend seeds `module_registry` with icon, route, category, and permissions; the context endpoint resolves and returns `availableModules[]` pre-filtered for the current user's feature flags and visibility; the frontend converts this to `ModeNavSection[]` via `buildNavSections()`.
+
+**Architecture**:
+- `module-nav-registry.ts` — `ICON_MAP` (snake_case backend icon names → Lucide components), `CATEGORY_TO_LABEL` (backend category field → section label), `MODULE_KEY_SECTION_OVERRIDE` (specific keys that override the category mapping, e.g., `org_settings` → "Settings"), `SECTION_ORDER` (canonical section display order), `buildNavSections(modules, navigationMode)` — returns `ModeNavSection[]`
+- `sidebar-nav.tsx` — uses `buildNavSections(availableModules, effectiveMode)` when `availableModules.length > 0`; falls back to `navSectionsForMode(effectiveMode)` (static nav)
+- `navigation-mode.ts` — static nav constants marked with fallback comment; not deleted
+
+**Key mapping decisions**:
+- All org-mode modules share `category="organization"` but static nav splits into "Organization" + "Settings" sections — `MODULE_KEY_SECTION_OVERRIDE` handles exceptions (`org_settings`, `preferences`, `profile`)
+- `ModuleRegistryItem.required_permissions: string[]` (OR logic on backend) → `ModeNavItem.permission?: string` (first element = primary frontend gate)
+- Backend icon names are snake_case; Lucide imports are PascalCase — `ICON_MAP` bridges this with explicit key→component mapping
+
+**How to apply**: Add new modules to `module_registry.py` in the backend with correct `icon` (snake_case Lucide name), `navigation_mode`, `category`, `route`, `required_permissions`, and `sort_order`. The frontend will pick them up automatically on the next context load. Add the icon to `ICON_MAP` in `module-nav-registry.ts` only if the icon name is not already present.
+
+## Decision: Frontend Sends navigation_mode to Context API; Backend Uses It [2026-07-04]
+
+**Rule**: `GET /context/platform` now accepts an optional `navigation_mode` query param ("platform"/"org"/"work"). When provided and valid, the backend uses it directly to resolve modules. It falls back to inferring from scope params (original behavior) only when the param is absent or invalid.
+
+**Rationale**: The backend's scope-based inference was wrong: if the frontend sends `workspace_id` (for permission resolution scope), the backend inferred `navigation_mode="work"` regardless of the user's actual mode. A superuser in platform mode with a workspace selected received work modules → `buildNavSections("platform")` got zero matches → empty sidebar. The frontend knows its own navigation mode; the backend should respect it.
+
+**Implementation**:
+- Backend `context.py`: `navigation_mode: str | None = Query(default=None)` → resolves to `resolved_navigation_mode`
+- Frontend `core-api.ts`: `navigation_mode?: string` in `getPlatformContext` params type
+- Frontend `platformContext.tsx`: `useState<NavigationMode>` seeded from `auth-store.currentUser.is_superuser` (persisted — correct on first render); `useEffect` updates it when roles arrive from first response; included in `queryKey` for automatic refetch on mode change
+
+**How to apply**: Never infer navigation mode from scope params alone — scope params determine permission resolution scope, not the sidebar mode. Always send `navigation_mode` from the frontend.
+
+## Decision: NavigationMode State Lives in PlatformContextProvider, Seeded from Auth Store [2026-07-04]
+
+**Rule**: `navigationMode` for the context API request is `useState` inside `PlatformContextProvider`, NOT prop-drilled from the shell and NOT in a separate Zustand store. It is seeded from `useAuthStore(s => s.currentUser)?.is_superuser` (available immediately on first render) and updated via `useEffect` once roles arrive from the first context response.
+
+**Rationale**: Shell computes `effectiveNavigationMode` for the sidebar but the context provider needs to know the mode independently (before the shell has computed it). Using the persisted `currentUser.is_superuser` from auth store solves the chicken-and-egg problem for superusers (the majority case). Non-superuser role detection causes at most one extra context call on first load (work → org for org owners/admins).
+
+**First-load behavior**:
+- Superusers: seed = "platform" → correct from render 0, no extra call
+- Work users: seed = "work" → correct, no extra call  
+- Org owners: seed = "work" → one extra refetch when roles arrive and mode updates to "org"
+
+**Limitation**: Superuser manual mode override (via sidebar dropdown) does not change the context API's `navigation_mode`. The sidebar uses the shell's `effectiveNavigationMode` to call `buildNavSections`, but the `availableModules` from the API are for "platform" mode. For overridden modes, the sidebar falls back to static nav. Resolving this would require syncing the shell's override to the context provider (future work).
