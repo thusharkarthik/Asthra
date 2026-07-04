@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-04 (Dynamic Navigation Registry — sidebar driven by availableModules[] from context API)
+Last updated: 2026-07-04 (Convention-based help registry — auto-registered from module registry, human content in HELP_CONTENT)
 
 ## Phase
 
@@ -159,6 +159,42 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 - `context/platformContext.tsx`: Exposes `featureFlags`, `enabledModules`, and `isFeatureEnabled(flagKey)` with safe defaults. Sidebar/module navigation behavior was not changed in this pass.
 
 **Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
+
+## Convention-Based Help Registry (added 2026-07-04)
+
+**Purpose**: Contextual help (Info button modal) is now driven by a convention-based registry. New backend modules auto-appear in help with placeholder content. Human-written content is preserved and never gets out of sync.
+
+**Architecture**:
+- `frontend/src/lib/convention-help-registry.ts` (new) — `HELP_CONTENT` (24 routes, human-written), `buildHelpRegistry(availableModules)` (merges HELP_CONTENT + auto-placeholders for unseen routes), `findHelpContent(registry, pathname)` (exact → parent chain → root → generic fallback)
+- `frontend/src/lib/help-registry.ts` (deprecated) — re-exports `HelpContent`, `HelpStep`, `HELP_REGISTRY` (= HELP_CONTENT) for backward compat; file kept, marked for future deletion
+- `frontend/src/components/platform/contextual-help.tsx` (updated) — imports `buildHelpRegistry`/`findHelpContent` from convention registry; uses `usePlatformContext().availableModules`; builds `helpRegistry` via `useMemo` (stable across re-renders), resolves `content` via `useMemo`
+
+**Routes with human content** (24): `/`, `/flow`, `/flow/backlog`, `/flow/boards`, `/docs`, `/discover`, `/desk`, `/pulse`, `/collab`, `/dev`, `/insights`, `/guard`, `/automation`, `/assistant`, `/memory`, `/settings`, `/settings/members`, `/settings/roles`, `/settings/permissions`, `/settings/organizations`, `/settings/workspaces`, `/settings/access-control`, `/settings/audit-logs`, `/settings/api-keys`
+
+**Convention**: Route in backend module_registry but missing from HELP_CONTENT → auto-placeholder + `console.info` warning in development. No silent gaps.
+
+**Stop-motion animation**: Unchanged. All timer/animation logic in `ContextualHelpModal` is untouched.
+
+## OpenAPI TypeScript Client Generation (added 2026-07-04)
+
+**Purpose**: Auto-generate typed TypeScript client from the core service OpenAPI spec so downstream features can use typed service calls and types instead of hand-writing fetch wrappers.
+
+**Generator**: `@hey-api/openapi-ts@0.49.0` (Node 18 compatible; v0.6+ requires Node 22). Uses built-in `fetch` client (not `@hey-api/client-fetch` — that package has incompatible API with v0.49).
+
+**Config**: `frontend/openapi-ts.config.ts` — reads from `http://localhost:8000/openapi.json`, outputs to `src/services/api/generated/`. Client: `'fetch'` (built-in).
+
+**Files generated** (gitignored, recreated by `npm run generate:api`):
+- `src/services/api/generated/index.ts` — barrel re-export
+- `src/services/api/generated/types.gen.ts` — TypeScript types for all 98 endpoints
+- `src/services/api/generated/services.gen.ts` — typed service functions
+- `src/services/api/generated/schemas.gen.ts` — JSON schemas
+- `src/services/api/generated/core/` — OpenAPI config, CancelablePromise, request helper
+
+**Barrel export**: `src/services/api/index.ts` re-exports everything from `generated/`.
+
+**Scripts**: `generate:api` (run manually or via prebuild/predev), `prebuild`, `predev` (both auto-run generate:api — requires core-service at localhost:8000).
+
+**Constraint**: `prebuild`/`predev` require core-service to be running. In offline environments, run `npm run build` without the hooks or pre-generate and commit a snapshot.
 
 ## Visual Permission Editor — Phase 2 (added 2026-07-03)
 

@@ -8,7 +8,10 @@
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate:api": "openapi-ts",
+    "prebuild": "npm run generate:api",
+    "predev": "npm run generate:api"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",
@@ -25,6 +28,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.49.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
