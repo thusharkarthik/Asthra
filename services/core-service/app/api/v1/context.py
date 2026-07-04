@@ -42,6 +42,7 @@ def get_platform_context(
     org_id: int | None = Query(default=None),
     workspace_id: int | None = Query(default=None),
     project_id: int | None = Query(default=None),
+    navigation_mode: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -57,11 +58,17 @@ def get_platform_context(
     if project_id is not None:
         scope_type = "project"
         scope_id = project_id
-    navigation_mode = "platform"
-    if org_id is not None:
-        navigation_mode = "org"
-    if workspace_id is not None or project_id is not None:
-        navigation_mode = "work"
+
+    # Use frontend's explicit navigation_mode if provided and valid;
+    # fall back to inferring from scope params.
+    if navigation_mode and navigation_mode in ("platform", "org", "work"):
+        resolved_navigation_mode = navigation_mode
+    else:
+        resolved_navigation_mode = "platform"
+        if org_id is not None:
+            resolved_navigation_mode = "org"
+        if workspace_id is not None or project_id is not None:
+            resolved_navigation_mode = "work"
 
     # Permissions
     perms = AccessControlService(db).get_user_permissions(current_user.id, scope_type, scope_id)
@@ -69,7 +76,7 @@ def get_platform_context(
         current_user,
         scope_type=scope_type,
         scope_id=scope_id,
-        navigation_mode=navigation_mode,
+        navigation_mode=resolved_navigation_mode,
     )
     ai_context = AIContextRegistryService(db).get_ai_context_metadata(
         current_user,

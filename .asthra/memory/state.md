@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-02 (BUG-040 fixed: direct role assignment now creates membership records)
+Last updated: 2026-07-04 (Dynamic Navigation Registry — sidebar driven by availableModules[] from context API)
 
 ## Phase
 
@@ -661,3 +661,20 @@ When a developer adds a new `PermissionGate`:
 3. Dynamic store picks up the enrichment on next load
 4. `hasUIGate: true` for that code — coverage % increases
 5. Coverage panel in God Mode shows green ✓ instead of ○
+
+## Dynamic Navigation Registry (added 2026-07-04)
+
+**Purpose**: Sidebar navigation is now driven by `availableModules[]` from `GET /context/platform`. New backend modules automatically appear in the correct sidebar section without any frontend code changes.
+
+**Architecture**:
+- `frontend/src/lib/module-nav-registry.ts` (new) — `ICON_MAP` (snake_case icon string → LucideIcon), `CATEGORY_TO_LABEL` (backend category → section label), `MODULE_KEY_SECTION_OVERRIDE` (per-key section overrides for org settings pages), `SECTION_ORDER`, `buildNavSections(modules, mode)` → `ModeNavSection[]`
+- `frontend/src/components/navigation/sidebar-nav.tsx` (updated) — uses `buildNavSections(availableModules, effectiveMode)` when modules loaded; falls back to `navSectionsForMode()` (static) when empty; wraps permission-gated items in `<PermissionGate>` during edit mode
+- `frontend/src/lib/navigation-mode.ts` (updated) — static nav constants marked as fallback only via comment block
+
+**Fallback chain**: `availableModules.length > 0` → `buildNavSections()` (dynamic) / empty → `navSectionsForMode()` (static PLATFORM_NAV / ORG_NAV / WORK_NAV)
+
+**God Mode integration**: In edit mode, `shouldShowItem` returns `true` for all permission-gated items (PermissionGate handles overlay). Item rendering wraps permission items in `<PermissionGate permission={item.permission} label="{item.label} (sidebar)">` when `isEditMode`.
+
+**Icon mapping**: Backend stores icon names in snake_case Lucide naming (e.g. `scroll_text`, `book_open`, `bar_chart3`). `ICON_MAP` in `module-nav-registry.ts` maps these to PascalCase Lucide components. To add a new icon: add snake_case key to `ICON_MAP`.
+
+**Section override**: All org-mode modules share `category="organization"` but display in "Organization" or "Settings" sections. `MODULE_KEY_SECTION_OVERRIDE` maps `org_settings`, `preferences`, `profile` → "Settings". Add keys here for any future per-module section overrides.

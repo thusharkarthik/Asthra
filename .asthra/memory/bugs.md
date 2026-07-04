@@ -364,3 +364,14 @@
 4. Change columns to `[..., ...(hasAnyAction ? ["Actions"] : [])]`.
 5. Change invitation and member row arrays to conditionally include the actions cell via spread.
 **God Mode rule**: `isEditMode` always keeps `hasAnyAction = true` so God Mode +/- overlays remain accessible even when the user has no real permissions.
+
+### BUG-046 — Dynamic Nav Sidebar Empty After Scope Auto-Selection [FIXED 2026-07-04]
+
+**Files**: `services/core-service/app/api/v1/context.py`, `frontend/src/services/api/core-api.ts`, `frontend/src/context/platformContext.tsx`
+**Symptom**: After scope auto-selection (org/workspace IDs confirmed), the sidebar became empty — all dynamic nav items disappeared. Static fallback did not activate.
+**Root cause**: Backend inferred `navigation_mode` from scope params: if `workspace_id` was present, it returned work modules regardless of the user's actual navigation mode. A superuser in platform mode with a workspace selected received `navigation_mode="work"` modules. `buildNavSections("platform")` found no matching modules → empty `ModeNavSection[]` → sidebar empty. The static fallback only triggered when `availableModules.length === 0`, but the backend returned non-empty work modules, so the fallback never activated.
+**Fix**:
+1. **Backend** (`context.py`): Added optional `navigation_mode` query param. Uses it if provided and valid ("platform"/"org"/"work"); falls back to inferring from scope params when not provided.
+2. **API** (`core-api.ts`): Added `navigation_mode?: string` to `getPlatformContext` params type and URL serialization.
+3. **Context** (`platformContext.tsx`): Added `useState<NavigationMode>` seeded from `auth-store.currentUser.is_superuser` (persisted across sessions — correct on first render without API call). Added `useEffect` to update mode once roles arrive from first response. `navigationMode` included in `queryKey` so a mode change triggers a refetch.
+**First-load behavior**: Superusers: seed = "platform" → correct from render 0, no extra call. Work users: seed = "work" → correct, no extra call. Org owners: seed = "work" → one extra refetch after roles arrive and mode updates to "org". Static fallback still active when `availableModules.length === 0`.

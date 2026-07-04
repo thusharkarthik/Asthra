@@ -82,6 +82,10 @@ export function autoDetectModeFromPath(pathname: string): NavigationMode {
   return "platform";
 }
 
+// STATIC FALLBACK NAV
+// Used when backend availableModules are not yet loaded or context is unavailable.
+// Primary nav is driven by modules[] from GET /context/platform via buildNavSections()
+// in module-nav-registry.ts. These constants serve as the fallback and development reference.
 export const PLATFORM_NAV: ModeNavSection[] = [
   {
     label: "Platform",
