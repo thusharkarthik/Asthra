@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, HelpCircle, Info, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
+import { Bell, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +22,8 @@ import { useCurrentPermissions, usePlatformContext } from "@/context/platformCon
 import { OnboardingGate } from "@/components/platform/platform-setup-guide";
 import { ContextualHelpModal } from "@/components/platform/contextual-help";
 import { VisualPermissionEditor } from "@/components/platform/visual-permission-editor";
+import { GodModeOverlay } from "@/components/platform/god-mode-overlay";
+import { GodModeToolbar } from "@/components/platform/god-mode-toolbar";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/use-logout";
 import { settingsApi } from "@/services/api/settings-api";
@@ -32,7 +34,6 @@ import { cn } from "@/lib/utils";
 import type { NavigationMode } from "@/lib/navigation-mode";
 import { detectNavigationMode, autoDetectModeFromPath } from "@/lib/navigation-mode";
 import { useSimulationStore } from "@/lib/permission-simulator";
-import { getPermissionsForRoute } from "@/lib/permission-registry";
 import { usePermissionRegistryStore } from "@/stores/permission-registry-store";
 
 const publicPaths = new Set(["/login", "/register"]);
@@ -115,18 +116,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const [superuserModeOverride, setSuperuserModeOverride] = useState<NavigationMode | null>(null);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const simulatedMode = useSimulationStore((state) => state.simulatedMode);
-  const simulatedRoleName = useSimulationStore((state) => state.simulatedRoleName);
-  const exitSimulation = useSimulationStore((state) => state.exitSimulation);
-  const isEditMode = useSimulationStore((state) => state.isEditMode);
-  const enterEditMode = useSimulationStore((state) => state.enterEditMode);
-  const exitEditMode = useSimulationStore((state) => state.exitEditMode);
-  const pendingChangeCount = useSimulationStore((state) => state.pendingChangeCount);
-  const [hintsOpen, setHintsOpen] = useState(false);
+  const isGodModeReady = useSimulationStore((state) => state.isGodModeReady);
+  const isActivating = useSimulationStore((state) => state.isActivating);
+  const isDeactivating = useSimulationStore((state) => state.isDeactivating);
   const registryIsLoaded = usePermissionRegistryStore((s) => s.isLoaded);
   const registryIsLoading = usePermissionRegistryStore((s) => s.isLoading);
   const loadRegistryFn = usePermissionRegistryStore((s) => s.loadRegistry);
   const resetRegistryFn = usePermissionRegistryStore((s) => s.reset);
-  const registryGetByRoute = usePermissionRegistryStore((s) => s.getByRoute);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -177,21 +173,13 @@ export function AsthraShell({ children }: { children: ReactNode }) {
     }
   }, [isPublicPath, contextIsError, contextError, logout, resetRegistryFn]);
 
-  // Load the full permission registry from the backend when God Mode opens.
+  // Load the full permission registry when God Mode starts activating or is active.
   // Cached for the session — only fetches once per login.
   useEffect(() => {
-    if (isSimulating && accessToken && !registryIsLoaded && !registryIsLoading) {
+    if ((isActivating || isSimulating) && accessToken && !registryIsLoaded && !registryIsLoading) {
       void loadRegistryFn(accessToken);
     }
-  }, [isSimulating, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
-
-  // Belt-and-suspenders: also trigger when entering edit mode in case the
-  // isSimulating effect fired while isLoading was transiently true.
-  useEffect(() => {
-    if (isEditMode && accessToken && !registryIsLoaded && !registryIsLoading) {
-      void loadRegistryFn(accessToken);
-    }
-  }, [isEditMode, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
+  }, [isActivating, isSimulating, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -244,12 +232,6 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (organizations.length > 0) setSkippedOnboardingUserId(null);
   }, [organizations.length]);
-
-  // Route hints: use dynamic registry when loaded, fall back to static registry
-  const routePerms = useMemo(
-    () => (registryIsLoaded ? registryGetByRoute(pathname) : getPermissionsForRoute(pathname)),
-    [pathname, registryIsLoaded, registryGetByRoute]
-  );
 
   if (isPublicPath) {
     return (
@@ -311,7 +293,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const showProjectSwitcher = effectiveNavigationMode === "work";
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
+    <div className={cn(
+      "flex h-screen flex-col overflow-hidden bg-background",
+      (isGodModeReady || isActivating || isDeactivating) && "ring-2 ring-purple-500/50 ring-inset"
+    )}>
       <div className="flex min-h-0 flex-1 pb-3">
         <aside className={cn("hidden min-h-0 shrink-0 flex-col border-r bg-card transition-[width] md:flex", sidebarCollapsed ? "w-16" : "w-64")}>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -326,128 +311,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {isSimulating && (
-            <div
-              className={cn(
-                "shrink-0 flex items-center justify-between border-b px-4 py-2 text-sm",
-                isEditMode
-                  ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/60"
-                  : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/60"
-              )}
-            >
-              <span
-                className={
-                  isEditMode
-                    ? "text-blue-800 dark:text-blue-300"
-                    : "text-amber-800 dark:text-amber-300"
-                }
-              >
-                <span className="mr-1">{isEditMode ? "✏️" : "👁"}</span>
-                <span className="font-semibold">
-                  {isEditMode ? "Editing permissions for:" : "Simulating:"}
-                </span>{" "}
-                <span>{simulatedRoleName}</span>
-                {!isEditMode && (
-                  <span
-                    className="ml-2 text-xs text-amber-600 dark:text-amber-400"
-                  >
-                    — API calls still use your real token
-                  </span>
-                )}
-              </span>
-              <div className="flex items-center gap-2">
-                {/* View / Edit mode toggle */}
-                <div className="flex items-center rounded-md border border-current/20 overflow-hidden text-xs font-medium">
-                  <button
-                    type="button"
-                    onClick={exitEditMode}
-                    className={cn(
-                      "px-2.5 py-1 transition-colors",
-                      !isEditMode
-                        ? "bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-100"
-                        : "text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40"
-                    )}
-                  >
-                    View Mode
-                  </button>
-                  <button
-                    type="button"
-                    onClick={enterEditMode}
-                    className={cn(
-                      "px-2.5 py-1 transition-colors",
-                      isEditMode
-                        ? "bg-blue-200 text-blue-900 dark:bg-blue-700 dark:text-blue-100"
-                        : "text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40"
-                    )}
-                  >
-                    ✏️ Edit Mode{isEditMode && pendingChangeCount > 0 ? ` · ${pendingChangeCount}` : ""}
-                  </button>
-                </div>
-                {/* Route-aware permission hints */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setHintsOpen((v) => !v)}
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded transition-colors",
-                      isEditMode
-                        ? "text-blue-700 hover:bg-blue-200 dark:text-blue-300 dark:hover:bg-blue-800/50"
-                        : "text-amber-700 hover:bg-amber-200 dark:text-amber-400 dark:hover:bg-amber-800/50"
-                    )}
-                    title="Permissions on this page"
-                  >
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                  {hintsOpen && (
-                    <div className="absolute right-0 top-8 z-50 w-80 rounded-md border bg-card p-3 shadow-lg text-foreground">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-semibold">Permissions on this page</span>
-                          {registryIsLoaded && (
-                            <span className="ml-2 text-[10px] text-muted-foreground">({routePerms.length} from backend)</span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setHintsOpen(false)}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      {routePerms.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">No registered permissions for this route.</p>
-                      ) : (
-                        <ul className="space-y-2 max-h-64 overflow-y-auto">
-                          {routePerms.map((def) => (
-                            <li key={def.code} className="text-xs">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] text-muted-foreground">{def.code}</span>
-                              </div>
-                              <div className="font-medium">{def.label}</div>
-                              <div className="text-muted-foreground">{def.affects}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={exitSimulation}
-                  className={cn(
-                    "rounded px-2 py-0.5 text-xs font-medium",
-                    isEditMode
-                      ? "text-blue-800 hover:bg-blue-200 dark:text-blue-300 dark:hover:bg-blue-800/50"
-                      : "text-amber-800 hover:bg-amber-200 dark:text-amber-300 dark:hover:bg-amber-800/50"
-                  )}
-                >
-                  Exit
-                </button>
-              </div>
-            </div>
-          )}
+          <GodModeToolbar />
           <div className="flex min-h-0 flex-1 relative">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
             {isSimulating && <VisualPermissionEditor />}
@@ -539,6 +403,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       <SearchDialog />
       <CommandPalette />
       <ContextualHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} pathname={pathname} />
+      <GodModeOverlay />
     </div>
   );
 }

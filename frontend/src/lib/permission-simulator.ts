@@ -37,6 +37,11 @@ type SimulationState = {
   hasUnsavedChanges: boolean;
   pendingChangeCount: number;
 
+  // God Mode animation state
+  isActivating: boolean;    // entry animation playing
+  isDeactivating: boolean;  // exit animation playing
+  isGodModeReady: boolean;  // entry animation complete, full God Mode UI active
+
   // Core actions
   startSimulation: (
     roleKey: string,
@@ -55,6 +60,18 @@ type SimulationState = {
   undoChange: (permission: string) => void;
   clearPendingChanges: () => void;
   commitChanges: () => void;
+
+  // God Mode animation actions
+  activateGodMode: (
+    roleKey: string,
+    roleName: string,
+    roleId: number | null,
+    permissions: string[],
+    mode: NavigationMode
+  ) => void;
+  deactivateGodMode: () => void;
+  onActivationComplete: () => void;
+  onDeactivationComplete: () => void;
 };
 
 export const useSimulationStore = create<SimulationState>((set) => ({
@@ -70,6 +87,9 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   pendingRemovals: [],
   hasUnsavedChanges: false,
   pendingChangeCount: 0,
+  isActivating: false,
+  isDeactivating: false,
+  isGodModeReady: false,
 
   startSimulation: (roleKey, roleName, roleId, permissions, mode) =>
     set({
@@ -147,7 +167,6 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     set((state) => {
       const pendingAdditions = state.pendingAdditions.filter((p) => p !== permission);
       const pendingRemovals = state.pendingRemovals.filter((p) => p !== permission);
-      // Restore this permission to its original state
       let simulatedPermissions = [...state.simulatedPermissions];
       if (state.originalSimulatedPermissions.includes(permission)) {
         if (!simulatedPermissions.includes(permission)) {
@@ -165,7 +184,6 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       };
     }),
 
-  // Discard — revert simulatedPermissions to original state
   clearPendingChanges: () =>
     set((state) => ({
       pendingAdditions: [],
@@ -175,7 +193,6 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       pendingChangeCount: 0,
     })),
 
-  // Commit — keep simulatedPermissions as new baseline after successful save
   commitChanges: () =>
     set((state) => ({
       pendingAdditions: [],
@@ -184,4 +201,56 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       hasUnsavedChanges: false,
       pendingChangeCount: 0,
     })),
+
+  activateGodMode: (roleKey, roleName, roleId, permissions, mode) => {
+    // Set role data and isSimulating immediately so PermissionGate reflects
+    // the simulated role during the animation. isGodModeReady (which controls
+    // toolbar visibility) is deferred until the animation completes.
+    set({
+      isActivating: true,
+      isGodModeReady: false,
+      isSimulating: true,
+      simulatedRoleKey: roleKey,
+      simulatedRoleName: roleName,
+      simulatedRoleId: roleId,
+      simulatedPermissions: [...permissions],
+      originalSimulatedPermissions: [...permissions],
+      simulatedMode: mode,
+      isEditMode: false,
+      pendingAdditions: [],
+      pendingRemovals: [],
+      hasUnsavedChanges: false,
+      pendingChangeCount: 0,
+    });
+    setTimeout(() => {
+      set({ isActivating: false, isGodModeReady: true });
+    }, 1800);
+  },
+
+  deactivateGodMode: () => {
+    set({ isDeactivating: true });
+    // After exit animation completes, clear all God Mode state
+    setTimeout(() => {
+      set({
+        isDeactivating: false,
+        isGodModeReady: false,
+        isSimulating: false,
+        simulatedRoleKey: null,
+        simulatedRoleName: null,
+        simulatedRoleId: null,
+        simulatedPermissions: [],
+        originalSimulatedPermissions: [],
+        simulatedMode: null,
+        isEditMode: false,
+        pendingAdditions: [],
+        pendingRemovals: [],
+        hasUnsavedChanges: false,
+        pendingChangeCount: 0,
+      });
+    }, 1200);
+  },
+
+  onActivationComplete: () => set({ isActivating: false }),
+
+  onDeactivationComplete: () => set({ isDeactivating: false }),
 }));
