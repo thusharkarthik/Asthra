@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Eye, Layers, Settings, X } from "lucide-react";
+import { Building2, Layers, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { usePlatformContext } from "@/context/platformContext";
@@ -11,8 +11,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
 import { navSectionsForMode } from "@/lib/navigation-mode";
 import { buildNavSections } from "@/lib/module-nav-registry";
-import { useSimulationStore, roleKeyToNavigationMode } from "@/lib/permission-simulator";
+import { useSimulationStore } from "@/lib/permission-simulator";
 import { PermissionGate } from "@/components/platform/permission-gate";
+import { GodModeActivation } from "@/components/platform/god-mode-activation";
 import { settingsApi } from "@/services/api/settings-api";
 
 function isActive(pathname: string, href: string) {
@@ -47,14 +48,11 @@ export function SidebarNav({
 
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const isEditMode = useSimulationStore((state) => state.isEditMode);
-  const simulatedRoleName = useSimulationStore((state) => state.simulatedRoleName);
-  const exitSimulation = useSimulationStore((state) => state.exitSimulation);
-  const startSimulation = useSimulationStore((state) => state.startSimulation);
+  const isGodModeReady = useSimulationStore((state) => state.isGodModeReady);
+  const isActivating = useSimulationStore((state) => state.isActivating);
+  const isDeactivating = useSimulationStore((state) => state.isDeactivating);
 
-  const [viewAsOpen, setViewAsOpen] = useState(false);
-  const [selectedRoleKey, setSelectedRoleKey] = useState("");
-  const [isStarting, setIsStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
+  const [godModeModalOpen, setGodModeModalOpen] = useState(false);
 
   const canSimulate =
     isSuperuser ||
@@ -63,7 +61,7 @@ export function SidebarNav({
   const rolesQuery = useQuery({
     queryKey: ["settings", "roles-for-simulate"],
     queryFn: () => settingsApi.listRoles(accessToken ?? ""),
-    enabled: Boolean(accessToken && viewAsOpen && canSimulate),
+    enabled: Boolean(accessToken && godModeModalOpen && canSimulate),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -98,26 +96,6 @@ export function SidebarNav({
 
   const ModeIcon =
     effectiveMode === "platform" ? Settings : effectiveMode === "org" ? Building2 : Layers;
-
-  async function handleStartSimulation() {
-    if (!selectedRoleKey || !accessToken) return;
-    setIsStarting(true);
-    setStartError(null);
-    try {
-      const result = await settingsApi.simulatePermissions(accessToken, { role_key: selectedRoleKey });
-      const role = rolesQuery.data?.find((r) => r.key === selectedRoleKey);
-      const roleName = role?.name ?? selectedRoleKey;
-      const roleId = role?.id ?? null;
-      const mode = roleKeyToNavigationMode(selectedRoleKey);
-      startSimulation(selectedRoleKey, roleName, roleId, result.permission_codes, mode);
-      setViewAsOpen(false);
-      setSelectedRoleKey("");
-    } catch (err) {
-      setStartError(err instanceof Error ? err.message : "Failed to start simulation.");
-    } finally {
-      setIsStarting(false);
-    }
-  }
 
   return (
     <nav aria-label="Primary navigation" className="flex flex-col gap-4">
@@ -195,109 +173,55 @@ export function SidebarNav({
         );
       })}
 
-      {/* View As section — superusers and platform owners only */}
+      {/* God Mode section — superusers and platform owners only */}
       {canSimulate && (
         <div className="mt-auto border-t pt-2">
-          {isSimulating ? (
-            /* Active simulation indicator */
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 dark:border-amber-700 dark:bg-amber-950/40">
+          {isGodModeReady || isActivating || isDeactivating ? (
+            /* God Mode active indicator */
+            <div className={cn(
+              "rounded-md border px-2.5 py-2",
+              isGodModeReady
+                ? "border-purple-700/50 bg-purple-950/40"
+                : "border-purple-800/30 bg-purple-950/20"
+            )}>
               {!collapsed && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-                      Simulating
-                    </span>
-                    <button
-                      type="button"
-                      onClick={exitSimulation}
-                      className="text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
-                      title="Exit simulation"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-amber-800 dark:text-amber-300">
-                    {simulatedRoleName}
-                  </div>
-                </>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">⚡</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-purple-400">
+                    {isActivating ? "Entering…" : isDeactivating ? "Exiting…" : "God Mode"}
+                  </span>
+                </div>
               )}
               {collapsed && (
-                <button
-                  type="button"
-                  onClick={exitSimulation}
-                  className="flex w-full items-center justify-center text-amber-700 dark:text-amber-400"
-                  title={`Exit simulation: ${simulatedRoleName}`}
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
+                <div className="flex w-full items-center justify-center text-purple-400">
+                  <span className="text-sm">⚡</span>
+                </div>
               )}
-            </div>
-          ) : viewAsOpen && !collapsed ? (
-            /* View As panel */
-            <div className="rounded-md border bg-card p-3 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">Permission Simulator</span>
-                <button
-                  type="button"
-                  onClick={() => { setViewAsOpen(false); setStartError(null); setSelectedRoleKey(""); }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                See the UI exactly as a role would. API calls still use your real token.
-              </p>
-              <div className="mb-3">
-                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                  Simulate by Role
-                </label>
-                <select
-                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  value={selectedRoleKey}
-                  onChange={(e) => setSelectedRoleKey(e.target.value)}
-                  disabled={rolesQuery.isLoading}
-                >
-                  <option value="">
-                    {rolesQuery.isLoading ? "Loading roles…" : "Select a role…"}
-                  </option>
-                  {(rolesQuery.data ?? [])
-                    .filter((r): r is typeof r & { key: string } => Boolean(r.is_active && r.key))
-                    .map((role) => (
-                      <option key={role.key} value={role.key}>
-                        {role.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              {startError && (
-                <p className="mb-2 text-[11px] text-destructive">{startError}</p>
-              )}
-              <button
-                type="button"
-                onClick={handleStartSimulation}
-                disabled={!selectedRoleKey || isStarting}
-                className="w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isStarting ? "Starting…" : "Start Simulation"}
-              </button>
             </div>
           ) : (
-            /* View As button */
+            /* God Mode button */
             <button
               type="button"
-              onClick={() => setViewAsOpen(true)}
+              onClick={() => setGodModeModalOpen(true)}
               className={cn(
-                "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-purple-950/40 hover:text-purple-300",
                 collapsed && "justify-center px-0"
               )}
-              title="View As — Permission Simulator"
+              title="God Mode — Permission Simulator"
             >
-              <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {!collapsed && <span>View As</span>}
+              <span className="shrink-0 text-base leading-none">⚡</span>
+              {!collapsed && <span>God Mode</span>}
             </button>
           )}
         </div>
+      )}
+
+      {/* God Mode activation modal */}
+      {godModeModalOpen && (
+        <GodModeActivation
+          roles={rolesQuery.data ?? []}
+          onClose={() => setGodModeModalOpen(false)}
+        />
       )}
     </nav>
   );

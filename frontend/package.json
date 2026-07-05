@@ -10,8 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate:api": "openapi-ts",
-    "prebuild": "npm run generate:api",
-    "predev": "npm run generate:api"
+    "prebuild": "npm run generate:api || true",
+    "predev": "npm run generate:api || true"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",
