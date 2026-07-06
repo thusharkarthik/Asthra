@@ -587,3 +587,31 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: `help-registry.ts` was a static list that required manual updates every time a new module was added. It drifted silently — no build failure, just a missing Info modal entry. The convention-based approach makes gaps visible (dev console warning) and ensures the Info button always works on any route.
 
 **How to apply**: When adding a new page, add its route to `HELP_CONTENT` in `convention-help-registry.ts`. The backend module_registry handles auto-discovery; human content enriches what auto-discovery can't provide. Never edit `help-registry.ts` (deprecated). Never import `matchHelpContent` (removed — use `findHelpContent` with an explicit registry).
+
+## 2026-07-06 — God Mode Mock Context: Override platformContext, Not Individual Pages
+
+**Decision**: When `isGodModeReady`, replace `organizations`, `workspaces`, `projects`, and their selected counterparts with fixed mock objects inside `PlatformContextProvider`. Individual pages and components are not changed.
+
+**Why**: God Mode is a "calibration sandbox" — the goal is for the admin to see exactly what the simulated role sees, with no real org/workspace/project names leaking through. Patching individual pages (e.g. MembersView) is fragile and requires ongoing maintenance as new pages are added. Intercepting at the context level is a single choke point: every consumer of `usePlatformContext()` automatically gets mock data without knowing it.
+
+**How to apply**: The gate is `isGodModeReady` (not `isSimulating`). Real context data is used during the 1800ms entry animation. Mock context activates only after animation completes. Deactivation is automatic — no cleanup needed. Mock object IDs are in the 9000+ range to avoid collisions with real DB records. `can()` and all non-scope fields (`permissions`, `featureFlags`, `availableModules`, etc.) always use real data — only the scope lists and selection are mocked.
+
+**What stays real**: `can()`, `permissions`, `permissionCodes`, `featureFlags`, `enabledModules`, `availableModules`, `currentUser`, `loadedAt`, `isLoading`. Only `organizations[]`, `workspaces[]`, `projects[]`, `selectedOrganization`, `selectedWorkspace`, `selectedProject`, and `currentScope.organization/workspace/project` are mocked.
+
+**Bottom bar**: When `isGodModeReady`, `asthra-shell.tsx` replaces the interactive `OrganizationSwitcher`/`WorkspaceSwitcher`/`ProjectSwitcher` with static purple text labels showing the mock names. No user interaction is possible with scope selectors during God Mode.
+
+## 2026-07-06 — God Mode Auto-Overlay: Track can() at the Source, Not at the Component
+
+**Decision**: Instead of requiring explicit `<PermissionGate>` wrapping for every permission-gated element, make `can()` itself register checks when in God Mode edit mode. A separate panel (`GodModeAutoOverlay`) reads the tracker and renders controls for all detected permissions — zero additional work per component.
+
+**Why**: The original approach (PermissionGate) required a developer to manually wrap every gated element. This meant 272 of 313 backend permissions had no God Mode coverage. Every new permission-gated component would need to be wrapped. The registration happens at the only mandatory call site — `can()` — so coverage is 100% by construction.
+
+**Key design choices**:
+- `useGodModeTracker.getState().registerPermissionCheck(...)` (not `useGodModeTracker(s => s.registerPermissionCheck)`) inside `can()`. Using `getState()` avoids making `PlatformContextProvider` subscribe to the tracker store, which would cause the provider to re-render on every tracker update. With `getState()`, the provider writes to the store without subscribing to it.
+- `pathnameRef.current` (not `pathname` in closure). Using a ref means `pathname` doesn't need to be in `useMemo` deps for `can`. If it were in deps, every navigation would recreate the context value (and trigger re-renders of all consumers). The ref always holds the current value.
+- Deduplicate by code (not by instance). The panel shows each permission code once. Stability: if the same code is checked N times in one render, only the first call inserts; subsequent calls are no-ops (same code+route → return current state without triggering subscriptions).
+- `granted` not stored in the tracker. The overlay computes granted status directly from `simulatedPermissions` (always reactive). If we stored `granted` in the tracker, it would be stale between the permission check and the panel rendering.
+
+**How to apply**: New permission-gated components should use `{can("code") && ...}` or `const canX = can("code")`. PermissionGate still works for cases that need the visual overlay (dashed placeholder + ring). Backend still enforces real permissions — God Mode Save to Role writes changes through the API.
+
+**Future-proof**: Every new `can()` call anywhere in the codebase is automatically tracked. No registry updates, no wrapper components, no new imports needed.

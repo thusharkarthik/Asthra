@@ -26,6 +26,11 @@ interface PermissionGateProps {
  *
  * Normal / View mode  → behaves exactly like `can(permission) ? children : fallback`
  * Edit mode (simulate + edit) → shows overlay with +/- controls for live editing
+ *
+ * NOTE: New code should prefer `{can("permission.code") && <Component />}` over
+ * PermissionGate. God Mode automatically tracks all can() calls via god-mode-tracker
+ * and surfaces them in GodModeAutoOverlay — no explicit wrapping needed for coverage.
+ * PermissionGate is kept for backward compatibility and explicit visual wrapping.
  */
 export function PermissionGate({
   permission,

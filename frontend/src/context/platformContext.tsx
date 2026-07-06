@@ -1,13 +1,16 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { detectNavigationMode } from "@/lib/navigation-mode";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { usePathname } from "next/navigation";
 import { useSimulationStore } from "@/lib/permission-simulator";
+import { useGodModeTracker } from "@/lib/god-mode-tracker";
+import { GOD_MODE_MOCK_ORG, GOD_MODE_MOCK_WORKSPACE, GOD_MODE_MOCK_PROJECT } from "@/lib/god-mode-mock-context";
 import { useAuthStore } from "@/stores/auth-store";
 import { coreApi } from "@/services/api/core-api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -61,7 +64,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const cachedCurrentUser = useAuthStore((state) => state.currentUser);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
+  const isGodModeReady = useSimulationStore((state) => state.isGodModeReady);
+  const isEditMode = useSimulationStore((state) => state.isEditMode);
   const simulatedPermissions = useSimulationStore((state) => state.simulatedPermissions);
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -171,6 +179,16 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const selectedOrganization = organizations.find((organization) => organization.id === selectedOrganizationId) ?? null;
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null;
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+
+  // When God Mode is fully active, replace all platform scope data with predictable
+  // mock objects so the sandbox shows exactly what the simulated role would see,
+  // with no real org/workspace/project names leaking through.
+  const effectiveOrganizations = isGodModeReady ? [GOD_MODE_MOCK_ORG] : organizations;
+  const effectiveWorkspaces = isGodModeReady ? [GOD_MODE_MOCK_WORKSPACE] : workspaces;
+  const effectiveProjects = isGodModeReady ? [GOD_MODE_MOCK_PROJECT] : projects;
+  const effectiveSelectedOrg = isGodModeReady ? GOD_MODE_MOCK_ORG : selectedOrganization;
+  const effectiveSelectedWorkspace = isGodModeReady ? GOD_MODE_MOCK_WORKSPACE : selectedWorkspace;
+  const effectiveSelectedProject = isGodModeReady ? GOD_MODE_MOCK_PROJECT : selectedProject;
   const workspaceScopeLoaded = !confirmedWorkspaceId || contextQuery.data?.current_workspace?.id === confirmedWorkspaceId;
   const projectScopeSettled = !confirmedWorkspaceId || Boolean(confirmedProjectId) || (workspaceScopeLoaded && projects.length === 0);
   const hasOrganizationContext = organizations.length > 0;
@@ -246,12 +264,12 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PlatformContextValue>(() => ({
     currentUser,
-    organizations,
-    selectedOrganization,
-    workspaces,
-    selectedWorkspace,
-    projects,
-    selectedProject,
+    organizations: effectiveOrganizations,
+    selectedOrganization: effectiveSelectedOrg,
+    workspaces: effectiveWorkspaces,
+    selectedWorkspace: effectiveSelectedWorkspace,
+    projects: effectiveProjects,
+    selectedProject: effectiveSelectedProject,
     permissions,
     permissionCodes,
     featureFlags,
@@ -271,16 +289,23 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       organizationId: confirmedOrganizationId,
       workspaceId: confirmedWorkspaceId,
       projectId: confirmedProjectId,
-      organization: selectedOrganization,
-      workspace: selectedWorkspace,
-      project: selectedProject
+      organization: effectiveSelectedOrg,
+      workspace: effectiveSelectedWorkspace,
+      project: effectiveSelectedProject
     },
     setSelectedOrganization,
     setSelectedWorkspace,
     setSelectedProject,
     can: (permissionCode: string) => {
-      if (isSimulating) return simulatedPermissions.includes(permissionCode);
-      return hasPermission(permissionCodes, permissionCode);
+      const result = isSimulating
+        ? simulatedPermissions.includes(permissionCode)
+        : hasPermission(permissionCodes, permissionCode);
+      // In God Mode edit mode: register this check so GodModeAutoOverlay can surface it.
+      // Access via getState() to avoid subscribing the provider to the tracker store.
+      if (isGodModeReady && isEditMode) {
+        useGodModeTracker.getState().registerPermissionCheck(permissionCode, pathnameRef.current);
+      }
+      return result;
     },
     isFeatureEnabled: (flagKey: string) => Boolean(featureFlags[flagKey]),
     hasModule: (moduleKey: string) => availableModules.some((module) => module.module_key === moduleKey && module.visible),
@@ -299,30 +324,32 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isFetching,
     isLoading,
     isSimulating,
+    isGodModeReady,
+    isEditMode,
     enabledModules,
     featureFlags,
     confirmedOrganizationId,
     confirmedProjectId,
     confirmedWorkspaceId,
     loadedAt,
-    organizations,
+    effectiveOrganizations,
     organizationTemplates,
     permissionCodes,
     permissions,
     platformContextScopeSettled,
-    projects,
-    selectedOrganization,
+    effectiveProjects,
+    effectiveSelectedOrg,
     selectedOrganizationId,
-    selectedProject,
+    effectiveSelectedProject,
     selectedProjectId,
     search,
-    selectedWorkspace,
+    effectiveSelectedWorkspace,
     selectedWorkspaceId,
+    effectiveWorkspaces,
     setSelectedOrganization,
     setSelectedProject,
     setSelectedWorkspace,
     simulatedPermissions,
-    workspaces,
     contextQuery,
   ]);
 
