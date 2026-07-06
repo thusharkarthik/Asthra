@@ -160,6 +160,14 @@ export function GodModeToolbar() {
 
       <div className="h-4 w-px bg-purple-700/60" />
 
+      {/* Demo data indicator */}
+      <div className="flex items-center gap-1 rounded bg-purple-900/50 px-2 py-0.5">
+        <span className="text-xs">🎭</span>
+        <span className="text-xs text-purple-300">Demo data active</span>
+      </div>
+
+      <div className="h-4 w-px bg-purple-700/60" />
+
       {/* View / Edit toggle */}
       <div className="flex items-center gap-0.5 rounded-md bg-purple-900/70 p-0.5">
         <button

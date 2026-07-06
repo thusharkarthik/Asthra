@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-04 (Convention-based help registry — auto-registered from module registry, human content in HELP_CONTENT)
+Last updated: 2026-07-06 (God Mode auto-overlay — tracked can() system; every can() call auto-detected in edit mode)
 
 ## Phase
 
@@ -159,6 +159,51 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 - `context/platformContext.tsx`: Exposes `featureFlags`, `enabledModules`, and `isFeatureEnabled(flagKey)` with safe defaults. Sidebar/module navigation behavior was not changed in this pass.
 
 **Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
+
+## God Mode Auto-Overlay: Tracked can() System (added 2026-07-06)
+
+**Purpose**: In God Mode edit mode, every `can("permission.code")` call is automatically tracked and surfaced in a "PAGE PERMISSIONS" panel. Zero developer work needed — any component that calls `can()` gets full God Mode coverage. Was 41 manually-wrapped permissions; now any of the 313 permissions are trackable automatically.
+
+**Files**:
+- `frontend/src/lib/god-mode-tracker.ts` (new) — Zustand store. Tracks `Record<code, { code, route }>`. Deduplicates by code (same code + route = no-op). Actions: `registerPermissionCheck(code, route)`, `clearForRoute(route)`, `clearAll()`.
+- `frontend/src/context/platformContext.tsx` — `can()` now calls `useGodModeTracker.getState().registerPermissionCheck(code, pathnameRef.current)` when `isGodModeReady && isEditMode`. Uses `pathnameRef` (not `pathname` in closure) to avoid adding `pathname` to useMemo deps. Subscribes to `isEditMode` from simulation store; adds it to useMemo deps.
+- `frontend/src/components/platform/god-mode-auto-overlay.tsx` (new) — Panel: `fixed right-4 top-20 z-50 w-72`. Filters tracker by current `pathname`. For each tracked code: shows label (from dynamic or static registry), granted/denied status (computed fresh from `simulatedPermissions`), +/- button (calls `markForAddition`/`markForRemoval`/`undoChange`).
+- `frontend/src/layouts/asthra-shell.tsx` — Imports `GodModeAutoOverlay` + `useGodModeTracker`. Mounts `<GodModeAutoOverlay />` in content area. Two effects: clear tracker on `pathname` change (fresh detection per page), clear all on `!isGodModeReady` (cleanup on exit).
+- `frontend/src/components/platform/permission-gate.tsx` — Added JSDoc note pointing to tracked can() as the preferred approach for new code.
+
+**How tracking works**:
+1. User enters God Mode → enters Edit mode → `isGodModeReady && isEditMode = true`
+2. Page components render → call `can("some.permission")` → `can()` in platformContext executes
+3. `registerPermissionCheck("some.permission", "/current/path")` called via `getState()` (no React subscription, no re-render of provider)
+4. Tracker store updated (dedup: same code+route = no-op)
+5. `GodModeAutoOverlay` re-renders (subscribed to tracker) → shows permission in panel
+6. User clicks −/+ → `markForRemoval`/`markForAddition` → `simulatedPermissions` changes → context re-renders → `can()` called again → tracker updated → overlay reflects new status
+
+**`getState()` pattern**: `useGodModeTracker.getState().registerPermissionCheck(...)` inside `can()` avoids making the platform context provider subscribe to the tracker store (which would cause provider re-renders on every tracker update).
+
+**pathnameRef pattern**: `pathnameRef.current = pathname` (updated each render). `can()` reads `pathnameRef.current` — avoids adding `pathname` to useMemo deps, so navigating doesn't recreate the entire context value.
+
+**Convention going forward**: New components should use `{can("code") && <Component />}` instead of `<PermissionGate>`. God Mode coverage is automatic. PermissionGate still works and stays for existing code.
+
+## God Mode UX + Mock Context (added 2026-07-04, mock context added 2026-07-06)
+
+**Purpose**: God Mode is a distinct powerful mode with dramatic entry/exit animations, a purple toolbar, a purple shell border, and mock platform context data so the sandbox shows exactly what the simulated role sees — with no real org/workspace/project names leaking through.
+
+**Key files**:
+- `frontend/src/lib/permission-simulator.ts` — Zustand store. `isActivating`, `isDeactivating`, `isGodModeReady` flags. `activateGodMode()` sets role data + `isSimulating=true` immediately; delays `isGodModeReady=true` by 1800ms (waits for animation). `deactivateGodMode()` delays full reset by 1200ms.
+- `frontend/src/lib/god-mode-mock-context.ts` — Fixed mock constants: `GOD_MODE_MOCK_ORG` (id 9001, "Demo Organization"), `GOD_MODE_MOCK_WORKSPACE` (id 9001, "Demo Workspace"), `GOD_MODE_MOCK_PROJECT` (id 9001, "Demo Project"). IDs in 9000+ range to avoid collision with real records.
+- `frontend/src/context/platformContext.tsx` — Subscribes to `isGodModeReady`. When true: overrides `organizations`, `workspaces`, `projects`, `selectedOrganization`, `selectedWorkspace`, `selectedProject`, and `currentScope` with mock data. `can()` and all other fields use real data.
+- `frontend/src/components/platform/god-mode-overlay.tsx` — Full-screen z-[9999] overlay with phase-based entry (1800ms) and exit (1200ms) animations.
+- `frontend/src/components/platform/god-mode-toolbar.tsx` — `bg-purple-950` toolbar: ⚡ GOD MODE label, role dropdown switcher (switches without animation via `startSimulation`), 🎭 Demo data active indicator, View/Edit toggle, changes badge, Save to Role, ℹ route hints, Exit God Mode.
+- `frontend/src/components/platform/god-mode-activation.tsx` — Role selection modal. Calls `activateGodMode()` on confirm.
+- `frontend/src/components/navigation/sidebar-nav.tsx` — ⚡ God Mode button (replaces old "View As"). Active indicator shows during animation phases.
+- `frontend/src/layouts/asthra-shell.tsx` — Purple `ring-2 ring-purple-500/50 ring-inset` during any God Mode state. Bottom bar: shows static purple mock labels (🎭 Demo Organization / Demo Workspace / Demo Project) instead of interactive switchers when `isGodModeReady`.
+
+**Mock context gate**: `isGodModeReady` (not `isSimulating`). During the 1800ms entry animation, `isSimulating=true` but `isGodModeReady=false` — real context data still shows. Mock data activates only after the animation ends.
+
+**Mock data restoration**: Automatic — no cleanup needed. When `isGodModeReady` becomes false (after exit animation), the `effectiveXxx` values revert to real context data.
+
+**`prebuild`/`predev` non-fatal generation**: `npm run generate:api || true` in both hooks so the dev server and production build proceed even when core-service is not reachable.
 
 ## Convention-Based Help Registry (added 2026-07-04)
 

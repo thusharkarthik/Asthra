@@ -24,6 +24,8 @@ import { ContextualHelpModal } from "@/components/platform/contextual-help";
 import { VisualPermissionEditor } from "@/components/platform/visual-permission-editor";
 import { GodModeOverlay } from "@/components/platform/god-mode-overlay";
 import { GodModeToolbar } from "@/components/platform/god-mode-toolbar";
+import { GodModeAutoOverlay } from "@/components/platform/god-mode-auto-overlay";
+import { useGodModeTracker } from "@/lib/god-mode-tracker";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/use-logout";
 import { settingsApi } from "@/services/api/settings-api";
@@ -92,7 +94,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const logout = useLogout();
-  const { currentUser, organizations, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt, isError: contextIsError, error: contextError } = usePlatformContext();
+  const { currentUser, organizations, selectedOrganization, selectedWorkspace, selectedProject, permissions, isLoading: contextLoading, loadedAt: contextLoadedAt, isError: contextIsError, error: contextError } = usePlatformContext();
   const setCommandPaletteOpen = useUIStore((state) => state.setCommandPaletteOpen);
   const setAuthTransition = useUIStore((state) => state.setAuthTransition);
   const zustandUnread = useNotificationStore((state) => state.notifications.filter((item) => item.unread).length);
@@ -123,6 +125,8 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const registryIsLoading = usePermissionRegistryStore((s) => s.isLoading);
   const loadRegistryFn = usePermissionRegistryStore((s) => s.loadRegistry);
   const resetRegistryFn = usePermissionRegistryStore((s) => s.reset);
+  const clearTrackerForRoute = useGodModeTracker((s) => s.clearForRoute);
+  const clearTrackerAll = useGodModeTracker((s) => s.clearAll);
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const progressActive = useProgressStore((state) => state.active);
@@ -180,6 +184,16 @@ export function AsthraShell({ children }: { children: ReactNode }) {
       void loadRegistryFn(accessToken);
     }
   }, [isActivating, isSimulating, accessToken, registryIsLoaded, registryIsLoading, loadRegistryFn]);
+
+  // Clear the permission tracker when navigating so the panel starts fresh per page.
+  useEffect(() => {
+    clearTrackerForRoute(pathname);
+  }, [pathname, clearTrackerForRoute]);
+
+  // Clear all tracked permissions when God Mode exits (stale data has no use).
+  useEffect(() => {
+    if (!isGodModeReady) clearTrackerAll();
+  }, [isGodModeReady, clearTrackerAll]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -315,6 +329,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 flex-1 relative">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
             {isSimulating && <VisualPermissionEditor />}
+            <GodModeAutoOverlay />
           </div>
         </div>
       </div>
@@ -352,9 +367,18 @@ export function AsthraShell({ children }: { children: ReactNode }) {
               </Button>
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 lg:flex-nowrap">
-              {showOrgSwitcher && <OrganizationSwitcher />}
-              {showWorkspaceSwitcher && <WorkspaceSwitcher />}
-              {showProjectSwitcher && <ProjectSwitcher />}
+              {showOrgSwitcher && (isGodModeReady
+                ? <span className="flex items-center gap-1 rounded border border-purple-700/40 bg-purple-950/30 px-2 py-1 text-xs text-purple-300">🎭 {selectedOrganization?.name}</span>
+                : <OrganizationSwitcher />
+              )}
+              {showWorkspaceSwitcher && (isGodModeReady
+                ? <span className="rounded border border-purple-700/40 bg-purple-950/30 px-2 py-1 text-xs text-purple-300">{selectedWorkspace?.name}</span>
+                : <WorkspaceSwitcher />
+              )}
+              {showProjectSwitcher && (isGodModeReady
+                ? <span className="rounded border border-purple-700/40 bg-purple-950/30 px-2 py-1 text-xs text-purple-300">{selectedProject?.name}</span>
+                : <ProjectSwitcher />
+              )}
               {effectiveNavigationMode === "platform" && (
                 <span className="text-xs text-muted-foreground dark:text-white/50">Platform Mode</span>
               )}
