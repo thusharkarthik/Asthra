@@ -22,7 +22,8 @@ import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
 import { RequestAccessButton } from "@/app/settings/layout";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
-import { PermissionGate } from "@/components/platform/permission-gate";
+import { SchemaGate } from "@/components/platform/schema-gate";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 const SELECT_CLASS =
   "w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
@@ -125,8 +126,8 @@ const ORG_TABS = [
 function OrgTabs({ orgId, active }: { orgId: number; active: string }) {
   return (
     <nav className="flex items-center gap-1 border-b pb-0">
-      {ORG_TABS.map((tab) => {
-        const link = (
+      {ORG_TABS.map((tab) => (
+        <SchemaGate key={tab.key} elementKey={`${tab.key}_tab`}>
           <Link
             href={`/settings/organizations/${orgId}${tab.key === "overview" ? "" : `/${tab.key}`}`}
             className={`px-3 py-2 text-sm font-medium transition-colors ${
@@ -137,16 +138,8 @@ function OrgTabs({ orgId, active }: { orgId: number; active: string }) {
           >
             {tab.label}
           </Link>
-        );
-        if (tab.permission) {
-          return (
-            <PermissionGate key={tab.key} permission={tab.permission} label={`${tab.label} Tab`}>
-              {link}
-            </PermissionGate>
-          );
-        }
-        return <span key={tab.key}>{link}</span>;
-      })}
+        </SchemaGate>
+      ))}
     </nav>
   );
 }
@@ -160,6 +153,8 @@ export default function OrganizationSettingsPage() {
   const queryClient = useQueryClient();
   const { organizations, workspaces, permissions, can, isLoading: ctxIsLoading } = usePlatformContext();
   const { authorityLevel } = useSettingsAuthority();
+
+  usePagePermissions();
 
   const isSuperuser = Boolean(currentUser?.is_superuser);
   const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
@@ -360,13 +355,13 @@ export default function OrganizationSettingsPage() {
               disabled={!isAuthorized}
             />
           </FormField>
-          <PermissionGate permission="settings.organization.edit" label="Save General Settings">
+          <SchemaGate elementKey="edit_general">
             <div className="flex justify-end">
               <Button type="submit" disabled={updateOrgMutation.isPending}>
                 {updateOrgMutation.isPending ? "Saving…" : "Save General"}
               </Button>
             </div>
-          </PermissionGate>
+          </SchemaGate>
         </form>
       </SettingsCard>
 
@@ -510,13 +505,13 @@ export default function OrganizationSettingsPage() {
           </div>
         </SettingsCard>
 
-        <PermissionGate permission="settings.organization.edit" label="Save Organization Settings">
+        <SchemaGate elementKey="edit_settings">
           <div className="flex justify-end">
             <Button type="submit" disabled={updateSettingsMutation.isPending}>
               {updateSettingsMutation.isPending ? "Saving…" : "Save Settings"}
             </Button>
           </div>
-        </PermissionGate>
+        </SchemaGate>
       </form>
 
       {/* Danger Zone */}

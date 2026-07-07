@@ -612,6 +612,30 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 
 **How to apply**: If a future feature needs to show mock roles specifically, remove `PREFIX/roles` from `PASSTHROUGH_PREFIXES` in `god-mode-interceptor.ts` and add mock role entries to `MOCK_REGISTRY`. For now, real roles are intentional.
 
+## 2026-07-07 — SchemaGate Replaces PermissionGate in Migrated Pages; Both Components Coexist
+
+**Decision**: In pages migrated to the schema system, replace `<PermissionGate permission="code">` with `<SchemaGate elementKey="element_key">`. The `PermissionGate` component itself is kept unchanged (not deleted, not modified) for backward compatibility with existing unmigrated pages and for explicit use when no schema entry is appropriate.
+
+**Why**: `SchemaGate` reads the permission from `PAGE_SCHEMAS` — the page component no longer needs to hardcode the permission string. This makes the page code declarative (just an `elementKey`) and ensures the schema is the single source of truth for what permission gates what element.
+
+**How to apply**: When migrating a new page to use SchemaGate, first add the page's elements to `PAGE_SCHEMAS` in `permission-schema.ts`, then replace `PermissionGate` usages with `SchemaGate elementKey="..."` where the key matches the schema. Elements with `permission: null` in the schema just pass through.
+
+## 2026-07-07 — Schema Panel Calls usePagePermissions Globally; Per-Page Calls Are Additive
+
+**Decision**: `GodModeSchemaPanel` calls `usePagePermissions()` internally. It's mounted globally in `asthra-shell.tsx`. Per-page `usePagePermissions()` calls in migrated pages are additive (idempotent) — they're for explicit documentation that the page participates in the schema system.
+
+**Why**: Since `registerPermissionCheck` is idempotent (same code + route = no-op), calling `usePagePermissions` from both the schema panel and the page component causes no harm. The global panel mount ensures schema registration works even for pages that haven't been migrated yet.
+
+**How to apply**: For new page migrations, add `usePagePermissions()` at the top of the component function for self-documentation purposes. It's not strictly required for the panel to work but makes the intent explicit.
+
+## 2026-07-07 — PAGE_SCHEMAS Defines 9 Pages Including Not-Yet-Migrated Ones
+
+**Decision**: `PAGE_SCHEMAS` pre-defines schemas for all 9 known settings pages (including `/settings/workspaces/:id`, `/settings/projects`, `/settings/roles`, `/settings/permissions`) even though only 3 are actively migrated. The panel shows schemas for unmigrated pages via the global `usePagePermissions` call.
+
+**Why**: Having the complete schema ahead of migration gives the God Mode panel immediate coverage. A platform admin testing God Mode on `/settings/roles` will see the declared schema elements even if that page hasn't had `SchemaGate` or `usePagePermissions` added to it yet. The schema represents the intended permission structure, not just the current implementation state.
+
+**How to apply**: When adding a new settings page, add its schema to `PAGE_SCHEMAS` first. Migration (adding `SchemaGate` or `usePagePermissions` to the page component) is optional — the panel will already show schema elements via the global mount.
+
 ## 2026-07-06 — God Mode Mock Context: Override platformContext, Not Individual Pages
 
 **Decision**: When `isGodModeReady`, replace `organizations`, `workspaces`, `projects`, and their selected counterparts with fixed mock objects inside `PlatformContextProvider`. Individual pages and components are not changed.

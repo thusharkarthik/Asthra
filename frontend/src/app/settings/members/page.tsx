@@ -7,12 +7,14 @@ import { useSettingsAuthority, RequestAccessButton } from "@/app/settings/layout
 import { MembersView } from "@/components/settings/settings-admin-views";
 import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 const PLATFORM_ADMIN_KEYS = new Set(["superuser", "platform_owner", "platform_admin"]);
 const ORG_ADMIN_KEYS = new Set(["organization_owner", "organization_admin"]);
 const WORKSPACE_ADMIN_KEYS = new Set(["workspace_admin", "workspace_manager"]);
 
 export default function MembersSettingsPage() {
+  usePagePermissions();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
   const isSuperuser = Boolean(currentUser?.is_superuser);

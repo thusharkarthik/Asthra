@@ -25,6 +25,7 @@ import { VisualPermissionEditor } from "@/components/platform/visual-permission-
 import { GodModeOverlay } from "@/components/platform/god-mode-overlay";
 import { GodModeToolbar } from "@/components/platform/god-mode-toolbar";
 import { GodModeAutoOverlay } from "@/components/platform/god-mode-auto-overlay";
+import { GodModeSchemaPanel } from "@/components/platform/god-mode-schema-panel";
 import { useGodModeTracker } from "@/lib/god-mode-tracker";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/use-logout";
@@ -330,6 +331,7 @@ export function AsthraShell({ children }: { children: ReactNode }) {
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
             {isSimulating && <VisualPermissionEditor />}
             <GodModeAutoOverlay />
+            <GodModeSchemaPanel />
           </div>
         </div>
       </div>
