@@ -70,6 +70,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+  const prevGodModeReady = useRef(false);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -168,6 +169,17 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     const resolved = detectNavigationMode(isSuperuser, roles);
     setNavigationMode((prev) => (prev === resolved ? prev : resolved));
   }, [contextQuery.data]);
+
+  useEffect(() => {
+    const wasReady = prevGodModeReady.current;
+    prevGodModeReady.current = isGodModeReady;
+    if (wasReady && !isGodModeReady) {
+      setSelectedOrganization(null);
+      setSelectedWorkspace(null);
+      setSelectedProject(null);
+      void contextQuery.refetch();
+    }
+  }, [isGodModeReady, setSelectedOrganization, setSelectedWorkspace, setSelectedProject, contextQuery.refetch]);
 
   const organizations: Organization[] = hasAccessToken ? (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations : [];
   const workspaces: WorkspaceRecord[] = (hasAccessToken ? (contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces : []).filter(

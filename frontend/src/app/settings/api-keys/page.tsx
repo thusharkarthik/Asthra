@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Plus, ShieldOff } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 import { settingsApi } from "@/services/api/settings-api";
 import type { ApiKeyRecord } from "@/types/core";
 import {
@@ -88,6 +89,7 @@ export default function ApiKeysSettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const addToast = useToastStore((state) => state.addToast);
   const queryClient = useQueryClient();
+  usePagePermissions();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);

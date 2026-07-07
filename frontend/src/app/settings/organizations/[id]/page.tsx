@@ -516,6 +516,7 @@ export default function OrganizationSettingsPage() {
 
       {/* Danger Zone */}
       {(isSuperuser || permissions?.roles?.some((r) => r.key === "organization_owner")) && (
+        <SchemaGate elementKey="danger_zone">
         <SettingsDangerZone
           description="Deactivating the organization will suspend access for all members. This can be reversed by a platform admin."
           actions={
@@ -545,6 +546,7 @@ export default function OrganizationSettingsPage() {
             )
           }
         />
+        </SchemaGate>
       )}
     </SettingsLayout>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { type ReactNode, Fragment } from "react";
-import { Minus, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { usePlatformContext } from "@/context/platformContext";
 import { useSimulationStore } from "@/lib/permission-simulator";
@@ -25,13 +24,16 @@ interface SchemaGateProps {
  * Elements with no permission in the schema always render children unchanged.
  * Unknown keys are treated the same way (safe pass-through).
  *
- * In God Mode edit mode renders the same +/- overlay controls as PermissionGate.
+ * In God Mode edit mode renders an always-visible border + +/- button overlay.
+ * Hidden elements show children dimmed at opacity-40 so the user can see what
+ * would appear after granting the permission.
  */
 export function SchemaGate({ elementKey, children, fallback, className }: SchemaGateProps) {
   const pathname = usePathname();
   const { can } = usePlatformContext();
   const isSimulating = useSimulationStore((s) => s.isSimulating);
   const isEditMode = useSimulationStore((s) => s.isEditMode);
+  const simulatedPermissions = useSimulationStore((s) => s.simulatedPermissions);
   const pendingAdditions = useSimulationStore((s) => s.pendingAdditions);
   const pendingRemovals = useSimulationStore((s) => s.pendingRemovals);
   const markForAddition = useSimulationStore((s) => s.markForAddition);
@@ -51,60 +53,61 @@ export function SchemaGate({ elementKey, children, fallback, className }: Schema
     return can(permission) ? <Fragment>{children}</Fragment> : <Fragment>{fallback ?? null}</Fragment>;
   }
 
-  const hasPermission = can(permission);
   const isPendingAddition = pendingAdditions.includes(permission);
   const isPendingRemoval = pendingRemovals.includes(permission);
   const isPending = isPendingAddition || isPendingRemoval;
+  const effectivelyVisible =
+    (simulatedPermissions.includes(permission) && !isPendingRemoval) || isPendingAddition;
 
-  if (hasPermission) {
-    return (
-      <div
-        className={cn(
-          "relative rounded-sm",
-          isPendingAddition ? "ring-1 ring-blue-500/50 bg-blue-500/5" : "ring-1 ring-emerald-500/40",
-          className,
-        )}
-        title={`${displayLabel}\n${permission}`}
-      >
-        {children}
-        <button
-          type="button"
-          onClick={() => (isPending ? undoChange(permission) : markForRemoval(permission))}
-          className={cn(
-            "absolute -right-1.5 -top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full text-white shadow-sm transition-colors",
-            isPendingAddition ? "bg-blue-500 hover:bg-blue-600" : "bg-rose-500 hover:bg-rose-600",
-          )}
-          title={isPendingAddition ? `Undo adding ${displayLabel}` : `Remove ${displayLabel} from role`}
-        >
-          <Minus className="h-2.5 w-2.5" />
-        </button>
-      </div>
-    );
-  }
+  const borderClass = isPendingAddition
+    ? "ring-2 ring-blue-500 bg-blue-500/5"
+    : isPendingRemoval
+      ? "ring-2 ring-orange-400 bg-orange-400/5"
+      : effectivelyVisible
+        ? "ring-2 ring-emerald-500/70"
+        : "ring-2 ring-rose-500/60 bg-rose-500/5";
+
+  const btnClass = isPendingAddition
+    ? "bg-blue-500 hover:bg-blue-600"
+    : isPendingRemoval
+      ? "bg-orange-500 hover:bg-orange-600"
+      : effectivelyVisible
+        ? "bg-rose-500 hover:bg-rose-600"
+        : "bg-emerald-500 hover:bg-emerald-600";
+
+  const btnSymbol = isPending ? "↩" : effectivelyVisible ? "−" : "+";
+  const btnTitle = isPendingAddition
+    ? `Undo adding ${displayLabel}`
+    : isPendingRemoval
+      ? `Undo removing ${displayLabel}`
+      : effectivelyVisible
+        ? `Remove ${displayLabel} from role`
+        : `Add ${displayLabel} to role`;
 
   return (
     <div
-      className={cn(
-        "relative flex min-h-[28px] items-center gap-1.5 rounded-sm border border-dashed px-2 py-1 text-xs",
-        isPendingRemoval
-          ? "border-orange-400/50 bg-orange-400/10 text-orange-600 dark:text-orange-400"
-          : "border-muted-foreground/25 bg-muted/20 text-muted-foreground",
-        className,
-      )}
+      className={cn("relative rounded-sm", borderClass, className)}
       title={`${displayLabel}\n${permission}`}
     >
-      <span className="truncate">{displayLabel}</span>
-      <span className="shrink-0 font-mono text-[10px] opacity-50">{permission}</span>
+      <div className={cn("transition-opacity", effectivelyVisible ? "opacity-100" : "opacity-40")}>
+        {children}
+      </div>
       <button
         type="button"
-        onClick={() => (isPending ? undoChange(permission) : markForAddition(permission))}
+        onClick={() =>
+          isPending
+            ? undoChange(permission)
+            : effectivelyVisible
+              ? markForRemoval(permission)
+              : markForAddition(permission)
+        }
         className={cn(
-          "ml-auto shrink-0 flex h-4 w-4 items-center justify-center rounded-full text-white shadow-sm transition-colors",
-          isPendingRemoval ? "bg-orange-500 hover:bg-orange-600" : "bg-emerald-500 hover:bg-emerald-600",
+          "absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm transition-colors",
+          btnClass,
         )}
-        title={isPendingRemoval ? `Undo removing ${displayLabel}` : `Add ${displayLabel} to role`}
+        title={btnTitle}
       >
-        <Plus className="h-2.5 w-2.5" />
+        {btnSymbol}
       </button>
     </div>
   );

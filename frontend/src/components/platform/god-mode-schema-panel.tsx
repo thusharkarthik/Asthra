@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Eye, EyeOff, FileText, Link2, Minus, MousePointer, Plus, Shield } from "lucide-react";
+import { useState } from "react";
+import { Box, FileText, Link2, MousePointer, Shield } from "lucide-react";
 import type { ComponentType } from "react";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 import { useSimulationStore } from "@/lib/permission-simulator";
@@ -17,51 +18,78 @@ const TYPE_ICON: Record<SchemaElementType, ComponentType<{ className?: string }>
 };
 
 export function GodModeSchemaPanel() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const isGodModeReady = useSimulationStore((s) => s.isGodModeReady);
   const isEditMode = useSimulationStore((s) => s.isEditMode);
+  const simulatedPermissions = useSimulationStore((s) => s.simulatedPermissions);
   const pendingAdditions = useSimulationStore((s) => s.pendingAdditions);
   const pendingRemovals = useSimulationStore((s) => s.pendingRemovals);
   const markForAddition = useSimulationStore((s) => s.markForAddition);
   const markForRemoval = useSimulationStore((s) => s.markForRemoval);
   const undoChange = useSimulationStore((s) => s.undoChange);
-  const { schema, visible } = usePagePermissions();
+  const { schema } = usePagePermissions();
 
   if (!isGodModeReady || !isEditMode || !schema) return null;
 
+  if (isCollapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(false)}
+        className="fixed right-0 top-24 z-50 flex h-28 w-6 cursor-pointer items-center justify-center rounded-l-md border border-r-0 border-purple-700 bg-purple-950/95 text-purple-300 shadow-lg hover:bg-purple-900/95"
+        title="Expand schema panel"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        <span className="text-[10px] font-bold uppercase tracking-widest">SCHEMA ◂</span>
+      </button>
+    );
+  }
+
   return (
-    <div className="fixed right-4 top-16 z-50 w-72 max-h-[80vh] overflow-y-auto rounded-lg border border-border bg-background shadow-xl">
-      <div className="flex items-center gap-2 border-b px-3 py-2">
-        <Shield className="h-3.5 w-3.5 text-violet-500" />
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Schema Permissions
+    <div className="fixed right-4 top-16 z-50 w-64 max-h-[80vh] overflow-y-auto rounded-lg border border-purple-700 bg-purple-950/95 shadow-xl text-purple-100">
+      <div className="flex items-center gap-2 border-b border-purple-700/50 px-3 py-2">
+        <Shield className="h-3.5 w-3.5 text-purple-400" />
+        <span className="truncate text-xs font-semibold uppercase tracking-wide text-purple-300">
+          {schema.label}
         </span>
-        <span className="ml-auto font-mono text-xs text-muted-foreground">{schema.elements.length}</span>
+        <span className="ml-auto shrink-0 font-mono text-xs text-purple-500">{schema.elements.length}</span>
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(true)}
+          className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-purple-400 hover:bg-purple-800 hover:text-purple-200"
+          title="Collapse panel"
+        >
+          ✕
+        </button>
       </div>
-      <div className="divide-y">
+      <div className="divide-y divide-purple-800/50">
         {schema.elements.map((el) => {
-          const isVisible = visible(el.key);
-          const Icon = TYPE_ICON[el.type] ?? Box;
           const isPendingAddition = el.permission ? pendingAdditions.includes(el.permission) : false;
           const isPendingRemoval = el.permission ? pendingRemovals.includes(el.permission) : false;
           const isPending = isPendingAddition || isPendingRemoval;
+          const effectivelyVisible = el.permission
+            ? (simulatedPermissions.includes(el.permission) && !isPendingRemoval) || isPendingAddition
+            : true;
+          const Icon = TYPE_ICON[el.type] ?? Box;
 
           return (
             <div key={el.key} className="flex items-start gap-2 px-3 py-2">
-              <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+              <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-500" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-xs font-medium">{el.label}</span>
-                  {isVisible ? (
-                    <Eye className="h-3 w-3 shrink-0 text-emerald-500" />
-                  ) : (
-                    <EyeOff className="h-3 w-3 shrink-0 text-muted-foreground/40" />
-                  )}
+                  <span className="truncate text-xs font-medium text-purple-100">{el.label}</span>
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-full",
+                      effectivelyVisible ? "bg-emerald-500" : "bg-rose-500/60",
+                    )}
+                  />
                 </div>
                 {el.permission && (
-                  <span className="block font-mono text-[10px] text-muted-foreground/60">{el.permission}</span>
+                  <span className="block font-mono text-[10px] text-purple-500/80">{el.permission}</span>
                 )}
                 {el.description && (
-                  <span className="block text-[10px] italic text-muted-foreground/50">{el.description}</span>
+                  <span className="block text-[10px] italic text-purple-500/60">{el.description}</span>
                 )}
               </div>
               {el.permission && (
@@ -70,19 +98,19 @@ export function GodModeSchemaPanel() {
                   onClick={() => {
                     if (isPending) {
                       undoChange(el.permission!);
-                    } else if (isVisible) {
+                    } else if (effectivelyVisible) {
                       markForRemoval(el.permission!);
                     } else {
                       markForAddition(el.permission!);
                     }
                   }}
                   className={cn(
-                    "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-colors",
+                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm transition-colors",
                     isPendingAddition
                       ? "bg-blue-500 hover:bg-blue-600"
                       : isPendingRemoval
                         ? "bg-orange-500 hover:bg-orange-600"
-                        : isVisible
+                        : effectivelyVisible
                           ? "bg-rose-500 hover:bg-rose-600"
                           : "bg-emerald-500 hover:bg-emerald-600",
                   )}
@@ -91,12 +119,12 @@ export function GodModeSchemaPanel() {
                       ? `Undo adding ${el.label}`
                       : isPendingRemoval
                         ? `Undo removing ${el.label}`
-                        : isVisible
+                        : effectivelyVisible
                           ? `Remove ${el.label} from role`
                           : `Add ${el.label} to role`
                   }
                 >
-                  {isVisible ? <Minus className="h-2.5 w-2.5" /> : <Plus className="h-2.5 w-2.5" />}
+                  {isPending ? "↩" : effectivelyVisible ? "−" : "+"}
                 </button>
               )}
             </div>
