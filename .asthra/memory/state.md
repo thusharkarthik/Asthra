@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-06 (God Mode auto-overlay — tracked can() system; every can() call auto-detected in edit mode)
+Last updated: 2026-07-06 (God Mode mock data interceptor — all API reads return Acme Engineering demo data when God Mode active)
 
 ## Phase
 
@@ -160,6 +160,34 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 
 **Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
 
+## God Mode Mock Data Interceptor (added 2026-07-06)
+
+**Purpose**: When God Mode is active (`isGodModeReady`), all API GET requests that would return real data instead return rich "Acme Engineering" demo data. Write operations (POST/PATCH/PUT/DELETE) are blocked with a toast notification. Every settings page shows realistic placeholder content without exposing real customer data.
+
+**Architecture**: Single intercept point at `apiRequest` in `client.ts` — covers all API calls from both `settings-api.ts` and `core-api.ts` without modifying either.
+
+**Files**:
+- `frontend/src/lib/god-mode-mock-responses.ts` (new) — Acme Engineering demo data: 4 users (Alex Chen, Jordan Lee, Morgan Smith, Sam Taylor), 1 org, 2 workspaces, 3 projects, org/workspace members, 2 teams+members, 2 API keys, 3 notifications, 5 audit logs, org/workspace settings, org health. All IDs in 9000+ range.
+- `frontend/src/lib/god-mode-interceptor.ts` (new) — URL pattern matcher using `:param` → `[^/]+` regex. `shouldPassThrough()` lets auth, platform context, permissions registry, access-control tools, and roles endpoints pass through to real API. All other GETs matched against `MOCK_REGISTRY`. All writes (POST/PATCH/PUT/DELETE) → toast + throw `ApiError(403, "GOD_MODE_BLOCKED")`.
+- `frontend/src/services/api/client.ts` (updated) — `apiRequest` calls `interceptGodModeRequest(path, method)` before the fetch. If intercepted + not blocked: waits 40ms (artificial latency for loading state realism), returns `data as T`. If blocked: throws ApiError.
+- `frontend/src/lib/god-mode-mock-context.ts` (updated) — Names updated from "Demo Organization/Workspace/Project" to "Acme Engineering / Engineering Hub / Asthra Platform" (in sync with interceptor mock data).
+
+**Passthrough routes** (real API always used):
+- `PREFIX/context/` — platform context polling (critical)
+- `PREFIX/auth/` — auth endpoints
+- `PREFIX/me/` (sub-paths) — `/me/permissions`, `/me/change-password`, etc.
+- `PREFIX/access-control/` — simulate, debug, inventory, registry sync
+- `PREFIX/roles` (and sub-paths) — God Mode toolbar needs real roles for role switcher
+- `PREFIX/role-templates`, `PREFIX/role-assignments` — permissions management
+- `PREFIX/permissions` — 313-permission registry and management
+
+**Intercepted GET patterns** (mock data):
+Organizations, workspaces, projects, org/workspace members, teams+members, API keys, invitations, notifications, users, audit activity logs, org/workspace settings, org health, `GET /me` (profile page).
+
+**Write blocking**: All non-GET/HEAD requests get a toast ("God Mode: write blocked") and throw 403 ApiError. Components using `useMutation` will see the error in `onError`. No state is changed.
+
+**Gate**: `isGodModeReady` (same as mock context). Interceptor is inactive during animation, passthrough resumes immediately after God Mode exit.
+
 ## God Mode Auto-Overlay: Tracked can() System (added 2026-07-06)
 
 **Purpose**: In God Mode edit mode, every `can("permission.code")` call is automatically tracked and surfaced in a "PAGE PERMISSIONS" panel. Zero developer work needed — any component that calls `can()` gets full God Mode coverage. Was 41 manually-wrapped permissions; now any of the 313 permissions are trackable automatically.
@@ -191,13 +219,13 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 
 **Key files**:
 - `frontend/src/lib/permission-simulator.ts` — Zustand store. `isActivating`, `isDeactivating`, `isGodModeReady` flags. `activateGodMode()` sets role data + `isSimulating=true` immediately; delays `isGodModeReady=true` by 1800ms (waits for animation). `deactivateGodMode()` delays full reset by 1200ms.
-- `frontend/src/lib/god-mode-mock-context.ts` — Fixed mock constants: `GOD_MODE_MOCK_ORG` (id 9001, "Demo Organization"), `GOD_MODE_MOCK_WORKSPACE` (id 9001, "Demo Workspace"), `GOD_MODE_MOCK_PROJECT` (id 9001, "Demo Project"). IDs in 9000+ range to avoid collision with real records.
+- `frontend/src/lib/god-mode-mock-context.ts` — Fixed mock constants: `GOD_MODE_MOCK_ORG` (id 9001, "Acme Engineering"), `GOD_MODE_MOCK_WORKSPACE` (id 9001, "Engineering Hub"), `GOD_MODE_MOCK_PROJECT` (id 9001, "Asthra Platform", key "ASTH"). IDs in 9000+ range to avoid collision with real records.
 - `frontend/src/context/platformContext.tsx` — Subscribes to `isGodModeReady`. When true: overrides `organizations`, `workspaces`, `projects`, `selectedOrganization`, `selectedWorkspace`, `selectedProject`, and `currentScope` with mock data. `can()` and all other fields use real data.
 - `frontend/src/components/platform/god-mode-overlay.tsx` — Full-screen z-[9999] overlay with phase-based entry (1800ms) and exit (1200ms) animations.
 - `frontend/src/components/platform/god-mode-toolbar.tsx` — `bg-purple-950` toolbar: ⚡ GOD MODE label, role dropdown switcher (switches without animation via `startSimulation`), 🎭 Demo data active indicator, View/Edit toggle, changes badge, Save to Role, ℹ route hints, Exit God Mode.
 - `frontend/src/components/platform/god-mode-activation.tsx` — Role selection modal. Calls `activateGodMode()` on confirm.
 - `frontend/src/components/navigation/sidebar-nav.tsx` — ⚡ God Mode button (replaces old "View As"). Active indicator shows during animation phases.
-- `frontend/src/layouts/asthra-shell.tsx` — Purple `ring-2 ring-purple-500/50 ring-inset` during any God Mode state. Bottom bar: shows static purple mock labels (🎭 Demo Organization / Demo Workspace / Demo Project) instead of interactive switchers when `isGodModeReady`.
+- `frontend/src/layouts/asthra-shell.tsx` — Purple `ring-2 ring-purple-500/50 ring-inset` during any God Mode state. Bottom bar: shows static purple mock labels (🎭 Acme Engineering / Engineering Hub / Asthra Platform) instead of interactive switchers when `isGodModeReady`.
 
 **Mock context gate**: `isGodModeReady` (not `isSimulating`). During the 1800ms entry animation, `isSimulating=true` but `isGodModeReady=false` — real context data still shows. Mock data activates only after the animation ends.
 
