@@ -10,6 +10,7 @@ import { settingsApi } from "@/services/api/settings-api";
 import { SettingsEmptyState, SettingsLayout } from "@/components/settings/settings-components";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import type { OrgHealthRecord } from "@/services/api/settings-api";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 function healthBadge(health: OrgHealthRecord | undefined, loading: boolean) {
   if (loading) return <span className="text-xs text-muted-foreground">Loading…</span>;
@@ -90,6 +91,7 @@ function OrgHealthSummary({ canViewHealth }: { canViewHealth: boolean }) {
 }
 
 export default function OrganizationsSettingsPage() {
+  usePagePermissions();
   const currentUser = useAuthStore((state) => state.currentUser);
   const isSuperuser = Boolean(currentUser?.is_superuser);
   const { permissions, can, isLoading: ctxIsLoading } = usePlatformContext();

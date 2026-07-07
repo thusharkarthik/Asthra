@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-07-06 (God Mode mock data interceptor — all API reads return Acme Engineering demo data when God Mode active)
+Last updated: 2026-07-07 (Permission Schema System — declarative schema panel showing all page elements, including hidden ones)
 
 ## Phase
 
@@ -159,6 +159,24 @@ All 5 Phase B test suites passed via code inspection (Docker Desktop was stopped
 - `context/platformContext.tsx`: Exposes `featureFlags`, `enabledModules`, and `isFeatureEnabled(flagKey)` with safe defaults. Sidebar/module navigation behavior was not changed in this pass.
 
 **Next Phase B item**: Module Registry — completed 2026-06-30. Current next item: AI Context Registry.
+
+## Permission Schema System (added 2026-07-07)
+
+**Purpose**: Declarative, single-source-of-truth schema for every page's permission-gated elements. `GodModeSchemaPanel` shows ALL schema elements — including ones never rendered because they're hidden — while `GodModeAutoOverlay` only shows what was actually can()-checked.
+
+**Files**:
+- `frontend/src/lib/permission-schema.ts` (new) — `SchemaElementType`, `PageSchemaElement` (key, label, permission, type, description?), `PageSchema` (route, label, elements), `PAGE_SCHEMAS` (9 pages: /settings, /settings/organizations, /settings/organizations/:id, /settings/members, /settings/workspaces, /settings/workspaces/:id, /settings/projects, /settings/roles, /settings/permissions), `findSchemaForRoute(pathname)` using same `:param` → `[^/]+` regex as interceptor.
+- `frontend/src/hooks/use-page-permissions.ts` (new) — `usePagePermissions()` hook. Returns `{ schema, visible }`. `visible(key)` → true if no permission OR `can(permission)`. `useEffect` when `isGodModeReady && isEditMode`: proactively calls `registerPermissionCheck` for ALL schema elements with a permission — so panel shows them even if they were never rendered.
+- `frontend/src/components/platform/schema-gate.tsx` (new) — `SchemaGate({ elementKey, children, fallback?, className? })`. Looks up permission from schema via `findSchemaForRoute(usePathname())`. No permission found → pass-through. Has permission → behaves identically to `PermissionGate` (+/- overlay in edit mode, ghost placeholder when denied).
+- `frontend/src/components/platform/god-mode-schema-panel.tsx` (new) — `GodModeSchemaPanel`. Position: `fixed right-4 top-16 z-50 w-72 max-h-[80vh]`. Calls `usePagePermissions()`. Shows all schema elements with type icons (Button→MousePointer, Tab→FileText, Section→Box, Action→MousePointer, Link→Link2), Eye/EyeOff for visible/hidden status, +/- buttons for permissioned elements. Only renders when `isGodModeReady && isEditMode && schema != null`.
+- `frontend/src/layouts/asthra-shell.tsx` (updated) — imports and mounts `<GodModeSchemaPanel />` alongside `<GodModeAutoOverlay />`.
+- `frontend/src/app/settings/organizations/[id]/page.tsx` (migrated) — replaced `PermissionGate` with `SchemaGate` for OrgTabs (all 5 tabs unified under `SchemaGate elementKey={tab.key+"_tab"}`), save buttons use `SchemaGate elementKey="edit_general"` / `elementKey="edit_settings"`. Added `usePagePermissions()` call.
+- `frontend/src/app/settings/members/page.tsx` (migrated) — added `usePagePermissions()` call.
+- `frontend/src/app/settings/organizations/page.tsx` (migrated) — added `usePagePermissions()` call.
+
+**Key difference from auto-overlay**: Schema panel knows about elements with `permission: null` (always visible) and elements that were never rendered (because a prior `can()` returned false and the component short-circuited). Auto-overlay only shows permissions that were actually called.
+
+**Coexistence**: Auto-overlay (`top-20`) and schema panel (`top-16`) are both mounted. They serve complementary purposes. `GodModeSchemaPanel` also calls `usePagePermissions` which proactively registers schema elements — this is additive to the tracker (idempotent).
 
 ## God Mode Mock Data Interceptor (added 2026-07-06)
 
