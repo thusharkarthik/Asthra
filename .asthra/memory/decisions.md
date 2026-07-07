@@ -588,6 +588,30 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 
 **How to apply**: When adding a new page, add its route to `HELP_CONTENT` in `convention-help-registry.ts`. The backend module_registry handles auto-discovery; human content enriches what auto-discovery can't provide. Never edit `help-registry.ts` (deprecated). Never import `matchHelpContent` (removed — use `findHelpContent` with an explicit registry).
 
+## 2026-07-06 — God Mode Mock Data Interceptor: Hook at client.ts, Not at Individual API Modules
+
+**Decision**: The God Mode API interceptor is wired into `apiRequest()` in `frontend/src/services/api/client.ts` — the single shared fetch wrapper — rather than into `settings-api.ts` or `core-api.ts` individually.
+
+**Why**: Both `settings-api.ts` and `core-api.ts` delegate to `apiRequest` in `client.ts`. Hooking at that level means one change covers all current and future API calls automatically. Patching individual files would require updating every new API module added in the future, and would risk missing one.
+
+**How to apply**: Any new API module that uses `apiRequest` from `@/services/api/client` is automatically intercepted in God Mode. No extra work needed. Only add entries to `MOCK_REGISTRY` in `god-mode-interceptor.ts` if the new endpoint should return demo data (GETs only — writes are blocked globally).
+
+## 2026-07-06 — God Mode Write Block: Toast + ApiError, Not Silent Failure
+
+**Decision**: Write operations (POST/PATCH/PUT/DELETE) in God Mode trigger a toast notification via `useToastStore.getState().addToast(...)` inside the interceptor, then throw an `ApiError(403, "GOD_MODE_BLOCKED")`. They do not return mock success responses.
+
+**Why**: Returning mock success would be misleading — the user would see "saved" feedback but nothing would actually change. Throwing an error ensures `useMutation.onError` handlers run and the user knows the operation was blocked. The toast is deduplicated via a fixed `id: "god-mode-write-blocked"` to avoid spam on rapid clicks.
+
+**How to apply**: Components using `useMutation` with write operations will see an error in their `onError` handler. They don't need to special-case `GOD_MODE_BLOCKED` — the toast is already shown. If a component has a `onError` that shows its own error toast, the result is two toasts (acceptable, since the context clarifies the situation).
+
+## 2026-07-06 — God Mode Roles: Real Roles Pass Through (Not Mocked)
+
+**Decision**: `GET /roles` and sub-paths are in the passthrough list — they return real backend roles in God Mode. All other data (orgs, workspaces, projects, members, teams, users, audit logs, etc.) is intercepted with mock data.
+
+**Why**: The God Mode toolbar role switcher dropdown needs to show real backend roles so `simulatePermissions({role_key})` works correctly. Mocking roles would mean the dropdown shows fake keys that don't exist in the backend, causing simulate calls to fail and God Mode activation to be broken.
+
+**How to apply**: If a future feature needs to show mock roles specifically, remove `PREFIX/roles` from `PASSTHROUGH_PREFIXES` in `god-mode-interceptor.ts` and add mock role entries to `MOCK_REGISTRY`. For now, real roles are intentional.
+
 ## 2026-07-06 — God Mode Mock Context: Override platformContext, Not Individual Pages
 
 **Decision**: When `isGodModeReady`, replace `organizations`, `workspaces`, `projects`, and their selected counterparts with fixed mock objects inside `PlatformContextProvider`. Individual pages and components are not changed.
