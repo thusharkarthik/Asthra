@@ -1631,8 +1631,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
   const memberRows = isGlobalDirectory
-    ? buildGlobalMemberRows({ users: globalUsersQuery.data ?? [], roleAssignments: globalRoleAssignmentsQuery.data ?? [], roles: visibleRoles })
-    : buildMemberRows({ members, invitations: scopedInvitations, profiles, roles: visibleRoles, organizations, workspaces });
+    ? buildGlobalMemberRows({ users: globalUsersQuery.data ?? [], roleAssignments: globalRoleAssignmentsQuery.data ?? [], roles })
+    : buildMemberRows({ members, invitations: scopedInvitations, profiles, roles, organizations, workspaces });
   const filteredRows = memberRows
     .filter((row) => {
       const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
