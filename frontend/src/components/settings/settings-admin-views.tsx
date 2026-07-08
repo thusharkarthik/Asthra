@@ -18,6 +18,7 @@ import { hasHierarchicalPermission } from "@/lib/settings-permissions";
 import { SETTINGS_ACTIONS, listActionDefinitions } from "@/access/actionRegistry";
 import { PermissionAction, PermissionButton } from "@/access/permission-components";
 import { PermissionGate } from "@/components/platform/permission-gate";
+import { SchemaGate } from "@/components/platform/schema-gate";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import type { ApiKeyRecord, CoreUser, CurrentUserPermissions, InvitationRecord, PermissionRecord, ProjectMembershipRecord, ProjectRecord, RoleAssignmentRecord, RoleRecord, RoleTemplateRecord, TeamMemberRecord, TeamRecord } from "@/types/core";
 import {
@@ -1630,8 +1631,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
     .filter((invitation) => (organizationId ? invitation.organization_id === organizationId : true))
     .filter((invitation) => (workspaceId ? invitation.workspace_id === workspaceId : true));
   const memberRows = isGlobalDirectory
-    ? buildGlobalMemberRows({ users: globalUsersQuery.data ?? [], roleAssignments: globalRoleAssignmentsQuery.data ?? [], roles: visibleRoles })
-    : buildMemberRows({ members, invitations: scopedInvitations, profiles, roles: visibleRoles, organizations, workspaces });
+    ? buildGlobalMemberRows({ users: globalUsersQuery.data ?? [], roleAssignments: globalRoleAssignmentsQuery.data ?? [], roles })
+    : buildMemberRows({ members, invitations: scopedInvitations, profiles, roles, organizations, workspaces });
   const filteredRows = memberRows
     .filter((row) => {
       const haystack = `${row.name} ${row.email} ${row.role} ${row.scopeLabel} ${row.status}`.toLowerCase();
@@ -1801,11 +1802,11 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         title="Members"
         description={isGlobalDirectory ? "Global user directory across the platform. Scoped membership is managed from organization, workspace, and project detail pages." : "Invite members, review status, filter membership, and assign roles without using raw database screens."}
         actions={
-          <PermissionGate permission="settings.member.invite">
+          <SchemaGate elementKey="invite_member">
             <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
               <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
             </PermissionAction>
-          </PermissionGate>
+          </SchemaGate>
         }
       />
       {isGlobalDirectory && !organizations.length ? <SettingsCard title="Global directory" description="Users are visible before an organization exists. Platform-scoped roles (Platform Admin, Platform Support) can be invited immediately. Create an organization first to invite with organization or workspace roles." /> : null}
@@ -1820,7 +1821,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           ))}
         </div>
       </SettingsCard>
-      <PermissionGate permission="settings.member.view" label="Member Search and Filters">
+      <SchemaGate elementKey="search_filters">
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_160px_160px_180px]">
           <SearchBox value={search} onChange={setSearch} placeholder="Search name or email" />
           <select aria-label="Role filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
@@ -1849,7 +1850,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             <option value="date">Sort by joined/invited</option>
           </select>
         </div>
-      </PermissionGate>
+      </SchemaGate>
       <SettingsDataTable
         columns={["Name", "Email", "Role", "Scope", "Status", "Joined / Invited", "Last Active", ...(hasAnyAction ? ["Actions"] : [])]}
         rows={filteredRows.map((row) => {

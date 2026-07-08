@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NavigationMode } from "@/lib/navigation-mode";
+import { useGodModeTracker } from "@/lib/god-mode-tracker";
 
 const PLATFORM_KEYS = new Set([
   "platform_owner",
@@ -228,6 +229,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   },
 
   deactivateGodMode: () => {
+    useGodModeTracker.getState().clearAll();
     set({ isDeactivating: true });
     // After exit animation completes, clear all God Mode state
     setTimeout(() => {

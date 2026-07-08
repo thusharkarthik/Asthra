@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
@@ -61,6 +61,7 @@ const PlatformContext = createContext<PlatformContextValue | null>(null);
 
 export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const cachedCurrentUser = useAuthStore((state) => state.currentUser);
   const isSimulating = useSimulationStore((state) => state.isSimulating);
@@ -70,6 +71,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+  const prevGodModeReady = useRef(false);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -168,6 +170,18 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     const resolved = detectNavigationMode(isSuperuser, roles);
     setNavigationMode((prev) => (prev === resolved ? prev : resolved));
   }, [contextQuery.data]);
+
+  useEffect(() => {
+    const wasReady = prevGodModeReady.current;
+    prevGodModeReady.current = isGodModeReady;
+    if (wasReady && !isGodModeReady) {
+      setSelectedOrganization(null);
+      setSelectedWorkspace(null);
+      setSelectedProject(null);
+      void queryClient.invalidateQueries();
+      void contextQuery.refetch();
+    }
+  }, [isGodModeReady, queryClient, setSelectedOrganization, setSelectedWorkspace, setSelectedProject, contextQuery.refetch]);
 
   const organizations: Organization[] = hasAccessToken ? (contextQuery.data?.organizations as Organization[] | undefined) ?? cachedOrganizations : [];
   const workspaces: WorkspaceRecord[] = (hasAccessToken ? (contextQuery.data?.workspaces as WorkspaceRecord[] | undefined) ?? cachedWorkspaces : []).filter(

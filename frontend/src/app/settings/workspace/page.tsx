@@ -18,7 +18,8 @@ import {
   SettingsEmptyState,
   FormField,
 } from "@/components/settings/settings-components";
-import { PermissionGate } from "@/components/platform/permission-gate";
+import { SchemaGate } from "@/components/platform/schema-gate";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
@@ -68,6 +69,7 @@ export default function WorkspaceSettingsPage() {
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const { workspaces, can, isLoading: ctxIsLoading } = usePlatformContext();
   const { authorityLevel } = useSettingsAuthority();
+  usePagePermissions();
 
   const isSuperuser = Boolean(currentUser?.is_superuser);
   const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
@@ -224,13 +226,13 @@ export default function WorkspaceSettingsPage() {
               disabled={!isAuthorized}
             />
           </FormField>
-          <PermissionGate permission="settings.workspace.edit">
+          <SchemaGate elementKey="save_general_button">
             <div className="flex justify-end">
               <Button type="submit" disabled={updateWsMutation.isPending}>
                 {updateWsMutation.isPending ? "Saving…" : "Save General"}
               </Button>
             </div>
-          </PermissionGate>
+          </SchemaGate>
         </form>
       </SettingsCard>
 
@@ -299,16 +301,16 @@ export default function WorkspaceSettingsPage() {
           </div>
         </SettingsCard>
 
-        <PermissionGate permission="settings.workspace.edit">
+        <SchemaGate elementKey="module_visibility">
           <div className="flex justify-end">
             <Button type="submit" disabled={updateSettingsMutation.isPending}>
               {updateSettingsMutation.isPending ? "Saving…" : "Save Settings"}
             </Button>
           </div>
-        </PermissionGate>
+        </SchemaGate>
       </form>
 
-      <PermissionGate permission="settings.workspace.edit">
+      <SchemaGate elementKey="archive_workspace">
         <SettingsDangerZone
           description="Archiving the workspace suspends access for all members. Projects and data are preserved. This can be reversed by an org admin."
           actions={
@@ -338,7 +340,7 @@ export default function WorkspaceSettingsPage() {
             )
           }
         />
-      </PermissionGate>
+      </SchemaGate>
     </SettingsLayout>
   );
 }

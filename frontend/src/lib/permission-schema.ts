@@ -38,11 +38,11 @@ export const PAGE_SCHEMAS: PageSchema[] = [
     elements: [
       { key: "members_tab", label: "Members tab", permission: "settings.member.view", type: "tab" },
       { key: "workspaces_tab", label: "Workspaces tab", permission: "settings.workspace.view", type: "tab" },
-      { key: "roles_tab", label: "Roles tab", permission: null, type: "tab" },
-      { key: "permissions_tab", label: "Permissions tab", permission: null, type: "tab" },
+      { key: "roles_tab", label: "Roles tab", permission: "settings.role.view", type: "tab" },
+      { key: "permissions_tab", label: "Permissions tab", permission: "settings.permission.view", type: "tab" },
       { key: "edit_general", label: "Save general settings", permission: "settings.organization.edit", type: "button" },
       { key: "edit_settings", label: "Save org settings", permission: "settings.organization.edit", type: "button" },
-      { key: "danger_zone", label: "Danger zone", permission: null, type: "section", description: "Organization owner role required" },
+      { key: "danger_zone", label: "Danger zone", permission: "settings.organization.delete", type: "action", description: "Organization owner role required" },
     ],
   },
   {
@@ -50,8 +50,11 @@ export const PAGE_SCHEMAS: PageSchema[] = [
     label: "Members",
     elements: [
       { key: "member_list", label: "Member list", permission: "settings.member.view", type: "section" },
-      { key: "invite_member", label: "Invite member", permission: "settings.member.invite", type: "button" },
-      { key: "remove_member", label: "Remove member", permission: "settings.member.remove", type: "action" },
+      { key: "invite_member", label: "Invite member button", permission: "settings.member.invite", type: "button" },
+      { key: "search_filters", label: "Search and filters", permission: "settings.member.view", type: "section" },
+      { key: "view_member_button", label: "View member detail", permission: "settings.member.view", type: "action" },
+      { key: "change_role_action", label: "Change member role", permission: "settings.role.manage", type: "action" },
+      { key: "remove_member_action", label: "Remove member", permission: "settings.member.remove", type: "action" },
     ],
   },
   {
@@ -95,6 +98,42 @@ export const PAGE_SCHEMAS: PageSchema[] = [
     elements: [
       { key: "permission_list", label: "Permission list", permission: null, type: "section" },
       { key: "assign_permission", label: "Assign permission", permission: "settings.permission.assign", type: "action" },
+    ],
+  },
+  {
+    route: "/settings/workspace",
+    label: "Workspace Settings",
+    elements: [
+      { key: "save_general_button", label: "Save general button", permission: "settings.workspace.edit", type: "button" },
+      { key: "module_visibility", label: "Module visibility toggles", permission: "settings.workspace.edit", type: "section" },
+      { key: "archive_workspace", label: "Archive workspace", permission: "settings.workspace.edit", type: "action" },
+    ],
+  },
+  {
+    route: "/settings/audit-logs",
+    label: "Audit Logs",
+    elements: [
+      { key: "audit_filters", label: "Audit filters", permission: "guard.audit.view", type: "section" },
+      { key: "audit_table", label: "Audit table", permission: "guard.audit.view", type: "section" },
+      { key: "export_button", label: "Export logs", permission: null, type: "button", description: "Not yet implemented" },
+    ],
+  },
+  {
+    route: "/settings/api-keys",
+    label: "API Keys",
+    elements: [
+      { key: "api_key_list", label: "API key list", permission: null, type: "section", description: "Personal API keys — no permission required" },
+      { key: "create_key_button", label: "Create API key", permission: null, type: "button", description: "Personal key creation" },
+      { key: "revoke_key_action", label: "Revoke API key", permission: null, type: "action", description: "Personal key management" },
+    ],
+  },
+  {
+    route: "/settings/access-control",
+    label: "Access Control",
+    elements: [
+      { key: "role_list", label: "Role list", permission: null, type: "section" },
+      { key: "create_role_button", label: "Create role", permission: "settings.role.create", type: "button" },
+      { key: "edit_role_permissions", label: "Edit role permissions", permission: "settings.role.edit", type: "action" },
     ],
   },
 ];

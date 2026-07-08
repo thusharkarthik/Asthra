@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePlatformContext } from "@/context/platformContext";
 import { useSettingsAuthority } from "@/app/settings/layout";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 import { settingsApi } from "@/services/api/settings-api";
 import type { ActivityLogRecord } from "@/services/api/settings-api";
 import { SettingsLayout, SettingsSectionHeader } from "@/components/settings/settings-components";
@@ -98,6 +99,7 @@ export default function AuditLogsSettingsPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const { authorityLevel, orgId } = useSettingsAuthority();
   const { organizations, workspaces, projects, can } = usePlatformContext();
+  usePagePermissions();
 
   const [actionFilter, setActionFilter] = useState("");
   const [page, setPage] = useState(0);

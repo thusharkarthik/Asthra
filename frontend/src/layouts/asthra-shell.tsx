@@ -26,6 +26,7 @@ import { GodModeOverlay } from "@/components/platform/god-mode-overlay";
 import { GodModeToolbar } from "@/components/platform/god-mode-toolbar";
 import { GodModeAutoOverlay } from "@/components/platform/god-mode-auto-overlay";
 import { GodModeSchemaPanel } from "@/components/platform/god-mode-schema-panel";
+import { findSchemaForRoute } from "@/lib/permission-schema";
 import { useGodModeTracker } from "@/lib/god-mode-tracker";
 import { useAuthStore } from "@/stores/auth-store";
 import { useLogout } from "@/hooks/use-logout";
@@ -120,8 +121,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const simulatedMode = useSimulationStore((state) => state.simulatedMode);
   const isGodModeReady = useSimulationStore((state) => state.isGodModeReady);
+  const isEditMode = useSimulationStore((state) => state.isEditMode);
   const isActivating = useSimulationStore((state) => state.isActivating);
   const isDeactivating = useSimulationStore((state) => state.isDeactivating);
+  const hasSchema = Boolean(findSchemaForRoute(pathname));
   const registryIsLoaded = usePermissionRegistryStore((s) => s.isLoaded);
   const registryIsLoading = usePermissionRegistryStore((s) => s.isLoading);
   const loadRegistryFn = usePermissionRegistryStore((s) => s.loadRegistry);
@@ -330,8 +333,9 @@ export function AsthraShell({ children }: { children: ReactNode }) {
           <div className="flex min-h-0 flex-1 relative">
             <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
             {isSimulating && <VisualPermissionEditor />}
-            <GodModeAutoOverlay />
-            <GodModeSchemaPanel />
+            {isGodModeReady && isEditMode && (
+              hasSchema ? <GodModeSchemaPanel /> : <GodModeAutoOverlay />
+            )}
           </div>
         </div>
       </div>

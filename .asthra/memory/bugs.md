@@ -178,6 +178,16 @@
 **Fix**: `alembic stamp 0013_scoped_membership_foundation` — updates `alembic_version` to 0013 without executing any SQL. Since 0013 is the head, subsequent `alembic upgrade head` on startup is a no-op.
 **Data**: 5 rows in `role_assignments` preserved intact.
 
+### BUG-047 — God Mode Schema Panel Missing +/- Buttons on Roles Tab, Permissions Tab, Danger Zone [FIXED 2026-07-07]
+
+**Files**: `frontend/src/lib/permission-schema.ts`, `frontend/src/app/settings/organizations/[id]/page.tsx`
+**Symptom**: On `/settings/organizations/:id`, the schema panel showed all 7 elements but `roles_tab`, `permissions_tab`, and `danger_zone` had no +/- action button — they appeared as display-only rows.
+**Root cause**: All three elements had `permission: null` in `PAGE_SCHEMAS`. The panel renders `{el.permission && <button>}` — null permission → no button. SchemaGate similarly passes through `!element?.permission` elements unchanged (no overlay). The danger zone was additionally not wrapped in `SchemaGate` on the page.
+**Fix**:
+1. `permission-schema.ts` — assigned real permission codes: `roles_tab → "settings.role.view"`, `permissions_tab → "settings.permission.view"`, `danger_zone → "settings.organization.delete"`. Changed `danger_zone` type from `"section"` to `"action"`.
+2. `organizations/[id]/page.tsx` — wrapped the `<SettingsDangerZone>` in `<SchemaGate elementKey="danger_zone">` so the overlay renders in God Mode edit mode.
+**Note**: `settings.role.view` and `settings.permission.view` are conceptual — they may not exist as explicit codes in the backend permission registry. In God Mode simulation they work correctly since `simulatedPermissions` is a plain string array. In normal mode, `can()` returns false for unknown codes → tabs are hidden for non-admins, which is acceptable (admins who are testing have all permissions).
+
 ## Open
 
 ### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]
@@ -375,3 +385,15 @@
 2. **API** (`core-api.ts`): Added `navigation_mode?: string` to `getPlatformContext` params type and URL serialization.
 3. **Context** (`platformContext.tsx`): Added `useState<NavigationMode>` seeded from `auth-store.currentUser.is_superuser` (persisted across sessions — correct on first render without API call). Added `useEffect` to update mode once roles arrive from first response. `navigationMode` included in `queryKey` so a mode change triggers a refetch.
 **First-load behavior**: Superusers: seed = "platform" → correct from render 0, no extra call. Work users: seed = "work" → correct, no extra call. Org owners: seed = "work" → one extra refetch after roles arrive and mode updates to "org". Static fallback still active when `availableModules.length === 0`.
+
+### BUG-048 — God Mode Exit Not Returning to Real Data [FIXED 2026-07-07]
+
+**Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/lib/permission-simulator.ts`
+**Symptom**: After exiting God Mode, the app showed an empty org list (or stale mock data) instead of the real user's organizations. The God Mode tracker retained previous permission registrations from the mock session.
+**Root cause (3 parts)**:
+1. On `isGodModeReady → false`, `effectiveOrganizations` reverted to `organizations` (real query data). But `contextQuery` was stale — 2-minute `staleTime` and no forced refetch on God Mode exit meant the cache held data from before (or during) simulation. Mock interceptor may have replaced the cache during the session.
+2. Workspace store still held mock scope IDs (org 9001, workspace 9001, project 9001) set during God Mode activation. `confirmedOrganizationId` could resolve to null (9001 not in real org list) causing a null-scope refetch, but the god-mode mock orgs might still be in the Zustand `cachedOrganizations` from the last `setPlatformContext` call.
+3. `useGodModeTracker` retained stale permission registrations from the God Mode session, polluting the auto-overlay panel after exit.
+**Fix**:
+1. **`platformContext.tsx`**: Added `prevGodModeReady = useRef(false)`. Added `useEffect` watching `isGodModeReady`: on `true → false` transition, calls `setSelectedOrganization(null)`, `setSelectedWorkspace(null)`, `setSelectedProject(null)`, then `void contextQuery.refetch()` — ensuring real scope IDs are cleared before the fresh context fetch.
+2. **`permission-simulator.ts`**: In `deactivateGodMode`, call `useGodModeTracker.getState().clearAll()` before `set({ isDeactivating: true })` — clears tracker before exit animation starts.
