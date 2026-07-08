@@ -586,6 +586,7 @@ export function OrganizationsView() {
   const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
   const createOrganizationScope = permissionActionScope(permissions);
   const showLimitedAccess = !permissions.isLoading && !permissions.isFetching && !canCreateOrganization;
+  const canViewOrganizations = permissions.can("settings.organization.view");
   const canPlatformOnboard = Boolean(
     currentUser?.is_superuser ||
     permissions.data?.roles?.some((role) => ["platform_owner", "platform_admin"].includes(role.key))
@@ -694,37 +695,41 @@ export function OrganizationsView() {
         </div>
       ) : null}
       {showLimitedAccess ? <SettingsCard title="Limited access" description="You need settings.organization.create to create organizations." /> : null}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium" htmlFor="organization-status-filter">Status</label>
-        <select
-          id="organization-status-filter"
-          aria-label="Organization status filter"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-          className="h-10 rounded-md border bg-background px-3 text-sm"
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="all">All</option>
-        </select>
-      </div>
-      <SettingsDataTable
-        columns={["Name", "Description", "Owner", "Status", "Actions"]}
-        rows={visibleOrganizations.map((organization) => [
-          organization.name,
-          organization.description ?? "No description",
-          organization.owner_name ? (
-            organization.owner_name
-          ) : (
-            <span key={`owner-${organization.id}`} className="text-muted-foreground">No owner assigned</span>
-          ),
-          organization.is_active === false ? "Inactive" : "Active",
-          <Link key={organization.id} className="text-primary hover:underline" href={`/settings/organizations/${organization.id}`}>
-            Open
-          </Link>
-        ])}
-        emptyMessage="No organizations yet"
-      />
+      {canViewOrganizations && (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <label className="text-sm font-medium" htmlFor="organization-status-filter">Status</label>
+            <select
+              id="organization-status-filter"
+              aria-label="Organization status filter"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <SettingsDataTable
+            columns={["Name", "Description", "Owner", "Status", "Actions"]}
+            rows={visibleOrganizations.map((organization) => [
+              organization.name,
+              organization.description ?? "No description",
+              organization.owner_name ? (
+                organization.owner_name
+              ) : (
+                <span key={`owner-${organization.id}`} className="text-muted-foreground">No owner assigned</span>
+              ),
+              organization.is_active === false ? "Inactive" : "Active",
+              <Link key={organization.id} className="text-primary hover:underline" href={`/settings/organizations/${organization.id}`}>
+                Open
+              </Link>
+            ])}
+            emptyMessage="No organizations yet"
+          />
+        </>
+      )}
       <SettingsCreateDialog title="Create organization" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Name" required>
           <Input name="name" placeholder="Acme Platform" />
@@ -769,6 +774,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
   const targetOrganization = organizations.find((organization) => organization.id === targetOrganizationId);
   const permissions = useCurrentPermissions({ orgId: targetOrganizationId ?? undefined });
   const canCreateWorkspace = permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode);
+  const canViewWorkspaces = permissions.can("settings.workspace.view");
   const visibleWorkspaces = organizationId ? workspaces.filter((workspace) => workspace.organization_id === organizationId) : workspaces;
 
   const mutation = useMutation({
@@ -843,7 +849,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
       {!canCreateWorkspace ? <SettingsCard title="Limited access" description="You need settings.workspace.create to create workspaces in this scope." /> : null}
       {!organizations.length ? (
         <SettingsEmptyState title="Create an organization first" description="A workspace must belong to an organization." action={<SettingsLinkButton href="/settings/organizations">Create Organization</SettingsLinkButton>} />
-      ) : (
+      ) : canViewWorkspaces ? (
         <SettingsDataTable
           columns={["Name", "Organization", "Description", "Actions"]}
           rows={visibleWorkspaces.map((workspace) => [
@@ -856,7 +862,7 @@ export function WorkspacesView({ organizationId }: { organizationId?: number }) 
           ])}
           emptyMessage="No workspaces yet"
         />
-      )}
+      ) : null}
       <SettingsCreateDialog title="Create workspace" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Organization" required>
           {organizationId ? (
@@ -902,6 +908,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
   const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
   const permissions = useCurrentPermissions({ workspaceId: targetWorkspaceId ?? undefined });
   const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
+  const canViewProjects = permissions.can("settings.project.view");
   const visibleProjects = (workspaceId ? projects.filter((project) => project.workspace_id === workspaceId) : projects).filter((project) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "archived") return project.is_active === false || project.status === "archived";
@@ -975,7 +982,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
       {!canCreateProject ? <SettingsCard title="Limited access" description="You need settings.project.create to create projects in this scope." /> : null}
       {!workspaces.length ? (
         <SettingsEmptyState title="Create a workspace first" description="A project must belong to a workspace." action={<SettingsLinkButton href="/settings/workspaces">Create Workspace</SettingsLinkButton>} />
-      ) : (
+      ) : canViewProjects ? (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <label className="text-sm font-medium" htmlFor="project-status-filter">Status</label>
@@ -998,7 +1005,7 @@ export function ProjectsView({ workspaceId }: { workspaceId?: number }) {
             emptyMessage="No projects yet"
           />
         </>
-      )}
+      ) : null}
       <SettingsCreateDialog title="Create project" open={open} onOpenChange={setOpen} onSubmit={submit} error={formError}>
         <FormField label="Workspace" required>
           {isScopedProjectCreate ? (
@@ -3088,7 +3095,9 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
               assignment.assigned_by ? `User ${assignment.assigned_by}` : "System",
               formatDate(assignment.assigned_at),
               roleDisplayName(assignment.status),
-              <ConfirmActionButton key={assignment.id} label="Revoke" message="Revoke this role assignment?" onConfirm={() => deleteAssignmentMutation.mutate(assignment.id)} />
+              <PermissionAction key={assignment.id} actionKey={SETTINGS_ACTIONS.roleManage.actionKey} scope={accessControlActionScope}>
+                <ConfirmActionButton label="Revoke" message="Revoke this role assignment?" onConfirm={() => deleteAssignmentMutation.mutate(assignment.id)} />
+              </PermissionAction>
             ])}
             emptyMessage="No scoped role assignments"
           />

@@ -366,7 +366,7 @@ export default function OrganizationSettingsPage() {
       </SettingsCard>
 
       {/* Identity & Contact */}
-      <form className="space-y-6" onSubmit={handleSaveSettings}>
+      {isAuthorized && <form className="space-y-6" onSubmit={handleSaveSettings}>
         <SettingsCard title="Identity & Contact" description="Domain, website, and industry help identify your organization.">
           <div className="space-y-4">
             <FormField label="Domain" helpText="e.g. mycompany.com — used for identification only">
@@ -512,7 +512,7 @@ export default function OrganizationSettingsPage() {
             </Button>
           </div>
         </SchemaGate>
-      </form>
+      </form>}
 
       {/* Danger Zone */}
       {(isSuperuser || permissions?.roles?.some((r) => r.key === "organization_owner")) && (
