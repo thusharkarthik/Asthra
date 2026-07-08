@@ -379,7 +379,7 @@ class RoleService:
     ) -> list[RolePermission]:
         role = self.get(role_id, current_user)
         self._require_role_manage(current_user, "organization" if role.organization_id else "platform", role.organization_id)
-        if not role.is_editable:
+        if not role.is_editable and not self._can_manage_role_permissions(current_user, role):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System role is not editable.")
         permission_ids = list(dict.fromkeys(replace_create.permission_ids))
         for permission_id in permission_ids:

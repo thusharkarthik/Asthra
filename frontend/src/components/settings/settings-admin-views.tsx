@@ -137,11 +137,15 @@ function invalidateSettingsAndContext(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ["settings", "global-member-role-assignments"] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.roles.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.permissions.current() }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.teams.all }),
     queryClient.invalidateQueries({ queryKey: queryKeys.invitations.all }),
     // Invalidate authority queries used by settings/layout.tsx so settings unlock without page refresh.
     queryClient.invalidateQueries({ queryKey: ["members-page"] }),
-    queryClient.invalidateQueries({ queryKey: ["settings", "roles"] })
+    queryClient.invalidateQueries({ queryKey: ["settings", "roles"] }),
+    queryClient.invalidateQueries({ queryKey: ["settings", "permissions"] })
   ]);
 }
 

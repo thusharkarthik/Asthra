@@ -2,6 +2,13 @@
 
 ## Fixed
 
+### BUG-048 — Role Permission Checkbox Changes Did Not Fully Refresh Effective RBAC [FIXED 2026-07-08]
+
+**Files**: `services/core-service/app/services/role_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `services/core-service/tests/test_rbac_permission_persistence.py`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: Checking/unchecking permissions in the role UI was not reliably reflected in effective permissions or frontend permission gates without additional refreshes. The complete replacement API also treated system roles differently from add/remove.
+**Root cause**: Frontend role-permission mutations invalidated role mapping data but did not explicitly invalidate Unified Platform Context, context version, and effective permission queries. Backend `replace_permissions()` still blocked system roles unconditionally, while add/remove allowed Superuser/Platform Owner to edit system role mappings except Superuser.
+**Fix**: Role permission replacement now uses the same privileged system-role rule as add/remove. Role-permission mutation success invalidates RBAC-relevant permission, role, platform context, context version, and settings permission queries. Added an end-to-end backend test proving role permission replacement persists, removed permissions disappear from `/me/permissions`, and `/context/platform` matches `/me/permissions` for the same scope.
+
 ### BUG-039 — Self-Serve Organization Onboarding Did Not Own No-Org Flow [FIXED 2026-07-01]
 
 **Files**: `frontend/src/layouts/asthra-shell.tsx`, `frontend/src/app/page.tsx`, `frontend/src/components/platform/platform-setup-guide.tsx`

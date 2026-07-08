@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-08 — RBAC Permission Changes Must Refresh Effective Context
+
+**Decision**: Role-permission changes must invalidate both mapping data and effective permission consumers: role permissions, permissions catalog/cache, context version, and Unified Platform Context. `/me/permissions` and `/context/platform` must continue to use the same backend resolver for the same scope.
+
+**Why**: Role permission editing changes the permissions users receive through active `role_assignments`. Updating only the role detail cache can leave frontend permission gates using stale platform context/effective permission data until a hard reload.
+
+**How to apply**: Mutations that add, remove, replace, generate, or sync role permissions must refresh RBAC query keys and platform context keys. Do not authorize frontend actions from role names/ranks; use permission codes resolved by the backend.
+
 ## 2026-07-01 — Authenticated No-Org Onboarding Owns the Initial Home Flow
 
 **Decision**: Once platform context settles with an authenticated user and `organizations: []`, the shell/onboarding path owns the first-run experience. Home/dashboard data queries must stay disabled until the user either creates an organization or explicitly skips onboarding.
