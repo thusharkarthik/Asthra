@@ -136,6 +136,38 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       { key: "edit_role_permissions", label: "Edit role permissions", permission: "settings.role.edit", type: "action" },
     ],
   },
+  {
+    route: "/settings/workspaces/:id/teams",
+    label: "Workspace Teams",
+    elements: [
+      { key: "team_list", label: "Team list", permission: null, type: "section" },
+      { key: "create_team", label: "Create team", permission: "settings.team.create", type: "button" },
+      { key: "edit_team", label: "Edit team", permission: "settings.team.edit", type: "action" },
+      { key: "delete_team", label: "Delete team", permission: "settings.team.delete", type: "action" },
+    ],
+  },
+  {
+    route: "/settings/teams/:id",
+    label: "Team Detail",
+    elements: [
+      { key: "member_list", label: "Member list", permission: null, type: "section" },
+      { key: "edit_team", label: "Edit team", permission: "settings.team.edit", type: "button" },
+      { key: "assign_member", label: "Assign member", permission: "settings.team.member.add", type: "button" },
+      { key: "remove_member", label: "Remove member", permission: "settings.team.member.remove", type: "action" },
+    ],
+  },
+  {
+    route: "/settings/projects/:id",
+    label: "Project Detail",
+    elements: [
+      { key: "edit_project", label: "Edit project", permission: "settings.project.edit", type: "button" },
+      { key: "assign_owner", label: "Assign owner", permission: "settings.project.edit", type: "button" },
+      { key: "add_member", label: "Add project member", permission: "settings.project.edit", type: "button" },
+      { key: "remove_member", label: "Remove member", permission: "settings.project.edit", type: "action" },
+      { key: "archive_project", label: "Archive project", permission: "settings.project.archive", type: "action" },
+      { key: "restore_project", label: "Restore project", permission: "settings.project.restore", type: "action" },
+    ],
+  },
 ];
 
 function matchesRoute(pathname: string, route: string): boolean {
