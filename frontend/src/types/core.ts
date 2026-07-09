@@ -177,14 +177,28 @@ export type PermissionInventoryRecord = {
 
 export type PermissionRegistrySyncResult = {
   created_count: number;
+  existing_count?: number;
   updated_count: number;
   deprecated_count: number;
   skipped_custom_count: number;
+  unknown_db_count?: number;
+  invalid_template_reference_count?: number;
   errors: string[];
   created: string[];
+  existing?: string[];
   updated: string[];
   deprecated: string[];
   skipped_custom: string[];
+  unknown_db_permissions?: string[];
+  invalid_template_references?: Array<{
+    role_key: string;
+    role_name: string;
+    permission_pattern: string;
+    reason: string;
+  }>;
+  created_permissions?: string[];
+  existing_permissions?: string[];
+  updated_permissions?: string[];
   total_registry_permissions: number;
 };
 

@@ -117,14 +117,23 @@ class PermissionService:
         permissions_by_code = {permission.code: permission for permission in existing_permissions}
         result = {
             "created_count": 0,
+            "existing_count": 0,
             "updated_count": 0,
             "deprecated_count": 0,
             "skipped_custom_count": 0,
+            "unknown_db_count": 0,
+            "invalid_template_reference_count": 0,
             "errors": [],
             "created": [],
+            "existing": [],
             "updated": [],
             "deprecated": [],
             "skipped_custom": [],
+            "unknown_db_permissions": [],
+            "invalid_template_references": [],
+            "created_permissions": [],
+            "existing_permissions": [],
+            "updated_permissions": [],
             "total_registry_permissions": len(registry_items),
         }
         dirty = False
@@ -132,11 +141,15 @@ class PermissionService:
         for item in registry_items:
             existing = permissions_by_code.get(item.code)
             if existing is not None:
+                result["existing_count"] += 1
+                result["existing"].append(item.code)
+                result["existing_permissions"].append(item.code)
                 update_data = self._registry_update_data(existing, item)
                 changed = bool(update_data)
                 if changed:
                     result["updated_count"] += 1
                     result["updated"].append(item.code)
+                    result["updated_permissions"].append(item.code)
                     if not dry_run:
                         for field, value in update_data.items():
                             setattr(existing, field, value)
@@ -144,6 +157,7 @@ class PermissionService:
                 continue
             result["created_count"] += 1
             result["created"].append(item.code)
+            result["created_permissions"].append(item.code)
             if dry_run:
                 continue
             self.db.add(
@@ -165,6 +179,8 @@ class PermissionService:
             )
             dirty = True
         for permission in existing_permissions:
+            if permission.code not in registry_codes:
+                result["unknown_db_permissions"].append(permission.code)
             if permission.source == "custom":
                 result["skipped_custom_count"] += 1
                 result["skipped_custom"].append(permission.code)
@@ -176,6 +192,10 @@ class PermissionService:
                     permission.status = "deprecated"
                     permission.is_active = False
                     dirty = True
+        result["unknown_db_permissions"] = sorted(set(result["unknown_db_permissions"]))
+        result["unknown_db_count"] = len(result["unknown_db_permissions"])
+        result["invalid_template_references"] = self._invalid_role_template_references(registry_codes)
+        result["invalid_template_reference_count"] = len(result["invalid_template_references"])
         if dirty:
             self.db.commit()
         if not dry_run:
@@ -459,6 +479,32 @@ class PermissionService:
             if all(pattern_part == "*" or pattern_part == code_part for pattern_part, code_part in zip(pattern_parts, parts)):
                 return True
         return False
+
+    def _invalid_role_template_references(self, registry_codes: set[str]) -> list[dict]:
+        from app.services.role_service import ASTHRA_ROLE_TEMPLATES
+
+        invalid: list[dict] = []
+        for template in ASTHRA_ROLE_TEMPLATES:
+            for pattern in template["permission_patterns"]:
+                if pattern == "*":
+                    continue
+                if "*" in pattern:
+                    if not any(self._permission_matches_any_pattern(code, [pattern]) for code in registry_codes):
+                        invalid.append({
+                            "role_key": template["key"],
+                            "role_name": template["name"],
+                            "permission_pattern": pattern,
+                            "reason": "No registry permissions match this role template pattern.",
+                        })
+                    continue
+                if pattern not in registry_codes:
+                    invalid.append({
+                        "role_key": template["key"],
+                        "role_name": template["name"],
+                        "permission_pattern": pattern,
+                        "reason": "Exact role template permission is not defined in the permission registry.",
+                    })
+        return invalid
 
     def _validate_status(self, value: str) -> None:
         if value not in VALID_PERMISSION_STATUSES:

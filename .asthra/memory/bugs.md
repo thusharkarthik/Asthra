@@ -2,6 +2,13 @@
 
 ## Fixed
 
+### BUG-049 — Permission Registry Sync Did Not Report Template Reference Gaps [FIXED 2026-07-08]
+
+**Files**: `services/core-service/app/services/permission_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/types/core.ts`, `services/core-service/tests/test_permission_registry.py`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: The existing Generate Missing Permissions foundation could create/update registry permissions, but it did not expose unknown database permissions or role-template permission references that were missing from the backend code registry. Admins could not see stale template references such as member self-service permissions during sync preview.
+**Root cause**: `sync_registry_permissions()` returned created/updated/deprecated/custom counts but did not include unknown DB permission reporting or role template reference validation.
+**Fix**: Sync results now include existing, created, updated, unknown DB permissions, and invalid role template references while preserving the existing response fields. Access Control sync preview displays unknown/template-reference counts and a short review list. Tests now cover invalid template reference reporting.
+
 ### BUG-048 — Role Permission Checkbox Changes Did Not Fully Refresh Effective RBAC [FIXED 2026-07-08]
 
 **Files**: `services/core-service/app/services/role_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `services/core-service/tests/test_rbac_permission_persistence.py`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
@@ -196,6 +203,14 @@
 **Note**: `settings.role.view` and `settings.permission.view` are conceptual — they may not exist as explicit codes in the backend permission registry. In God Mode simulation they work correctly since `simulatedPermissions` is a plain string array. In normal mode, `can()` returns false for unknown codes → tabs are hidden for non-admins, which is acceptable (admins who are testing have all permissions).
 
 ## Open
+
+### BUG-050 — Frontend Production Build Stalls in Next Optimizer [FIXED 2026-07-09]
+
+**Files**: `frontend/package.json`, `frontend/scripts/prepare-next-build-dir.mjs`, `frontend/.gitignore`
+**Symptom**: `npm run build` completed OpenAPI generation and reached `Creating an optimized production build ...`, then appeared stuck after several minutes. Initial attempts also failed with `EACCES` writing `frontend/.next/trace`.
+**Root cause**: There were two issues. First, local `.next` artifacts were being created/left as `nobody:nogroup`, causing permission failures for `trace` and manifest writes. Second, the full Next 15.5.19 route graph has a long optimizer compile with no intermediate output; it was mistaken for a deadlock when interrupted too early.
+**Fix**: The prebuild guard quarantines non-writable `.next` and recreates a writable generated build directory. Route isolation confirmed the minimal app, Settings/RBAC routes, first-half route groups, and second-half route groups all compile. The full frontend production build now completes successfully after the longer optimizer compile.
+**Verification**: `cd frontend && npm run build` completed successfully on 2026-07-09; optimizer compile took 9.2 minutes and generated 137 static pages. Recent RBAC registry frontend changes were ruled out as the cause.
 
 ### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]
 

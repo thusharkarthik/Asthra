@@ -61,6 +61,9 @@ def test_permission_registry_sync_creates_missing_permissions():
         permission_count = db.query(Permission).count()
 
         assert result["created_count"] == result["total_registry_permissions"]
+        assert result["existing_count"] == 0
+        assert result["unknown_db_count"] == 0
+        assert result["created_permissions"] == result["created"]
         assert permission_count == result["total_registry_permissions"]
         assert db.query(Permission).filter(Permission.code == "docs.page.publish").first() is not None
     finally:
@@ -156,9 +159,27 @@ def test_permission_registry_sync_deprecates_removed_registry_permissions():
         deprecated = db.query(Permission).filter(Permission.code == "legacy.module.view").first()
 
         assert "legacy.module.view" in result["deprecated"]
+        assert "legacy.module.view" in result["unknown_db_permissions"]
+        assert result["unknown_db_count"] >= 1
         assert deprecated is not None
         assert deprecated.status == "deprecated"
         assert deprecated.is_active is False
+    finally:
+        db.close()
+
+
+def test_permission_registry_sync_reports_invalid_role_template_references():
+    db = SessionLocal()
+    try:
+        result = PermissionService(db).sync_registry_permissions(dry_run=True)
+        references = result["invalid_template_references"]
+
+        assert result["invalid_template_reference_count"] == len(references)
+        assert any(
+            reference["role_key"] == "organization_member"
+            and reference["permission_pattern"] == "settings.profile.view"
+            for reference in references
+        )
     finally:
         db.close()
 

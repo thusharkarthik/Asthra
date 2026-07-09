@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-08 — Permission Registry Sync Is the Single Generation Path
+
+**Decision**: Backend permission definitions live in `PermissionRegistryItem` entries under `services/core-service/app/services/permission_registry.py`. Startup/bootstrap, manual "Generate Missing Permissions", and future module permission generation must use `PermissionService.sync_registry_permissions()`.
+
+**Why**: A single sync engine prevents drift between startup seeding, manual admin sync, role templates, and frontend permission management. It also gives administrators one structured result showing created, updated, deprecated, unknown database permissions, and invalid role-template references.
+
+**How to apply**: Add new backend permission definitions to the registry code, not frontend files or one-off database rows. Do not delete DB permissions automatically; report unknown/deprecated permissions and resolve intentionally. Frontend permission lists and role checkboxes must be loaded from backend permission APIs.
+
 ## 2026-07-08 — RBAC Permission Changes Must Refresh Effective Context
 
 **Decision**: Role-permission changes must invalidate both mapping data and effective permission consumers: role permissions, permissions catalog/cache, context version, and Unified Platform Context. `/me/permissions` and `/context/platform` must continue to use the same backend resolver for the same scope.

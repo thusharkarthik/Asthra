@@ -35,6 +35,7 @@ build/
 node_modules/
 .next/
 .next-*/
+.asthra-next-quarantine/
 out/
 coverage/
 
