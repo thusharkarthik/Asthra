@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-09 — Permission Editor Grouping Is Display-Only; Backend Registry Remains Source of Truth
+
+**Decision**: The frontend role permission editor may derive module/resource/action labels from permission codes only as a display fallback. Backend permission records and registry metadata remain the source of truth for permission codes, IDs, metadata, and save behavior.
+
+**Why**: The editor needs usable grouping and search even when legacy/custom permissions have incomplete metadata. Deriving `settings.project.create` into Settings -> Project -> Create is safe for UI display, but it must not become an authorization or persistence source.
+
+**How to apply**: Fetch permissions from backend APIs, preserve backend IDs for role mapping writes, and use derived code segments only for rendering/filtering when `module`, `resource`, or `action` metadata is missing.
+
 ## 2026-07-08 — Permission Registry Sync Is the Single Generation Path
 
 **Decision**: Backend permission definitions live in `PermissionRegistryItem` entries under `services/core-service/app/services/permission_registry.py`. Startup/bootstrap, manual "Generate Missing Permissions", and future module permission generation must use `PermissionService.sync_registry_permissions()`.

@@ -285,6 +285,36 @@ function permissionModule(permission: PermissionRecord) {
   return permission.module || permission.code.split(".")[0] || "uncategorized";
 }
 
+function permissionResource(permission: PermissionRecord) {
+  return permission.resource || permission.code.split(".")[1] || "general";
+}
+
+function permissionAction(permission: PermissionRecord) {
+  return permission.action || permission.code.split(".").slice(2).join(".") || "use";
+}
+
+function permissionStatus(permission: PermissionRecord) {
+  return permission.status ?? (permission.is_active === false ? "inactive" : "active");
+}
+
+function permissionSearchText(permission: PermissionRecord) {
+  return [
+    permission.code,
+    permission.name,
+    permission.description,
+    permissionModule(permission),
+    permissionResource(permission),
+    permissionAction(permission),
+    permission.scope,
+    permission.risk_level,
+    permission.source,
+    permissionStatus(permission)
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function accessLevelForPermission(permission: PermissionRecord, role?: RoleRecord, mapped = false) {
   if (!mapped || !role) return "None";
   if (role.key === "platform_owner") return "Full";
@@ -298,6 +328,16 @@ function groupPermissionsByModule(permissions: PermissionRecord[]) {
   return permissions.reduce<Record<string, PermissionRecord[]>>((groups, permission) => {
     const module = permissionModule(permission);
     groups[module] = [...(groups[module] ?? []), permission];
+    return groups;
+  }, {});
+}
+
+function groupPermissionsByModuleAndResource(permissions: PermissionRecord[]) {
+  return permissions.reduce<Record<string, Record<string, PermissionRecord[]>>>((groups, permission) => {
+    const module = permissionModule(permission);
+    const resource = permissionResource(permission);
+    groups[module] = groups[module] ?? {};
+    groups[module][resource] = [...(groups[module][resource] ?? []), permission];
     return groups;
   }, {});
 }
@@ -3480,12 +3520,19 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
   const canManageRoleMappings = currentPermissions.can(SETTINGS_ACTIONS.roleManage.permissionCode);
   const queryClient = useQueryClient();
   const addToast = useToastStore((state) => state.addToast);
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [permissionModuleFilter, setPermissionModuleFilter] = useState("");
+  const [permissionScopeFilter, setPermissionScopeFilter] = useState("");
+  const [permissionSelectedFilter, setPermissionSelectedFilter] = useState<"all" | "selected" | "unselected">("all");
+  const [permissionActionFilter, setPermissionActionFilter] = useState("");
+  const [collapsedPermissionGroups, setCollapsedPermissionGroups] = useState<Set<string>>(new Set());
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
   const permissionsQuery = useQuery({ queryKey: ["settings", "permissions"], queryFn: () => settingsApi.listPermissions(accessToken ?? ""), enabled: Boolean(accessToken) });
   const rolePermissionsQuery = useQuery({ queryKey: ["settings", "role-permissions", roleId], queryFn: () => settingsApi.listRolePermissions(accessToken ?? "", roleId), enabled: Boolean(accessToken && roleId) });
   const role = rolesQuery.data?.find((item) => item.id === roleId);
   type RolePermissionEntry = { id: number; role_id: number; permission_id: number };
   const rolePermQueryKey = ["settings", "role-permissions", roleId] as const;
+  const buildOptimisticRolePermissions = (permissionIds: number[]) => permissionIds.map((permissionId, index) => ({ id: -(index + 1), role_id: roleId, permission_id: permissionId }));
   const addPermissionMutation = useMutation({
     mutationFn: (permissionId: number) => settingsApi.addRolePermission(accessToken ?? "", roleId, permissionId),
     onMutate: async (permissionId: number) => {
@@ -3527,6 +3574,81 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
       addToast({ type: "error", title: "Permission removal failed", message: error instanceof Error ? error.message : "Unable to remove permission." });
     },
   });
+  const replacePermissionsMutation = useMutation({
+    mutationFn: (permissionIds: number[]) => settingsApi.replaceRolePermissions(accessToken ?? "", roleId, permissionIds),
+    onMutate: async (permissionIds: number[]) => {
+      await queryClient.cancelQueries({ queryKey: rolePermQueryKey });
+      const previousData = queryClient.getQueryData<RolePermissionEntry[]>(rolePermQueryKey);
+      queryClient.setQueryData<RolePermissionEntry[]>(rolePermQueryKey, buildOptimisticRolePermissions(permissionIds));
+      return { previousData };
+    },
+    onSuccess: async (data) => {
+      queryClient.setQueryData(rolePermQueryKey, data);
+      await invalidateSettingsAndContext(queryClient);
+      await queryClient.invalidateQueries({ queryKey: rolePermQueryKey });
+      addToast({ type: "success", title: "Role permissions updated" });
+    },
+    onError: (error, _permissionIds, context) => {
+      if (context?.previousData !== undefined) queryClient.setQueryData(rolePermQueryKey, context.previousData);
+      addToast({ type: "error", title: "Permission update failed", message: error instanceof Error ? error.message : "Unable to update role permissions." });
+    },
+  });
+  const rolePermissionEntries = rolePermissionsQuery.data ?? [];
+  const linkedPermissionIds = useMemo(() => new Set(rolePermissionEntries.map((item) => item.permission_id)), [rolePermissionEntries]);
+  const allPermissions = permissionsQuery.data ?? [];
+  const permissionModules = useMemo(() => Array.from(new Set([...ACCESS_CONTROL_MODULES, ...allPermissions.map(permissionModule)])).sort(), [allPermissions]);
+  const permissionScopes = useMemo(() => Array.from(new Set(allPermissions.map((permission) => permission.scope).filter(Boolean) as string[])).sort(), [allPermissions]);
+  const permissionActions = useMemo(() => Array.from(new Set(allPermissions.map(permissionAction))).sort(), [allPermissions]);
+  const filteredRolePermissions = useMemo(() => {
+    const normalizedSearch = permissionSearch.trim().toLowerCase();
+    return allPermissions.filter((permission) => {
+      const linked = linkedPermissionIds.has(permission.id);
+      if (normalizedSearch && !permissionSearchText(permission).includes(normalizedSearch)) return false;
+      if (permissionModuleFilter && permissionModule(permission) !== permissionModuleFilter) return false;
+      if (permissionScopeFilter && permission.scope !== permissionScopeFilter) return false;
+      if (permissionActionFilter && permissionAction(permission) !== permissionActionFilter) return false;
+      if (permissionSelectedFilter === "selected" && !linked) return false;
+      if (permissionSelectedFilter === "unselected" && linked) return false;
+      return true;
+    });
+  }, [allPermissions, linkedPermissionIds, permissionActionFilter, permissionModuleFilter, permissionScopeFilter, permissionSearch, permissionSelectedFilter]);
+  const groupedRolePermissions = useMemo(() => groupPermissionsByModuleAndResource(filteredRolePermissions), [filteredRolePermissions]);
+  const rolePermissionModules = useMemo(
+    () => Array.from(new Set([...ACCESS_CONTROL_MODULES, ...Object.keys(groupedRolePermissions)])).filter((module) => Object.keys(groupedRolePermissions[module] ?? {}).length),
+    [groupedRolePermissions]
+  );
+  const visibleGroupKeys = useMemo(
+    () => rolePermissionModules.flatMap((module) => Object.keys(groupedRolePermissions[module] ?? {}).map((resource) => `${module}:${resource}`)),
+    [groupedRolePermissions, rolePermissionModules]
+  );
+  const isPermissionMutationPending = addPermissionMutation.isPending || removePermissionMutation.isPending || replacePermissionsMutation.isPending;
+  function togglePermissionGroup(groupKey: string) {
+    setCollapsedPermissionGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
+  function collapseVisiblePermissionGroups() {
+    setCollapsedPermissionGroups(new Set(visibleGroupKeys));
+  }
+  function expandVisiblePermissionGroups() {
+    setCollapsedPermissionGroups((current) => {
+      const next = new Set(current);
+      visibleGroupKeys.forEach((key) => next.delete(key));
+      return next;
+    });
+  }
+  function replaceVisibleGroupPermissions(permissions: PermissionRecord[], selected: boolean) {
+    const visibleIds = permissions.map((permission) => permission.id);
+    const nextIds = new Set(linkedPermissionIds);
+    visibleIds.forEach((permissionId) => {
+      if (selected) nextIds.add(permissionId);
+      else nextIds.delete(permissionId);
+    });
+    replacePermissionsMutation.mutate(Array.from(nextIds));
+  }
   if (!role) return <SettingsEmptyState title="Role not found" description="Open the access control center or refresh the page." action={<SettingsLinkButton href="/settings/access-control">Access Control</SettingsLinkButton>} />;
   const resolvedRoles = currentPermissions.data?.roles ?? [];
   const isSuperuserUser = Boolean(currentUser?.is_superuser);
@@ -3536,9 +3658,6 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
   // Platform Admin (canManageRoleMappings) can only edit non-system roles (is_editable !== false).
   const canEditAnyRole = (isSuperuserUser || isPlatformOwner) && !isSuperuserRole;
   const canEditPermissions = canEditAnyRole || (canManageRoleMappings && role.is_editable !== false && !isSuperuserRole);
-  const linkedPermissionIds = new Set((rolePermissionsQuery.data ?? []).map((item) => item.permission_id));
-  const groupedPermissions = groupPermissionsByModule(permissionsQuery.data ?? []);
-  const modules = Array.from(new Set([...ACCESS_CONTROL_MODULES, ...Object.keys(groupedPermissions)])).filter((module) => groupedPermissions[module]?.length);
   return (
     <SettingsLayout breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Access Control", href: "/settings/access-control" }, { label: "Roles", href: "/settings/access-control" }, { label: role.name }]} backHref="/settings/access-control" backLabel="Back to Access Control" parentContext={{ label: "Role", title: role.name, description: role.description ?? undefined, meta: `Scope: ${roleDisplayName(role.scope)}` }}>
       <SettingsSectionHeader title={role.name} description={role.description ?? "Role detail and permission mapping."} />
@@ -3554,32 +3673,120 @@ export function RoleDetailView({ roleId }: { roleId: number }) {
       </SettingsCard>
       {isSuperuserRole ? <SettingsCard title="Superuser Role — Always Read-Only" description="The Superuser role is permanently managed by the system. Its permissions cannot be modified by anyone." /> : role.is_system && !canEditAnyRole ? <SettingsCard title="System Role" description="System role templates are managed by Asthra. Only Superuser and Platform Owner can modify their permission mappings." /> : null}
       {!canEditPermissions && !isSuperuserRole ? <SettingsCard title="View Only" description="You need settings.role.manage to change role-permission mappings. Superuser or Platform Owner privileges are required to edit system role permissions." /> : null}
-      {modules.map((module) => (
-        <SettingsCard key={module} title={`${moduleLabel(module)} Permissions`} description="Assign or remove permissions from this role.">
-          <SettingsDataTable
-            columns={["Permission", "Scope", "Status", "Assigned", "Action"]}
-            rows={(groupedPermissions[module] ?? []).map((permission) => {
-              const linked = linkedPermissionIds.has(permission.id);
-              return [
-                <div key={`${permission.id}-permission`}><div className="font-medium">{permission.name}</div><div className="text-xs text-muted-foreground">{permission.code}</div></div>,
-                roleDisplayName(permission.scope),
-                roleDisplayName(permission.status ?? (permission.is_active === false ? "inactive" : "active")),
-                linked ? "Yes" : "No",
-                <label key={`${permission.id}-action`} className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={linked}
-                    disabled={!canEditPermissions || addPermissionMutation.isPending || removePermissionMutation.isPending}
-                    onChange={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
-                  />
-                  {!canEditPermissions ? "View only" : linked ? "Assigned" : "Assign Permission"}
-                </label>
-              ];
-            })}
-            emptyMessage={`No ${moduleLabel(module)} permissions`}
-          />
-        </SettingsCard>
-      ))}
+      <SettingsCard title="Permission Editor" description="Search, filter, and group backend permission records before assigning them to this role.">
+        <div className="space-y-4">
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_repeat(4,170px)]">
+            <SearchBox value={permissionSearch} onChange={setPermissionSearch} placeholder="Search code, name, resource, action" />
+            <select aria-label="Role permission module filter" value={permissionModuleFilter} onChange={(event) => setPermissionModuleFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All modules</option>
+              {permissionModules.map((module) => <option key={module} value={module}>{moduleLabel(module)}</option>)}
+            </select>
+            <select aria-label="Role permission scope filter" value={permissionScopeFilter} onChange={(event) => setPermissionScopeFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All scopes</option>
+              {permissionScopes.map((scope) => <option key={scope} value={scope}>{roleDisplayName(scope)}</option>)}
+            </select>
+            <select aria-label="Role permission action filter" value={permissionActionFilter} onChange={(event) => setPermissionActionFilter(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">All actions</option>
+              {permissionActions.map((action) => <option key={action} value={action}>{roleDisplayName(action)}</option>)}
+            </select>
+            <select aria-label="Role permission selected filter" value={permissionSelectedFilter} onChange={(event) => setPermissionSelectedFilter(event.target.value as "all" | "selected" | "unselected")} className="h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="all">All states</option>
+              <option value="selected">Selected only</option>
+              <option value="unselected">Unselected only</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <div>{filteredRolePermissions.length} of {allPermissions.length} permissions visible · {linkedPermissionIds.size} selected</div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={expandVisiblePermissionGroups}>Expand all</Button>
+              <Button type="button" variant="outline" onClick={collapseVisiblePermissionGroups}>Collapse all</Button>
+            </div>
+          </div>
+          {rolePermissionModules.map((module) => {
+            const resourceGroups = groupedRolePermissions[module] ?? {};
+            const modulePermissions = Object.values(resourceGroups).flat();
+            const moduleSelectedCount = modulePermissions.filter((permission) => linkedPermissionIds.has(permission.id)).length;
+            return (
+              <section key={module} className="rounded-md border">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+                  <div>
+                    <div className="font-medium">{moduleLabel(module)}</div>
+                    <div className="text-xs text-muted-foreground">{moduleSelectedCount} selected / {modulePermissions.length} visible permissions</div>
+                  </div>
+                </div>
+                <div className="divide-y">
+                  {Object.keys(resourceGroups).sort().map((resource) => {
+                    const groupKey = `${module}:${resource}`;
+                    const permissions = [...resourceGroups[resource]].sort((left, right) => permissionAction(left).localeCompare(permissionAction(right)) || left.code.localeCompare(right.code));
+                    const isCollapsed = collapsedPermissionGroups.has(groupKey);
+                    const selectedCount = permissions.filter((permission) => linkedPermissionIds.has(permission.id)).length;
+                    return (
+                      <div key={groupKey}>
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                          <button type="button" onClick={() => togglePermissionGroup(groupKey)} className="text-left">
+                            <div className="font-medium">{roleDisplayName(resource)}</div>
+                            <div className="text-xs text-muted-foreground">{selectedCount} selected / {permissions.length} visible · {isCollapsed ? "Collapsed" : "Expanded"}</div>
+                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" disabled={!canEditPermissions || isPermissionMutationPending || selectedCount === permissions.length} onClick={() => replaceVisibleGroupPermissions(permissions, true)}>Select visible</Button>
+                            <Button type="button" variant="outline" disabled={!canEditPermissions || isPermissionMutationPending || selectedCount === 0} onClick={() => replaceVisibleGroupPermissions(permissions, false)}>Clear visible</Button>
+                          </div>
+                        </div>
+                        {!isCollapsed ? (
+                          <div className="overflow-x-auto px-4 pb-4">
+                            <table className="w-full min-w-[760px] text-sm">
+                              <thead className="text-left text-xs uppercase text-muted-foreground">
+                                <tr>
+                                  <th className="py-2 pr-3 font-medium">Permission</th>
+                                  <th className="py-2 pr-3 font-medium">Action</th>
+                                  <th className="py-2 pr-3 font-medium">Scope</th>
+                                  <th className="py-2 pr-3 font-medium">Risk</th>
+                                  <th className="py-2 pr-3 font-medium">Status</th>
+                                  <th className="py-2 font-medium">Assigned</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {permissions.map((permission) => {
+                                  const linked = linkedPermissionIds.has(permission.id);
+                                  return (
+                                    <tr key={permission.id}>
+                                      <td className="py-3 pr-3 align-top">
+                                        <div className="font-medium">{permission.name}</div>
+                                        <div className="text-xs text-muted-foreground">{permission.code}</div>
+                                        {permission.description ? <div className="mt-1 text-xs text-muted-foreground">{permission.description}</div> : null}
+                                      </td>
+                                      <td className="py-3 pr-3 align-top">{roleDisplayName(permissionAction(permission))}</td>
+                                      <td className="py-3 pr-3 align-top">{roleDisplayName(permission.scope)}</td>
+                                      <td className="py-3 pr-3 align-top">{roleDisplayName(permission.risk_level ?? "low")}</td>
+                                      <td className="py-3 pr-3 align-top">{roleDisplayName(permissionStatus(permission))}</td>
+                                      <td className="py-3 align-top">
+                                        <label className="inline-flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={linked}
+                                            disabled={!canEditPermissions || isPermissionMutationPending}
+                                            onChange={() => linked ? removePermissionMutation.mutate(permission.id) : addPermissionMutation.mutate(permission.id)}
+                                          />
+                                          {!canEditPermissions ? "View only" : linked ? "Assigned" : "Assign"}
+                                        </label>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+          {!filteredRolePermissions.length ? <SettingsEmptyState title="No permissions found" description="Adjust search, module, scope, action, or selected-state filters." /> : null}
+        </div>
+      </SettingsCard>
       <SettingsCard title="Assigned Members" description="User-role assignments are shown on member detail pages. Bulk role membership editing is planned." />
     </SettingsLayout>
   );

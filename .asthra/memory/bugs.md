@@ -2,6 +2,13 @@
 
 ## Fixed
 
+### BUG-051 — Role Permission Editor Was Hard to Use With Large Permission Sets [FIXED 2026-07-09]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: Role detail permission editing showed backend permissions mostly as broad module groups. Finding a permission such as `settings.project.create` required scrolling through long flat lists.
+**Root cause**: The role editor used backend permission records but only grouped them by top-level module. It did not expose search, selected/unselected filters, or resource-level grouping from permission metadata/code.
+**Fix**: Added backend-driven permission search, module/scope/action/selected-state filters, module -> resource grouping, resource expand/collapse, selected/visible counts, and select/clear visible group actions. Grouping uses backend `module/resource/action/scope` metadata when available and derives display-only fallbacks from `module.resource.action` codes. Role-permission persistence remains unchanged and still uses backend permission IDs.
+
 ### BUG-049 — Permission Registry Sync Did Not Report Template Reference Gaps [FIXED 2026-07-08]
 
 **Files**: `services/core-service/app/services/permission_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/types/core.ts`, `services/core-service/tests/test_permission_registry.py`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
