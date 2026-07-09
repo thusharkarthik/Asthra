@@ -2838,7 +2838,12 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
         queryClient.invalidateQueries({ queryKey: ["settings", "permission-registry-sync-preview"] }),
         invalidateSettingsAndContext(queryClient)
       ]);
-      addToast({ type: "success", title: "Permission registry synced", message: `${result.created_count} created, ${result.updated_count} updated, ${result.deprecated_count} deprecated.` });
+      const reviewCount = (result.unknown_db_count ?? 0) + (result.invalid_template_reference_count ?? 0);
+      addToast({
+        type: "success",
+        title: "Permission registry synced",
+        message: `${result.created_count} created, ${result.updated_count} updated, ${result.deprecated_count} deprecated${reviewCount ? `, ${reviewCount} to review` : ""}.`
+      });
     },
     onError: (error) => addToast({ type: "error", title: "Permission sync failed", message: error instanceof Error ? error.message : "Unable to sync permissions." })
   });
@@ -3135,9 +3140,22 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
               <div><span className="text-muted-foreground">Updated preview:</span> {syncPreviewQuery.data?.updated_count ?? 0}</div>
               <div><span className="text-muted-foreground">Deprecated preview:</span> {syncPreviewQuery.data?.deprecated_count ?? 0}</div>
+              <div><span className="text-muted-foreground">Unknown DB:</span> {syncPreviewQuery.data?.unknown_db_count ?? 0}</div>
+              <div><span className="text-muted-foreground">Template refs:</span> {syncPreviewQuery.data?.invalid_template_reference_count ?? 0}</div>
               <div><span className="text-muted-foreground">Custom skipped:</span> {syncPreviewQuery.data?.skipped_custom_count ?? 0}</div>
               <div><span className="text-muted-foreground">Errors:</span> {syncPreviewQuery.data?.errors.length ?? 0}</div>
             </div>
+            {syncPreviewQuery.data?.invalid_template_references?.length ? (
+              <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <div className="font-medium">Role template references to review</div>
+                <div className="mt-2 max-h-28 overflow-auto text-muted-foreground">
+                  {syncPreviewQuery.data.invalid_template_references.slice(0, 8).map((reference) => (
+                    <div key={`${reference.role_key}-${reference.permission_pattern}`}>{reference.role_name}: {reference.permission_pattern}</div>
+                  ))}
+                  {syncPreviewQuery.data.invalid_template_references.length > 8 ? <div>+{syncPreviewQuery.data.invalid_template_references.length - 8} more</div> : null}
+                </div>
+              </div>
+            ) : null}
           </SettingsCard>
           {registryModules.map((module) => {
             const moduleItems = registryItems.filter((item) => item.module === module);
