@@ -83,7 +83,7 @@ Frontend gates should continue to use permission codes through `can("permission.
 ## Known Gaps
 
 - Manual QA still needs to verify role edit behavior in the browser against real users/scopes.
-- Frontend production build is not certified yet. The `.next` ownership/EACCES blocker was isolated and guarded, and TypeScript passes, but Next still stalls at `Creating an optimized production build ...` in both the working tree and a clean temporary copy.
+- Frontend production build now passes. The `.next` ownership/EACCES blocker is guarded by the prebuild script, and the apparent optimizer stall was a long full-route compile. `cd frontend && npm run build` completed on 2026-07-09 after a 9.2 minute optimizer phase.
 - Some legacy tests in `test_access_control_rbac.py` have pre-existing assertions that conflict with current Superuser behavior and seeded permissions.
 - Current role template audit reports member self-service exact references such as `settings.profile.view`, `settings.notifications.view`, and `settings.preferences.view` as missing from the backend registry. They are now visible in sync preview/report output instead of silently hidden.
 

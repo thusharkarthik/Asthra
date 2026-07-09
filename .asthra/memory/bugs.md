@@ -204,13 +204,13 @@
 
 ## Open
 
-### BUG-050 — Frontend Production Build Stalls in Next Optimizer [OPEN]
+### BUG-050 — Frontend Production Build Stalls in Next Optimizer [FIXED 2026-07-09]
 
 **Files**: `frontend/package.json`, `frontend/scripts/prepare-next-build-dir.mjs`, `frontend/.gitignore`
-**Symptom**: `npm run build` completes OpenAPI generation and reaches `Creating an optimized production build ...`, then does not advance after several minutes. Initial attempts also failed with `EACCES` writing `frontend/.next/trace`.
-**Root cause found**: Local `.next` artifacts were being created/left as `nobody:nogroup`, causing permission failures for `trace` and manifest writes. A prebuild guard now quarantines non-writable `.next` and recreates a writable generated build directory.
-**Remaining blocker**: After the `.next` ownership fix, the Next 15.5.19 optimizer still stalls at the production compile line. This reproduces in a clean temporary frontend copy that excludes `.next*` artifacts, so it is not caused by the recent RBAC sync JSX/type changes. `npx tsc --noEmit` passes.
-**Next investigation**: Profile Next/webpack compilation outside the current sandbox or with host process visibility, inspect dependency/version changes around Next 15.5.19, and isolate the route/module that blocks production optimization.
+**Symptom**: `npm run build` completed OpenAPI generation and reached `Creating an optimized production build ...`, then appeared stuck after several minutes. Initial attempts also failed with `EACCES` writing `frontend/.next/trace`.
+**Root cause**: There were two issues. First, local `.next` artifacts were being created/left as `nobody:nogroup`, causing permission failures for `trace` and manifest writes. Second, the full Next 15.5.19 route graph has a long optimizer compile with no intermediate output; it was mistaken for a deadlock when interrupted too early.
+**Fix**: The prebuild guard quarantines non-writable `.next` and recreates a writable generated build directory. Route isolation confirmed the minimal app, Settings/RBAC routes, first-half route groups, and second-half route groups all compile. The full frontend production build now completes successfully after the longer optimizer compile.
+**Verification**: `cd frontend && npm run build` completed successfully on 2026-07-09; optimizer compile took 9.2 minutes and generated 137 static pages. Recent RBAC registry frontend changes were ruled out as the cause.
 
 ### BUG-024 — Role-Permission Sync Destroys Manual Assignments [FIXED 2026-06-28]
 
