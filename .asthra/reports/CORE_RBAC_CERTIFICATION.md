@@ -64,6 +64,8 @@ Role detail checkboxes use backend permission IDs and call:
 
 Checkbox state is based on `GET /roles/{role_id}/permissions`, not current-user effective permissions. After mutation, frontend invalidates role permissions, settings permissions, effective permissions, context version, and unified platform context.
 
+Role detail permission editing now adds search, module/scope/action/selected-state filters, module -> resource grouping, expand/collapse controls, visible/selected counts, and group select/clear actions. These controls only affect display and selected backend permission IDs; they do not introduce frontend-owned permission definitions.
+
 ## Frontend Permission Registry Refresh
 
 Frontend permission and role-management UI is backend-driven:
