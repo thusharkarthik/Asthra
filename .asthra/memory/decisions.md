@@ -687,3 +687,23 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **How to apply**: New permission-gated components should use `{can("code") && ...}` or `const canX = can("code")`. PermissionGate still works for cases that need the visual overlay (dashed placeholder + ring). Backend still enforces real permissions — God Mode Save to Role writes changes through the API.
 
 **Future-proof**: Every new `can()` call anywhere in the codebase is automatically tracked. No registry updates, no wrapper components, no new imports needed.
+
+## 2026-07-09 — Sidebar Visibility Uses Backend Permission Codes, Including Static Fallbacks
+
+**Decision**: Sidebar links must be visible based on backend permission codes, not role names, role ranks, or navigation mode alone. Dynamic Module Registry items may provide multiple `required_permissions`; the frontend treats them as an any-of list. Static fallback navigation must mirror the backend Module Registry permission mapping wherever registry permissions exist.
+
+**Why**: During early load or module-registry transitions, the shell can fall back to static navigation. If that fallback lacks permission metadata, users can see links they should not see even though the dynamic registry path is correct.
+
+**How to apply**: New nav items should define either `permission` or `permissions`. Use `permissions` when any one of several backend permissions should reveal the module, such as Access Control.
+
+## 2026-07-09 — Role Member Counts Use Active role_assignments
+
+**Decision**: Access Control role member counts are computed from distinct users with active `role_assignments` for the role. They must not use `user_roles`, organization/workspace membership rows, role labels, or member role fallbacks.
+
+**Why**: `role_assignments` is the RBAC source of truth. Membership rows can exist without active scoped role assignments and can overcount or undercount roles.
+
+## 2026-07-09 — Organization Manage Is Not Lifecycle Authority
+
+**Decision**: `settings.organization.manage` can grant access to organization management surfaces and edit controls, but organization archive and restore remain explicitly gated by `settings.organization.archive` and `settings.organization.restore`.
+
+**Why**: Archive/restore are sensitive lifecycle actions. Keeping them explicit makes QA and role templates easier to reason about.

@@ -79,11 +79,12 @@ export function SidebarNav({
 
   function shouldShowItem(item: ModeNavItem): boolean {
     if (skippedUser && !SKIPPED_ALLOWED_HREFS.has(item.href)) return false;
-    if (item.permission) {
+    const requiredPermissions = item.permissions?.length ? item.permissions : item.permission ? [item.permission] : [];
+    if (requiredPermissions.length > 0) {
       // In edit mode, always show — PermissionGate renders the overlay UI
       if (isEditMode) return true;
       if (permissionsLoading) return true;
-      return can(item.permission);
+      return requiredPermissions.some((permission) => can(permission));
     }
     return true;
   }

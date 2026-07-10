@@ -361,8 +361,8 @@ function scopeLabelForAssignment(assignment: RoleAssignmentRecord, organizations
   return `${roleDisplayName(assignment.scope_type)} ${assignment.scope_id ?? ""}`.trim();
 }
 
-function countMembersForRole(role: RoleRecord, members: Array<{ role_id?: number | null; member_role?: string | null }>) {
-  return members.filter((member) => member.role_id === role.id || normalizeRole(member.member_role) === normalizeRole(role.key ?? role.name)).length;
+function countActiveAssignmentsForRole(role: RoleRecord, assignments: RoleAssignmentRecord[]) {
+  return new Set(assignments.filter((assignment) => assignment.role_id === role.id && assignment.status === "active").map((assignment) => assignment.user_id)).size;
 }
 
 function roleNameFromRecord(role?: RoleRecord | null, fallback?: string | null) {
@@ -1088,10 +1088,17 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
   const organization = organizations.find((item) => item.id === organizationId);
   const scopedWorkspaces = workspaces.filter((workspace) => workspace.organization_id === organizationId);
   const permissions = useCurrentPermissions({ orgId: organizationId });
-  const canEditOrganization =
-    permissions.can(SETTINGS_ACTIONS.organizationEdit.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.organizationArchive.permissionCode) ||
-    permissions.can(SETTINGS_ACTIONS.organizationRestore.permissionCode);
+  const canEditOrganization = permissions.can(SETTINGS_ACTIONS.organizationEdit.permissionCode) || permissions.can("settings.organization.manage");
+  const canArchiveOrganization = permissions.can(SETTINGS_ACTIONS.organizationArchive.permissionCode);
+  const canRestoreOrganization = permissions.can(SETTINGS_ACTIONS.organizationRestore.permissionCode);
+  const canViewOrganizationTemplates = permissions.can("settings.organization_templates.view");
+  const canApplyOrganizationTemplates = permissions.can("settings.organization_templates.apply");
+  const isOrganizationInactive = organization?.is_active === false;
+  const templatesQuery = useQuery({
+    queryKey: ["settings", "organization-templates"],
+    queryFn: () => settingsApi.listOrganizationTemplates(accessToken ?? ""),
+    enabled: Boolean(accessToken && canViewOrganizationTemplates)
+  });
   const updateMutation = useMutation({
     mutationFn: (payload: { name?: string; description?: string; is_active?: boolean }) => settingsApi.updateOrganization(accessToken ?? "", organizationId, payload),
     onSuccess: async (updatedOrganization) => {
@@ -1111,6 +1118,33 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
       setFormError(message);
       addToast({ type: "error", title: "Organization update failed", message });
     }
+  });
+  const statusMutation = useMutation({
+    mutationFn: (isActive: boolean) => settingsApi.updateOrganization(accessToken ?? "", organizationId, { is_active: isActive }),
+    onSuccess: async (updatedOrganization) => {
+      await invalidateSettingsAndContext(queryClient);
+      addToast({
+        type: "success",
+        title: updatedOrganization.is_active === false ? "Organization archived" : "Organization restored",
+        message: updatedOrganization.is_active === false
+          ? "Organization moved to Inactive. Use status filter to view it."
+          : `${updatedOrganization.name} is active again.`
+      });
+    },
+    onError: (error) => addToast({ type: "error", title: "Organization status update failed", message: error instanceof Error ? error.message : "Unable to update organization status." })
+  });
+  const applyTemplateMutation = useMutation({
+    mutationFn: (templateKey: string) => settingsApi.applyOrganizationTemplate(accessToken ?? "", templateKey, organizationId),
+    onSuccess: async (report) => {
+      await invalidateSettingsAndContext(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["settings", "organization-templates"] });
+      addToast({
+        type: "success",
+        title: "Organization template applied",
+        message: `${report.summary.workspaces_to_create} workspaces, ${report.summary.projects_to_create} projects, and ${report.summary.teams_to_create} teams were processed.`
+      });
+    },
+    onError: (error) => addToast({ type: "error", title: "Template apply failed", message: error instanceof Error ? error.message : "Unable to apply organization template." })
   });
 
   if (!organization) {
@@ -1149,7 +1183,7 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         description={organization.description ?? "Organization administration and setup."}
         actions={canEditOrganization ? <Button type="button" onClick={() => setEditOpen(true)}>Edit Organization</Button> : undefined}
       />
-      {!canEditOrganization ? <SettingsCard title="View only" description="You can view this organization, but do not have settings.organization.edit for edit actions." /> : null}
+      {!canEditOrganization ? <SettingsCard title="View only" description="You can view this organization, but do not have settings.organization.edit or settings.organization.manage for edit actions." /> : null}
       <AdminTabs
         tabs={[
           { label: "Overview", href: `/settings/organizations/${organizationId}`, active: true },
@@ -1172,7 +1206,48 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
         rows={scopedWorkspaces.map((workspace) => [workspace.name, workspace.description ?? "No description", <Link key={workspace.id} className="text-primary hover:underline" href={`/settings/workspaces/${workspace.id}`}>Open</Link>])}
         emptyMessage="No workspaces in this organization"
       />
-      <SettingsDangerZone description="Organization deletion and ownership transfer are intentionally deferred for the operational foundation." />
+      {canViewOrganizationTemplates ? (
+        <SettingsCard title="Organization Templates" description="Apply Core-owned setup templates to create workspaces, projects, teams, feature flag overrides, and configuration values.">
+          {templatesQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading organization templates...</p>
+          ) : (
+            <SettingsDataTable
+              columns={["Template", "Category", "Creates", "Actions"]}
+              rows={(templatesQuery.data?.templates ?? []).map((template) => [
+                <div key={`${template.template_key}-name`}>
+                  <div className="font-medium">{template.name}</div>
+                  <div className="text-xs text-muted-foreground">{template.description}</div>
+                </div>,
+                roleDisplayName(template.category),
+                `${template.workspaces.length} workspaces / ${template.workspaces.reduce((count, workspace) => count + workspace.projects.length, 0)} projects / ${template.workspaces.reduce((count, workspace) => count + workspace.teams.length, 0)} teams`,
+                canApplyOrganizationTemplates ? (
+                  <ConfirmActionButton
+                    key={template.template_key}
+                    label={applyTemplateMutation.isPending ? "Applying..." : "Apply Template"}
+                    message={`Apply the ${template.name} template to ${organization.name}? Existing matching records will be skipped.`}
+                    onConfirm={() => applyTemplateMutation.mutate(template.template_key)}
+                  />
+                ) : (
+                  <span key={template.template_key} className="text-sm text-muted-foreground">View only</span>
+                )
+              ])}
+              emptyMessage="No organization templates available"
+            />
+          )}
+        </SettingsCard>
+      ) : null}
+      {(isOrganizationInactive ? canRestoreOrganization : canArchiveOrganization) ? (
+        <SettingsDangerZone
+          description={isOrganizationInactive ? "Restore this organization to active status." : "Archive this organization without permanently deleting it. Inactive organizations remain recoverable from the Organizations status filter."}
+          actions={isOrganizationInactive ? (
+            <ConfirmActionButton label="Restore Organization" message={`Restore organization ${organization.name}?`} onConfirm={() => statusMutation.mutate(true)} />
+          ) : (
+            <ConfirmActionButton label="Archive Organization" message={`Archive organization ${organization.name}?`} onConfirm={() => statusMutation.mutate(false)} />
+          )}
+        />
+      ) : (
+        <SettingsDangerZone description="Organization archive and restore actions require explicit settings.organization.archive or settings.organization.restore permissions." />
+      )}
       <SettingsCreateDialog title="Edit organization" open={editOpen} onOpenChange={setEditOpen} onSubmit={submitEdit} error={formError}>
         <FormField label="Name" required>
           <Input name="name" defaultValue={organization.name} />
@@ -2791,17 +2866,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
     },
     enabled: Boolean(accessToken && roles.length)
   });
-  const membersQuery = useQuery({
-    queryKey: ["settings", "access-control-members", organizations.map((item) => item.id).join(","), workspaces.map((item) => item.id).join(",")],
-    queryFn: async () => {
-      const organizationMembers = await Promise.all(organizations.map((organization) => settingsApi.listOrganizationMembers(accessToken ?? "", organization.id).catch(() => [])));
-      const workspaceMembers = await Promise.all(workspaces.map((workspace) => settingsApi.listWorkspaceMembers(accessToken ?? "", workspace.id).catch(() => [])));
-      return [...organizationMembers.flat(), ...workspaceMembers.flat()];
-    },
-    enabled: Boolean(accessToken)
-  });
   const rolePermissionMap = rolePermissionsQuery.data ?? {};
-  const members = membersQuery.data ?? [];
   const filteredPermissions = permissions
     .filter((permission) => `${permission.code} ${permission.name} ${permission.description ?? ""}`.toLowerCase().includes(search.toLowerCase()))
     .filter((permission) => (moduleFilter ? permissionModule(permission) === moduleFilter : true))
@@ -3011,7 +3076,7 @@ export function AccessControlView({ section = "roles" }: { section?: AccessContr
               <div key={`${role.id}-name`}><div className="font-medium">{role.name}</div><div className="text-xs text-muted-foreground">{role.description ?? role.key}</div></div>,
               roleDisplayName(role.scope),
               role.is_system ? "Yes" : "No",
-              String(countMembersForRole(role, members)),
+              String(countActiveAssignmentsForRole(role, roleAssignmentsQuery.data ?? [])),
               String(rolePermissionMap[role.id]?.length ?? 0),
               <div key={role.id} className="flex flex-wrap gap-2">
                 <SettingsLinkButton href={`/settings/access-control/roles/${role.id}`} variant="outline">{role.is_editable === false ? "View" : "View/Edit"}</SettingsLinkButton>

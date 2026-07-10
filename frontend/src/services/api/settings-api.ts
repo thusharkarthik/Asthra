@@ -11,6 +11,8 @@ import type {
   PermissionInventoryRecord,
   Organization,
   OrganizationMember,
+  OrganizationTemplateRecord,
+  OrganizationTemplateReport,
   PermissionRecord,
   PermissionRegistryItem,
   ProjectMembershipRecord,
@@ -132,6 +134,15 @@ export const settingsApi = {
   },
   deleteOrganization(token: string, organizationId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/organizations/${organizationId}`, { method: "DELETE", authToken: token });
+  },
+  listOrganizationTemplates(token: string) {
+    return apiRequest<{ templates: OrganizationTemplateRecord[] }>(`${CORE_PREFIX}/organization-templates`, { method: "GET", authToken: token });
+  },
+  previewOrganizationTemplate(token: string, templateKey: string, organizationId: number) {
+    return apiRequest<OrganizationTemplateReport>(`${CORE_PREFIX}/organization-templates/${templateKey}/preview`, { method: "POST", authToken: token, json: { organization_id: organizationId } });
+  },
+  applyOrganizationTemplate(token: string, templateKey: string, organizationId: number) {
+    return apiRequest<OrganizationTemplateReport>(`${CORE_PREFIX}/organization-templates/${templateKey}/apply`, { method: "POST", authToken: token, json: { organization_id: organizationId } });
   },
   listOrganizationMembers(token: string, organizationId: number) {
     return apiRequest<OrganizationMember[]>(`${CORE_PREFIX}/organizations/${organizationId}/members`, { method: "GET", authToken: token });

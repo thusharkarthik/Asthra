@@ -78,6 +78,21 @@ Frontend permission and role-management UI is backend-driven:
 
 No frontend-only permission registry is used as the source of truth for role save or checkbox state.
 
+## Frontend Enforcement Batch 1
+
+Manual QA batch 1 frontend enforcement gaps were addressed on 2026-07-09:
+
+- Sidebar visibility now evaluates backend permission codes for both dynamic module-registry navigation and static fallback navigation.
+- Static fallback navigation now carries the same permission mappings as the backend module registry where registry permissions exist.
+- Multi-permission module links, such as Access Control, allow visibility when the user has any listed backend permission.
+- Access Control -> Roles member counts now use distinct active users from active `role_assignments`, not organization/workspace member rows or legacy role labels.
+- The old Access Control member aggregation query was removed from the roles table path, reducing unrelated member-list requests.
+- Organization edit visibility uses `settings.organization.edit` or `settings.organization.manage`.
+- Organization archive and restore actions are surfaced on organization detail and are explicitly gated by `settings.organization.archive` and `settings.organization.restore`.
+- Organization template visibility is gated by `settings.organization_templates.view`; applying a template is gated by `settings.organization_templates.apply` and uses the backend apply endpoint.
+
+Organization manage behavior is defined as management-surface/edit authority only. Destructive lifecycle actions remain explicitly permission-gated.
+
 ## Frontend Gates
 
 Frontend gates should continue to use permission codes through `can("permission.code")` and action registry helpers. No new role-name or role-rank access checks were added.

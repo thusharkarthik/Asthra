@@ -404,6 +404,20 @@
 5. Change invitation and member row arrays to conditionally include the actions cell via spread.
 **God Mode rule**: `isEditMode` always keeps `hasAnyAction = true` so God Mode +/- overlays remain accessible even when the user has no real permissions.
 
+### BUG-051 — RBAC Frontend Enforcement Gaps in Sidebar, Role Counts, and Organization Actions [FIXED 2026-07-09]
+
+**Files**: `frontend/src/components/navigation/sidebar-nav.tsx`, `frontend/src/lib/navigation-mode.ts`, `frontend/src/lib/module-nav-registry.ts`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/services/api/settings-api.ts`, `frontend/src/types/core.ts`
+**Symptom**: Manual RBAC QA found several frontend gaps: fallback sidebar links could appear without backend permission mappings, Access Control role member counts were based on member rows instead of active role assignments, organization archive/restore permissions were not surfaced as UI actions, and organization template permissions were not represented in organization settings UI.
+**Root cause**: The dynamic Module Registry path had permission metadata, but the static fallback navigation did not mirror those gates. The Roles table still used old membership/role-label assumptions. Organization detail had edit-only organization actions and no minimal template section even though backend endpoints and permissions existed.
+**Fix**:
+1. Sidebar now checks `item.permissions` as an any-of backend permission list, with `item.permission` as a single-permission fallback.
+2. Static fallback nav definitions now carry backend permission codes where the backend Module Registry defines them.
+3. Dynamic module navigation preserves the full `required_permissions` array instead of only the first permission.
+4. Roles table member count now counts distinct users from active `role_assignments` for each role.
+5. Organization detail exposes Archive/Restore actions through existing organization update behavior, gated explicitly by `settings.organization.archive` and `settings.organization.restore`.
+6. Organization templates list/apply controls use `settings.organization_templates.view` and `settings.organization_templates.apply`.
+**Build note**: The frontend build passed after hardening Next build artifact preparation for mixed-owner `.next` files in the local environment.
+
 ### BUG-046 — Dynamic Nav Sidebar Empty After Scope Auto-Selection [FIXED 2026-07-04]
 
 **Files**: `services/core-service/app/api/v1/context.py`, `frontend/src/services/api/core-api.ts`, `frontend/src/context/platformContext.tsx`
