@@ -33,6 +33,7 @@ export type ModeNavItem = {
   href: string;
   icon: LucideIcon;
   permission?: string;
+  permissions?: string[];
 };
 
 export type ModeNavSection = {
@@ -91,12 +92,12 @@ export const PLATFORM_NAV: ModeNavSection[] = [
     label: "Platform",
     items: [
       { label: "Home", href: "/", icon: Home },
-      { label: "Organizations", href: "/settings/organizations", icon: Building2 },
-      { label: "Members", href: "/settings/members", icon: Users },
-      { label: "Access Control", href: "/settings/access-control", icon: Shield },
-      { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },
+      { label: "Organizations", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
+      { label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
+      { label: "Access Control", href: "/settings/access-control", icon: Shield, permissions: ["settings.access_control.view", "settings.role.view", "settings.permission.view"] },
+      { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText, permission: "guard.audit.view" },
       { label: "API Keys", href: "/settings/api-keys", icon: Key },
-      { label: "Platform Health", href: "/platform/health", icon: Activity },
+      { label: "Platform Health", href: "/platform/health", icon: Activity, permission: "settings.organization.view" },
     ],
   },
   {
@@ -110,16 +111,16 @@ export const ORG_NAV: ModeNavSection[] = [
     label: "Organization",
     items: [
       { label: "Home", href: "/", icon: Home },
-      { label: "Workspaces", href: "/settings/workspaces", icon: Layers },
-      { label: "Members", href: "/settings/members", icon: Users },
-      { label: "Teams", href: "/settings/teams", icon: UsersRound },
-      { label: "Roles", href: "/settings/roles", icon: Shield },
+      { label: "Workspaces", href: "/settings/workspaces", icon: Layers, permission: "settings.workspace.view" },
+      { label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
+      { label: "Teams", href: "/settings/teams", icon: UsersRound, permission: "settings.team.view" },
+      { label: "Roles", href: "/settings/roles", icon: Shield, permission: "settings.role.view" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { label: "Org Settings", href: "/settings/organizations", icon: Building2 },
+      { label: "Org Settings", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
       { label: "Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
       { label: "Profile", href: "/settings/profile", icon: User },
     ],
@@ -134,7 +135,7 @@ export const WORK_NAV: ModeNavSection[] = [
       { label: "Flow", href: "/flow", icon: Zap, permission: "flow.work_item.view" },
       { label: "Discover", href: "/discover", icon: Lightbulb, permission: "discover.idea.view" },
       { label: "Docs", href: "/docs", icon: BookOpen, permission: "docs.page.view" },
-      { label: "Collab", href: "/collab", icon: MessageSquare },
+      { label: "Collab", href: "/collab", icon: MessageSquare, permission: "collab.thread.view" },
     ],
   },
   {
@@ -142,20 +143,20 @@ export const WORK_NAV: ModeNavSection[] = [
     items: [
       { label: "Desk", href: "/desk", icon: Ticket, permission: "desk.ticket.view" },
       { label: "Pulse", href: "/pulse", icon: Activity, permission: "pulse.incident.view" },
-      { label: "Automation", href: "/automation", icon: Workflow },
+      { label: "Automation", href: "/automation", icon: Workflow, permission: "automation.rule.view" },
     ],
   },
   {
     label: "Engineering",
     items: [
-      { label: "Dev", href: "/dev", icon: Code2 },
-      { label: "Connect", href: "/connect", icon: Plug },
+      { label: "Dev", href: "/dev", icon: Code2, permission: "dev.release.view" },
+      { label: "Connect", href: "/connect", icon: Plug, permission: "connect.integration.view" },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { label: "Insights", href: "/insights", icon: BarChart3 },
+      { label: "Insights", href: "/insights", icon: BarChart3, permission: "insights.report.view" },
       { label: "Memory", href: "/memory", icon: Brain },
       { label: "Assistant", href: "/assistant", icon: Bot },
     ],

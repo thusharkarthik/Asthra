@@ -281,6 +281,48 @@ export type OrganizationTemplateMetadata = {
   categories: string[];
 };
 
+export type OrganizationTemplateRecord = {
+  template_key: string;
+  name: string;
+  description: string;
+  category: string;
+  recommended_for: string[];
+  workspaces: Array<{
+    name: string;
+    description?: string | null;
+    projects: Array<{ name: string; description?: string | null }>;
+    teams: Array<{ name: string; description?: string | null }>;
+  }>;
+  feature_flags: Record<string, boolean>;
+  configuration: Record<string, unknown>;
+  notes: string[];
+  sort_order: number;
+  is_active: boolean;
+};
+
+export type OrganizationTemplateReport = {
+  template_key: string;
+  organization_id: number;
+  summary: {
+    workspaces_to_create: number;
+    projects_to_create: number;
+    teams_to_create: number;
+    feature_flags_to_apply: number;
+    configuration_values_to_apply: number;
+    skipped_existing: number;
+  };
+  actions: Array<{
+    action_type: string;
+    name: string;
+    status: string;
+    scope_type?: string | null;
+    scope_id?: number | null;
+    parent?: string | null;
+    detail?: string | null;
+  }>;
+  warnings: string[];
+};
+
 export type ContextVersionSnapshot = {
   user_id: number;
   organization_id?: number | null;

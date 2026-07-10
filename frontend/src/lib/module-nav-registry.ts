@@ -131,6 +131,7 @@ export function buildNavSections(
       href: m.route,
       icon: MODULE_KEY_ICON_MAP[m.module_key] ?? Home,
       permission: m.required_permissions.length > 0 ? m.required_permissions[0] : undefined,
+      permissions: m.required_permissions,
     });
   }
 
