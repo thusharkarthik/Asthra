@@ -1,15 +1,20 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.organization import OrganizationMember
+from app.models.project import Project, ProjectMembership
 from app.models.role import Role
-from app.models.user import User, UserRole
-from app.models.workspace import WorkspaceMember
+from app.models.team import Team, TeamMember
+from app.models.user import RoleAssignment, User, UserRole
+from app.models.workspace import Workspace, WorkspaceMember
 from app.repositories.invitation_repository import InvitationRepository
 from app.schemas.organization import OrganizationMemberUpdate
 from app.schemas.workspace import WorkspaceMemberUpdate
 from app.services.access_control_service import AccessControlService
 from app.services.activity_service import ActivityService
+from app.services.context_version_service import ContextVersionService
 
 
 class MembershipService:
@@ -38,6 +43,7 @@ class MembershipService:
             current_user=current_user,
             scope_name="organization",
         )
+        self._remove_organization_access(organization_id, user_id)
         self.db.delete(member)
         self.db.commit()
         ActivityService(self.db).log_activity(
@@ -48,6 +54,8 @@ class MembershipService:
             action="member.removed",
             description=f"User {user_id} was removed from organization {organization_id}.",
         )
+        ContextVersionService(self.db).bump_access("organization", organization_id)
+        self.db.commit()
 
     def remove_workspace_member(
         self,
@@ -70,6 +78,7 @@ class MembershipService:
             current_user=current_user,
             scope_name="workspace",
         )
+        self._remove_workspace_access(workspace_id, user_id)
         self.db.delete(member)
         self.db.commit()
         ActivityService(self.db).log_activity(
@@ -80,6 +89,8 @@ class MembershipService:
             action="member.removed",
             description=f"User {user_id} was removed from workspace {workspace_id}.",
         )
+        ContextVersionService(self.db).bump_access("workspace", workspace_id)
+        self.db.commit()
 
     def update_organization_member(
         self,
@@ -219,6 +230,91 @@ class MembershipService:
             self.db.query(WorkspaceMember)
             .filter(WorkspaceMember.workspace_id == workspace_id)
             .all()
+        )
+
+    def _remove_organization_access(self, organization_id: int, user_id: int) -> None:
+        workspace_ids = [
+            row[0]
+            for row in self.db.query(Workspace.id)
+            .filter(Workspace.organization_id == organization_id)
+            .all()
+        ]
+        project_ids = [
+            row[0]
+            for row in self.db.query(Project.id)
+            .join(Workspace, Workspace.id == Project.workspace_id)
+            .filter(Workspace.organization_id == organization_id)
+            .all()
+        ]
+        team_ids = [
+            row[0]
+            for row in self.db.query(Team.id)
+            .filter(Team.workspace_id.in_(workspace_ids))
+            .all()
+        ] if workspace_ids else []
+
+        self._revoke_role_assignments(user_id, "organization", [organization_id])
+        self._revoke_role_assignments(user_id, "workspace", workspace_ids)
+        self._revoke_role_assignments(user_id, "project", project_ids)
+        self._revoke_role_assignments(user_id, "team", team_ids)
+
+        if workspace_ids:
+            self.db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id, WorkspaceMember.workspace_id.in_(workspace_ids)).delete(synchronize_session=False)
+        if project_ids:
+            self.db.query(ProjectMembership).filter(ProjectMembership.user_id == user_id, ProjectMembership.project_id.in_(project_ids)).update({"status": "inactive"}, synchronize_session=False)
+        if team_ids:
+            self.db.query(TeamMember).filter(TeamMember.user_id == user_id, TeamMember.team_id.in_(team_ids)).update({"status": "inactive"}, synchronize_session=False)
+
+        version_service = ContextVersionService(self.db)
+        for workspace_id in workspace_ids:
+            version_service.bump_access("workspace", workspace_id)
+        for project_id in project_ids:
+            version_service.bump_access("project", project_id)
+        for team_id in team_ids:
+            version_service.bump_access("team", team_id)
+
+    def _remove_workspace_access(self, workspace_id: int, user_id: int) -> None:
+        project_ids = [
+            row[0]
+            for row in self.db.query(Project.id)
+            .filter(Project.workspace_id == workspace_id)
+            .all()
+        ]
+        team_ids = [
+            row[0]
+            for row in self.db.query(Team.id)
+            .filter(Team.workspace_id == workspace_id)
+            .all()
+        ]
+
+        self._revoke_role_assignments(user_id, "workspace", [workspace_id])
+        self._revoke_role_assignments(user_id, "project", project_ids)
+        self._revoke_role_assignments(user_id, "team", team_ids)
+
+        if project_ids:
+            self.db.query(ProjectMembership).filter(ProjectMembership.user_id == user_id, ProjectMembership.project_id.in_(project_ids)).update({"status": "inactive"}, synchronize_session=False)
+        if team_ids:
+            self.db.query(TeamMember).filter(TeamMember.user_id == user_id, TeamMember.team_id.in_(team_ids)).update({"status": "inactive"}, synchronize_session=False)
+
+        version_service = ContextVersionService(self.db)
+        for project_id in project_ids:
+            version_service.bump_access("project", project_id)
+        for team_id in team_ids:
+            version_service.bump_access("team", team_id)
+
+    def _revoke_role_assignments(self, user_id: int, scope_type: str, scope_ids: list[int]) -> None:
+        if not scope_ids:
+            return
+        now = datetime.now(timezone.utc)
+        (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == scope_type,
+                RoleAssignment.scope_id.in_(scope_ids),
+                RoleAssignment.status == "active",
+            )
+            .update({"status": "revoked", "revoked_at": now}, synchronize_session=False)
         )
 
     def _member_role_from_update(

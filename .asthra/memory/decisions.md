@@ -707,3 +707,22 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Decision**: `settings.organization.manage` can grant access to organization management surfaces and edit controls, but organization archive and restore remain explicitly gated by `settings.organization.archive` and `settings.organization.restore`.
 
 **Why**: Archive/restore are sensitive lifecycle actions. Keeping them explicit makes QA and role templates easier to reason about.
+
+## 2026-07-10 — Active role_assignments Own Membership Access
+
+**Decision**: Active `role_assignments` are the source of scoped access. Organization/workspace membership rows are supporting membership/listing records and must not grant effective permissions unless backed by an active matching role assignment.
+
+**Why**: Preserving a fallback role or allowing stale membership rows to grant access made removals untruthful: the UI could report "removed" while the user still retained access. RBAC needs a clean lifecycle where removing the final role in a scope removes active access to that scope.
+
+**How to apply**:
+- Removing one role assignment revokes only that assignment.
+- Removing the last ordinary role in a scope removes active membership/access for that scope.
+- Protected platform safety checks still prevent removing the last Superuser or Platform Owner.
+- Removing a member from an organization revokes organization and descendant workspace/project/team assignments under that organization.
+- Removing a member from a workspace revokes workspace and descendant project/team assignments under that workspace.
+
+## 2026-07-10 — Sidebar Audit Without Customization
+
+**Decision**: Sidebar behavior remains driven by Module Registry + feature flags + permission codes, with static navigation as fallback only. This batch audits and documents sidebar source/mapping but does not implement full sidebar customization.
+
+**Why**: The immediate QA issue is permission correctness and explainability, not user-customizable navigation. Customization would add product surface and persistence decisions beyond the RBAC lifecycle fix.

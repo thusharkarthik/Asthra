@@ -418,6 +418,22 @@
 6. Organization templates list/apply controls use `settings.organization_templates.view` and `settings.organization_templates.apply`.
 **Build note**: The frontend build passed after hardening Next build artifact preparation for mixed-owner `.next` files in the local environment.
 
+### BUG-052 — Last Role Removal Recreated Fallback Roles and Left Stale Memberships [FIXED 2026-07-10]
+
+**Files**: `services/core-service/app/services/scoped_membership_service.py`, `services/core-service/app/services/membership_service.py`, `services/core-service/app/services/access_control_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `services/core-service/tests/test_scoped_membership.py`
+**Symptom**: Removing a member's only organization/workspace role showed success but the role or membership effectively remained. Removing a member from an organization/workspace could leave stale scoped access visible through old membership rows.
+**Root cause**:
+1. `ScopedMembershipService.delete_role_assignment()` called `_ensure_default_role_after_revocation()`, which recreated an organization/workspace/project/team fallback role when the last active scoped role was removed.
+2. `MembershipService.remove_organization_member()` and `remove_workspace_member()` deleted membership rows but did not revoke active `role_assignments` in that scope or descendant scopes.
+3. `AccessControlService` still allowed organization/workspace membership fallback rows to contribute effective permissions even when no active matching role assignment remained.
+**Fix**:
+1. Last ordinary scoped role removal now revokes the assignment and cleans the matching scoped membership instead of assigning a fallback role.
+2. Organization member removal revokes active organization and descendant workspace/project/team role assignments and removes/deactivates descendant membership records.
+3. Workspace member removal revokes active workspace and descendant project/team role assignments and deactivates descendant memberships.
+4. Organization/workspace membership fallback only contributes if an active matching role assignment exists.
+5. Member detail role add/remove now invalidates effective permissions, role assignments, member lists, context version, and Unified Platform Context.
+**Tests**: `pytest tests/test_scoped_membership.py -vv` passed with lifecycle coverage; `pytest tests/test_app_imports.py` passed.
+
 ### BUG-046 — Dynamic Nav Sidebar Empty After Scope Auto-Selection [FIXED 2026-07-04]
 
 **Files**: `services/core-service/app/api/v1/context.py`, `frontend/src/services/api/core-api.ts`, `frontend/src/context/platformContext.tsx`
