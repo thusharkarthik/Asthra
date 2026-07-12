@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-12 — Organization Member Detail Preserves Route Scope
+
+**Decision**: Member detail opened from `/settings/organizations/:orgId/members` must stay under the organization route as `/settings/organizations/:orgId/members/:memberId`. Scoped Settings member actions use the explicit route organization as their authority and payload scope, not the bottom-bar selected organization and not the global member detail fallback.
+
+**Why**: Settings org routes are administrative scope routes. Losing the route scope forces users to reselect the organization, risks stale bottom-bar scope, and can expose platform/global role choices in organization-specific flows.
+
+**How to apply**: Org-scoped member list links should route to the scoped member detail route. Invite and Add Role dialogs launched inside org routes should default/lock `organization_id` from the route, hide platform roles, and filter descendant workspace choices to the route organization. Global `/settings/members/:id` remains the flexible cross-scope admin view.
+
 ## 2026-07-09 — Permission Editor Grouping Is Display-Only; Backend Registry Remains Source of Truth
 
 **Decision**: The frontend role permission editor may derive module/resource/action labels from permission codes only as a display fallback. Backend permission records and registry metadata remain the source of truth for permission codes, IDs, metadata, and save behavior.
