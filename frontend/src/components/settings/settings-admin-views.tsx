@@ -2305,8 +2305,8 @@ export function MemberDetailView({ userId }: { userId: number }) {
       setAssignWsId("");
       await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments", userId] });
-      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
-      await queryClient.invalidateQueries({ queryKey: ["settings", "roles"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "effective-permissions", userId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role assigned" });
     },
     onError: (error) => addToast({ type: "error", title: "Role assignment failed", message: error instanceof Error ? error.message : "Unable to assign role." })
@@ -2316,7 +2316,8 @@ export function MemberDetailView({ userId }: { userId: number }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["settings", "user-roles", userId] });
       await queryClient.invalidateQueries({ queryKey: ["settings", "role-assignments", userId] });
-      await queryClient.invalidateQueries({ queryKey: ["members-page"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "effective-permissions", userId] });
+      await invalidateSettingsAndContext(queryClient);
       addToast({ type: "success", title: "Role removed" });
     },
     onError: (error) => addToast({ type: "error", title: "Role removal failed", message: error instanceof Error ? error.message : "Unable to remove role." })

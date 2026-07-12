@@ -315,7 +315,7 @@ class AccessControlService:
         if member is None:
             return
         role = member.role or self._role_by_key(LEGACY_ORGANIZATION_ROLE_MAP.get(member.member_role.lower()))
-        if role and role.is_active:
+        if role and role.is_active and self._has_active_role_assignment(user_id, role.id, "organization", organization_id):
             self._add_role(roles, role, "organization", organization_id)
 
     def _add_workspace_membership_role(
@@ -335,7 +335,7 @@ class AccessControlService:
         if member is None:
             return
         role = member.role or self._role_by_key(LEGACY_WORKSPACE_ROLE_MAP.get(member.member_role.lower()))
-        if role and role.is_active:
+        if role and role.is_active and self._has_active_role_assignment(user_id, role.id, "workspace", workspace_id):
             self._add_role(roles, role, "workspace", workspace_id)
 
     def _add_project_membership_role(
@@ -380,6 +380,20 @@ class AccessControlService:
             scope=role.scope,
             source_scope_type=source_scope_type,
             source_scope_id=source_scope_id,
+        )
+
+    def _has_active_role_assignment(self, user_id: int, role_id: int, scope_type: str, scope_id: int | None) -> bool:
+        return (
+            self.db.query(RoleAssignment.id)
+            .filter(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.role_id == role_id,
+                RoleAssignment.scope_type == scope_type,
+                RoleAssignment.scope_id == scope_id,
+                RoleAssignment.status == "active",
+            )
+            .first()
+            is not None
         )
 
     def _permission_codes_for_roles(self, role_ids: list[int]) -> set[str]:
