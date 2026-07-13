@@ -26,6 +26,42 @@ type WorkspaceState = {
   resetContext: () => void;
 };
 
+function normalizeId(id: number | null | undefined) {
+  return id == null ? "null" : String(id);
+}
+
+function normalizeActive(isActive: boolean | null | undefined) {
+  return isActive === false ? "0" : "1";
+}
+
+function snapshotKey<T extends { id: number }>(items: T[], mapItem: (item: T) => string) {
+  return [...items]
+    .sort((left, right) => left.id - right.id)
+    .map(mapItem)
+    .join(",");
+}
+
+function sameOrganizationSnapshot(left: Organization[], right: Organization[]) {
+  return (
+    snapshotKey(left, (organization) => [organization.id, normalizeActive(organization.is_active)].join(":")) ===
+    snapshotKey(right, (organization) => [organization.id, normalizeActive(organization.is_active)].join(":"))
+  );
+}
+
+function sameWorkspaceSnapshot(left: WorkspaceRecord[], right: WorkspaceRecord[]) {
+  return (
+    snapshotKey(left, (workspace) => [workspace.id, normalizeId(workspace.organization_id)].join(":")) ===
+    snapshotKey(right, (workspace) => [workspace.id, normalizeId(workspace.organization_id)].join(":"))
+  );
+}
+
+function sameProjectSnapshot(left: ProjectRecord[], right: ProjectRecord[]) {
+  return (
+    snapshotKey(left, (project) => [project.id, normalizeId(project.workspace_id)].join(":")) ===
+    snapshotKey(right, (project) => [project.id, normalizeId(project.workspace_id)].join(":"))
+  );
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
@@ -73,7 +109,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       setPlatformContext: ({ organizations, workspaces, projects, currentOrganizationId, currentWorkspaceId, currentProjectId }) => {
         const state = get();
-        const selectedOrganizationId = currentOrganizationId ?? (
+        const currentOrganizationExists = currentOrganizationId != null && organizations.some((organization) => organization.id === currentOrganizationId);
+        const selectedOrganizationId = currentOrganizationExists ? currentOrganizationId : (
           organizations.some((organization) => organization.id === state.selectedOrganizationId)
             ? state.selectedOrganizationId
             : organizations[0]?.id ?? null
@@ -81,7 +118,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const scopedWorkspaces = selectedOrganizationId
           ? workspaces.filter((workspace) => workspace.organization_id === selectedOrganizationId)
           : workspaces;
-        const selectedWorkspaceId = currentWorkspaceId ?? (
+        const currentWorkspaceExists = currentWorkspaceId != null && scopedWorkspaces.some((workspace) => workspace.id === currentWorkspaceId);
+        const selectedWorkspaceId = currentWorkspaceExists ? currentWorkspaceId : (
           scopedWorkspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)
             ? state.selectedWorkspaceId
             : scopedWorkspaces[0]?.id ?? null
@@ -89,20 +127,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const scopedProjects = selectedWorkspaceId
           ? projects.filter((project) => project.workspace_id === selectedWorkspaceId)
           : projects;
-        const selectedProjectId = currentProjectId ?? (
+        const currentProjectExists = currentProjectId != null && scopedProjects.some((project) => project.id === currentProjectId);
+        const selectedProjectId = currentProjectExists ? currentProjectId : (
           scopedProjects.some((project) => project.id === state.selectedProjectId)
             ? state.selectedProjectId
             : scopedProjects[0]?.id ?? null
         );
-        const sameIds = (left: { id: number }[], right: { id: number }[]) =>
-          left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
         if (
           state.selectedOrganizationId === selectedOrganizationId &&
           state.selectedWorkspaceId === selectedWorkspaceId &&
           state.selectedProjectId === selectedProjectId &&
-          sameIds(state.organizations, organizations) &&
-          sameIds(state.workspaces, workspaces) &&
-          sameIds(state.projects, projects)
+          sameOrganizationSnapshot(state.organizations, organizations) &&
+          sameWorkspaceSnapshot(state.workspaces, workspaces) &&
+          sameProjectSnapshot(state.projects, projects)
         ) {
           return;
         }

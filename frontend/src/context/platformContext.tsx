@@ -59,6 +59,21 @@ type PlatformContextValue = {
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 
+function joinSnapshot<T extends { id?: number }>(items: T[], mapItem: (item: T) => string) {
+  return [...items]
+    .sort((left, right) => Number(left.id ?? 0) - Number(right.id ?? 0))
+    .map(mapItem)
+    .join(",");
+}
+
+function normalizeId(id: number | null | undefined) {
+  return id == null ? "null" : String(id);
+}
+
+function normalizeActive(isActive: boolean | null | undefined) {
+  return isActive === false ? "0" : "1";
+}
+
 export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -72,6 +87,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
   const prevGodModeReady = useRef(false);
+  const lastWorkspaceSyncKeyRef = useRef<string | null>(null);
+  const lastWorkspaceSyncTokenRef = useRef<string | null>(null);
   const selectedOrganizationId = useWorkspaceStore((state) => state.selectedOrganizationId);
   const selectedWorkspaceId = useWorkspaceStore((state) => state.selectedWorkspaceId);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -129,9 +146,43 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     refetchOnReconnect: false,
   });
 
+  const workspaceSyncKey = useMemo(() => {
+    if (!accessToken || !contextQuery.data) return "";
+    const d = contextQuery.data;
+    const organizations = (d.organizations ?? []) as Organization[];
+    const workspaces = (d.workspaces ?? []) as WorkspaceRecord[];
+    const projects = (d.projects ?? []) as ProjectRecord[];
+    return [
+      normalizeId(d.current_org?.id),
+      normalizeId(d.current_workspace?.id),
+      normalizeId(d.current_project?.id),
+      joinSnapshot(organizations, (organization) =>
+        [organization.id, normalizeActive(organization.is_active)].join(":")
+      ),
+      joinSnapshot(workspaces, (workspace) =>
+        [workspace.id, normalizeId(workspace.organization_id)].join(":")
+      ),
+      joinSnapshot(projects, (project) =>
+        [project.id, normalizeId(project.workspace_id)].join(":")
+      ),
+    ].join("|");
+  }, [accessToken, contextQuery.data]);
+
+  const userSyncKey = useMemo(() => {
+    if (!accessToken || !contextQuery.data?.user) return "";
+    const user = contextQuery.data.user as CoreUser;
+    return [user.id, user.email, user.full_name ?? "", user.is_superuser ?? ""].join("|");
+  }, [accessToken, contextQuery.data]);
+
   // Sync unified context data into Zustand workspace store for downstream consumers
   useEffect(() => {
-    if (!accessToken || !contextQuery.data) return;
+    if (!accessToken || !contextQuery.data || !workspaceSyncKey) return;
+    if (lastWorkspaceSyncTokenRef.current !== accessToken) {
+      lastWorkspaceSyncTokenRef.current = accessToken;
+      lastWorkspaceSyncKeyRef.current = null;
+    }
+    if (lastWorkspaceSyncKeyRef.current === workspaceSyncKey) return;
+    lastWorkspaceSyncKeyRef.current = workspaceSyncKey;
     const d = contextQuery.data;
     setPlatformContext({
       organizations: d.organizations as Organization[],
@@ -141,6 +192,11 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       currentWorkspaceId: d.current_workspace?.id ?? null,
       currentProjectId: d.current_project?.id ?? null,
     });
+  }, [accessToken, setPlatformContext, workspaceSyncKey]);
+
+  useEffect(() => {
+    if (!accessToken || !contextQuery.data || !userSyncKey) return;
+    const d = contextQuery.data;
     useAuthStore.setState((state) => {
       const nextUser = d.user as CoreUser;
       if (
@@ -153,10 +209,14 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       }
       return { ...state, currentUser: nextUser, isAuthenticated: true };
     });
-  }, [accessToken, contextQuery.data, setPlatformContext]);
+  }, [accessToken, userSyncKey]);
 
   useEffect(() => {
-    if (!accessToken) setLoadedAt(null);
+    if (!accessToken) {
+      setLoadedAt(null);
+      lastWorkspaceSyncKeyRef.current = null;
+      lastWorkspaceSyncTokenRef.current = null;
+    }
   }, [accessToken]);
 
   // Update navigation mode from roles once the first context response arrives.

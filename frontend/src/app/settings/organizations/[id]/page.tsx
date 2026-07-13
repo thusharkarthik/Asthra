@@ -285,7 +285,6 @@ export default function OrganizationSettingsPage() {
         queryClient.invalidateQueries({ queryKey: ["organizations"] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.organizations.detail(orgId) }),
-        queryClient.invalidateQueries({ queryKey: ["org-settings", orgId] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
         queryClient.invalidateQueries({ queryKey: queryKeys.permissions.current(orgId, null, null) }),

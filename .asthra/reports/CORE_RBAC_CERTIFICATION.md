@@ -138,6 +138,11 @@ Backend organization archive/restore is supported through `PATCH /organizations/
 - Frontend organization detail surfaces Archive or Restore based on the detail record's active state and explicit lifecycle permission.
 - The runtime lifecycle action is no longer wrapped by the old `danger_zone` schema gate because that schema entry represented `settings.organization.delete`, not archive/restore authority.
 - Archive/restore success updates the organization detail cache and invalidates organization list/detail, platform context, context version, and scoped permission queries.
+- The optional `/organizations/{id}/settings` read is non-fatal; if Core returns 404, the frontend uses safe default settings and keeps rendering canonical org detail state.
+- Archive/restore no longer forces an `org-settings` refetch, because organization lifecycle state is owned by `GET /organizations/{id}` and the list/platform context refreshes.
+- Post-action platform context refetches no longer trigger the AsthraShell skipped-onboarding clear loop; the shell only clears skipped onboarding state when a matching non-null skipped user id exists.
+- Post-action platform context sync into `workspace-store` is idempotent; invalid current scope ids from refetched context are ignored unless present in incoming arrays, and equivalent id/parent/active snapshots do not rewrite store state.
+- `PlatformContextProvider` syncs workspace-store from a stable workspace-scope key, not full platform context object identity. The key excludes volatile timestamps and permission/navigation/module/metadata fields, and a ref guard prevents syncing the same workspace key twice for the same access token.
 - `settings.organization.manage` does not grant archive/restore by itself.
 
 ## Organization-Scoped Member Routing Batch
