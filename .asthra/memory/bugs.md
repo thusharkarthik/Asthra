@@ -2,6 +2,14 @@
 
 ## Fixed
 
+### BUG-054 — Organization Archive/Restore Hidden by Delete-Based Schema Gate [FIXED 2026-07-13]
+
+**Files**: `frontend/src/app/settings/organizations/[id]/page.tsx`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: Organization owners/admins with `settings.organization.archive` or `settings.organization.restore` could not reliably see the organization lifecycle action. Archived organization detail could lose restore visibility after refresh.
+**Root cause**: The runtime archive/restore UI was wrapped in `SchemaGate elementKey="danger_zone"`, whose schema permission was `settings.organization.delete`, so explicit archive/restore permissions were ignored. The route also read organization state from platform context lists, which may omit inactive organizations.
+**Fix**: Organization detail now loads `GET /organizations/{id}` for the route, so inactive organizations remain addressable. The lifecycle action is gated directly by `settings.organization.archive` or `settings.organization.restore`, updates the detail cache from the PATCH response, and invalidates organization/platform context/version/scoped-permission queries.
+**Verification**: Repository-local `npm run build` remains blocked by pre-existing `.next` EACCES ownership artifacts. `npm run build` passed from a clean `/tmp/asthra-frontend-verify` copy with repository `node_modules` symlinked.
+
 ### BUG-053 — Organization Member Flows Lost Explicit Org Scope [FIXED 2026-07-12]
 
 **Files**: `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/app/settings/organizations/[id]/members/[memberId]/page.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`

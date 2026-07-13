@@ -134,7 +134,10 @@ Backend organization archive/restore is supported through `PATCH /organizations/
 
 - Archive is enforced by `settings.organization.archive`.
 - Restore is enforced by `settings.organization.restore`.
-- Frontend organization detail surfaces Archive or Restore based on active state and explicit permission.
+- Frontend organization detail loads `GET /organizations/{id}` directly for the route, so inactive organization detail remains reachable even when platform context/list queries hide inactive records by default.
+- Frontend organization detail surfaces Archive or Restore based on the detail record's active state and explicit lifecycle permission.
+- The runtime lifecycle action is no longer wrapped by the old `danger_zone` schema gate because that schema entry represented `settings.organization.delete`, not archive/restore authority.
+- Archive/restore success updates the organization detail cache and invalidates organization list/detail, platform context, context version, and scoped permission queries.
 - `settings.organization.manage` does not grant archive/restore by itself.
 
 ## Organization-Scoped Member Routing Batch

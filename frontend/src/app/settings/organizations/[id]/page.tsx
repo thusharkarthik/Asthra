@@ -172,6 +172,9 @@ export default function OrganizationSettingsPage() {
     hasPlatformAuthority ||
     scopedCan("settings.organization.view") ||
     scopedCan("settings.organization.manage") ||
+    scopedCan("settings.organization.edit") ||
+    scopedCan("settings.organization.archive") ||
+    scopedCan("settings.organization.restore") ||
     hasHierarchicalPermission(can, "settings.organization.view");
   const isAuthorized =
     hasPlatformAuthority ||
@@ -181,7 +184,14 @@ export default function OrganizationSettingsPage() {
   const canArchiveOrganization = scopedCan("settings.organization.archive");
   const canRestoreOrganization = scopedCan("settings.organization.restore");
 
-  const org = organizations.find((o) => o.id === orgId);
+  const orgDetailQuery = useQuery({
+    queryKey: queryKeys.organizations.detail(orgId),
+    queryFn: () => settingsApi.getOrganization(accessToken ?? "", orgId),
+    enabled: Boolean(accessToken && orgId && canViewOrgPage),
+    staleTime: 60_000,
+  });
+
+  const org = orgDetailQuery.data ?? organizations.find((o) => o.id === orgId);
   const scopedWorkspaces = workspaces.filter((w) => w.organization_id === orgId);
 
   const settingsQuery = useQuery({
@@ -244,8 +254,12 @@ export default function OrganizationSettingsPage() {
   const updateOrgMutation = useMutation({
     mutationFn: (payload: { name: string; description?: string }) =>
       settingsApi.updateOrganization(accessToken ?? "", orgId, payload),
-    onSuccess: async () => {
+    onSuccess: async (updatedOrg) => {
+      queryClient.setQueryData(queryKeys.organizations.detail(orgId), updatedOrg);
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.organizations.detail(orgId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
       addToast({ type: "success", title: "Saved", message: "Organization details updated." });
     },
     onError: () => addToast({ type: "error", title: "Save failed", message: "Could not update organization." }),
@@ -264,13 +278,26 @@ export default function OrganizationSettingsPage() {
   const statusMutation = useMutation({
     mutationFn: (isActive: boolean) =>
       settingsApi.updateOrganization(accessToken ?? "", orgId, { is_active: isActive }),
-    onSuccess: async () => {
+    onSuccess: async (updatedOrg) => {
       setDeactivateConfirm(false);
-      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot });
-      addToast({ type: "success", title: "Saved", message: "Organization status updated." });
+      queryClient.setQueryData(queryKeys.organizations.detail(orgId), updatedOrg);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["organizations"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.detail(orgId) }),
+        queryClient.invalidateQueries({ queryKey: ["org-settings", orgId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.permissions.current(orgId, null, null) }),
+      ]);
+      addToast({
+        type: "success",
+        title: updatedOrg.is_active === false ? "Organization archived" : "Organization restored",
+        message:
+          updatedOrg.is_active === false
+            ? "Organization moved to inactive status. Use the status filter to view inactive organizations."
+            : "Organization restored to active status.",
+      });
     },
     onError: () => addToast({ type: "error", title: "Failed", message: "Could not update organization status." }),
   });
@@ -301,7 +328,7 @@ export default function OrganizationSettingsPage() {
     { label: org?.name ?? "Organization" },
   ];
 
-  if (!hasPlatformAuthority && (ctxIsLoading || scopedPermissionsQuery.isLoading || scopedPermissionsQuery.isFetching)) return null;
+  if (!hasPlatformAuthority && (ctxIsLoading || scopedPermissionsQuery.isLoading)) return null;
 
   if (!canViewOrgPage) {
     return (
@@ -315,7 +342,9 @@ export default function OrganizationSettingsPage() {
     );
   }
 
-  if (!org && organizations.length > 0) {
+  if (orgDetailQuery.isLoading) return null;
+
+  if (!org && !orgDetailQuery.isLoading) {
     return (
       <SettingsLayout breadcrumbs={breadcrumbs} backHref="/settings/organizations" backLabel="Back to Organizations">
         <EmptyModuleState title="Organization not found" description="This organization was not found or you don't have access." />
@@ -537,9 +566,8 @@ export default function OrganizationSettingsPage() {
 
       {/* Danger Zone */}
       {(displayOrg.is_active === false ? canRestoreOrganization : canArchiveOrganization) ? (
-        <SchemaGate elementKey="danger_zone">
         <SettingsDangerZone
-          description={displayOrg.is_active === false ? "Restore this organization to active status." : "Deactivating the organization will suspend access for all members. This can be reversed by a user with restore permission."}
+          description={displayOrg.is_active === false ? "Restore this organization to active status." : "Archiving the organization will suspend access for all members. This can be reversed by a user with restore permission."}
           actions={
             deactivateConfirm ? (
               <div className="flex items-center gap-2">
@@ -549,7 +577,7 @@ export default function OrganizationSettingsPage() {
                   onClick={() => statusMutation.mutate(displayOrg.is_active === false)}
                   disabled={statusMutation.isPending}
                 >
-                  {statusMutation.isPending ? "Saving…" : displayOrg.is_active === false ? "Yes, Restore" : "Yes, Deactivate"}
+                  {statusMutation.isPending ? "Saving…" : displayOrg.is_active === false ? "Yes, Restore" : "Yes, Archive"}
                 </Button>
                 <Button variant="outline" onClick={() => setDeactivateConfirm(false)}>
                   Cancel
@@ -561,12 +589,11 @@ export default function OrganizationSettingsPage() {
                 className="border-destructive/50 text-destructive hover:bg-destructive/10"
                 onClick={() => setDeactivateConfirm(true)}
               >
-                {displayOrg.is_active === false ? "Restore Organization" : "Deactivate Organization"}
+                {displayOrg.is_active === false ? "Restore Organization" : "Archive Organization"}
               </Button>
             )
           }
         />
-        </SchemaGate>
       ) : (
         <SettingsDangerZone description="Organization archive and restore actions require explicit settings.organization.archive or settings.organization.restore permissions." />
       )}

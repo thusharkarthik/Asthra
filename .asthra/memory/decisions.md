@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-13 — Organization Lifecycle Actions Use Explicit Archive/Restore Permissions
+
+**Decision**: Runtime organization archive and restore controls are gated by `settings.organization.archive` and `settings.organization.restore` directly. They must not be hidden behind a generic danger-zone schema entry or a delete permission. Archived organization detail routes must load the organization by id rather than relying on active-only platform context/list data.
+
+**Why**: Organization lifecycle permissions are intentionally separate from edit/manage/delete authority. Platform context and list queries may omit inactive organizations by default, so restore flows need the canonical detail endpoint to preserve state after refresh.
+
+**How to apply**: Use route-scoped permissions for Settings organization pages. Use `PATCH /organizations/{id}` with `is_active=false/true` for archive/restore and refresh organization detail, organization lists, platform context, context version, and scoped permissions after success.
+
 ## 2026-07-12 — Organization Member Detail Preserves Route Scope
 
 **Decision**: Member detail opened from `/settings/organizations/:orgId/members` must stay under the organization route as `/settings/organizations/:orgId/members/:memberId`. Scoped Settings member actions use the explicit route organization as their authority and payload scope, not the bottom-bar selected organization and not the global member detail fallback.
