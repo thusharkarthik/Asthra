@@ -2,6 +2,14 @@
 
 ## Fixed
 
+### BUG-053 — Organization Member Flows Lost Explicit Org Scope [FIXED 2026-07-12]
+
+**Files**: `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/app/settings/organizations/[id]/members/[memberId]/page.tsx`, `frontend/src/app/settings/organizations/[id]/page.tsx`
+**Symptom**: Inviting from an organization members page still asked for an organization in scoped flows, clicking a member opened the global member detail route, Add Role from that detail route asked for an organization again, and the active organization settings page only exposed deactivate through role-name checks with no restore action.
+**Root cause**: `MembersView` did not lock invite state to the explicit organization route, member row links always pointed to `/settings/members/:id`, `MemberDetailView` only used bottom-bar/default scope for assignment and effective permissions, and the active organization route had an older danger-zone implementation separate from the reusable organization detail view.
+**Fix**: Organization member rows now route to `/settings/organizations/:orgId/members/:memberId`, the new scoped member detail route reuses `MemberDetailView` with explicit organization scope, invite/add-role forms default and lock the route organization, platform roles are hidden in org-scoped role pickers, and organization archive/restore visibility uses `settings.organization.archive` / `settings.organization.restore` with `PATCH /organizations/{id}`.
+**Verification**: `./node_modules/.bin/tsc --noEmit` passed. `npm run build` passed from a clean `/tmp` frontend copy; the repo-local build remains blocked by pre-existing `frontend/.next` files owned by `nobody:nogroup`.
+
 ### BUG-051 — Role Permission Editor Was Hard to Use With Large Permission Sets [FIXED 2026-07-09]
 
 **Files**: `frontend/src/components/settings/settings-admin-views.tsx`

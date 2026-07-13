@@ -137,6 +137,23 @@ Backend organization archive/restore is supported through `PATCH /organizations/
 - Frontend organization detail surfaces Archive or Restore based on active state and explicit permission.
 - `settings.organization.manage` does not grant archive/restore by itself.
 
+## Organization-Scoped Member Routing Batch
+
+Organization member management scope was corrected on 2026-07-12:
+
+- Inviting from `/settings/organizations/:orgId/members` defaults and locks the invitation organization to the route org.
+- Platform roles are hidden in organization-scoped invite and add-role flows.
+- Workspace choices in scoped invite/add-role flows are constrained to descendants of the route organization.
+- Member rows opened from an organization member list now route to `/settings/organizations/:orgId/members/:memberId`.
+- The scoped member detail route reuses `MemberDetailView` with explicit organization scope, so effective permissions and Add Role defaults are resolved for the route org.
+- Global `/settings/members/:memberId` remains available for platform/global cross-scope administration.
+- The active organization settings route now uses explicit `settings.organization.archive` / `settings.organization.restore` permissions for lifecycle actions and exposes Restore for inactive organizations.
+
+Validation:
+
+- `./node_modules/.bin/tsc --noEmit` passed.
+- `npm run build` passed from a clean `/tmp/asthra-frontend-verify` copy because the repository-local `.next` directory contains pre-existing files owned by `nobody:nogroup`.
+
 ## Organization Template Permission Status
 
 Organization template permissions are implemented and documented:

@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { EmptyModuleState } from "@/components/layout/ui-states";
 import { RequestAccessButton } from "@/app/settings/layout";
 import { hasHierarchicalPermission } from "@/lib/settings-permissions";
+import { can as hasPermissionCode } from "@/lib/permissions";
+import { queryKeys } from "@/lib/queryKeys";
 import { SchemaGate } from "@/components/platform/schema-gate";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
@@ -157,11 +159,27 @@ export default function OrganizationSettingsPage() {
   usePagePermissions();
 
   const isSuperuser = Boolean(currentUser?.is_superuser);
-  const isAdminUser = isSuperuser || authorityLevel === "platform" || authorityLevel === "org";
-  const canViewOrgPage = isAdminUser || hasHierarchicalPermission(can, "settings.organization.view");
+  const hasPlatformAuthority = isSuperuser || authorityLevel === "platform";
+  const scopedPermissionsQuery = useQuery({
+    queryKey: queryKeys.permissions.current(orgId, null, null),
+    queryFn: () => settingsApi.getCurrentPermissions(accessToken ?? "", { org_id: orgId }),
+    enabled: Boolean(accessToken && orgId && !isSuperuser),
+    staleTime: 60_000,
+  });
+  const scopedPermissionCodes = scopedPermissionsQuery.data?.permission_codes ?? [];
+  const scopedCan = (permissionCode: string) => isSuperuser || hasPermissionCode(scopedPermissionCodes, permissionCode);
+  const canViewOrgPage =
+    hasPlatformAuthority ||
+    scopedCan("settings.organization.view") ||
+    scopedCan("settings.organization.manage") ||
+    hasHierarchicalPermission(can, "settings.organization.view");
   const isAuthorized =
-    isAdminUser ||
+    hasPlatformAuthority ||
+    scopedCan("settings.organization.edit") ||
+    scopedCan("settings.organization.manage") ||
     hasHierarchicalPermission(can, "settings.organization.view", "settings.organization.edit");
+  const canArchiveOrganization = scopedCan("settings.organization.archive");
+  const canRestoreOrganization = scopedCan("settings.organization.restore");
 
   const org = organizations.find((o) => o.id === orgId);
   const scopedWorkspaces = workspaces.filter((w) => w.organization_id === orgId);
@@ -243,15 +261,18 @@ export default function OrganizationSettingsPage() {
     onError: () => addToast({ type: "error", title: "Save failed", message: "Could not update settings." }),
   });
 
-  const deactivateMutation = useMutation({
-    mutationFn: () =>
-      settingsApi.updateOrganization(accessToken ?? "", orgId, { is_active: false }),
+  const statusMutation = useMutation({
+    mutationFn: (isActive: boolean) =>
+      settingsApi.updateOrganization(accessToken ?? "", orgId, { is_active: isActive }),
     onSuccess: async () => {
       setDeactivateConfirm(false);
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      addToast({ type: "success", title: "Deactivated", message: "Organization has been deactivated." });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot });
+      addToast({ type: "success", title: "Saved", message: "Organization status updated." });
     },
-    onError: () => addToast({ type: "error", title: "Failed", message: "Could not deactivate organization." }),
+    onError: () => addToast({ type: "error", title: "Failed", message: "Could not update organization status." }),
   });
 
   function handleSaveGeneral(e: FormEvent) {
@@ -280,7 +301,7 @@ export default function OrganizationSettingsPage() {
     { label: org?.name ?? "Organization" },
   ];
 
-  if (!isAdminUser && ctxIsLoading) return null;
+  if (!hasPlatformAuthority && (ctxIsLoading || scopedPermissionsQuery.isLoading || scopedPermissionsQuery.isFetching)) return null;
 
   if (!canViewOrgPage) {
     return (
@@ -515,20 +536,20 @@ export default function OrganizationSettingsPage() {
       </form>}
 
       {/* Danger Zone */}
-      {(isSuperuser || permissions?.roles?.some((r) => r.key === "organization_owner")) && (
+      {(displayOrg.is_active === false ? canRestoreOrganization : canArchiveOrganization) ? (
         <SchemaGate elementKey="danger_zone">
         <SettingsDangerZone
-          description="Deactivating the organization will suspend access for all members. This can be reversed by a platform admin."
+          description={displayOrg.is_active === false ? "Restore this organization to active status." : "Deactivating the organization will suspend access for all members. This can be reversed by a user with restore permission."}
           actions={
             deactivateConfirm ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-destructive">Are you sure?</span>
                 <Button
                   className="bg-destructive text-destructive-foreground hover:opacity-90"
-                  onClick={() => deactivateMutation.mutate()}
-                  disabled={deactivateMutation.isPending || displayOrg.is_active === false}
+                  onClick={() => statusMutation.mutate(displayOrg.is_active === false)}
+                  disabled={statusMutation.isPending}
                 >
-                  {deactivateMutation.isPending ? "Deactivating…" : "Yes, Deactivate"}
+                  {statusMutation.isPending ? "Saving…" : displayOrg.is_active === false ? "Yes, Restore" : "Yes, Deactivate"}
                 </Button>
                 <Button variant="outline" onClick={() => setDeactivateConfirm(false)}>
                   Cancel
@@ -539,14 +560,15 @@ export default function OrganizationSettingsPage() {
                 variant="outline"
                 className="border-destructive/50 text-destructive hover:bg-destructive/10"
                 onClick={() => setDeactivateConfirm(true)}
-                disabled={displayOrg.is_active === false}
               >
-                {displayOrg.is_active === false ? "Already Inactive" : "Deactivate Organization"}
+                {displayOrg.is_active === false ? "Restore Organization" : "Deactivate Organization"}
               </Button>
             )
           }
         />
         </SchemaGate>
+      ) : (
+        <SettingsDangerZone description="Organization archive and restore actions require explicit settings.organization.archive or settings.organization.restore permissions." />
       )}
     </SettingsLayout>
   );

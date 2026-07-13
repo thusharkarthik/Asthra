@@ -1691,7 +1691,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   useEffect(() => {
     if (searchParams.get("action") === "invite") {
       const paramOrgId = searchParams.get("orgId");
-      if (paramOrgId) setInviteOrgId(Number(paramOrgId));
+      setInviteOrgId(scopeOrganizationId ?? (paramOrgId ? Number(paramOrgId) : ""));
+      setInviteWsId(scopeWorkspaceId ?? "");
       setInviteOpen(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1727,6 +1728,8 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const scopeWorkspaceId = workspaceId ?? null;
   const scopedOrganization = organizationId ? organizations.find((organization) => organization.id === organizationId) : undefined;
   const scopedWorkspace = workspaceId ? workspaces.find((workspace) => workspace.id === workspaceId) : undefined;
+  const lockedInviteOrganization = scopeOrganizationId ? organizations.find((org) => org.id === scopeOrganizationId) : undefined;
+  const lockedInviteWorkspace = scopeWorkspaceId ? workspaces.find((workspace) => workspace.id === scopeWorkspaceId) : undefined;
   const permissions = useCurrentPermissions({ orgId: organizationId ?? undefined, workspaceId: workspaceId ?? undefined });
   const memberActionScope = permissionActionScope(permissions);
   const visibleRoles = filterVisibleRoles(roles, canViewProtectedRoles(currentUser, permissions));
@@ -1851,13 +1854,13 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
       return;
     }
     const needsOrg = inviteRoleScopeCategory !== "platform";
-    const effectiveOrgId = needsOrg ? (Number(inviteOrgId) || null) : (scopeOrganizationId ?? null);
+    const effectiveOrgId = needsOrg ? (scopeOrganizationId ?? (Number(inviteOrgId) || null)) : (scopeOrganizationId ?? null);
     if (needsOrg && !effectiveOrgId) {
       setFormError("Select an organization for this role.");
       return;
     }
     const needsWorkspace = inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team";
-    const effectiveWsId = needsWorkspace ? (Number(inviteWsId) || null) : scopeWorkspaceId;
+    const effectiveWsId = needsWorkspace ? (scopeWorkspaceId ?? (Number(inviteWsId) || null)) : scopeWorkspaceId;
     if (needsWorkspace && !effectiveWsId) {
       setFormError("Select a workspace for this role.");
       return;
@@ -1930,7 +1933,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         actions={
           <SchemaGate elementKey="invite_member">
             <PermissionAction actionKey={SETTINGS_ACTIONS.memberInvite.actionKey} scope={memberActionScope}>
-              <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
+              <QuickCreateButton onClick={() => { setInviteRoleId(""); setInviteOrgId(scopeOrganizationId ?? ""); setInviteWsId(scopeWorkspaceId ?? ""); setInviteOpen(true); }}>Invite Member</QuickCreateButton>
             </PermissionAction>
           </SchemaGate>
         }
@@ -2009,7 +2012,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
             "Not tracked yet",
             ...(hasAnyAction ? [<div key={row.userId} className="flex flex-wrap gap-2">
               <PermissionGate permission="settings.member.view" label="View Member Detail">
-                <SettingsLinkButton href={`/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
+                <SettingsLinkButton href={organizationId ? `/settings/organizations/${organizationId}/members/${row.userId}` : `/settings/members/${row.userId}`} variant="outline">View</SettingsLinkButton>
               </PermissionGate>
               {!isGlobalDirectory ? (
                 <PermissionGate permission="settings.role.manage">
@@ -2042,7 +2045,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
           <select
             aria-label="Invite role"
             value={inviteRoleId}
-            onChange={(e) => { setInviteRoleId(e.target.value); setInviteOrgId(""); setInviteWsId(""); }}
+            onChange={(e) => { setInviteRoleId(e.target.value); setInviteOrgId(scopeOrganizationId ?? ""); setInviteWsId(scopeWorkspaceId ?? ""); }}
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
           >
             <option value="">Default member</option>
@@ -2051,15 +2054,19 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         </FormField>
         {inviteRoleScopeCategory !== "platform" ? (
           <FormField label="Organization" required>
-            <select
-              aria-label="Invite organization"
-              value={inviteOrgId}
-              onChange={(e) => { setInviteOrgId(Number(e.target.value) || ""); setInviteWsId(""); }}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">Select organization</option>
-              {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-            </select>
+            {scopeOrganizationId ? (
+              <Input value={lockedInviteOrganization?.name ?? `Organization ${scopeOrganizationId}`} readOnly />
+            ) : (
+              <select
+                aria-label="Invite organization"
+                value={inviteOrgId}
+                onChange={(e) => { setInviteOrgId(Number(e.target.value) || ""); setInviteWsId(""); }}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Select organization</option>
+                {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+              </select>
+            )}
           </FormField>
         ) : (
           <FormField label="Scope">
@@ -2068,17 +2075,21 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
         )}
         {(inviteRoleScopeCategory === "workspace" || inviteRoleScopeCategory === "project" || inviteRoleScopeCategory === "team") ? (
           <FormField label="Workspace" required>
-            <select
-              aria-label="Invite workspace"
-              value={inviteWsId}
-              onChange={(e) => setInviteWsId(Number(e.target.value) || "")}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <option value="">Select workspace</option>
-              {workspaces
-                .filter((ws) => !inviteOrgId || ws.organization_id === Number(inviteOrgId))
-                .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
-            </select>
+            {scopeWorkspaceId ? (
+              <Input value={lockedInviteWorkspace?.name ?? `Workspace ${scopeWorkspaceId}`} readOnly />
+            ) : (
+              <select
+                aria-label="Invite workspace"
+                value={inviteWsId}
+                onChange={(e) => setInviteWsId(Number(e.target.value) || "")}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">Select workspace</option>
+                {workspaces
+                  .filter((ws) => (scopeOrganizationId ? ws.organization_id === scopeOrganizationId : !inviteOrgId || ws.organization_id === Number(inviteOrgId)))
+                  .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
+              </select>
+            )}
           </FormField>
         ) : null}
         <FormActions submitLabel="Invite Member" isSubmitting={inviteMutation.isPending} onCancel={() => { setInviteOpen(false); setInviteRoleId(""); setInviteOrgId(""); setInviteWsId(""); setFormError(null); }} />
@@ -2242,7 +2253,13 @@ function memberSortValue(row: MemberListRow, sortKey: string) {
   return row.name.toLowerCase();
 }
 
-export function MemberDetailView({ userId }: { userId: number }) {
+export function MemberDetailView({
+  userId,
+  scope,
+}: {
+  userId: number;
+  scope?: { type: "organization"; organizationId: number };
+}) {
   const { organizations, workspaces } = useSettingsData();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -2254,6 +2271,8 @@ export function MemberDetailView({ userId }: { userId: number }) {
   const [assignRoleId, setAssignRoleId] = useState("");
   const [assignOrgId, setAssignOrgId] = useState<number | "">("");
   const [assignWsId, setAssignWsId] = useState<number | "">("");
+  const scopedOrganizationId = scope?.type === "organization" ? scope.organizationId : null;
+  const scopedOrganization = scopedOrganizationId ? organizations.find((organization) => organization.id === scopedOrganizationId) : undefined;
   const userQuery = useQuery({ queryKey: ["settings", "user", userId], queryFn: () => settingsApi.getUser(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const userRolesQuery = useQuery({ queryKey: ["settings", "user-roles", userId], queryFn: () => settingsApi.listUserRoles(accessToken ?? "", userId), enabled: Boolean(accessToken && userId) });
   const rolesQuery = useQuery({ queryKey: ["settings", "roles"], queryFn: () => settingsApi.listRoles(accessToken ?? ""), enabled: Boolean(accessToken) });
@@ -2262,24 +2281,27 @@ export function MemberDetailView({ userId }: { userId: number }) {
     queryFn: () => settingsApi.listRoleAssignments(accessToken ?? "", { user_id: userId }),
     enabled: Boolean(accessToken && userId)
   });
-  const currentPermissions = useCurrentPermissions();
-  const effectiveScope = selectedProjectId
-    ? { scope_type: "project", scope_id: selectedProjectId }
-    : selectedWorkspaceId
-      ? { scope_type: "workspace", scope_id: selectedWorkspaceId }
-      : selectedOrganizationId
-        ? { scope_type: "organization", scope_id: selectedOrganizationId }
-        : { scope_type: "platform", scope_id: null };
+  const currentPermissions = useCurrentPermissions(scopedOrganizationId ? { orgId: scopedOrganizationId } : undefined);
+  const effectiveScope = scopedOrganizationId
+    ? { scope_type: "organization", scope_id: scopedOrganizationId }
+    : selectedProjectId
+      ? { scope_type: "project", scope_id: selectedProjectId }
+      : selectedWorkspaceId
+        ? { scope_type: "workspace", scope_id: selectedWorkspaceId }
+        : selectedOrganizationId
+          ? { scope_type: "organization", scope_id: selectedOrganizationId }
+          : { scope_type: "platform", scope_id: null };
   const effectivePermissionsQuery = useQuery({
     queryKey: ["settings", "effective-permissions", userId, effectiveScope.scope_type, effectiveScope.scope_id],
     queryFn: () => settingsApi.getUserEffectivePermissions(accessToken ?? "", userId, effectiveScope),
     enabled: Boolean(accessToken && userId)
   });
   const visibleRoles = filterVisibleRoles(rolesQuery.data ?? [], canViewProtectedRoles(currentUser, currentPermissions));
+  const assignableRoles = scopedOrganizationId ? visibleRoles.filter((role) => role.scope !== "platform") : visibleRoles;
   // Active role_assignments is the source of truth — user_roles only has backward-compat unscoped data.
   const activeAssignments = (roleAssignmentsQuery.data ?? []).filter((a) => a.status === "active");
   const memberRoleIds = activeAssignments.map((assignment) => assignment.role_id);
-  const assignSelectedRole = visibleRoles.find((role) => role.id === Number(assignRoleId));
+  const assignSelectedRole = assignableRoles.find((role) => role.id === Number(assignRoleId));
   const assignScopeCategory: "platform" | "organization" | "workspace" | "project" | "team" = (() => {
     const scope = assignSelectedRole?.scope ?? "";
     if (scope === "organization") return "organization";
@@ -2323,13 +2345,30 @@ export function MemberDetailView({ userId }: { userId: number }) {
     onError: (error) => addToast({ type: "error", title: "Role removal failed", message: error instanceof Error ? error.message : "Unable to remove role." })
   });
   const user = userQuery.data;
-  const availableRoles = visibleRoles.filter((role) => !memberRoleIds.includes(role.id));
+  const availableRoles = assignableRoles.filter((role) => !memberRoleIds.includes(role.id));
+  const detailBackHref = scopedOrganizationId ? `/settings/organizations/${scopedOrganizationId}/members` : "/settings/members";
+  const detailBackLabel = scopedOrganizationId ? "Back to Organization Members" : "Back to Members";
+  const detailBreadcrumbs = scopedOrganizationId
+    ? [
+        { label: "Settings", href: "/settings" },
+        { label: "Organizations", href: "/settings/organizations" },
+        { label: scopedOrganization?.name ?? `Organization ${scopedOrganizationId}`, href: `/settings/organizations/${scopedOrganizationId}` },
+        { label: "Members", href: `/settings/organizations/${scopedOrganizationId}/members` },
+        { label: displayUser(user, userId).name }
+      ]
+    : [{ label: "Settings", href: "/settings" }, { label: "Members", href: "/settings/members" }, { label: displayUser(user, userId).name }];
   return (
     <SettingsLayout
-      breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Members", href: "/settings/members" }, { label: displayUser(user, userId).name }]}
-      backHref="/settings/members"
-      backLabel="Back to Members"
-      parentContext={{ label: "Member", title: displayUser(user, userId).name, meta: "Detailed user profile lookup pending when core-service returns only membership IDs." }}
+      breadcrumbs={detailBreadcrumbs}
+      backHref={detailBackHref}
+      backLabel={detailBackLabel}
+      parentContext={{
+        label: scopedOrganizationId ? "Organization Member" : "Member",
+        title: displayUser(user, userId).name,
+        meta: scopedOrganizationId
+          ? `Organization: ${scopedOrganization?.name ?? `Organization ${scopedOrganizationId}`}`
+          : "Detailed user profile lookup pending when core-service returns only membership IDs."
+      }}
     >
       <SettingsSectionHeader title={displayUser(user, userId).name} description="Member details, assigned roles, teams, projects, and activity placeholders." />
       <SettingsCard title="Overview">
@@ -2397,22 +2436,26 @@ export function MemberDetailView({ userId }: { userId: number }) {
                 <select
                   aria-label="Assign member role"
                   value={assignRoleId}
-                  onChange={(event) => { setAssignRoleId(event.target.value); setAssignOrgId(""); setAssignWsId(""); }}
+                  onChange={(event) => { setAssignRoleId(event.target.value); setAssignOrgId(scopedOrganizationId ?? ""); setAssignWsId(""); }}
                   className="h-9 rounded-md border bg-background px-3 text-sm"
                 >
                   <option value="">Select role</option>
                   {availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
                 </select>
                 {assignScopeCategory !== "platform" ? (
-                  <select
-                    aria-label="Assign organization"
-                    value={assignOrgId}
-                    onChange={(e) => { setAssignOrgId(Number(e.target.value) || ""); setAssignWsId(""); }}
-                    className="h-9 rounded-md border bg-background px-3 text-sm"
-                  >
-                    <option value="">Select org</option>
-                    {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-                  </select>
+                  scopedOrganizationId ? (
+                    <Input value={scopedOrganization?.name ?? `Organization ${scopedOrganizationId}`} readOnly className="h-9 w-48" />
+                  ) : (
+                    <select
+                      aria-label="Assign organization"
+                      value={assignOrgId}
+                      onChange={(e) => { setAssignOrgId(Number(e.target.value) || ""); setAssignWsId(""); }}
+                      className="h-9 rounded-md border bg-background px-3 text-sm"
+                    >
+                      <option value="">Select org</option>
+                      {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+                    </select>
+                  )
                 ) : null}
                 {(assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") ? (
                   <select
@@ -2423,7 +2466,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
                   >
                     <option value="">Select workspace</option>
                     {workspaces
-                      .filter((ws) => !assignOrgId || ws.organization_id === Number(assignOrgId))
+                      .filter((ws) => (scopedOrganizationId ? ws.organization_id === scopedOrganizationId : !assignOrgId || ws.organization_id === Number(assignOrgId)))
                       .map((ws) => <option key={ws.id} value={ws.id}>{ws.name}</option>)}
                   </select>
                 ) : null}
@@ -2432,7 +2475,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
                   size="sm"
                   disabled={
                     !assignRoleId ||
-                    (assignScopeCategory !== "platform" && !assignOrgId) ||
+                    (assignScopeCategory !== "platform" && !(scopedOrganizationId || assignOrgId)) ||
                     ((assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team") && !assignWsId) ||
                     assignRoleMutation.isPending
                   }
@@ -2441,7 +2484,7 @@ export function MemberDetailView({ userId }: { userId: number }) {
                       assignScopeCategory === "workspace" || assignScopeCategory === "project" || assignScopeCategory === "team"
                         ? Number(assignWsId) || null
                         : assignScopeCategory === "organization"
-                          ? Number(assignOrgId) || null
+                          ? scopedOrganizationId ?? (Number(assignOrgId) || null)
                           : null;
                     assignRoleMutation.mutate({ role_id: Number(assignRoleId), scope_type: assignScopeCategory, scope_id: scopeId });
                   }}
