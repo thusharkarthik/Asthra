@@ -248,8 +248,10 @@ export function AsthraShell({ children }: { children: ReactNode }) {
   }, [isSkippedUser, pathname, router]);
 
   useEffect(() => {
-    if (organizations.length > 0) setSkippedOnboardingUserId(null);
-  }, [organizations.length]);
+    if (organizations.length === 0 || skippedOnboardingUserId == null) return;
+    if (currentUser?.id != null && skippedOnboardingUserId !== currentUser.id) return;
+    setSkippedOnboardingUserId(null);
+  }, [currentUser?.id, organizations.length, skippedOnboardingUserId]);
 
   if (isPublicPath) {
     return (

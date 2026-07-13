@@ -1,4 +1,4 @@
-import { apiRequest } from "@/services/api/client";
+import { ApiError, apiRequest } from "@/services/api/client";
 import type {
   ApiKeyRecord,
   CoreNotificationRecord,
@@ -42,6 +42,19 @@ export type OrgSettingsRecord = {
   primary_color: string | null;
   locale: string | null;
   date_format: string | null;
+};
+
+const DEFAULT_ORG_SETTINGS: OrgSettingsRecord = {
+  default_timezone: "UTC",
+  allow_public_invites: false,
+  default_member_role: "member",
+  domain: null,
+  website_url: null,
+  industry: null,
+  logo_url: null,
+  primary_color: null,
+  locale: "en",
+  date_format: "YYYY-MM-DD",
 };
 
 export type WorkspaceSettingsRecord = {
@@ -349,8 +362,15 @@ export const settingsApi = {
   listApiKeys(token: string) {
     return apiRequest<ApiKeyRecord[]>(`${CORE_PREFIX}/api-keys`, { method: "GET", authToken: token });
   },
-  getOrganizationSettings(token: string, orgId: number) {
-    return apiRequest<OrgSettingsRecord>(`${CORE_PREFIX}/organizations/${orgId}/settings`, { method: "GET", authToken: token });
+  async getOrganizationSettings(token: string, orgId: number) {
+    try {
+      return await apiRequest<OrgSettingsRecord>(`${CORE_PREFIX}/organizations/${orgId}/settings`, { method: "GET", authToken: token });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return DEFAULT_ORG_SETTINGS;
+      }
+      throw error;
+    }
   },
   updateOrganizationSettings(token: string, orgId: number, payload: Partial<OrgSettingsRecord>) {
     return apiRequest<OrgSettingsRecord>(`${CORE_PREFIX}/organizations/${orgId}/settings`, { method: "PATCH", authToken: token, json: payload });

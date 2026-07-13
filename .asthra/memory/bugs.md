@@ -2,6 +2,38 @@
 
 ## Fixed
 
+### BUG-058 — PlatformContextProvider Re-Synced Workspace Store on Context Object Identity [FIXED 2026-07-13]
+
+**Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/stores/workspace-store.ts`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: After the workspace-store guard hardening, Archive/Restore still produced `Maximum update depth exceeded`. Stack still pointed to `setPlatformContext` called by `PlatformContextProvider`, with repeated platform context requests.
+**Root cause**: `PlatformContextProvider` still keyed the workspace-store sync effect on the full `contextQuery.data` object. Platform context refetches can produce new object identities for unchanged workspace-scope data, so the effect kept calling `setPlatformContext` despite equivalent org/workspace/project scope snapshots.
+**Fix**: Split provider sync into two effects: one for workspace-store scope data and one for auth user data. Workspace-store sync now runs from a stable key built only from current org/workspace/project ids and organization/workspace/project id/parent/lifecycle snapshots, excluding permissions, navigation, modules, feature flags, AI/config/search metadata, and query object identity.
+**Verification**: Repository-local `./node_modules/.bin/tsc --noEmit` remains blocked by stale `.next/types` artifacts. `./node_modules/.bin/tsc --noEmit` passed from a clean `/tmp/asthra-frontend-tsc` copy with repository `node_modules` symlinked.
+
+### BUG-057 — PlatformContext Store Sync Rewrote Invalid Scope After Archive/Restore [FIXED 2026-07-13]
+
+**Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/stores/workspace-store.ts`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: Organization Archive/Restore succeeded, then the app showed React runtime error `Maximum update depth exceeded`. Stack pointed to `setPlatformContext` in `workspace-store.ts`, called from `PlatformContextProvider`.
+**Root cause**: `PlatformContextProvider` legitimately refetches platform context after lifecycle changes and syncs the result into `workspace-store`. `setPlatformContext` accepted `currentOrganizationId/currentWorkspaceId/currentProjectId` even when those ids were not present in the incoming organization/workspace/project arrays, and its id-only equality check was not strict enough for lifecycle state. This allowed repeated writes of effectively unstable scope state during post-archive context refetches.
+**Fix**: `setPlatformContext` now validates incoming current scope ids against the incoming arrays before selecting them. It skips store writes when selected ids and entity id/version/active snapshots are unchanged, while still updating when lifecycle state or actual scope data changes.
+**Verification**: Repository-local `./node_modules/.bin/tsc --noEmit` remains blocked by stale `.next/types` artifacts. `./node_modules/.bin/tsc --noEmit` passed from a clean `/tmp/asthra-frontend-tsc` copy with repository `node_modules` symlinked.
+
+### BUG-056 — AsthraShell Onboarding Skip Clear Caused Update Loop After Archive/Restore [FIXED 2026-07-13]
+
+**Files**: `frontend/src/layouts/asthra-shell.tsx`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: Organization Archive/Restore succeeded, then the app showed React runtime error `Maximum update depth exceeded`. Refresh cleared the problem. Stack pointed to the shell effect that clears skipped onboarding state when organizations exist.
+**Root cause**: `AsthraShell` called `setSkippedOnboardingUserId(null)` every time `organizations.length > 0`, even when the skip state was already cleared. Archive/restore invalidates platform context and refetches organization data, repeatedly re-entering that effect during the post-action refresh path.
+**Fix**: The skip clear effect now only calls the setter when `skippedOnboardingUserId` is non-null and either no current user is known or the skipped id matches the current user. Dependency tracking now includes the skipped id and current user id.
+**Verification**: Repository-local `./node_modules/.bin/tsc --noEmit` remains blocked by stale `.next/types` artifacts. `./node_modules/.bin/tsc --noEmit` passed from a clean `/tmp/asthra-frontend-tsc` copy with repository `node_modules` symlinked.
+
+### BUG-055 — Optional Organization Settings 404 Crashed After Archive/Restore [FIXED 2026-07-13]
+
+**Files**: `frontend/src/services/api/settings-api.ts`, `frontend/src/app/settings/organizations/[id]/page.tsx`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
+**Symptom**: Organization Archive and Restore completed successfully, then the page showed an application error. Refresh fixed the page. Console showed `GET /api/core/api/v1/organizations/{id}/settings 404`.
+**Root cause**: The organization detail route treated `/organizations/{id}/settings` as a normal required query even though the active Core backend does not implement that endpoint. Archive/restore success also invalidated `["org-settings", orgId]`, forcing a refetch of the optional endpoint immediately after lifecycle changes.
+**Fix**: `settingsApi.getOrganizationSettings()` now treats 404 as optional missing settings and returns safe defaults. Archive/restore invalidation now refreshes canonical organization detail/list, platform context, context version, and scoped permissions without forcing an org-settings refetch.
+**Verification**: Repository-local `./node_modules/.bin/tsc --noEmit` is blocked by stale `.next/types` artifacts from prior builds. `./node_modules/.bin/tsc --noEmit` passed from a clean `/tmp/asthra-frontend-tsc` copy with repository `node_modules` symlinked.
+
 ### BUG-054 — Organization Archive/Restore Hidden by Delete-Based Schema Gate [FIXED 2026-07-13]
 
 **Files**: `frontend/src/app/settings/organizations/[id]/page.tsx`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`
@@ -472,3 +504,14 @@
 **Fix**:
 1. **`platformContext.tsx`**: Added `prevGodModeReady = useRef(false)`. Added `useEffect` watching `isGodModeReady`: on `true → false` transition, calls `setSelectedOrganization(null)`, `setSelectedWorkspace(null)`, `setSelectedProject(null)`, then `void contextQuery.refetch()` — ensuring real scope IDs are cleared before the fresh context fetch.
 2. **`permission-simulator.ts`**: In `deactivateGodMode`, call `useGodModeTracker.getState().clearAll()` before `set({ isDeactivating: true })` — clears tracker before exit animation starts.
+
+### BUG-059 — Platform Context Workspace Sync Key Still Replayed After Archive/Restore [FIXED 2026-07-13]
+
+**Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/stores/workspace-store.ts`
+**Symptom**: Organization Archive/Restore succeeded, but post-action platform context refetches could still trigger a React maximum update depth error through `PlatformContextProvider` -> `workspace-store.setPlatformContext`.
+**Root cause**: The first workspace sync hardening still included volatile fields such as `updated_at` in the provider/store snapshots and did not keep a ref-level guard for the last synced workspace key. Refetches with the same effective org/workspace/project scope but new timestamps or object identities could repeatedly call the store sync path.
+**Fix**:
+1. `PlatformContextProvider` now builds the workspace sync key only from current org/workspace/project ids, organization id + active state, workspace id + organization id, and project id + workspace id.
+2. The provider keeps `lastWorkspaceSyncKeyRef` and `lastWorkspaceSyncTokenRef`, so the same workspace key is not synced twice for the same access token.
+3. `workspace-store` compares stable sorted snapshots and no longer treats timestamp-only changes as workspace state changes.
+**Validation**: Safe frontend type validation passed from a clean `/tmp/asthra-frontend-tsc` copy; repository-local validation remains blocked by stale `.next/types` artifacts.
