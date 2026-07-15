@@ -1,10 +1,29 @@
 # Platform State
 
-Last updated: 2026-07-07 (Permission Schema System — declarative schema panel showing all page elements, including hidden ones)
+Last updated: 2026-07-15 (Core Navigation Registry v1 — backend-resolved sidebar/nav metadata)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
+
+## Core Navigation Registry v1 (added 2026-07-15)
+
+**Purpose**: Core now owns a code-defined Navigation Registry that describes where existing capabilities appear in the UI. Module Registry still defines what capabilities exist, Feature Flags define availability, and RBAC permissions define user access.
+
+**Backend (`services/core-service/`)**:
+- `services/navigation_registry.py`: Code-defined navigation item catalog plus resolver. Items carry mode, group, route, icon, order, optional module key, optional feature flag, and any-of permission requirements.
+- `schemas/navigation.py`: Platform-context/API schemas for resolved navigation.
+- `api/v1/navigation.py`: Added resolved navigation endpoint and admin registry endpoint.
+- `api/v1/context.py`: Unified Platform Context now includes `navigation`.
+- `services/permission_registry.py`: Added `settings.navigation.view` and `settings.navigation.manage` for future navigation registry/configuration management.
+
+**Frontend (`frontend/src/`)**:
+- Platform context types now accept `navigation`.
+- `usePlatformContext()` exposes `navigation` with safe defaults.
+- Sidebar priority is now: resolved Core Navigation Registry -> Module Registry-derived nav -> static fallback.
+- No sidebar customization UI was added.
+
+**Design rule**: Navigation controls visibility and UX only. It must not grant access; backend route/page permission checks remain authoritative.
 
 ## Branch
 

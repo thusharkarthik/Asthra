@@ -13,6 +13,7 @@ from app.services.configuration_registry import ConfigurationRegistryService
 from app.services.context_version_service import ContextVersionService
 from app.services.global_search_registry import GlobalSearchRegistryService
 from app.services.module_registry import ModuleRegistryService
+from app.services.navigation_registry import NavigationRegistryService
 from app.services.organization_service import OrganizationService
 from app.services.organization_templates import OrganizationTemplateService
 from app.services.project_service import ProjectService
@@ -77,6 +78,11 @@ def get_platform_context(
         scope_type=scope_type,
         scope_id=scope_id,
         navigation_mode=resolved_navigation_mode,
+    )
+    navigation = NavigationRegistryService(db).resolve_navigation_for_context(
+        current_user,
+        scope_type=scope_type,
+        scope_id=scope_id,
     )
     ai_context = AIContextRegistryService(db).get_ai_context_metadata(
         current_user,
@@ -171,6 +177,7 @@ def get_platform_context(
         "feature_flags": perms.get("feature_flags", {}),
         "enabled_modules": perms.get("enabled_modules", []),
         "modules": modules,
+        "navigation": navigation,
         "ai_context": ai_context,
         "configuration": configuration,
         "search": search,

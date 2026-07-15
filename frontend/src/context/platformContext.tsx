@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, SearchMetadata, WorkspaceRecord } from "@/types/core";
+import type { AIContextMetadata, ConfigurationMetadata, ContextVersionSnapshot, CoreUser, CurrentUserPermissions, ModuleRegistryItem, Organization, OrganizationTemplateMetadata, ProjectRecord, ResolvedNavigation, SearchMetadata, WorkspaceRecord } from "@/types/core";
 import { useContextVersion } from "@/hooks/use-context-version";
 import { can as hasPermission } from "@/lib/permissions";
 import { detectNavigationMode } from "@/lib/navigation-mode";
@@ -37,6 +37,7 @@ type PlatformContextValue = {
   featureFlags: Record<string, boolean>;
   enabledModules: string[];
   availableModules: ModuleRegistryItem[];
+  navigation: ResolvedNavigation;
   aiContext: AIContextMetadata;
   configuration: ConfigurationMetadata;
   search: SearchMetadata;
@@ -58,6 +59,11 @@ type PlatformContextValue = {
 };
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
+
+const EMPTY_NAVIGATION: ResolvedNavigation = {
+  version: 1,
+  modes: {},
+};
 
 function joinSnapshot<T extends { id?: number }>(items: T[], mapItem: (item: T) => string) {
   return [...items]
@@ -286,6 +292,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
   const featureFlags: Record<string, boolean> = hasAccessToken ? contextQuery.data?.feature_flags ?? {} : {};
   const enabledModules: string[] = hasAccessToken ? contextQuery.data?.enabled_modules ?? [] : [];
   const availableModules: ModuleRegistryItem[] = hasAccessToken ? contextQuery.data?.modules ?? [] : [];
+  const navigation: ResolvedNavigation = hasAccessToken && contextQuery.data?.navigation ? contextQuery.data.navigation : EMPTY_NAVIGATION;
   const aiContext: AIContextMetadata = hasAccessToken && contextQuery.data?.ai_context ? contextQuery.data.ai_context : {
     available: false,
     endpoint: "/api/v1/ai/context",
@@ -350,6 +357,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     featureFlags,
     enabledModules,
     availableModules,
+    navigation,
     aiContext,
     configuration,
     search,
@@ -399,6 +407,7 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
     isFetching,
     isLoading,
     isSimulating,
+    navigation,
     isGodModeReady,
     isEditMode,
     enabledModules,
