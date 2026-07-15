@@ -192,7 +192,8 @@ export function PlatformContextProvider({ children }: { children: ReactNode }) {
       currentWorkspaceId: d.current_workspace?.id ?? null,
       currentProjectId: d.current_project?.id ?? null,
     });
-  }, [accessToken, setPlatformContext, workspaceSyncKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, workspaceSyncKey]);
 
   useEffect(() => {
     if (!accessToken || !contextQuery.data || !userSyncKey) return;
