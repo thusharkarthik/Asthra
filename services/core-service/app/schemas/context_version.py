@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.schemas.ai_context import AIContextMetadataRead
 from app.schemas.configuration import ConfigurationMetadataRead
+from app.schemas.navigation import NavigationResponse
 from app.schemas.organization_template import OrganizationTemplateMetadataRead
 from app.schemas.search import SearchMetadataRead
 
@@ -98,6 +99,7 @@ class PlatformContextResponse(BaseModel):
     feature_flags: dict[str, bool]
     enabled_modules: list[str]
     modules: list[ModuleContextRead]
+    navigation: NavigationResponse
     ai_context: AIContextMetadataRead
     configuration: ConfigurationMetadataRead
     search: SearchMetadataRead

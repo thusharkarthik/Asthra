@@ -248,6 +248,28 @@ export type ModuleRegistryItem = {
   visible: boolean;
 };
 
+export type NavigationRegistryItem = {
+  nav_key: string;
+  label: string;
+  route: string;
+  mode: string;
+  group: string;
+  icon: string;
+  order: number;
+  required_any_permissions: string[];
+  required_feature_flag?: string | null;
+  module_key?: string | null;
+  default_visible: boolean;
+  is_customizable: boolean;
+  description?: string | null;
+  children?: NavigationRegistryItem[];
+};
+
+export type ResolvedNavigation = {
+  version: number;
+  modes: Record<string, { items: NavigationRegistryItem[] }>;
+};
+
 export type AIContextMetadata = {
   available: boolean;
   endpoint: string;

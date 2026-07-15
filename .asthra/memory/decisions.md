@@ -1,5 +1,13 @@
 # Architectural Decisions
 
+## 2026-07-15 — Core Navigation Registry Owns Sidebar Metadata, Not Access
+
+**Decision**: Core owns a code-defined Navigation Registry for sidebar/navigation item metadata. The frontend should prefer resolved navigation from Unified Platform Context, then fall back to Module Registry-derived navigation, then static fallback navigation while context is loading or older APIs are in use.
+
+**Why**: Module Registry describes capabilities, Feature Flags describe availability, and RBAC permissions describe authority. Navigation needs its own layer for where visible capabilities appear in the UI without overloading Module Registry or hardcoding every sidebar item only in the frontend.
+
+**How to apply**: Add navigation items to `services/core-service/app/services/navigation_registry.py` with explicit mode/group/order/route/icon and backend permission codes. Navigation visibility may hide items, but it must never grant access. Backend endpoint guards and route/page permission checks remain authoritative. Future sidebar customization may hide/reorder items but cannot bypass feature flags or permissions.
+
 ## 2026-07-13 — Organization Lifecycle Actions Use Explicit Archive/Restore Permissions
 
 **Decision**: Runtime organization archive and restore controls are gated by `settings.organization.archive` and `settings.organization.restore` directly. They must not be hidden behind a generic danger-zone schema entry or a delete permission. Archived organization detail routes must load the organization by id rather than relying on active-only platform context/list data.

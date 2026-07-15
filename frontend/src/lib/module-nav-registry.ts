@@ -1,11 +1,13 @@
 import {
   Activity,
   BarChart3,
+  Bell,
   BookOpen,
   Bot,
   Brain,
   Building2,
   Code2,
+  FolderKanban,
   Home,
   Key,
   Layers,
@@ -24,7 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ModuleRegistryItem } from "@/types/core";
+import type { ModuleRegistryItem, NavigationRegistryItem, ResolvedNavigation } from "@/types/core";
 import type { ModeNavItem, ModeNavSection, NavigationMode } from "@/lib/navigation-mode";
 
 // Derive icon from module_key — more reliable than icon string from DB
@@ -62,6 +64,34 @@ export const MODULE_KEY_ICON_MAP: Record<string, LucideIcon> = {
   memory: Brain,
   assistant: Bot,
   guard: Shield,
+};
+
+const ICON_NAME_MAP: Record<string, LucideIcon> = {
+  activity: Activity,
+  bar_chart3: BarChart3,
+  bell: Bell,
+  book_open: BookOpen,
+  bot: Bot,
+  brain: Brain,
+  building2: Building2,
+  code2: Code2,
+  folder_kanban: FolderKanban,
+  home: Home,
+  key: Key,
+  layers: Layers,
+  lightbulb: Lightbulb,
+  message_square: MessageSquare,
+  plug: Plug,
+  scroll_text: ScrollText,
+  settings: Settings,
+  shield: Shield,
+  sliders_horizontal: SlidersHorizontal,
+  ticket: Ticket,
+  user: User,
+  users: Users,
+  users_round: UsersRound,
+  workflow: Workflow,
+  zap: Zap,
 };
 
 // Backend category field → sidebar section label
@@ -146,4 +176,38 @@ export function buildNavSections(
     if (!SECTION_ORDER.includes(label)) result.push({ label, items });
   }
   return result;
+}
+
+export function buildNavSectionsFromNavigation(
+  navigation: ResolvedNavigation | null | undefined,
+  navigationMode: NavigationMode,
+): ModeNavSection[] {
+  const items = navigation?.modes?.[navigationMode]?.items ?? [];
+  if (items.length === 0) return [];
+
+  const sectionMap = new Map<string, ModeNavItem[]>();
+  for (const item of [...items].sort((a, b) => a.order - b.order)) {
+    if (!sectionMap.has(item.group)) sectionMap.set(item.group, []);
+    sectionMap.get(item.group)!.push(navItemToModeItem(item));
+  }
+
+  const result: ModeNavSection[] = [];
+  for (const label of SECTION_ORDER) {
+    const sectionItems = sectionMap.get(label);
+    if (sectionItems) result.push({ label, items: sectionItems });
+  }
+  for (const [label, sectionItems] of sectionMap) {
+    if (!SECTION_ORDER.includes(label)) result.push({ label, items: sectionItems });
+  }
+  return result;
+}
+
+function navItemToModeItem(item: NavigationRegistryItem): ModeNavItem {
+  return {
+    label: item.label,
+    href: item.route,
+    icon: ICON_NAME_MAP[item.icon] ?? (item.module_key ? MODULE_KEY_ICON_MAP[item.module_key] : undefined) ?? Home,
+    permission: item.required_any_permissions.length > 0 ? item.required_any_permissions[0] : undefined,
+    permissions: item.required_any_permissions,
+  };
 }

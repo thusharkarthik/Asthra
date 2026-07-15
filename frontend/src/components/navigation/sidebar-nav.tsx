@@ -10,7 +10,7 @@ import { usePlatformContext } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
 import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
 import { navSectionsForMode } from "@/lib/navigation-mode";
-import { buildNavSections } from "@/lib/module-nav-registry";
+import { buildNavSections, buildNavSectionsFromNavigation } from "@/lib/module-nav-registry";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { PermissionGate } from "@/components/platform/permission-gate";
 import { GodModeActivation } from "@/components/platform/god-mode-activation";
@@ -43,7 +43,7 @@ export function SidebarNav({
   onModeOverride?: (mode: NavigationMode | null) => void;
 }) {
   const pathname = usePathname();
-  const { selectedOrganization, selectedWorkspace, can, permissions, availableModules } = usePlatformContext();
+  const { selectedOrganization, selectedWorkspace, can, permissions, availableModules, navigation } = usePlatformContext();
   const accessToken = useAuthStore((state) => state.accessToken);
 
   const isSimulating = useSimulationStore((state) => state.isSimulating);
@@ -66,14 +66,16 @@ export function SidebarNav({
   });
 
   const effectiveMode: NavigationMode = modeOverride ?? navigationMode;
-  // Dynamic nav: use when modules loaded for the correct mode.
-  // buildNavSections returns [] when modules are cached for a different mode
-  // (e.g., platform modules in cache while user needs "org") — fall through to
-  // static nav so the sidebar is never empty during mode transitions.
+  // Core Navigation Registry is the primary source when present.
+  // Module Registry-derived nav remains the compatibility fallback, and the
+  // static nav keeps the shell usable while context is loading or on older APIs.
+  const resolvedSections = buildNavSectionsFromNavigation(navigation, effectiveMode);
   const dynamicSections = availableModules.length > 0
     ? buildNavSections(availableModules, effectiveMode)
     : [];
-  const sections = dynamicSections.length > 0
+  const sections = resolvedSections.length > 0
+    ? resolvedSections
+    : dynamicSections.length > 0
     ? dynamicSections
     : navSectionsForMode(effectiveMode);
 
