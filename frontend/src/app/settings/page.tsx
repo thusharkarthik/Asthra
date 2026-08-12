@@ -10,6 +10,7 @@ const PERSONAL_CARDS = [
   { title: "Preferences", href: "/settings/preferences" },
   { title: "Notifications", href: "/settings/notifications" },
   { title: "Account", href: "/settings/account" },
+  { title: "About Asthra", href: "/about" },
 ];
 
 export default function SettingsPage() {

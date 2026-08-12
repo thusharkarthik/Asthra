@@ -1,10 +1,22 @@
 # Platform State
 
-Last updated: 2026-07-15 (Core Navigation Registry v1 — backend-resolved sidebar/nav metadata)
+Last updated: 2026-08-12 (About Asthra in-app product definition page)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
+
+## About Asthra Product Definition Page (added 2026-08-12)
+
+**Purpose**: The authenticated app now includes `/about`, an in-app product and vision page that explains what Asthra is, why it exists, what Core currently provides, how modules fit together, and which future phases are planned.
+
+**Frontend (`frontend/src/`)**:
+- `app/about/page.tsx`: New page covering Asthra positioning, disconnected-tool problem, differentiators, current Core foundation, module/service map, future phases, and principles.
+- `app/settings/page.tsx`: Personal Settings now links to About Asthra.
+- `components/settings/settings-admin-views.tsx`: Admin Settings home and Settings navigation now link to About Asthra.
+- `lib/convention-help-registry.ts`: Help content added for `/about`.
+
+**Design rule**: The About page is authenticated product context, not a public marketing redesign. Sidebar/navigation registry wiring is intentionally deferred so navigation ownership remains stable.
 
 ## Core Navigation Registry v1 (added 2026-07-15)
 

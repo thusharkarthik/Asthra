@@ -750,3 +750,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Decision**: Sidebar behavior remains driven by Module Registry + feature flags + permission codes, with static navigation as fallback only. This batch audits and documents sidebar source/mapping but does not implement full sidebar customization.
 
 **Why**: The immediate QA issue is permission correctness and explainability, not user-customizable navigation. Customization would add product surface and persistence decisions beyond the RBAC lifecycle fix.
+
+## 2026-08-12 — About Asthra Is The In-App Product Definition Surface
+
+**Decision**: Asthra has an in-app `/about` page that documents the product vision, current foundation, module map, differentiation, and future phases. It is intended as a living product definition page and should be updated as services mature.
+
+**Why**: The platform now has many Core registries and planned modules. A dedicated authenticated page gives developers, admins, and future QA a single place to understand what Asthra is, what is built, what is planned, and how Core ties the product together.
+
+**How to apply**: Update `/about` when major product architecture changes land. Do not use the About page as a permission boundary or navigation source; backend permissions and the Core Navigation Registry keep their existing responsibilities.
