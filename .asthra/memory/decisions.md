@@ -758,3 +758,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: The platform now has many Core registries and planned modules. A dedicated authenticated page gives developers, admins, and future QA a single place to understand what Asthra is, what is built, what is planned, and how Core ties the product together.
 
 **How to apply**: Update `/about` when major product architecture changes land. Do not use the About page as a permission boundary or navigation source; backend permissions and the Core Navigation Registry keep their existing responsibilities.
+
+## 2026-08-12 — Navigation Customization Must Preserve Sidebar Baseline First
+
+**Decision**: Asthra navigation customization will be rebuilt in phases. Existing sidebar behavior is the fallback baseline. Navigation Registry and Role Navigation Config must be additive first and must not replace live sidebar behavior until explicitly enabled by feature flag.
+
+**Why**: Previous navigation customization attempts risked removing sidebar items, God Mode behavior, and bottom bar context. The current sidebar has a working source chain: Core Navigation Registry, then Module Registry fallback, then static fallback. Future customization must preserve that chain until QA proves replacement behavior is safe.
+
+**How to apply**: Keep the real sidebar fallback-safe. If Navigation Registry or Role Navigation Config is missing, invalid, empty, disabled, or failed, render the current baseline sidebar. Role Navigation Config may hide, show, lock, reorder, or group navigation items, but it cannot grant access; backend permissions and route/page guards remain authoritative.
