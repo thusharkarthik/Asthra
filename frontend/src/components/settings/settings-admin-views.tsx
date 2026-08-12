@@ -508,7 +508,8 @@ export function SettingsHomeView() {
     { title: "Members", value: "Manage", href: "/settings/members" },
     { title: "Teams", value: "Manage", href: "/settings/teams" },
     { title: "Access Control", value: "Manage", href: "/settings/access-control" },
-    { title: "API Keys", value: "Manage", href: "/settings/api-keys" }
+    { title: "API Keys", value: "Manage", href: "/settings/api-keys" },
+    { title: "About Asthra", value: "Read", href: "/about" }
   ];
 
   return (
@@ -582,6 +583,7 @@ export function SettingsHomeView() {
               <Link className="text-muted-foreground hover:text-foreground" href="/settings/audit-logs">Audit Logs</Link>
               <Link className="text-muted-foreground hover:text-foreground" href="/settings/integrations">Integrations</Link>
               <Link className="text-muted-foreground hover:text-foreground" href="/settings/ai-preferences">AI Preferences</Link>
+              <Link className="text-muted-foreground hover:text-foreground" href="/about">About Asthra</Link>
             </div>
           </div>
         </div>

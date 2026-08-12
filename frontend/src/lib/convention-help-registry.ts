@@ -32,6 +32,17 @@ export const HELP_CONTENT: Record<string, HelpContent> = {
     steps: [],
     cta: null,
   },
+  "/about": {
+    title: "About Asthra",
+    description: "Asthra is a modular execution operating system for organizations and teams. This page explains the product vision, current Core foundation, module map, and future phases.",
+    steps: [
+      { label: "Core", icon: "🏗️" },
+      { label: "Modules", icon: "🧩" },
+      { label: "Context", icon: "🧠" },
+      { label: "AI-ready", icon: "✨" },
+    ],
+    cta: null,
+  },
   "/flow": {
     title: "Flow",
     description: "Flow helps you plan, track, and deliver work. Create work items, organize them in backlog, plan sprints, move work across boards, and release completed work.",
