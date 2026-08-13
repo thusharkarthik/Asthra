@@ -15,10 +15,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePlatformContext } from "@/context/platformContext";
+import { calculateNavigationPreviewItems, countNavigationPreviewStates } from "@/lib/navigation-config-preview";
+import type { NavigationPreviewItem, NavigationPreviewState } from "@/lib/navigation-config-preview";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
-import type { NavigationRegistryItem, RoleNavigationConfigPreviewItem, RoleNavigationVisibility, RoleRecord } from "@/types/core";
+import type { NavigationRegistryItem, RoleNavigationVisibility, RoleRecord } from "@/types/core";
 
 const NAV_CONFIG_FLAG = "core.navigation_config.enabled";
 const NAVIGATION_MODES = [
@@ -98,21 +100,6 @@ const MODULE_PREVIEW_ICON_MAP: Record<string, LucideIcon> = {
 
 type ModeValue = (typeof NAVIGATION_MODES)[number]["value"];
 type EditorItemState = { visibility: RoleNavigationVisibility; orderOverride: string };
-type SidebarPreviewState = "allowed" | "locked" | "hidden";
-type SidebarPreviewItem = {
-  navKey: string;
-  label: string;
-  route: string;
-  group: string;
-  order: number;
-  icon: LucideIcon;
-  visibility: RoleNavigationVisibility;
-  state: SidebarPreviewState;
-  configSource: string;
-  requiredPermissions: string[];
-  missingPermissions: string[];
-  reason: string;
-};
 
 function asErrorMessage(error: unknown) {
   if (!error) return null;
@@ -162,43 +149,24 @@ function visibilityCounts(items: Array<{ preview_visibility: RoleNavigationVisib
   );
 }
 
-function configSourceLabel(visibility: RoleNavigationVisibility) {
-  if (visibility === "hidden") return "Hidden";
-  if (visibility === "show_when_allowed") return "Show when allowed";
-  if (visibility === "show_locked_if_denied") return "Show locked if denied";
-  return "Default";
-}
-
 function getPreviewIcon(iconName: string | undefined, moduleKey: string | null | undefined) {
   if (iconName && PREVIEW_ICON_MAP[iconName]) return PREVIEW_ICON_MAP[iconName];
   if (moduleKey && MODULE_PREVIEW_ICON_MAP[moduleKey]) return MODULE_PREVIEW_ICON_MAP[moduleKey];
   return Home;
 }
 
-function previewStateBadgeClass(state: SidebarPreviewState) {
+function previewStateBadgeClass(state: NavigationPreviewState) {
   if (state === "allowed") return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300";
   if (state === "locked") return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300";
   return "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300";
 }
 
-function groupSidebarPreviewItems(items: SidebarPreviewItem[]) {
-  return items.reduce<Record<string, SidebarPreviewItem[]>>((groups, item) => {
+function groupNavigationPreviewItems(items: NavigationPreviewItem[]) {
+  return items.reduce<Record<string, NavigationPreviewItem[]>>((groups, item) => {
     groups[item.group] ??= [];
     groups[item.group].push(item);
     return groups;
   }, {});
-}
-
-function buildPreviewBaseItems(previewItems: RoleNavigationConfigPreviewItem[] | undefined, modeItems: NavigationRegistryItem[]) {
-  if (previewItems?.length) return previewItems;
-  return modeItems.map((item) => ({
-    ...item,
-    config: null,
-    preview_visibility: "default" as RoleNavigationVisibility,
-    preview_label: item.label,
-    preview_group: item.group,
-    preview_order: item.order,
-  }));
 }
 
 export default function NavigationSettingsPage() {
@@ -267,7 +235,6 @@ export default function NavigationSettingsPage() {
     retry: false,
   });
 
-
   const permissionsQuery = useQuery({
     queryKey: ["settings", "navigation", "permissions"],
     queryFn: () => settingsApi.listPermissions(accessToken ?? ""),
@@ -319,72 +286,19 @@ export default function NavigationSettingsPage() {
   }, [permissionCodeById, rolePermissionsQuery.data]);
   const permissionEvaluationReady = permissionsQuery.isSuccess && rolePermissionsQuery.isSuccess;
   const permissionEvaluationUnavailable = permissionsQuery.isError || rolePermissionsQuery.isError;
-  const sidebarPreviewItems = useMemo<SidebarPreviewItem[]>(() => {
-    const baseItems = buildPreviewBaseItems(previewQuery.data?.items, modeItems);
-    return baseItems
-      .map((item) => {
-        const state = editorState[item.nav_key];
-        const visibility = state?.visibility ?? item.preview_visibility ?? "default";
-        const parsedOrder = state?.orderOverride?.trim() ? Number(state.orderOverride) : null;
-        const order = parsedOrder != null && Number.isFinite(parsedOrder) ? parsedOrder : item.preview_order;
-        const requiredPermissions = item.required_any_permissions ?? [];
-        const hasRequiredPermission = requiredPermissions.length === 0 || requiredPermissions.some((permission) => selectedRolePermissionCodes.has(permission));
-        const missingPermissions = requiredPermissions.length > 0 && !hasRequiredPermission ? requiredPermissions : [];
-        const featureUnavailable = Boolean(item.required_feature_flag && featureFlags[item.required_feature_flag] === false);
-        let previewState: SidebarPreviewState = "allowed";
-        let reason = "Role has required access for this preview item.";
-
-        if (visibility === "hidden") {
-          previewState = "hidden";
-          reason = "Role navigation config hides this item.";
-        } else if (featureUnavailable) {
-          previewState = "hidden";
-          reason = "Required module or feature flag is unavailable in the current context.";
-        } else if (!item.default_visible && visibility === "default") {
-          previewState = "hidden";
-          reason = "Registry default visibility hides this item.";
-        } else if (!permissionEvaluationReady && requiredPermissions.length > 0) {
-          previewState = visibility === "show_locked_if_denied" ? "locked" : "hidden";
-          reason = permissionEvaluationUnavailable
-            ? "Permission evaluation is unavailable; preview is conservative."
-            : "Permission evaluation is loading; preview is conservative.";
-        } else if (!hasRequiredPermission) {
-          if (visibility === "show_locked_if_denied") {
-            previewState = "locked";
-            reason = "Role lacks the required permission, and config asks to show a locked item.";
-          } else {
-            previewState = "hidden";
-            reason = "Role lacks the required permission, so default/show-when-allowed behavior hides it.";
-          }
-        }
-
-        return {
-          navKey: item.nav_key,
-          label: item.preview_label ?? item.label,
-          route: item.route,
-          group: item.preview_group ?? item.group,
-          order,
-          icon: getPreviewIcon(item.icon, item.module_key),
-          visibility,
-          state: previewState,
-          configSource: configSourceLabel(visibility),
-          requiredPermissions,
-          missingPermissions,
-          reason,
-        };
-      })
-      .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
-  }, [editorState, featureFlags, modeItems, permissionEvaluationReady, permissionEvaluationUnavailable, previewQuery.data?.items, selectedRolePermissionCodes]);
+  const sidebarPreviewItems = useMemo<NavigationPreviewItem[]>(() => calculateNavigationPreviewItems({
+    previewItems: previewQuery.data?.items,
+    modeItems,
+    editorState,
+    rolePermissionCodes: selectedRolePermissionCodes,
+    featureFlags,
+    permissionEvaluationReady,
+    permissionEvaluationUnavailable,
+  }), [editorState, featureFlags, modeItems, permissionEvaluationReady, permissionEvaluationUnavailable, previewQuery.data?.items, selectedRolePermissionCodes]);
   const visibleSidebarPreviewItems = sidebarPreviewItems.filter((item) => item.state !== "hidden");
   const hiddenSidebarPreviewItems = sidebarPreviewItems.filter((item) => item.state === "hidden");
-  const sidebarPreviewGroups = useMemo(() => groupSidebarPreviewItems(visibleSidebarPreviewItems), [visibleSidebarPreviewItems]);
-  const sidebarPreviewCounts = sidebarPreviewItems.reduce<Record<SidebarPreviewState, number>>(
-    (counts, item) => {
-      counts[item.state] += 1;
-      return counts;
-    },
-    { allowed: 0, locked: 0, hidden: 0 },
-  );
+  const sidebarPreviewGroups = useMemo(() => groupNavigationPreviewItems(visibleSidebarPreviewItems), [visibleSidebarPreviewItems]);
+  const sidebarPreviewCounts = countNavigationPreviewStates(sidebarPreviewItems);
   const sidebarPreviewLoading = previewQuery.isLoading || roleConfigQuery.isLoading || permissionsQuery.isLoading || rolePermissionsQuery.isLoading;
 
   useEffect(() => {
@@ -688,7 +602,7 @@ export default function NavigationSettingsPage() {
                       <section key={group} className="space-y-1">
                         <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
                         {items.map((item) => {
-                          const Icon = item.icon;
+                          const Icon = getPreviewIcon(item.icon, item.moduleKey);
                           const isLocked = item.state === "locked";
                           return (
                             <button
@@ -722,7 +636,7 @@ export default function NavigationSettingsPage() {
                   columns={["Item", "State", "Config", "Route", "Required permissions", "Reason"]}
                   emptyMessage="No preview items"
                   rows={visibleSidebarPreviewItems.map((item) => {
-                    const Icon = item.icon;
+                    const Icon = getPreviewIcon(item.icon, item.moduleKey);
                     return [
                       <span key="item" className="inline-flex items-center gap-2">
                         <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

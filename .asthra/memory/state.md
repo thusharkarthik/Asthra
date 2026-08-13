@@ -18,6 +18,19 @@ Last updated: 2026-08-12 (About Asthra in-app product definition page)
 
 **Design rule**: The About page is authenticated product context, not a public marketing redesign. Sidebar/navigation registry wiring is intentionally deferred so navigation ownership remains stable.
 
+
+## Core Navigation Config QA Fixtures (added 2026-08-13)
+
+**Purpose**: Step 5.5 adds certification fixtures before any live sidebar integration. This keeps role navigation customization testable while preserving the current sidebar baseline.
+
+**Files**:
+- `services/core-service/tests/test_navigation_config_certification.py`: Backend certification around feature flag default, registry shape, config persistence/validation, preview metadata, no permission grant, and no live resolver effect.
+- `frontend/src/lib/navigation-config-preview.ts`: Shared pure helper for simulated Settings -> Navigation preview state.
+- `frontend/src/lib/navigation-config-preview.test.ts`: Frontend preview-rule tests for allowed, locked, hidden, feature-flagged, and counted states.
+- `.asthra/reports/CORE_NAVIGATION_CERTIFICATION.md`: Go/no-go criteria for future Step 6 live sidebar integration.
+
+**Design rule**: Role Navigation Config remains metadata-only. The live sidebar, God Mode, bottom bar, and `/context/platform` navigation resolver remain unchanged until a later feature-flagged integration step.
+
 ## Core Navigation Registry v1 (added 2026-07-15)
 
 **Purpose**: Core now owns a code-defined Navigation Registry that describes where existing capabilities appear in the UI. Module Registry still defines what capabilities exist, Feature Flags define availability, and RBAC permissions define user access.

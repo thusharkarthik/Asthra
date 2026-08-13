@@ -383,3 +383,26 @@ Validation:
 - `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because this migrated checkout is missing `frontend/node_modules/.bin/tsc`.
 
 Future Step 6 should add QA fixtures/certification for preview behavior, then consider an explicitly approved feature-flagged live consumer only after certification.
+
+
+## 14. Step 5.5 Navigation QA Fixtures
+
+Step 5.5 added certification fixtures before any live sidebar integration.
+
+Files added/updated:
+
+- `services/core-service/tests/test_navigation_config_certification.py`
+- `frontend/src/lib/navigation-config-preview.ts`
+- `frontend/src/lib/navigation-config-preview.test.ts`
+- `.asthra/reports/CORE_NAVIGATION_CERTIFICATION.md`
+
+Certified guardrails:
+
+- `core.navigation_config.enabled` remains disabled by default.
+- Role Navigation Config persists and previews metadata.
+- Invalid role config inputs are rejected.
+- Role config does not grant effective permissions.
+- Live Navigation Registry resolver ignores role config.
+- Settings preview computes allowed/locked/hidden states from backend permission codes, feature flags, registry defaults, and saved/editor config.
+
+No live sidebar behavior, God Mode behavior, bottom bar behavior, or `/context/platform` navigation resolver behavior changed in this step.
