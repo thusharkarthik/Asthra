@@ -5,8 +5,14 @@ from app.api.v1.auth import get_current_user
 from app.core.permissions import require_permission
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.navigation import NavigationResponse
+from app.schemas.navigation import (
+    NavigationResponse,
+    RoleNavigationConfigBatchUpdate,
+    RoleNavigationConfigPreviewResponse,
+    RoleNavigationConfigResponse,
+)
 from app.services.navigation_registry import NavigationRegistryService
+from app.services.role_navigation_config import RoleNavigationConfigService
 
 
 router = APIRouter()
@@ -38,3 +44,35 @@ def get_navigation_registry(
         "version": 1,
         "items": [service._item_to_payload(item) for item in items],
     }
+
+
+@router.get("/role-config", response_model=RoleNavigationConfigResponse)
+def get_role_navigation_config(
+    role_id: int = Query(...),
+    mode: str = Query(...),
+    _: None = Depends(require_permission("settings.navigation.view")),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return RoleNavigationConfigService(db).get_role_config(role_id, mode)
+
+
+@router.put("/role-config", response_model=RoleNavigationConfigResponse)
+def update_role_navigation_config(
+    payload: RoleNavigationConfigBatchUpdate,
+    _: None = Depends(require_permission("settings.navigation.manage")),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return RoleNavigationConfigService(db).upsert_role_config(payload)
+
+
+@router.get("/role-config/preview", response_model=RoleNavigationConfigPreviewResponse)
+def get_role_navigation_config_preview(
+    role_id: int = Query(...),
+    mode: str = Query(...),
+    _: None = Depends(require_permission("settings.navigation.view")),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    return RoleNavigationConfigService(db).get_preview(role_id, mode)
