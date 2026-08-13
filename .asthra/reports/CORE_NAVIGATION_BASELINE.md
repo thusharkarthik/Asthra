@@ -314,3 +314,36 @@ Explicit non-changes:
 - Editing/saving role navigation config from the frontend is deferred to Step 4.
 
 Future Step 4 should add a safe editor workflow, still behind explicit warnings, before any live sidebar application is considered.
+
+## 16. Step 4 Role Navigation Config Editor (2026-08-13)
+
+Step 4 added a safe editor workflow to the existing Navigation settings page. Live sidebar behavior remains unchanged.
+
+Added frontend editor workflow:
+
+- `/settings/navigation` now supports role selection, mode selection, role search, saved config loading, preview loading, and per-item metadata editing.
+- Visibility options are: `default`, `hidden`, `show_when_allowed`, and `show_locked_if_denied`.
+- Optional order overrides can be saved per role/mode/nav item. Label/group overrides remain preserved as API fields but are not exposed as primary editing controls in this pass.
+- Save writes to `PUT /api/v1/navigation/role-config` through typed frontend API methods.
+- Reset mode to Default rewrites the selected mode's items back to default metadata. This is metadata only and does not remove backend permissions or registry items.
+- Preview shows backend-computed role navigation metadata counts and item-level effective visibility/order.
+
+Permission behavior:
+
+- Page visibility remains gated by `settings.navigation.view` or `settings.navigation.manage`.
+- Editing and saving require `settings.navigation.manage`. View-only users can inspect registry and preview metadata, but save controls are disabled.
+- Role Navigation Config remains a UX metadata layer only. It cannot grant access; backend permissions and route/page guards remain authoritative.
+
+Explicit non-changes:
+
+- No live sidebar consumer was added.
+- `AsthraShell`, SidebarNav live rendering, God Mode, bottom bar, and `/context/platform` resolved navigation behavior were not changed.
+- `core.navigation_config.enabled` remains disabled by default.
+- Existing sidebar behavior remains the fallback baseline.
+
+Validation:
+
+- `git diff --check` passed.
+- `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because this migrated checkout is missing `frontend/node_modules/.bin/tsc`.
+
+Future Step 5 should add a QA/static preview pass and only then consider an explicitly approved, feature-flagged live sidebar consumer.

@@ -18,6 +18,7 @@ import type {
   PermissionRegistryItem,
   ProjectMembershipRecord,
   ProjectRecord,
+  RoleNavigationConfigBatchUpdate,
   RoleNavigationConfigPreviewResponse,
   RoleNavigationConfigResponse,
   RoleAssignmentRecord,
@@ -352,6 +353,9 @@ export const settingsApi = {
     search.set("role_id", String(roleId));
     search.set("mode", mode);
     return apiRequest<RoleNavigationConfigPreviewResponse>(`${CORE_PREFIX}/navigation/role-config/preview?${search.toString()}`, { method: "GET", authToken: token });
+  },
+  updateRoleNavigationConfig(token: string, payload: RoleNavigationConfigBatchUpdate) {
+    return apiRequest<RoleNavigationConfigResponse>(`${CORE_PREFIX}/navigation/role-config`, { method: "PUT", authToken: token, json: payload });
   },
   getEffectiveAccessDebug(token: string, params: { user_id: number; scope_type?: string; scope_id?: number | null; action_keys?: string[] }) {
     const search = new URLSearchParams();

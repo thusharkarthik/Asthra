@@ -860,3 +860,11 @@ Frontend now has `/settings/navigation`, a read-only admin inspection page for C
 - `core.navigation_config.enabled` remains default `false`; live application is still deferred.
 
 Next navigation step: Step 4 safe role navigation config editor/QA, still without enabling live sidebar behavior until explicitly approved.
+
+## Navigation Config Editor Step 4 (added 2026-08-13)
+
+Frontend `/settings/navigation` now includes a safe role navigation config editor for future sidebar customization metadata. Admins with `settings.navigation.manage` can select a role/mode, edit per-item visibility metadata and optional order overrides, save via the backend role navigation config API, reset a mode to default metadata, and inspect backend preview output. Users with only `settings.navigation.view` remain read-only.
+
+Live sidebar behavior is unchanged. `AsthraShell`, SidebarNav, God Mode, bottom bar, `/context/platform` resolved navigation, and `core.navigation_config.enabled` remain untouched; the feature flag still defaults false. Role Navigation Config is still metadata/QA only and cannot grant access.
+
+Next navigation step: Step 5 QA/static preview, then an explicitly approved feature-flagged live consumer only after certification.
