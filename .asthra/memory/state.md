@@ -868,3 +868,11 @@ Frontend `/settings/navigation` now includes a safe role navigation config edito
 Live sidebar behavior is unchanged. `AsthraShell`, SidebarNav, God Mode, bottom bar, `/context/platform` resolved navigation, and `core.navigation_config.enabled` remain untouched; the feature flag still defaults false. Role Navigation Config is still metadata/QA only and cannot grant access.
 
 Next navigation step: Step 5 QA/static preview, then an explicitly approved feature-flagged live consumer only after certification.
+
+## Navigation Sidebar Preview Step 5 (added 2026-08-13)
+
+Frontend `/settings/navigation` now includes a simulated sidebar preview for the selected role and mode. The preview combines backend role navigation config preview metadata, current editor state, selected role permissions, current feature flag availability, and registry defaults to show Allowed, Locked, and Hidden item states. Hidden items are counted and expandable; locked preview items are disabled and do not navigate. Unsaved editor changes are reflected locally and clearly marked.
+
+Live sidebar behavior remains unchanged. `AsthraShell`, SidebarNav live rendering, God Mode, bottom bar, `/context/platform` navigation, and `core.navigation_config.enabled` remain untouched. Navigation configuration still cannot grant access; backend permissions and route/page guards remain authoritative.
+
+Next navigation step: Step 6 preview QA/certification, followed only later by an explicitly approved feature-flagged live sidebar consumer.
