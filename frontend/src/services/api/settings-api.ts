@@ -13,10 +13,13 @@ import type {
   OrganizationMember,
   OrganizationTemplateRecord,
   OrganizationTemplateReport,
+  NavigationRegistryResponse,
   PermissionRecord,
   PermissionRegistryItem,
   ProjectMembershipRecord,
   ProjectRecord,
+  RoleNavigationConfigPreviewResponse,
+  RoleNavigationConfigResponse,
   RoleAssignmentRecord,
   RoleMappingSuggestion,
   RoleRecord,
@@ -334,6 +337,21 @@ export const settingsApi = {
   },
   listRoleMappingSuggestions(token: string) {
     return apiRequest<RoleMappingSuggestion[]>(`${CORE_PREFIX}/access-control/role-mapping-suggestions`, { method: "GET", authToken: token });
+  },
+  getNavigationRegistry(token: string) {
+    return apiRequest<NavigationRegistryResponse>(`${CORE_PREFIX}/navigation/registry`, { method: "GET", authToken: token });
+  },
+  getRoleNavigationConfig(token: string, roleId: number, mode: string) {
+    const search = new URLSearchParams();
+    search.set("role_id", String(roleId));
+    search.set("mode", mode);
+    return apiRequest<RoleNavigationConfigResponse>(`${CORE_PREFIX}/navigation/role-config?${search.toString()}`, { method: "GET", authToken: token });
+  },
+  getRoleNavigationConfigPreview(token: string, roleId: number, mode: string) {
+    const search = new URLSearchParams();
+    search.set("role_id", String(roleId));
+    search.set("mode", mode);
+    return apiRequest<RoleNavigationConfigPreviewResponse>(`${CORE_PREFIX}/navigation/role-config/preview?${search.toString()}`, { method: "GET", authToken: token });
   },
   getEffectiveAccessDebug(token: string, params: { user_id: number; scope_type?: string; scope_id?: number | null; action_keys?: string[] }) {
     const search = new URLSearchParams();
