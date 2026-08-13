@@ -237,3 +237,38 @@ def test_role_navigation_config_certification_live_resolver_ignores_config_even_
     assert "platform.organizations" in _keys(before, "platform")
     assert "platform.organizations" in _keys(after, "platform")
     assert before == after
+
+
+def test_my_role_navigation_config_is_available_for_active_role_without_navigation_admin_permission(client) -> None:
+    create_test_user(client, email="nav-cert-platform-owner@example.com")
+    create_test_user(client, email="nav-cert-member@example.com")
+    member_token = get_auth_token(client, email="nav-cert-member@example.com")
+    member_headers = auth_headers(member_token)
+
+    with SessionLocal() as db:
+        member = db.query(User).filter(User.email == "nav-cert-member@example.com").one()
+        role = _create_role(db, name="Live Nav Member Role", key="live_nav_member_role", scope="organization")
+        unrelated_role = _create_role(db, name="Unrelated Live Nav Role", key="unrelated_live_nav_role", scope="organization")
+        db.add(RoleAssignment(user_id=member.id, role_id=role.id, scope_type="organization", scope_id=123, status="active"))
+        db.commit()
+        RoleNavigationConfigService(db).upsert_role_config(
+            RoleNavigationConfigBatchUpdate(
+                role_id=role.id,
+                mode="org",
+                items=[RoleNavigationConfigUpdateItem(nav_key="organization.members", visibility=RoleNavigationVisibility.hidden)],
+            )
+        )
+
+    allowed = client.get(
+        f"/api/v1/navigation/my-role-config?role_id={role.id}&mode=org&scope_type=organization&scope_id=123",
+        headers=member_headers,
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["items"][0]["nav_key"] == "organization.members"
+    assert allowed.json()["items"][0]["visibility"] == "hidden"
+
+    denied = client.get(
+        f"/api/v1/navigation/my-role-config?role_id={unrelated_role.id}&mode=org&scope_type=organization&scope_id=123",
+        headers=member_headers,
+    )
+    assert denied.status_code == 403

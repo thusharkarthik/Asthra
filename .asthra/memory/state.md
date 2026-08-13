@@ -1,10 +1,23 @@
 # Platform State
 
-Last updated: 2026-08-12 (About Asthra in-app product definition page)
+Last updated: 2026-08-13 (Settings Feature Flags admin UI)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
+
+
+## Settings Feature Flags Admin UI (added 2026-08-13)
+
+**Purpose**: Settings now includes `/settings/feature-flags`, a safe admin surface for inspecting existing Core feature flags and setting platform-scope overrides. This enables controlled QA for `core.navigation_config.enabled` without manual database edits.
+
+**Frontend (`frontend/src/`)**:
+- `app/settings/feature-flags/page.tsx`: New permission-gated Feature Flags settings page. Users with `settings.feature_flags.view` can inspect catalog/effective values; users with `settings.feature_flags.manage` can toggle platform overrides.
+- `services/api/settings-api.ts`: Added Feature Flag catalog, effective flags, and override update client methods.
+- `types/core.ts`: Added backend-shaped Feature Flag API types.
+- `components/settings/settings-admin-views.tsx`: Settings home/navigation links now expose Feature Flags only to users with Feature Flag permissions.
+
+**Design rule**: The UI does not change default flag seed values and does not wire feature flags into new runtime behavior. `core.navigation_config.enabled` remains default false; toggling it is an explicit admin QA action.
 
 ## About Asthra Product Definition Page (added 2026-08-12)
 
@@ -18,6 +31,19 @@ Last updated: 2026-08-12 (About Asthra in-app product definition page)
 
 **Design rule**: The About page is authenticated product context, not a public marketing redesign. Sidebar/navigation registry wiring is intentionally deferred so navigation ownership remains stable.
 
+
+
+## Core Navigation Config Live Consumer (added 2026-08-13)
+
+**Purpose**: Step 6 adds a feature-flagged live sidebar consumer for Role Navigation Config. When `core.navigation_config.enabled` is false, the sidebar remains on the existing baseline path. When true, the sidebar can apply saved role config item-by-item without granting access.
+
+**Files**:
+- `frontend/src/lib/navigation-config-live-resolver.ts`: Pure resolver for hidden, clickable, and locked sidebar item states.
+- `frontend/src/lib/navigation-config-live-resolver.test.ts`: Resolver tests covering flag-off identity, missing config fallback, hidden, locked, show-when-allowed, no-grant behavior, and role selection ambiguity.
+- `frontend/src/components/navigation/sidebar-nav.tsx`: Feature-flagged consumer. It does not fetch live config when the flag is false, skips config for Superuser and during God Mode/simulation, and falls back unchanged on missing/error/ambiguous config.
+- `services/core-service/app/api/v1/navigation.py`: Added authenticated `GET /navigation/my-role-config` for a user's own effective role config. Existing admin registry/config endpoints remain permission-gated.
+
+**Design rule**: Role Navigation Config can hide or lock navigation affordances only. It cannot make denied items clickable and cannot grant backend access. God Mode and bottom bar behavior remain outside navigation config.
 
 ## Core Navigation Config QA Fixtures (added 2026-08-13)
 

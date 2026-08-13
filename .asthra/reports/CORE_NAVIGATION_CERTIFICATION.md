@@ -18,7 +18,7 @@ This certification is deliberately inspection-first. Role Navigation Config rema
 | Step 4 Navigation Settings Editor UI | Complete | Role config metadata can be edited and saved from Settings. |
 | Step 5 Navigation Sidebar Preview | Complete | Settings preview simulates allowed/locked/hidden states; live sidebar unchanged. |
 | Step 5.5 Navigation QA Fixtures | Complete in code | Backend certification tests and frontend pure preview-rule tests added. Local test execution is blocked by missing migrated test tooling. |
-| Step 6 Live Sidebar Integration | Not started | Must not start until go/no-go criteria below pass. |
+| Step 6 Live Sidebar Integration | Complete in code | Feature-flagged live consumer added; full dependency-backed validation and browser QA still required. |
 
 ## Safety Rules
 
@@ -144,3 +144,48 @@ Run full targeted backend/frontend tests after restoring project dependencies or
 ## Certification Result
 
 Step 5.5 is ready for dependency-backed validation. It adds QA fixtures and documentation without changing live sidebar behavior.
+
+
+## Step 6 Certification Addendum
+
+Step 6 adds the first live consumer behind `core.navigation_config.enabled`. The flag remains default false.
+
+Certified code paths added:
+
+- `frontend/src/lib/navigation-config-live-resolver.ts` returns original section references when the feature flag is false or config is missing.
+- `frontend/src/components/navigation/sidebar-nav.tsx` does not fetch live role config when the feature flag is false.
+- Live config is skipped for Superuser and during God Mode/simulation/edit/activation/deactivation states.
+- Ambiguous effective role selection falls back to baseline behavior.
+- Locked items render as disabled buttons and do not navigate.
+- Config cannot grant access: denied items become hidden or locked, never clickable.
+- `GET /api/v1/navigation/my-role-config` exposes only the current user's own effective role config for the requested scope.
+
+Step 6 browser QA is still required with the flag false baseline and a local flag-true controlled test before moving to Step 7.
+
+
+## Step 6 Validation Results
+
+Local migrated checkout validation on 2026-08-13:
+
+- `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because `frontend/node_modules/.bin/tsc` is missing.
+- `cd frontend && ./node_modules/.bin/vitest run src/lib/navigation-config-live-resolver.test.ts` could not run because `frontend/node_modules/.bin/vitest` is missing.
+- `cd services/core-service && python3 -m pytest tests/test_navigation_config_certification.py -vv` could not run because system Python has no `pytest` installed.
+- Direct Python syntax compile for `services/core-service/app/api/v1/navigation.py` and `services/core-service/tests/test_navigation_config_certification.py` passed using `compile(...)`.
+- `git diff --check` passed.
+
+Full Step 6 acceptance still requires dependency-backed frontend typecheck, resolver tests, backend test execution, and browser QA for flag-false and flag-true scenarios.
+
+
+## Feature Flags QA Control Addendum
+
+Settings now includes `/settings/feature-flags` as a controlled admin UI for existing Core feature flags. The page is gated by `settings.feature_flags.view` and `settings.feature_flags.manage`, uses the existing Feature Flag API, and highlights `core.navigation_config.enabled` for Step 6 flag-true browser QA.
+
+This addendum does not change the default seed value: `core.navigation_config.enabled` remains false by default. The UI only writes explicit platform-scope overrides when an authorized admin toggles a flag. Live sidebar behavior remains governed by the existing feature-flagged Step 6 consumer and is unchanged by the page itself.
+
+Manual Step 6 flag-true QA can now be performed without direct database edits:
+
+1. Open `/settings/feature-flags` as Superuser or Platform Owner.
+2. Toggle `core.navigation_config.enabled` to true.
+3. Refresh `/settings/navigation` and confirm the flag status reads true.
+4. Run the live sidebar flag-true checks.
+5. Toggle `core.navigation_config.enabled` back to false after QA.
