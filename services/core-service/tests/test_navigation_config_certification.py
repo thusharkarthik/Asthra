@@ -251,6 +251,7 @@ def test_my_role_navigation_config_is_available_for_active_role_without_navigati
         unrelated_role = _create_role(db, name="Unrelated Live Nav Role", key="unrelated_live_nav_role", scope="organization")
         db.add(RoleAssignment(user_id=member.id, role_id=role.id, scope_type="organization", scope_id=123, status="active"))
         db.commit()
+        before_permissions = set(AccessControlService(db).get_user_permissions(member.id, "organization", 123)["permission_codes"])
         RoleNavigationConfigService(db).upsert_role_config(
             RoleNavigationConfigBatchUpdate(
                 role_id=role.id,
@@ -272,3 +273,27 @@ def test_my_role_navigation_config_is_available_for_active_role_without_navigati
         headers=member_headers,
     )
     assert denied.status_code == 403
+
+    scope_mismatch = client.get(
+        f"/api/v1/navigation/my-role-config?role_id={role.id}&mode=org&scope_type=organization&scope_id=456",
+        headers=member_headers,
+    )
+    assert scope_mismatch.status_code == 403
+
+    unauthenticated = client.get(
+        f"/api/v1/navigation/my-role-config?role_id={role.id}&mode=org&scope_type=organization&scope_id=123",
+    )
+    assert unauthenticated.status_code in {401, 403}
+
+    admin_endpoint_denied = client.get(
+        f"/api/v1/navigation/role-config?role_id={role.id}&mode=org",
+        headers=member_headers,
+    )
+    assert admin_endpoint_denied.status_code == 403
+
+    with SessionLocal() as db:
+        member = db.query(User).filter(User.email == "nav-cert-member@example.com").one()
+        after_permissions = set(AccessControlService(db).get_user_permissions(member.id, "organization", 123)["permission_codes"])
+
+    assert after_permissions == before_permissions
+    assert "settings.member.view" not in after_permissions

@@ -92,18 +92,18 @@ export const PLATFORM_NAV: ModeNavSection[] = [
   {
     label: "Platform",
     items: [
-      { label: "Home", href: "/", icon: Home },
-      { label: "Organizations", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
-      { label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
-      { label: "Access Control", href: "/settings/access-control", icon: Shield, permissions: ["settings.access_control.view", "settings.role.view", "settings.permission.view"] },
-      { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText, permission: "guard.audit.view" },
-      { label: "API Keys", href: "/settings/api-keys", icon: Key },
-      { label: "Platform Health", href: "/platform/health", icon: Activity, permission: "settings.organization.view" },
+      { navKey: "platform.home", label: "Home", href: "/", icon: Home },
+      { navKey: "platform.organizations", label: "Organizations", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
+      { navKey: "platform.members", label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
+      { navKey: "platform.access_control", label: "Access Control", href: "/settings/access-control", icon: Shield, permissions: ["settings.access_control.view", "settings.role.view", "settings.permission.view"] },
+      { navKey: "platform.audit_logs", label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText, permission: "guard.audit.view" },
+      { navKey: "platform.api_keys", label: "API Keys", href: "/settings/api-keys", icon: Key },
+      { navKey: "platform.health", label: "Platform Health", href: "/platform/health", icon: Activity, permission: "settings.organization.view" },
     ],
   },
   {
     label: "Admin",
-    items: [{ label: "Settings", href: "/settings", icon: Settings }],
+    items: [{ navKey: "platform.settings", label: "Settings", href: "/settings", icon: Settings }],
   },
 ];
 
@@ -111,19 +111,19 @@ export const ORG_NAV: ModeNavSection[] = [
   {
     label: "Organization",
     items: [
-      { label: "Home", href: "/", icon: Home },
-      { label: "Workspaces", href: "/settings/workspaces", icon: Layers, permission: "settings.workspace.view" },
-      { label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
-      { label: "Teams", href: "/settings/teams", icon: UsersRound, permission: "settings.team.view" },
-      { label: "Roles", href: "/settings/roles", icon: Shield, permission: "settings.role.view" },
+      { navKey: "organization.home", label: "Home", href: "/", icon: Home },
+      { navKey: "organization.workspaces", label: "Workspaces", href: "/settings/workspaces", icon: Layers, permission: "settings.workspace.view" },
+      { navKey: "organization.members", label: "Members", href: "/settings/members", icon: Users, permission: "settings.member.view" },
+      { navKey: "organization.teams", label: "Teams", href: "/settings/teams", icon: UsersRound, permission: "settings.team.view" },
+      { navKey: "organization.roles", label: "Roles", href: "/settings/roles", icon: Shield, permission: "settings.role.view" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { label: "Org Settings", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
-      { label: "Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
-      { label: "Profile", href: "/settings/profile", icon: User },
+      { navKey: "organization.settings", label: "Org Settings", href: "/settings/organizations", icon: Building2, permission: "settings.organization.view" },
+      { navKey: "organization.preferences", label: "Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
+      { navKey: "organization.profile", label: "Profile", href: "/settings/profile", icon: User },
     ],
   },
 ];
@@ -132,39 +132,39 @@ export const WORK_NAV: ModeNavSection[] = [
   {
     label: "Work",
     items: [
-      { label: "Home", href: "/", icon: Home },
-      { label: "Flow", href: "/flow", icon: Zap, permission: "flow.work_item.view" },
-      { label: "Discover", href: "/discover", icon: Lightbulb, permission: "discover.idea.view" },
-      { label: "Docs", href: "/docs", icon: BookOpen, permission: "docs.page.view" },
-      { label: "Collab", href: "/collab", icon: MessageSquare, permission: "collab.thread.view" },
+      { navKey: "work.home", label: "Home", href: "/", icon: Home },
+      { navKey: "work.flow", label: "Flow", href: "/flow", icon: Zap, permission: "flow.work_item.view" },
+      { navKey: "work.discover", label: "Discover", href: "/discover", icon: Lightbulb, permission: "discover.idea.view" },
+      { navKey: "work.docs", label: "Docs", href: "/docs", icon: BookOpen, permission: "docs.page.view" },
+      { navKey: "work.collab", label: "Collab", href: "/collab", icon: MessageSquare, permission: "collab.thread.view" },
     ],
   },
   {
     label: "Operations",
     items: [
-      { label: "Desk", href: "/desk", icon: Ticket, permission: "desk.ticket.view" },
-      { label: "Pulse", href: "/pulse", icon: Activity, permission: "pulse.incident.view" },
-      { label: "Automation", href: "/automation", icon: Workflow, permission: "automation.rule.view" },
+      { navKey: "work.desk", label: "Desk", href: "/desk", icon: Ticket, permission: "desk.ticket.view" },
+      { navKey: "work.pulse", label: "Pulse", href: "/pulse", icon: Activity, permission: "pulse.incident.view" },
+      { navKey: "work.automation", label: "Automation", href: "/automation", icon: Workflow, permission: "automation.rule.view" },
     ],
   },
   {
     label: "Engineering",
     items: [
-      { label: "Dev", href: "/dev", icon: Code2, permission: "dev.release.view" },
-      { label: "Connect", href: "/connect", icon: Plug, permission: "connect.integration.view" },
+      { navKey: "work.dev", label: "Dev", href: "/dev", icon: Code2, permission: "dev.release.view" },
+      { navKey: "work.connect", label: "Connect", href: "/connect", icon: Plug, permission: "connect.integration.view" },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { label: "Insights", href: "/insights", icon: BarChart3, permission: "insights.report.view" },
-      { label: "Memory", href: "/memory", icon: Brain },
-      { label: "Assistant", href: "/assistant", icon: Bot },
+      { navKey: "work.insights", label: "Insights", href: "/insights", icon: BarChart3, permission: "insights.report.view" },
+      { navKey: "work.memory", label: "Memory", href: "/memory", icon: Brain },
+      { navKey: "work.assistant", label: "Assistant", href: "/assistant", icon: Bot },
     ],
   },
   {
     label: "Admin",
-    items: [{ label: "Settings", href: "/settings", icon: Settings }],
+    items: [{ navKey: "work.settings", label: "Settings", href: "/settings", icon: Settings }],
   },
 ];
 

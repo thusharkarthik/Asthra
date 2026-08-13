@@ -6,7 +6,7 @@ Date: 2026-08-13
 
 This report certifies the Navigation Config foundation before any live sidebar integration. Step 5.5 adds backend and frontend QA fixtures for role navigation config behavior while preserving the current production sidebar baseline.
 
-This certification is deliberately inspection-first. Role Navigation Config remains metadata only until a later gated integration step.
+This certification is deliberately inspection-first. Role Navigation Config is live-consumed only behind `core.navigation_config.enabled`; the default false path remains the baseline.
 
 ## Current Phase Status
 
@@ -18,7 +18,8 @@ This certification is deliberately inspection-first. Role Navigation Config rema
 | Step 4 Navigation Settings Editor UI | Complete | Role config metadata can be edited and saved from Settings. |
 | Step 5 Navigation Sidebar Preview | Complete | Settings preview simulates allowed/locked/hidden states; live sidebar unchanged. |
 | Step 5.5 Navigation QA Fixtures | Complete in code | Backend certification tests and frontend pure preview-rule tests added. Local test execution is blocked by missing migrated test tooling. |
-| Step 6 Live Sidebar Integration | Complete in code | Feature-flagged live consumer added; full dependency-backed validation and browser QA still required. |
+| Step 6 Live Sidebar Integration | Complete in code | Feature-flagged live consumer added; flag-false and owner flag-true behavior manually smoke-tested; lower-permission locked QA pending. |
+| Step 7 Live Consumer Certification | Complete in code | Resolver and self-scoped endpoint certification expanded; docs/manual QA checklist updated. |
 
 ## Safety Rules
 
@@ -189,3 +190,91 @@ Manual Step 6 flag-true QA can now be performed without direct database edits:
 3. Refresh `/settings/navigation` and confirm the flag status reads true.
 4. Run the live sidebar flag-true checks.
 5. Toggle `core.navigation_config.enabled` back to false after QA.
+
+
+## Step 7 Live Consumer Certification
+
+Step 7 adds tests and certification notes only. It does not add request-access UX, locked item modals, new navigation behavior, or default-enabled rollout.
+
+### Certified Frontend Live Resolver Behavior
+
+Frontend fixture: `frontend/src/lib/navigation-config-live-resolver.test.ts`
+
+| Case | Certified Behavior |
+|---|---|
+| Flag false | Returns the original sidebar section references unchanged for hidden, locked, and show-when-allowed configs. |
+| Missing config | Returns the original sidebar section references unchanged. |
+| Unmatched config | Falls back unchanged instead of applying unrelated role config. |
+| Permission present + `show_locked_if_denied` | Item remains `visible_clickable`; this matches manual Org Owner QA. |
+| Permission present + `show_when_allowed` | Item remains `visible_clickable`. |
+| Permission present + `hidden` | Item is hidden even though access exists. |
+| Permission missing + `show_locked_if_denied` | Item becomes `visible_locked`. |
+| Permission missing + `show_when_allowed` / `default` | Item stays hidden; config cannot make it clickable. |
+| Ambiguous role selection | No role is selected for live config, so the sidebar boundary falls back. |
+
+### Certified Backend Self-Scoped Endpoint Behavior
+
+Backend fixture: `services/core-service/tests/test_navigation_config_certification.py`
+
+| Case | Certified Behavior |
+|---|---|
+| Active role in requested scope | Authenticated user can read their own role config without `settings.navigation.view`. |
+| Unrelated role | Returns 403. |
+| Scope mismatch | Returns 403. |
+| Unauthenticated request | Rejected. |
+| Admin role-config endpoint | Still requires navigation admin permissions and rejects normal users. |
+| Permission grant safety | Reading role config does not change effective permissions and does not add item permissions. |
+
+### Manual QA Results
+
+Completed:
+
+- Feature Flags UI can toggle `core.navigation_config.enabled`.
+- With flag true, Org Owner + `hidden` hides Members in the real sidebar.
+- With flag true, Org Owner + `show_locked_if_denied` keeps Members clickable because Org Owner has the required member permission. This is correct behavior.
+
+Pending lower-permission browser QA:
+
+1. Create or use a user with Organization Member role.
+2. Ensure that role does not have Members view/manage/invite permissions.
+3. Open `/settings/feature-flags` as Superuser or Platform Owner.
+4. Enable `core.navigation_config.enabled`.
+5. Open `/settings/navigation`.
+6. Configure Organization Member / Organization mode / Members = `show_locked_if_denied`.
+7. Login as the Organization Member user.
+8. Confirm Members appears locked.
+9. Click Members.
+10. Confirm no navigation occurs.
+11. Disable `core.navigation_config.enabled` again.
+12. Confirm flag false skips `/navigation/my-role-config` and restores baseline sidebar behavior.
+
+### Step 7 Validation Results
+
+Local migrated checkout validation on 2026-08-13:
+
+- Targeted frontend resolver tests could not run because `frontend/node_modules/.bin/vitest` is missing.
+- Targeted backend certification tests could not run because system Python has no `pytest` installed.
+- Direct Python syntax compile for `services/core-service/tests/test_navigation_config_certification.py` passed using `compile(...)`.
+- `git diff --check` passed.
+
+
+## Locked Candidate Fix Addendum
+
+Manual lower-permission QA found a real integration bug: `show_locked_if_denied` did not show Members as locked for Organization Member because the live resolver received sidebar sections that had already been filtered by backend permission-aware platform context navigation. The denied item was not present, so the resolver could not convert it to `visible_locked`.
+
+Fix implemented:
+
+- Static fallback navigation items now carry `navKey` values matching Core Navigation Registry keys.
+- The flag-enabled live sidebar path merges static fallback candidates into the resolver input only when a matching active role config item is explicitly `show_locked_if_denied`.
+- The resolver still performs final permission evaluation, so denied locked candidates become disabled/non-navigating, allowed users stay clickable, and denied `default` / `show_when_allowed` items remain hidden.
+- Flag false remains baseline and does not fetch live role config.
+
+Updated expected behavior:
+
+| Scenario | Expected Result |
+|---|---|
+| Flag false + denied Members | Members hidden; no `/navigation/my-role-config` fetch. |
+| Flag true + Organization Member + Members `hidden` | Members hidden. |
+| Flag true + Organization Member + Members `show_locked_if_denied` | Members visible as locked and does not navigate. |
+| Flag true + Organization Owner + Members `show_locked_if_denied` | Members visible and clickable because permission exists. |
+| Flag true + Organization Member + Members `default` / `show_when_allowed` | Members hidden. |
