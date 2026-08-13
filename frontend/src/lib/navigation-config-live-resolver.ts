@@ -44,6 +44,59 @@ const FALLBACK_DIAGNOSTICS: LiveNavigationConfigDiagnostics = {
   clickableCount: 0,
 };
 
+export function mergeLiveNavigationCandidateSections(
+  primarySections: ModeNavSection[],
+  candidateSections: ModeNavSection[],
+  roleConfig?: RoleNavigationConfigResponse | null,
+): ModeNavSection[] {
+  const lockedCandidateKeys = new Set(
+    (roleConfig?.items ?? [])
+      .filter((config) => config.is_active !== false && config.visibility === "show_locked_if_denied")
+      .map((config) => config.nav_key),
+  );
+  if (candidateSections.length === 0 || lockedCandidateKeys.size === 0) return primarySections;
+
+  const seenKeys = new Set<string>();
+  const sectionMap = new Map<string, ModeNavSection>();
+  const mergedSections: ModeNavSection[] = [];
+
+  function itemKey(item: ModeNavItem) {
+    return item.navKey ?? item.href;
+  }
+
+  function ensureSection(section: ModeNavSection) {
+    let target = sectionMap.get(section.label);
+    if (!target) {
+      target = { ...section, items: [] };
+      sectionMap.set(section.label, target);
+      mergedSections.push(target);
+    }
+    return target;
+  }
+
+  for (const section of primarySections) {
+    const target = ensureSection(section);
+    for (const item of section.items) {
+      const key = itemKey(item);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      target.items.push(item);
+    }
+  }
+
+  for (const section of candidateSections) {
+    const target = ensureSection(section);
+    for (const item of section.items) {
+      const key = itemKey(item);
+      if (seenKeys.has(key) || !lockedCandidateKeys.has(key)) continue;
+      seenKeys.add(key);
+      target.items.push(item);
+    }
+  }
+
+  return mergedSections.filter((section) => section.items.length > 0);
+}
+
 export function resolveLiveNavigationConfig({
   sections,
   featureEnabled,

@@ -11,7 +11,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
 import { navSectionsForMode } from "@/lib/navigation-mode";
 import { buildNavSections, buildNavSectionsFromNavigation } from "@/lib/module-nav-registry";
-import { resolveLiveNavigationConfig, selectRoleForNavigationConfig } from "@/lib/navigation-config-live-resolver";
+import { mergeLiveNavigationCandidateSections, resolveLiveNavigationConfig, selectRoleForNavigationConfig } from "@/lib/navigation-config-live-resolver";
 import type { LiveNavigationConfigItem } from "@/lib/navigation-config-live-resolver";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { PermissionGate } from "@/components/platform/permission-gate";
@@ -95,11 +95,15 @@ export function SidebarNav({
   const dynamicSections = availableModules.length > 0
     ? buildNavSections(availableModules, effectiveMode)
     : [];
+  const staticSections = navSectionsForMode(effectiveMode);
   const sections = resolvedSections.length > 0
     ? resolvedSections
     : dynamicSections.length > 0
     ? dynamicSections
-    : navSectionsForMode(effectiveMode);
+    : staticSections;
+  const liveCandidateSections = navConfigEnabled && liveRoleConfigQuery.data
+    ? mergeLiveNavigationCandidateSections(sections, staticSections, liveRoleConfigQuery.data)
+    : sections;
 
   function shouldShowItem(item: ModeNavItem): boolean {
     if (skippedUser && !SKIPPED_ALLOWED_HREFS.has(item.href)) return false;
@@ -114,11 +118,11 @@ export function SidebarNav({
   }
 
   const liveNavigation = useMemo(() => resolveLiveNavigationConfig({
-    sections,
+    sections: liveCandidateSections,
     featureEnabled: Boolean(navConfigEnabled && liveRoleConfigQuery.isSuccess),
     roleConfig: liveRoleConfigQuery.data ?? null,
     canAccessItem: shouldShowItem,
-  }), [sections, navConfigEnabled, liveRoleConfigQuery.isSuccess, liveRoleConfigQuery.data, permissionsLoading, skippedUser, isEditMode, can]);
+  }), [liveCandidateSections, navConfigEnabled, liveRoleConfigQuery.isSuccess, liveRoleConfigQuery.data, permissionsLoading, skippedUser, isEditMode, can]);
   const renderedSections = liveNavigation.diagnostics.fallbackUsed ? sections : liveNavigation.sections;
   const liveNavigationConfigApplied = !liveNavigation.diagnostics.fallbackUsed;
 

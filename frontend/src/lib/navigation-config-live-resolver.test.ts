@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Home } from "lucide-react";
-import { resolveLiveNavigationConfig, resolveItemState, selectRoleForNavigationConfig } from "@/lib/navigation-config-live-resolver";
+import { mergeLiveNavigationCandidateSections, resolveLiveNavigationConfig, resolveItemState, selectRoleForNavigationConfig } from "@/lib/navigation-config-live-resolver";
 import type { ModeNavSection } from "@/lib/navigation-mode";
 import type { RoleNavigationConfigResponse } from "@/types/core";
 
@@ -35,15 +35,18 @@ function config(visibility: "default" | "hidden" | "show_when_allowed" | "show_l
 
 describe("live navigation config resolver", () => {
   it("returns the original sections unchanged when the feature flag is false", () => {
-    const result = resolveLiveNavigationConfig({
-      sections,
-      featureEnabled: false,
-      roleConfig: config("hidden"),
-      canAccessItem: () => false,
-    });
+    for (const visibility of ["hidden", "show_locked_if_denied", "show_when_allowed"] as const) {
+      const result = resolveLiveNavigationConfig({
+        sections,
+        featureEnabled: false,
+        roleConfig: config(visibility),
+        canAccessItem: () => false,
+      });
 
-    expect(result.sections).toBe(sections);
-    expect(result.diagnostics.fallbackReason).toBe("flag_disabled");
+      expect(result.sections).toBe(sections);
+      expect(result.diagnostics.fallbackUsed).toBe(true);
+      expect(result.diagnostics.fallbackReason).toBe("flag_disabled");
+    }
   });
 
   it("returns the original sections unchanged when config is missing", () => {
@@ -56,6 +59,25 @@ describe("live navigation config resolver", () => {
 
     expect(result.sections).toBe(sections);
     expect(result.diagnostics.fallbackReason).toBe("config_missing");
+  });
+
+  it("returns the original sections unchanged when config does not match any nav item", () => {
+    const result = resolveLiveNavigationConfig({
+      sections,
+      featureEnabled: true,
+      roleConfig: {
+        role_id: 1,
+        mode: "org",
+        items: [{
+          ...config("hidden").items[0],
+          nav_key: "organization.not_registered",
+        }],
+      },
+      canAccessItem: () => false,
+    });
+
+    expect(result.sections).toBe(sections);
+    expect(result.diagnostics.fallbackReason).toBe("config_unmatched");
   });
 
   it("hides configured hidden items", () => {
@@ -85,6 +107,32 @@ describe("live navigation config resolver", () => {
     expect(result.diagnostics.lockedCount).toBe(1);
   });
 
+  it("keeps show_locked_if_denied items clickable when permission is present", () => {
+    const result = resolveLiveNavigationConfig({
+      sections,
+      featureEnabled: true,
+      roleConfig: config("show_locked_if_denied"),
+      canAccessItem: () => true,
+    });
+
+    expect(result.sections[0].items.find((item) => item.label === "Members")?.navigationConfigState).toBe("visible_clickable");
+    expect(result.diagnostics.lockedCount).toBe(0);
+    expect(result.diagnostics.clickableCount).toBe(2);
+  });
+
+  it("keeps default denied items hidden like baseline access behavior", () => {
+    const result = resolveLiveNavigationConfig({
+      sections,
+      featureEnabled: true,
+      roleConfig: config("default"),
+      canAccessItem: (item) => item.label === "Home",
+    });
+
+    expect(result.sections[0].items.map((item) => item.label)).toEqual(["Home"]);
+    expect(result.diagnostics.fallbackUsed).toBe(false);
+    expect(result.diagnostics.hiddenCount).toBe(1);
+  });
+
   it("does not grant clickable access through show_when_allowed", () => {
     const result = resolveLiveNavigationConfig({
       sections,
@@ -112,6 +160,50 @@ describe("live navigation config resolver", () => {
     expect(resolveItemState("show_when_allowed", false)).toBe("hidden");
     expect(resolveItemState("show_locked_if_denied", false)).toBe("visible_locked");
     expect(resolveItemState("show_locked_if_denied", true)).toBe("visible_clickable");
+  });
+
+  it("can lock a denied candidate item when supplied by the sidebar candidate set", () => {
+    const permissionFilteredSections: ModeNavSection[] = [
+      { label: "Organization", items: [{ navKey: "organization.home", label: "Home", href: "/", icon: Home }] },
+    ];
+    const candidateSections = mergeLiveNavigationCandidateSections(permissionFilteredSections, sections, config("show_locked_if_denied"));
+
+    const result = resolveLiveNavigationConfig({
+      sections: candidateSections,
+      featureEnabled: true,
+      roleConfig: config("show_locked_if_denied"),
+      canAccessItem: (item) => item.label === "Home",
+    });
+
+    expect(result.sections[0].items.map((item) => [item.label, item.navigationConfigState])).toEqual([
+      ["Home", "visible_clickable"],
+      ["Members", "visible_locked"],
+    ]);
+  });
+
+  it("does not preserve denied candidates for show_when_allowed", () => {
+    const permissionFilteredSections: ModeNavSection[] = [
+      { label: "Organization", items: [{ navKey: "organization.home", label: "Home", href: "/", icon: Home }] },
+    ];
+    const candidateSections = mergeLiveNavigationCandidateSections(permissionFilteredSections, sections, config("show_when_allowed"));
+
+    expect(candidateSections).toBe(permissionFilteredSections);
+  });
+
+  it("cannot resurrect a configured item that is absent from all candidate sections", () => {
+    const permissionFilteredSections: ModeNavSection[] = [
+      { label: "Organization", items: [{ navKey: "organization.home", label: "Home", href: "/", icon: Home }] },
+    ];
+
+    const result = resolveLiveNavigationConfig({
+      sections: permissionFilteredSections,
+      featureEnabled: true,
+      roleConfig: config("show_locked_if_denied"),
+      canAccessItem: (item) => item.label === "Home",
+    });
+
+    expect(result.sections).toBe(permissionFilteredSections);
+    expect(result.diagnostics.fallbackReason).toBe("config_unmatched");
   });
 
   it("selects a single role for mode and falls back on ambiguity", () => {

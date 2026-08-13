@@ -1,11 +1,31 @@
 # Platform State
 
-Last updated: 2026-08-13 (Settings Feature Flags admin UI)
+Last updated: 2026-08-13 (Navigation Config locked-item fix)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
 
+
+
+
+## Navigation Config Locked Item Fix (added 2026-08-13)
+
+**Issue**: Lower-permission Organization Member users did not see `organization.members` as locked when Role Navigation Config set Members to `show_locked_if_denied`. The item was absent before the live resolver ran because the primary sidebar sections from platform context were already permission-filtered.
+
+**Fix**: When `core.navigation_config.enabled` is true and live role config is loaded, the sidebar now preserves static fallback candidates only for nav keys explicitly configured as `show_locked_if_denied`. The resolver then evaluates permissions and renders the item as locked if denied, clickable if allowed, or hidden for default/show-when-allowed.
+
+**Safety**: Flag false remains exact baseline and does not fetch role config. The fix does not grant access, does not alter `AsthraShell`, God Mode, or bottom bar, and locked items still render as non-navigating disabled buttons.
+
+## Navigation Config Live Consumer Certification (added 2026-08-13)
+
+**Purpose**: Step 7 certifies the feature-flagged Role Navigation Config live consumer added in Step 6 before any richer locked/request-access UX. This pass adds tests and QA documentation only; live sidebar behavior is not expanded.
+
+**Coverage**:
+- Frontend resolver tests now explicitly cover flag-false identity, missing/unmatched config fallback, hidden behavior, locked-only-when-denied behavior, allowed `show_locked_if_denied` remaining clickable, default denied hiding, and no-grant behavior.
+- Backend certification now covers `/navigation/my-role-config` for active-role access, unrelated role denial, scope mismatch denial, unauthenticated denial, admin endpoint gating, and no permission mutation.
+
+**Manual QA recorded**: Org Owner with `hidden` hides Members when the flag is enabled. Org Owner with `show_locked_if_denied` keeps Members clickable because the permission is present. Lower-permission locked-state browser QA remains pending.
 
 ## Settings Feature Flags Admin UI (added 2026-08-13)
 

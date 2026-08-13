@@ -237,7 +237,7 @@ Current fallback behavior is explicit and must be preserved:
 - Bottom bar scope selectors are not navigation items. Treating them as role navigation config would risk breaking work-module context.
 - Role keys are still used for navigation mode detection and God Mode availability, even though runtime access uses permission codes.
 - `/about` is reachable through Settings but is not currently a sidebar registry item.
-- Role Navigation Config now exists as backend metadata, but it is inactive for live sidebar rendering because `core.navigation_config.enabled` defaults false and no frontend sidebar consumer exists yet.
+- Role Navigation Config now has a feature-flagged live sidebar consumer. It is inactive by default because `core.navigation_config.enabled` defaults false; while false, the existing fallback baseline remains the active behavior and the sidebar does not fetch live role config.
 
 ## 13. Rules For Future Implementation
 
@@ -433,3 +433,28 @@ Unchanged areas:
 - `/context/platform` navigation resolver is unchanged.
 - Module Registry and static fallback remain in the source chain.
 - `core.navigation_config.enabled` still defaults false.
+
+## 13. Step 7 Live Consumer Certification Notes
+
+### Locked Candidate Preservation Fix
+
+Manual lower-permission QA found that `show_locked_if_denied` could not show `organization.members` as locked when the current sidebar candidates came from already permission-filtered platform context navigation. The flag-enabled live path now merges in static fallback candidates only for nav keys explicitly configured as `show_locked_if_denied`, then the resolver applies permission evaluation.
+
+This preserves the baseline rules:
+
+- Flag false uses the original sections and skips `/navigation/my-role-config`.
+- Denied items are not globally shown.
+- `default` and `show_when_allowed` denied items remain hidden.
+- Locked candidates are disabled buttons and do not navigate.
+
+
+Step 7 is tests/docs certification only. It does not change sidebar rendering rules, God Mode, bottom bar, or the fallback chain. The certified live consumer rules are:
+
+- `core.navigation_config.enabled=false` returns baseline sections unchanged and does not fetch `/navigation/my-role-config`.
+- Missing, unmatched, ambiguous, or failed role config falls back unchanged.
+- `hidden` hides a configured item even when permission is present.
+- `show_locked_if_denied` shows a locked item only when the user lacks the item permission.
+- If the user has permission, `show_locked_if_denied` remains clickable; this is expected.
+- Role Navigation Config cannot grant clickable access for a denied item.
+- Superuser and God Mode bypass live role config at the sidebar integration boundary.
+- Bottom bar scope selectors and identity display are outside Role Navigation Config.
