@@ -766,3 +766,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: Previous navigation customization attempts risked removing sidebar items, God Mode behavior, and bottom bar context. The current sidebar has a working source chain: Core Navigation Registry, then Module Registry fallback, then static fallback. Future customization must preserve that chain until QA proves replacement behavior is safe.
 
 **How to apply**: Keep the real sidebar fallback-safe. If Navigation Registry or Role Navigation Config is missing, invalid, empty, disabled, or failed, render the current baseline sidebar. Role Navigation Config may hide, show, lock, reorder, or group navigation items, but it cannot grant access; backend permissions and route/page guards remain authoritative.
+
+## 2026-08-13 — Navigation Configuration Foundation Is Separate From Live Sidebar Rendering
+
+**Decision**: Role Navigation Config stores per-role/per-mode sidebar UX preferences as backend metadata, but those preferences are not applied to live sidebar rendering until a later phase explicitly enables a consumer behind `core.navigation_config.enabled`. Existing sidebar behavior remains the fallback baseline.
+
+**Why**: Navigation customization is a UX layer, not an access-control layer. Adding persistence/API first lets Core model configuration safely while preserving the current source chain: Core Navigation Registry -> Module Registry fallback -> static fallback.
+
+**How to apply**: Step 2 APIs may read, update, and preview role navigation config. They must not alter `NavigationRegistryService.resolve_navigation_for_context(...)`, `/context/platform` navigation output, `AsthraShell`, God Mode, or bottom bar scope display. Future live consumption must remain feature-flagged and must never grant permissions or bypass backend guards.

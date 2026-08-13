@@ -39,6 +39,7 @@ DEFAULT_FEATURE_FLAGS: tuple[DefaultFeatureFlag, ...] = (
     DefaultFeatureFlag("module.insights.enabled", "Insights Module", "Enables Insights dashboards and reports.", "module", False),
     DefaultFeatureFlag("module.memory.enabled", "Memory Module", "Enables Memory navigation and service workflows.", "module", True),
     DefaultFeatureFlag("module.assistant.enabled", "Assistant Module", "Enables the Asthra assistant shell affordance.", "module", True),
+    DefaultFeatureFlag("core.navigation_config.enabled", "Navigation Configuration", "Enables preview and future rollout of role-based navigation configuration.", "core", False),
     DefaultFeatureFlag("beta.module_registry.enabled", "Module Registry Beta", "Enables beta Module Registry surfaces.", "beta", False),
     DefaultFeatureFlag("beta.ai_context_registry.enabled", "AI Context Registry Beta", "Enables beta AI Context Registry surfaces.", "beta", False),
     DefaultFeatureFlag("beta.global_search.enabled", "Global Search Beta", "Enables beta global search registry behavior.", "beta", False),

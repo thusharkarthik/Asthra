@@ -20,6 +20,8 @@ def initialize_access_control(engine: Engine, db: Session) -> None:
         Base.metadata.create_all(bind=engine, checkfirst=True)
     if not {"configuration_definitions", "configuration_values"}.issubset(existing_tables):
         Base.metadata.create_all(bind=engine, checkfirst=True)
+    if "role_navigation_configs" not in existing_tables:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
     _ensure_rbac_columns(engine)
     PermissionService(db).ensure_permission_catalog()
     RoleService(db).ensure_role_catalog(sync_permissions=False)

@@ -836,3 +836,15 @@ When a developer adds a new `PermissionGate`:
 **Icon mapping**: Backend stores icon names in snake_case Lucide naming (e.g. `scroll_text`, `book_open`, `bar_chart3`). `ICON_MAP` in `module-nav-registry.ts` maps these to PascalCase Lucide components. To add a new icon: add snake_case key to `ICON_MAP`.
 
 **Section override**: All org-mode modules share `category="organization"` but display in "Organization" or "Settings" sections. `MODULE_KEY_SECTION_OVERRIDE` maps `org_settings`, `preferences`, `profile` → "Settings". Add keys here for any future per-module section overrides.
+
+## Navigation Configuration Foundation Step 2 (added 2026-08-13)
+
+Core now has the Step 2 foundation for future role-based navigation customization:
+
+- `core.navigation_config.enabled` feature flag exists and defaults to `false`.
+- `role_navigation_configs` model/table/migration exists for per-role/per-mode nav metadata.
+- Backend navigation APIs can read, update, and preview role nav config with `settings.navigation.view/manage`.
+- Live sidebar rendering is unchanged. Role Navigation Config is not consumed by `/context/platform`, `AsthraShell`, or `SidebarNav` yet.
+- Existing sidebar baseline remains: Core Navigation Registry -> Module Registry fallback -> static fallback.
+
+Next navigation step: build admin preview/read UI and QA matrix before any live sidebar consumer is enabled.

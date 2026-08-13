@@ -214,7 +214,7 @@ Current dependency behavior:
 - It uses `ModuleRegistryService.resolve_modules_for_context(...)` to confirm module-key availability.
 - Navigation item visibility is filtered by `default_visible`, required feature flag, visible module key, and required any-of permission codes.
 
-There is no evidence of `core.navigation_config.enabled` or a live Role Navigation Config feature flag in the current codebase.
+`core.navigation_config.enabled` now exists and defaults to false. Role Navigation Config foundation exists as backend catalog/config metadata, but it is not applied to live `/context/platform` navigation resolution or the frontend sidebar.
 
 ## 11. Current Fallback Behavior
 
@@ -237,7 +237,7 @@ Current fallback behavior is explicit and must be preserved:
 - Bottom bar scope selectors are not navigation items. Treating them as role navigation config would risk breaking work-module context.
 - Role keys are still used for navigation mode detection and God Mode availability, even though runtime access uses permission codes.
 - `/about` is reachable through Settings but is not currently a sidebar registry item.
-- There is no active Role Navigation Config or `core.navigation_config.enabled` feature flag yet.
+- Role Navigation Config now exists as backend metadata, but it is inactive for live sidebar rendering because `core.navigation_config.enabled` defaults false and no frontend sidebar consumer exists yet.
 
 ## 13. Rules For Future Implementation
 
@@ -261,3 +261,28 @@ Additional implementation guidance:
 - Preserve skipped-onboarding restrictions.
 - Preserve bottom dock layout and selector rules.
 - Treat Navigation Registry and Role Navigation Config as UI/UX layers only, never authorization layers.
+
+## 14. Step 2 Navigation Configuration Foundation (2026-08-13)
+
+Step 2 added persistent backend foundation only. Live sidebar behavior remains unchanged.
+
+Added backend foundation:
+
+- Feature flag `core.navigation_config.enabled`, default `false`.
+- Table/model `role_navigation_configs` with role ID, navigation mode, `nav_key`, visibility, order/label/group overrides, active flag, and timestamps.
+- Visibility values: `default`, `hidden`, `show_when_allowed`, `show_locked_if_denied`.
+- Permission-gated APIs:
+  - `GET /api/v1/navigation/role-config?role_id=<id>&mode=<mode>` requires `settings.navigation.view`.
+  - `PUT /api/v1/navigation/role-config` requires `settings.navigation.manage`.
+  - `GET /api/v1/navigation/role-config/preview?role_id=<id>&mode=<mode>` requires `settings.navigation.view`.
+- Preview metadata merges registry items with stored config, but preview is informational only.
+
+Explicit non-changes:
+
+- Role Navigation Config is not read by `NavigationRegistryService.resolve_navigation_for_context(...)`.
+- `/api/v1/context/platform` navigation output is unchanged.
+- Frontend sidebar source order is unchanged: Core Navigation Registry -> Module Registry fallback -> static fallback.
+- `AsthraShell`, God Mode, and bottom bar behavior are unchanged.
+- Role Navigation Config cannot grant access; backend permissions and route/page guards remain authoritative.
+
+Future Step 3/4/5 work should build read-only UI/preview and QA before enabling any live consumer behind `core.navigation_config.enabled`.
