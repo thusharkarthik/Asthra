@@ -295,6 +295,21 @@ export type RoleNavigationConfigItem = {
   is_active: boolean;
 };
 
+export type RoleNavigationConfigUpdateItem = {
+  nav_key: string;
+  visibility: RoleNavigationVisibility;
+  order_override?: number | null;
+  label_override?: string | null;
+  group_override?: string | null;
+  is_active?: boolean;
+};
+
+export type RoleNavigationConfigBatchUpdate = {
+  role_id: number;
+  mode: string;
+  items: RoleNavigationConfigUpdateItem[];
+};
+
 export type RoleNavigationConfigResponse = {
   role_id: number;
   mode: string;
