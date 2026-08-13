@@ -347,3 +347,39 @@ Validation:
 - `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because this migrated checkout is missing `frontend/node_modules/.bin/tsc`.
 
 Future Step 5 should add a QA/static preview pass and only then consider an explicitly approved, feature-flagged live sidebar consumer.
+
+## 17. Step 5 Sidebar Preview (2026-08-13)
+
+Step 5 added a simulated sidebar preview to the existing Navigation settings page. Live sidebar behavior remains unchanged.
+
+Added frontend preview workflow:
+
+- `/settings/navigation` now includes a `Sidebar Preview` card for the selected role and navigation mode.
+- The preview uses the existing backend role navigation config preview endpoint plus the current editor state, so unsaved changes are reflected locally and marked with an `Unsaved changes` badge.
+- The preview fetches backend role permissions and backend permission records for the selected role to approximate role-level access for registry items.
+- Preview states are shown as Allowed, Locked, or Hidden.
+- Hidden items are counted and can be expanded for reason/details.
+- Locked preview items render as disabled/restricted and never navigate.
+- The panel clearly states that it is preview-only and that the live sidebar remains unchanged until a later explicitly approved step enables `core.navigation_config.enabled`.
+
+Preview rules:
+
+- `hidden` role config hides the item.
+- Missing required feature flag/module availability hides the item.
+- Missing required permissions hides default/show-when-allowed items.
+- Missing required permissions show a locked preview item only when config is `show_locked_if_denied`.
+- Items with no required permissions are allowed unless hidden by config, registry default, or feature availability.
+
+Explicit non-changes:
+
+- No live sidebar consumer was added.
+- `AsthraShell`, SidebarNav live rendering, God Mode, bottom bar, and `/context/platform` resolved navigation behavior were not changed.
+- `core.navigation_config.enabled` remains disabled by default.
+- Navigation configuration remains a UX metadata layer and cannot grant access.
+
+Validation:
+
+- `git diff --check` passed.
+- `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because this migrated checkout is missing `frontend/node_modules/.bin/tsc`.
+
+Future Step 6 should add QA fixtures/certification for preview behavior, then consider an explicitly approved feature-flagged live consumer only after certification.

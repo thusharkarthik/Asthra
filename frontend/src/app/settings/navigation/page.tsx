@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Activity, BarChart3, Bell, BookOpen, Bot, Brain, Building2, Code2, EyeOff, FolderKanban, Home, Key, Layers, Lightbulb, Lock, MessageSquare, MousePointer2, Plug, ScrollText, Settings, Shield, SlidersHorizontal, Ticket, User, Users, UsersRound, Workflow, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { RequestAccessButton } from "@/app/settings/layout";
 import {
   SettingsCard,
@@ -16,7 +18,7 @@ import { usePlatformContext } from "@/context/platformContext";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useToastStore } from "@/stores/toast-store";
-import type { NavigationRegistryItem, RoleNavigationVisibility, RoleRecord } from "@/types/core";
+import type { NavigationRegistryItem, RoleNavigationConfigPreviewItem, RoleNavigationVisibility, RoleRecord } from "@/types/core";
 
 const NAV_CONFIG_FLAG = "core.navigation_config.enabled";
 const NAVIGATION_MODES = [
@@ -33,8 +35,84 @@ const VISIBILITY_OPTIONS: Array<{ value: RoleNavigationVisibility; label: string
   { value: "show_locked_if_denied", label: "Show locked if denied" },
 ];
 
+const PREVIEW_ICON_MAP: Record<string, LucideIcon> = {
+  activity: Activity,
+  bar_chart3: BarChart3,
+  bell: Bell,
+  book_open: BookOpen,
+  bot: Bot,
+  brain: Brain,
+  building2: Building2,
+  code2: Code2,
+  folder_kanban: FolderKanban,
+  home: Home,
+  key: Key,
+  layers: Layers,
+  lightbulb: Lightbulb,
+  message_square: MessageSquare,
+  plug: Plug,
+  scroll_text: ScrollText,
+  settings: Settings,
+  shield: Shield,
+  sliders_horizontal: SlidersHorizontal,
+  ticket: Ticket,
+  user: User,
+  users: Users,
+  users_round: UsersRound,
+  workflow: Workflow,
+  zap: Zap,
+};
+
+const MODULE_PREVIEW_ICON_MAP: Record<string, LucideIcon> = {
+  platform_home: Home,
+  organizations: Building2,
+  platform_members: Users,
+  access_control: Shield,
+  audit_logs: ScrollText,
+  api_keys: Key,
+  platform_health: Activity,
+  platform_settings: Settings,
+  org_home: Home,
+  workspaces: Layers,
+  org_members: Users,
+  teams: UsersRound,
+  roles: Shield,
+  org_settings: Building2,
+  preferences: SlidersHorizontal,
+  profile: User,
+  home: Home,
+  flow: Zap,
+  discover: Lightbulb,
+  docs: BookOpen,
+  collab: MessageSquare,
+  desk: Ticket,
+  pulse: Activity,
+  automation: Workflow,
+  dev: Code2,
+  connect: Plug,
+  insights: BarChart3,
+  memory: Brain,
+  assistant: Bot,
+  guard: Shield,
+};
+
 type ModeValue = (typeof NAVIGATION_MODES)[number]["value"];
 type EditorItemState = { visibility: RoleNavigationVisibility; orderOverride: string };
+type SidebarPreviewState = "allowed" | "locked" | "hidden";
+type SidebarPreviewItem = {
+  navKey: string;
+  label: string;
+  route: string;
+  group: string;
+  order: number;
+  icon: LucideIcon;
+  visibility: RoleNavigationVisibility;
+  state: SidebarPreviewState;
+  configSource: string;
+  requiredPermissions: string[];
+  missingPermissions: string[];
+  reason: string;
+};
 
 function asErrorMessage(error: unknown) {
   if (!error) return null;
@@ -84,6 +162,45 @@ function visibilityCounts(items: Array<{ preview_visibility: RoleNavigationVisib
   );
 }
 
+function configSourceLabel(visibility: RoleNavigationVisibility) {
+  if (visibility === "hidden") return "Hidden";
+  if (visibility === "show_when_allowed") return "Show when allowed";
+  if (visibility === "show_locked_if_denied") return "Show locked if denied";
+  return "Default";
+}
+
+function getPreviewIcon(iconName: string | undefined, moduleKey: string | null | undefined) {
+  if (iconName && PREVIEW_ICON_MAP[iconName]) return PREVIEW_ICON_MAP[iconName];
+  if (moduleKey && MODULE_PREVIEW_ICON_MAP[moduleKey]) return MODULE_PREVIEW_ICON_MAP[moduleKey];
+  return Home;
+}
+
+function previewStateBadgeClass(state: SidebarPreviewState) {
+  if (state === "allowed") return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300";
+  if (state === "locked") return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300";
+  return "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300";
+}
+
+function groupSidebarPreviewItems(items: SidebarPreviewItem[]) {
+  return items.reduce<Record<string, SidebarPreviewItem[]>>((groups, item) => {
+    groups[item.group] ??= [];
+    groups[item.group].push(item);
+    return groups;
+  }, {});
+}
+
+function buildPreviewBaseItems(previewItems: RoleNavigationConfigPreviewItem[] | undefined, modeItems: NavigationRegistryItem[]) {
+  if (previewItems?.length) return previewItems;
+  return modeItems.map((item) => ({
+    ...item,
+    config: null,
+    preview_visibility: "default" as RoleNavigationVisibility,
+    preview_label: item.label,
+    preview_group: item.group,
+    preview_order: item.order,
+  }));
+}
+
 export default function NavigationSettingsPage() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -94,6 +211,7 @@ export default function NavigationSettingsPage() {
   const [roleSearch, setRoleSearch] = useState("");
   const [editorState, setEditorState] = useState<Record<string, EditorItemState>>({});
   const [isDirty, setIsDirty] = useState(false);
+  const [showHiddenPreviewItems, setShowHiddenPreviewItems] = useState(false);
 
   const canViewNavigation = can("settings.navigation.view") || can("settings.navigation.manage");
   const canManageNavigation = can("settings.navigation.manage");
@@ -149,6 +267,23 @@ export default function NavigationSettingsPage() {
     retry: false,
   });
 
+
+  const permissionsQuery = useQuery({
+    queryKey: ["settings", "navigation", "permissions"],
+    queryFn: () => settingsApi.listPermissions(accessToken ?? ""),
+    enabled: Boolean(accessToken && canViewNavigation && selectedRoleId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const rolePermissionsQuery = useQuery({
+    queryKey: ["settings", "navigation", "role-permissions", selectedRoleId],
+    queryFn: () => settingsApi.listRolePermissions(accessToken ?? "", selectedRoleId ?? 0),
+    enabled: Boolean(accessToken && canViewNavigation && selectedRoleId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const registryItems = registryQuery.data?.items ?? [];
   const registryGroups = useMemo(() => groupRegistryItems(registryItems), [registryItems]);
   const modeItems = useMemo(
@@ -173,6 +308,84 @@ export default function NavigationSettingsPage() {
   const permissionRequiredCount = registryItems.filter((item) => item.required_any_permissions.length > 0).length;
   const customizableCount = registryItems.filter((item) => item.is_customizable).length;
   const previewCounts = visibilityCounts(previewQuery.data?.items ?? []);
+  const permissionCodeById = useMemo(() => new Map((permissionsQuery.data ?? []).map((permission) => [permission.id, permission.code])), [permissionsQuery.data]);
+  const selectedRolePermissionCodes = useMemo(() => {
+    const codes = new Set<string>();
+    for (const rolePermission of rolePermissionsQuery.data ?? []) {
+      const code = permissionCodeById.get(rolePermission.permission_id);
+      if (code) codes.add(code);
+    }
+    return codes;
+  }, [permissionCodeById, rolePermissionsQuery.data]);
+  const permissionEvaluationReady = permissionsQuery.isSuccess && rolePermissionsQuery.isSuccess;
+  const permissionEvaluationUnavailable = permissionsQuery.isError || rolePermissionsQuery.isError;
+  const sidebarPreviewItems = useMemo<SidebarPreviewItem[]>(() => {
+    const baseItems = buildPreviewBaseItems(previewQuery.data?.items, modeItems);
+    return baseItems
+      .map((item) => {
+        const state = editorState[item.nav_key];
+        const visibility = state?.visibility ?? item.preview_visibility ?? "default";
+        const parsedOrder = state?.orderOverride?.trim() ? Number(state.orderOverride) : null;
+        const order = parsedOrder != null && Number.isFinite(parsedOrder) ? parsedOrder : item.preview_order;
+        const requiredPermissions = item.required_any_permissions ?? [];
+        const hasRequiredPermission = requiredPermissions.length === 0 || requiredPermissions.some((permission) => selectedRolePermissionCodes.has(permission));
+        const missingPermissions = requiredPermissions.length > 0 && !hasRequiredPermission ? requiredPermissions : [];
+        const featureUnavailable = Boolean(item.required_feature_flag && featureFlags[item.required_feature_flag] === false);
+        let previewState: SidebarPreviewState = "allowed";
+        let reason = "Role has required access for this preview item.";
+
+        if (visibility === "hidden") {
+          previewState = "hidden";
+          reason = "Role navigation config hides this item.";
+        } else if (featureUnavailable) {
+          previewState = "hidden";
+          reason = "Required module or feature flag is unavailable in the current context.";
+        } else if (!item.default_visible && visibility === "default") {
+          previewState = "hidden";
+          reason = "Registry default visibility hides this item.";
+        } else if (!permissionEvaluationReady && requiredPermissions.length > 0) {
+          previewState = visibility === "show_locked_if_denied" ? "locked" : "hidden";
+          reason = permissionEvaluationUnavailable
+            ? "Permission evaluation is unavailable; preview is conservative."
+            : "Permission evaluation is loading; preview is conservative.";
+        } else if (!hasRequiredPermission) {
+          if (visibility === "show_locked_if_denied") {
+            previewState = "locked";
+            reason = "Role lacks the required permission, and config asks to show a locked item.";
+          } else {
+            previewState = "hidden";
+            reason = "Role lacks the required permission, so default/show-when-allowed behavior hides it.";
+          }
+        }
+
+        return {
+          navKey: item.nav_key,
+          label: item.preview_label ?? item.label,
+          route: item.route,
+          group: item.preview_group ?? item.group,
+          order,
+          icon: getPreviewIcon(item.icon, item.module_key),
+          visibility,
+          state: previewState,
+          configSource: configSourceLabel(visibility),
+          requiredPermissions,
+          missingPermissions,
+          reason,
+        };
+      })
+      .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label));
+  }, [editorState, featureFlags, modeItems, permissionEvaluationReady, permissionEvaluationUnavailable, previewQuery.data?.items, selectedRolePermissionCodes]);
+  const visibleSidebarPreviewItems = sidebarPreviewItems.filter((item) => item.state !== "hidden");
+  const hiddenSidebarPreviewItems = sidebarPreviewItems.filter((item) => item.state === "hidden");
+  const sidebarPreviewGroups = useMemo(() => groupSidebarPreviewItems(visibleSidebarPreviewItems), [visibleSidebarPreviewItems]);
+  const sidebarPreviewCounts = sidebarPreviewItems.reduce<Record<SidebarPreviewState, number>>(
+    (counts, item) => {
+      counts[item.state] += 1;
+      return counts;
+    },
+    { allowed: 0, locked: 0, hidden: 0 },
+  );
+  const sidebarPreviewLoading = previewQuery.isLoading || roleConfigQuery.isLoading || permissionsQuery.isLoading || rolePermissionsQuery.isLoading;
 
   useEffect(() => {
     const configsByKey = new Map((roleConfigQuery.data?.items ?? []).map((item) => [item.nav_key, item]));
@@ -432,6 +645,125 @@ export default function NavigationSettingsPage() {
           </div>
         ) : (
           <SettingsEmptyState title="No registry items for this mode" description="Choose another mode or add items to the Core Navigation Registry." />
+        )}
+      </SettingsCard>
+
+      <SettingsCard title="Sidebar Preview" description="Preview how the selected role and mode may experience navigation. This does not affect the live sidebar.">
+        {rolesQuery.isError ? (
+          <SettingsEmptyState title="Role list unavailable" description={asErrorMessage(rolesQuery.error) ?? "Could not load roles for preview."} />
+        ) : !selectedRole ? (
+          <SettingsEmptyState title="Select a role" description="Choose a role and navigation mode to preview simulated sidebar metadata." />
+        ) : registryQuery.isLoading || sidebarPreviewLoading ? (
+          <SettingsEmptyState title="Loading sidebar preview" description="Fetching registry, saved role navigation config, and role permissions." />
+        ) : previewQuery.isError ? (
+          <SettingsEmptyState title="Sidebar preview unavailable" description={asErrorMessage(previewQuery.error) ?? "Could not load role navigation preview metadata."} />
+        ) : (
+          <div className="space-y-4">
+            <section className="rounded-lg border border-cyan-300/60 bg-cyan-50 p-3 text-sm text-cyan-950 dark:border-cyan-700/60 dark:bg-cyan-950/30 dark:text-cyan-100">
+              <div className="font-semibold">Preview only. The live sidebar is unchanged until `core.navigation_config.enabled` is enabled in a later step.</div>
+              <p className="mt-1">This panel simulates saved config plus current editor state for {roleLabel(selectedRole)} in {modeLabel(normalizedSelectedMode)} mode.</p>
+              {isDirty ? <span className="mt-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">Preview includes unsaved changes</span> : null}
+            </section>
+
+            {permissionEvaluationUnavailable ? (
+              <section className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                Permission evaluation is approximate; live enforcement still uses backend effective permissions.
+              </section>
+            ) : null}
+
+            <div className="grid gap-3 text-sm md:grid-cols-3">
+              <div className="rounded-md border bg-muted/20 p-3">Allowed: <span className="font-semibold text-emerald-600">{sidebarPreviewCounts.allowed}</span></div>
+              <div className="rounded-md border bg-muted/20 p-3">Locked: <span className="font-semibold text-amber-600">{sidebarPreviewCounts.locked}</span></div>
+              <div className="rounded-md border bg-muted/20 p-3">Hidden: <span className="font-semibold text-muted-foreground">{sidebarPreviewCounts.hidden}</span></div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+              <aside className="rounded-lg border bg-background p-3 shadow-sm">
+                <div className="mb-3 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                  {modeLabel(normalizedSelectedMode)} Preview
+                </div>
+                {visibleSidebarPreviewItems.length ? (
+                  <nav aria-label="Simulated sidebar preview" className="space-y-4">
+                    {Object.entries(sidebarPreviewGroups).map(([group, items]) => (
+                      <section key={group} className="space-y-1">
+                        <div className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</div>
+                        {items.map((item) => {
+                          const Icon = item.icon;
+                          const isLocked = item.state === "locked";
+                          return (
+                            <button
+                              key={item.navKey}
+                              type="button"
+                              className={`flex min-h-9 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                                isLocked
+                                  ? "cursor-not-allowed border border-amber-200 bg-amber-50/70 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                              }`}
+                              onClick={(event) => event.preventDefault()}
+                              aria-disabled={isLocked}
+                              title={isLocked ? `Restricted: ${item.missingPermissions.join(", ") || item.reason}` : item.route}
+                            >
+                              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                              {isLocked ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <MousePointer2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+                            </button>
+                          );
+                        })}
+                      </section>
+                    ))}
+                  </nav>
+                ) : (
+                  <SettingsEmptyState title="No visible preview items" description="All selected mode items are hidden by role config, permissions, or feature availability." />
+                )}
+              </aside>
+
+              <div className="space-y-3">
+                <SettingsDataTable
+                  columns={["Item", "State", "Config", "Route", "Required permissions", "Reason"]}
+                  emptyMessage="No preview items"
+                  rows={visibleSidebarPreviewItems.map((item) => {
+                    const Icon = item.icon;
+                    return [
+                      <span key="item" className="inline-flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </span>,
+                      <span key="state" className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${previewStateBadgeClass(item.state)}`}>{item.state === "allowed" ? "Allowed" : "Locked"}</span>,
+                      item.configSource,
+                      <code key="route" className="text-xs">{item.route}</code>,
+                      <span key="permissions" className="text-xs">{joinValues(item.requiredPermissions)}</span>,
+                      <span key="reason" className="text-xs text-muted-foreground">{item.reason}{item.missingPermissions.length ? ` Missing: ${item.missingPermissions.join(", ")}` : ""}</span>,
+                    ];
+                  })}
+                />
+
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-left text-sm font-medium"
+                    onClick={() => setShowHiddenPreviewItems((value) => !value)}
+                  >
+                    <span className="inline-flex items-center gap-2"><EyeOff className="h-4 w-4" aria-hidden="true" /> Hidden items ({hiddenSidebarPreviewItems.length})</span>
+                    <span className="text-xs text-muted-foreground">{showHiddenPreviewItems ? "Hide details" : "Show details"}</span>
+                  </button>
+                  {showHiddenPreviewItems ? (
+                    <div className="mt-3">
+                      <SettingsDataTable
+                        columns={["Item", "Config", "Route", "Reason"]}
+                        emptyMessage="No hidden items"
+                        rows={hiddenSidebarPreviewItems.map((item) => [
+                          item.label,
+                          item.configSource,
+                          <code key="route" className="text-xs">{item.route}</code>,
+                          <span key="reason" className="text-xs text-muted-foreground">{item.reason}{item.missingPermissions.length ? ` Missing: ${item.missingPermissions.join(", ")}` : ""}</span>,
+                        ])}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </SettingsCard>
 
