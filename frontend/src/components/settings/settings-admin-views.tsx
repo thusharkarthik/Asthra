@@ -500,6 +500,7 @@ export function SettingsHomeView() {
   const canCreateOrganization = organizations.length === 0 || permissions.can(SETTINGS_ACTIONS.organizationCreate.permissionCode);
   const canCreateWorkspace = permissions.can(SETTINGS_ACTIONS.workspaceCreate.permissionCode);
   const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
+  const canViewNavigation = permissions.can("settings.navigation.view") || permissions.can("settings.navigation.manage");
   const cards = [
     { title: "Administration", value: "Open", href: "/settings/administration" },
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
@@ -508,6 +509,7 @@ export function SettingsHomeView() {
     { title: "Members", value: "Manage", href: "/settings/members" },
     { title: "Teams", value: "Manage", href: "/settings/teams" },
     { title: "Access Control", value: "Manage", href: "/settings/access-control" },
+    ...(canViewNavigation ? [{ title: "Navigation", value: "Inspect", href: "/settings/navigation" }] : []),
     { title: "API Keys", value: "Manage", href: "/settings/api-keys" },
     { title: "About Asthra", value: "Read", href: "/about" }
   ];
@@ -574,6 +576,7 @@ export function SettingsHomeView() {
                 </Link>
               ))}
               <Link className="text-muted-foreground hover:text-foreground" href="/settings/access-control">Access Control</Link>
+              {canViewNavigation ? <Link className="text-muted-foreground hover:text-foreground" href="/settings/navigation">Navigation</Link> : null}
             </div>
           </div>
           <div>

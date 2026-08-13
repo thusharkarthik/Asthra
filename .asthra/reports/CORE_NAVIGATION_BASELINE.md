@@ -286,3 +286,31 @@ Explicit non-changes:
 - Role Navigation Config cannot grant access; backend permissions and route/page guards remain authoritative.
 
 Future Step 3/4/5 work should build read-only UI/preview and QA before enabling any live consumer behind `core.navigation_config.enabled`.
+
+## 15. Step 3 Navigation Settings Inspection UI (2026-08-13)
+
+Step 3 added a frontend inspection surface only. Live sidebar behavior remains unchanged.
+
+Added frontend inspection UI:
+
+- Route `/settings/navigation`.
+- Settings home card/link gated by `settings.navigation.view` or `settings.navigation.manage`.
+- Typed frontend API methods for:
+  - `GET /api/v1/navigation/registry`
+  - `GET /api/v1/navigation/role-config?role_id=<id>&mode=<mode>`
+  - `GET /api/v1/navigation/role-config/preview?role_id=<id>&mode=<mode>`
+- Read-only Navigation page sections:
+  - Status: Navigation Registry active, Role Navigation Config foundation active, live sidebar config disabled, `core.navigation_config.enabled` value.
+  - Registry overview: item counts by mode/group, gated item count, customizable item count.
+  - Registry item tables grouped by mode and group.
+  - Role Config Preview: role selector, mode selector, stored config count, preview item count, preview visibility, label/group/order metadata.
+
+Explicit non-changes:
+
+- No live sidebar consumer was added.
+- No `AsthraShell`, God Mode, bottom bar, or sidebar source-order changes were made.
+- `core.navigation_config.enabled` remains disabled by default.
+- Role Navigation Config remains metadata/preview only and cannot grant access.
+- Editing/saving role navigation config from the frontend is deferred to Step 4.
+
+Future Step 4 should add a safe editor workflow, still behind explicit warnings, before any live sidebar application is considered.

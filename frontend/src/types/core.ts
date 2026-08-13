@@ -265,9 +265,55 @@ export type NavigationRegistryItem = {
   children?: NavigationRegistryItem[];
 };
 
+export type NavigationRegistryResponse = {
+  version: number;
+  items: NavigationRegistryItem[];
+};
+
 export type ResolvedNavigation = {
   version: number;
   modes: Record<string, { items: NavigationRegistryItem[] }>;
+};
+
+export type RoleNavigationVisibility =
+  | "default"
+  | "hidden"
+  | "show_when_allowed"
+  | "show_locked_if_denied";
+
+export type RoleNavigationConfigItem = {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  role_id: number;
+  mode: string;
+  nav_key: string;
+  visibility: RoleNavigationVisibility;
+  order_override?: number | null;
+  label_override?: string | null;
+  group_override?: string | null;
+  is_active: boolean;
+};
+
+export type RoleNavigationConfigResponse = {
+  role_id: number;
+  mode: string;
+  items: RoleNavigationConfigItem[];
+};
+
+export type RoleNavigationConfigPreviewItem = NavigationRegistryItem & {
+  config?: RoleNavigationConfigItem | null;
+  preview_visibility: RoleNavigationVisibility;
+  preview_label: string;
+  preview_group: string;
+  preview_order: number;
+};
+
+export type RoleNavigationConfigPreviewResponse = {
+  role_id: number;
+  mode: string;
+  generated_at: string;
+  items: RoleNavigationConfigPreviewItem[];
 };
 
 export type AIContextMetadata = {

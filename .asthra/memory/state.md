@@ -848,3 +848,15 @@ Core now has the Step 2 foundation for future role-based navigation customizatio
 - Existing sidebar baseline remains: Core Navigation Registry -> Module Registry fallback -> static fallback.
 
 Next navigation step: build admin preview/read UI and QA matrix before any live sidebar consumer is enabled.
+
+## Navigation Settings Inspection UI Step 3 (added 2026-08-13)
+
+Frontend now has `/settings/navigation`, a read-only admin inspection page for Core Navigation Registry and Role Navigation Config foundation data.
+
+- Shows navigation registry status, counts, and grouped item tables.
+- Shows role/mode config preview metadata from backend role navigation config APIs.
+- Adds a Settings home/card link gated by `settings.navigation.view` or `settings.navigation.manage`.
+- Does not modify live sidebar rendering, `AsthraShell`, God Mode, bottom bar, or navigation source order.
+- `core.navigation_config.enabled` remains default `false`; live application is still deferred.
+
+Next navigation step: Step 4 safe role navigation config editor/QA, still without enabling live sidebar behavior until explicitly approved.
