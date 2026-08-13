@@ -6,6 +6,10 @@ import type {
   EffectiveAccessDebugRecord,
   CurrentUserPermissions,
   EffectivePermissionsRecord,
+  EffectiveFeatureFlagsResponse,
+  FeatureFlagCatalogResponse,
+  FeatureFlagOverridePayload,
+  FeatureFlagOverrideRecord,
   InvitationRecord,
   PermissionGapRecord,
   PermissionInventoryRecord,
@@ -339,6 +343,18 @@ export const settingsApi = {
   listRoleMappingSuggestions(token: string) {
     return apiRequest<RoleMappingSuggestion[]>(`${CORE_PREFIX}/access-control/role-mapping-suggestions`, { method: "GET", authToken: token });
   },
+  listFeatureFlags(token: string) {
+    return apiRequest<FeatureFlagCatalogResponse>(`${CORE_PREFIX}/feature-flags`, { method: "GET", authToken: token });
+  },
+  getEffectiveFeatureFlags(token: string, params: { scope_type?: string; scope_id?: number | null } = {}) {
+    const search = new URLSearchParams();
+    search.set("scope_type", params.scope_type ?? "platform");
+    if (params.scope_id != null) search.set("scope_id", String(params.scope_id));
+    return apiRequest<EffectiveFeatureFlagsResponse>(`${CORE_PREFIX}/feature-flags/effective?${search.toString()}`, { method: "GET", authToken: token });
+  },
+  updateFeatureFlagOverride(token: string, payload: FeatureFlagOverridePayload) {
+    return apiRequest<FeatureFlagOverrideRecord>(`${CORE_PREFIX}/feature-flags/overrides`, { method: "PUT", authToken: token, json: payload });
+  },
   getNavigationRegistry(token: string) {
     return apiRequest<NavigationRegistryResponse>(`${CORE_PREFIX}/navigation/registry`, { method: "GET", authToken: token });
   },
@@ -347,6 +363,14 @@ export const settingsApi = {
     search.set("role_id", String(roleId));
     search.set("mode", mode);
     return apiRequest<RoleNavigationConfigResponse>(`${CORE_PREFIX}/navigation/role-config?${search.toString()}`, { method: "GET", authToken: token });
+  },
+  getMyRoleNavigationConfig(token: string, roleId: number, mode: string, scope?: { scope_type?: string; scope_id?: number | null }) {
+    const search = new URLSearchParams();
+    search.set("role_id", String(roleId));
+    search.set("mode", mode);
+    search.set("scope_type", scope?.scope_type ?? "platform");
+    if (scope?.scope_id != null) search.set("scope_id", String(scope.scope_id));
+    return apiRequest<RoleNavigationConfigResponse>(`${CORE_PREFIX}/navigation/my-role-config?${search.toString()}`, { method: "GET", authToken: token });
   },
   getRoleNavigationConfigPreview(token: string, roleId: number, mode: string) {
     const search = new URLSearchParams();

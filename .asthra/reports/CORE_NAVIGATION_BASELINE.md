@@ -406,3 +406,30 @@ Certified guardrails:
 - Settings preview computes allowed/locked/hidden states from backend permission codes, feature flags, registry defaults, and saved/editor config.
 
 No live sidebar behavior, God Mode behavior, bottom bar behavior, or `/context/platform` navigation resolver behavior changed in this step.
+
+
+## 15. Step 6 Feature-Flagged Live Consumer
+
+Step 6 adds a live sidebar Role Navigation Config consumer behind `core.navigation_config.enabled`.
+
+Runtime behavior:
+
+- When `core.navigation_config.enabled=false`, the sidebar uses the existing baseline path unchanged and does not fetch live role navigation config.
+- When `core.navigation_config.enabled=true`, `SidebarNav` attempts to identify one unambiguous effective role for the current navigation mode.
+- If no single role can be selected, if the user is Superuser, if the app is in God Mode/simulation/edit mode, if config is missing/loading/erroring, or if config does not match current nav keys, the sidebar falls back to the existing baseline behavior.
+- Matching config is applied item-by-item: `hidden` hides, `show_when_allowed` keeps existing permission behavior, `show_locked_if_denied` shows denied items as disabled locked items, and `default` keeps existing behavior.
+- Locked items are buttons, not links, and do not navigate.
+
+Backend read path:
+
+- Existing admin endpoints remain gated by `settings.navigation.view` / `settings.navigation.manage`.
+- New `GET /api/v1/navigation/my-role-config` is authenticated and returns config only when the requested role id is present in the current user's effective roles for the requested scope.
+
+Unchanged areas:
+
+- `AsthraShell` behavior is unchanged.
+- God Mode behavior is unchanged.
+- Bottom bar behavior is unchanged.
+- `/context/platform` navigation resolver is unchanged.
+- Module Registry and static fallback remain in the source chain.
+- `core.navigation_config.enabled` still defaults false.

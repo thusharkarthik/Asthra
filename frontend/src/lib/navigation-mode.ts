@@ -29,6 +29,7 @@ import type { CurrentUserResolvedRole } from "@/types/core";
 export type NavigationMode = "platform" | "org" | "work";
 
 export type ModeNavItem = {
+  navKey?: string;
   label: string;
   href: string;
   icon: LucideIcon;

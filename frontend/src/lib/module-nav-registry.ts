@@ -157,6 +157,7 @@ export function buildNavSections(
     if (!sectionMap.has(sectionLabel)) sectionMap.set(sectionLabel, []);
 
     sectionMap.get(sectionLabel)!.push({
+      navKey: m.module_key,
       label: m.name,
       href: m.route,
       icon: MODULE_KEY_ICON_MAP[m.module_key] ?? Home,
@@ -204,6 +205,7 @@ export function buildNavSectionsFromNavigation(
 
 function navItemToModeItem(item: NavigationRegistryItem): ModeNavItem {
   return {
+    navKey: item.nav_key,
     label: item.label,
     href: item.route,
     icon: ICON_NAME_MAP[item.icon] ?? (item.module_key ? MODULE_KEY_ICON_MAP[item.module_key] : undefined) ?? Home,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -11,6 +11,7 @@ from app.schemas.navigation import (
     RoleNavigationConfigPreviewResponse,
     RoleNavigationConfigResponse,
 )
+from app.services.access_control_service import AccessControlService
 from app.services.navigation_registry import NavigationRegistryService
 from app.services.role_navigation_config import RoleNavigationConfigService
 
@@ -44,6 +45,21 @@ def get_navigation_registry(
         "version": 1,
         "items": [service._item_to_payload(item) for item in items],
     }
+
+
+@router.get("/my-role-config", response_model=RoleNavigationConfigResponse)
+def get_my_role_navigation_config(
+    role_id: int = Query(...),
+    mode: str = Query(...),
+    scope_type: str = Query(default="platform"),
+    scope_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    resolved = AccessControlService(db).get_user_permissions(current_user.id, scope_type, scope_id)
+    if not any(role["id"] == role_id for role in resolved["roles"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role navigation config is only available for an active role in the current scope.")
+    return RoleNavigationConfigService(db).get_role_config(role_id, mode)
 
 
 @router.get("/role-config", response_model=RoleNavigationConfigResponse)

@@ -233,6 +233,52 @@ export type CurrentUserPermissions = {
   enabled_modules?: string[];
 };
 
+export type FeatureFlagRecord = {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  flag_key: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  default_enabled: boolean;
+  is_system: boolean;
+  is_active: boolean;
+};
+
+export type FeatureFlagOverrideRecord = {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  flag_key: string;
+  scope_type: string;
+  scope_id?: number | null;
+  enabled: boolean;
+  reason?: string | null;
+  created_by?: number | null;
+};
+
+export type FeatureFlagCatalogResponse = {
+  flags: FeatureFlagRecord[];
+  overrides: FeatureFlagOverrideRecord[];
+};
+
+export type EffectiveFeatureFlagsResponse = {
+  scope_type: string;
+  scope_id?: number | null;
+  feature_flags: Record<string, boolean>;
+  enabled_modules: string[];
+  generated_at: string;
+};
+
+export type FeatureFlagOverridePayload = {
+  flag_key: string;
+  scope_type: string;
+  scope_id?: number | null;
+  enabled: boolean;
+  reason?: string | null;
+};
+
 export type ModuleRegistryItem = {
   module_key: string;
   name: string;

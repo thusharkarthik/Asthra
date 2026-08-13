@@ -1,3 +1,11 @@
+## 2026-08-13 — Role Navigation Config Live Consumer Is Feature-Flagged And Self-Scoped
+
+**Decision**: The live sidebar may consume Role Navigation Config only behind `core.navigation_config.enabled`. The default false path must preserve the existing Core Navigation Registry -> Module Registry -> static fallback chain and must not fetch live role config. Users read live config through a self-scoped endpoint that only returns config for roles already present in their effective role list for the requested scope.
+
+**Why**: Existing admin role-config endpoints require `settings.navigation.view`, which normal users should not need just to receive their own navigation UX metadata. At the same time, role navigation config must not become a public role inspection API or a permission grant path.
+
+**How to apply**: Keep admin registry/config endpoints permission-gated. Use `/navigation/my-role-config` only for current-user live sidebar consumption. If role selection is ambiguous, config is missing/erroring, God Mode is active, or the feature flag is false, fall back to baseline navigation. Locked items must be disabled affordances only; backend permissions remain authoritative.
+
 # Architectural Decisions
 
 ## 2026-07-15 — Core Navigation Registry Owns Sidebar Metadata, Not Access

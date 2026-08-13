@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Layers, Settings } from "lucide-react";
+import { Building2, Layers, Lock, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { usePlatformContext } from "@/context/platformContext";
@@ -11,6 +11,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import type { NavigationMode, ModeNavItem } from "@/lib/navigation-mode";
 import { navSectionsForMode } from "@/lib/navigation-mode";
 import { buildNavSections, buildNavSectionsFromNavigation } from "@/lib/module-nav-registry";
+import { resolveLiveNavigationConfig, selectRoleForNavigationConfig } from "@/lib/navigation-config-live-resolver";
+import type { LiveNavigationConfigItem } from "@/lib/navigation-config-live-resolver";
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { PermissionGate } from "@/components/platform/permission-gate";
 import { GodModeActivation } from "@/components/platform/god-mode-activation";
@@ -43,7 +45,7 @@ export function SidebarNav({
   onModeOverride?: (mode: NavigationMode | null) => void;
 }) {
   const pathname = usePathname();
-  const { selectedOrganization, selectedWorkspace, can, permissions, availableModules, navigation } = usePlatformContext();
+  const { selectedOrganization, selectedWorkspace, can, permissions, availableModules, navigation, isFeatureEnabled, currentScope } = usePlatformContext();
   const accessToken = useAuthStore((state) => state.accessToken);
 
   const isSimulating = useSimulationStore((state) => state.isSimulating);
@@ -66,6 +68,26 @@ export function SidebarNav({
   });
 
   const effectiveMode: NavigationMode = modeOverride ?? navigationMode;
+  const navConfigEnabled = isFeatureEnabled("core.navigation_config.enabled");
+  const liveConfigRole = useMemo(() => {
+    if (isSuperuser || !navConfigEnabled || isSimulating || isGodModeReady || isEditMode || isActivating || isDeactivating) return null;
+    return selectRoleForNavigationConfig(permissions?.roles ?? [], effectiveMode);
+  }, [effectiveMode, isActivating, isDeactivating, isEditMode, isGodModeReady, isSimulating, isSuperuser, navConfigEnabled, permissions?.roles]);
+
+  const liveRoleConfigQuery = useQuery({
+    queryKey: ["navigation", "live-role-config", liveConfigRole?.id ?? null, effectiveMode, permissions?.scope?.scope_type ?? "platform", permissions?.scope?.scope_id ?? null],
+    queryFn: () => settingsApi.getMyRoleNavigationConfig(accessToken ?? "", liveConfigRole?.id ?? 0, effectiveMode, permissions?.scope ?? {
+      scope_type: currentScope.workspaceId ? "workspace" : currentScope.organizationId ? "organization" : "platform",
+      scope_id: currentScope.workspaceId ?? currentScope.organizationId ?? null,
+    }),
+    enabled: Boolean(accessToken && navConfigEnabled && liveConfigRole?.id),
+    staleTime: 60_000,
+    retry: false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
   // Core Navigation Registry is the primary source when present.
   // Module Registry-derived nav remains the compatibility fallback, and the
   // static nav keeps the shell usable while context is loading or on older APIs.
@@ -90,6 +112,15 @@ export function SidebarNav({
     }
     return true;
   }
+
+  const liveNavigation = useMemo(() => resolveLiveNavigationConfig({
+    sections,
+    featureEnabled: Boolean(navConfigEnabled && liveRoleConfigQuery.isSuccess),
+    roleConfig: liveRoleConfigQuery.data ?? null,
+    canAccessItem: shouldShowItem,
+  }), [sections, navConfigEnabled, liveRoleConfigQuery.isSuccess, liveRoleConfigQuery.data, permissionsLoading, skippedUser, isEditMode, can]);
+  const renderedSections = liveNavigation.diagnostics.fallbackUsed ? sections : liveNavigation.sections;
+  const liveNavigationConfigApplied = !liveNavigation.diagnostics.fallbackUsed;
 
   const modeLabel = (() => {
     if (effectiveMode === "platform") return "Platform Mode";
@@ -135,8 +166,8 @@ export function SidebarNav({
       )}
 
       {/* Nav sections for current mode */}
-      {sections.map((section) => {
-        const visibleItems = section.items.filter(shouldShowItem);
+      {renderedSections.map((section) => {
+        const visibleItems = liveNavigationConfigApplied ? section.items : section.items.filter(shouldShowItem);
         if (visibleItems.length === 0) return null;
         return (
           <section key={section.label} aria-label={section.label} className="space-y-1">
@@ -146,9 +177,26 @@ export function SidebarNav({
               </div>
             )}
             {visibleItems.map((item) => {
+              const liveItem = item as LiveNavigationConfigItem;
               const Icon = item.icon;
               const active = isActive(pathname, item.href);
-              const link = (
+              const isLocked = liveItem.navigationConfigState === "visible_locked";
+              const link = isLocked ? (
+                <button
+                  type="button"
+                  className={cn(
+                    "flex h-9 w-full cursor-not-allowed items-center gap-3 rounded-md border border-amber-200/70 bg-amber-50/70 px-3 text-sm text-amber-800 transition-colors dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200",
+                    collapsed && "justify-center px-0"
+                  )}
+                  aria-disabled="true"
+                  title={liveItem.navigationConfigReason ?? "Access restricted"}
+                  onClick={(event) => event.preventDefault()}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+                  {!collapsed && <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+                </button>
+              ) : (
                 <Link
                   href={item.href}
                   className={cn(
