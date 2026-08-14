@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-13 (Navigation Config locked-item fix)
+Last updated: 2026-08-14 (Navigation Config locked access UX)
 
 ## Phase
 
@@ -8,6 +8,18 @@ Last updated: 2026-08-13 (Navigation Config locked-item fix)
 
 
 
+
+## Navigation Config Locked Access UX (added 2026-08-14)
+
+**Purpose**: Step 8 improves the feature-flagged locked sidebar item experience. When `core.navigation_config.enabled` is true and a Role Navigation Config item resolves to `visible_locked`, the sidebar now shows a restricted affordance and opens an explanation modal on click instead of silently doing nothing.
+
+**Behavior**:
+- Locked items remain buttons, not links, and do not navigate.
+- The explanation shows item label, route, mode, role, nav key, and missing permission codes when available.
+- The modal reuses the existing Core notification access-request endpoint (`/notifications/access-request`) to send a real request with prefilled navigation context.
+- Backend permissions remain authoritative; this UX grants no access.
+
+**Safety**: Flag false remains the exact baseline, does not fetch live role config, and does not show locked UX. `AsthraShell`, God Mode, and bottom bar behavior remain unchanged.
 
 ## Navigation Config Locked Item Fix (added 2026-08-13)
 

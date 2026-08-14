@@ -278,3 +278,31 @@ Updated expected behavior:
 | Flag true + Organization Member + Members `show_locked_if_denied` | Members visible as locked and does not navigate. |
 | Flag true + Organization Owner + Members `show_locked_if_denied` | Members visible and clickable because permission exists. |
 | Flag true + Organization Member + Members `default` / `show_when_allowed` | Members hidden. |
+
+## Step 8 Locked Access UX Addendum
+
+Step 8 adds the user-facing explanation for `visible_locked` sidebar items in the feature-flagged live Role Navigation Config path.
+
+Implemented behavior:
+
+- Locked sidebar items render with a lock indicator and restricted styling.
+- Locked items are buttons, not links, and do not navigate.
+- Clicking a locked item opens an `Access restricted` modal showing the item label, route, navigation mode, source role, nav key, and missing permission codes when the resolver provides them.
+- The modal states clearly that navigation visibility is not access and backend permissions still block the route/action.
+- The existing Core access-request endpoint (`POST /notifications/access-request`) is reused; the request message includes the nav item, nav key, mode, role, route, and missing permissions.
+- Failed access-request sends surface the backend/API error through the existing toast system.
+
+Safety checks preserved:
+
+- `core.navigation_config.enabled=false` remains baseline and does not fetch role config.
+- Role Navigation Config still cannot grant clickable access.
+- Superuser/God Mode boundaries remain unchanged.
+- Bottom bar and `AsthraShell` remain unchanged.
+
+Validation on 2026-08-14:
+
+- `git diff --check` passed.
+- `cd frontend && ./node_modules/.bin/vitest run src/lib/navigation-config-live-resolver.test.ts` could not run because `frontend/node_modules/.bin/vitest` is missing in this migrated checkout.
+- `cd frontend && ./node_modules/.bin/tsc --noEmit` could not run because `frontend/node_modules/.bin/tsc` is missing in this migrated checkout.
+
+Manual browser QA remains required with `core.navigation_config.enabled=true` and an Organization Member missing `settings.member.view` for `organization.members`.
