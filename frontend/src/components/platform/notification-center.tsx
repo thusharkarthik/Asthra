@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import { settingsApi } from "@/services/api/settings-api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -56,8 +57,12 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
       await queryClient.invalidateQueries({ queryKey: ["members-page"] });
-      await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      await queryClient.invalidateQueries({ queryKey: ["permissions.all"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "members"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.platformContext.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.context.versionRoot });
       addToast({ type: "success", title: "Invitation accepted", message: "You've joined — your new role is now active." });
       onClose();
     },
@@ -67,9 +72,10 @@ export function NotificationCenter({ open, onClose, placement = "top" }: { open:
   });
 
   const declineInvitationMutation = useMutation({
-    mutationFn: (invitationId: number) => settingsApi.revokeInvitation(accessToken ?? "", invitationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
+    mutationFn: (invitationId: number) => settingsApi.declineInvitationInApp(accessToken ?? "", invitationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["core", "notifications"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.invitations });
       addToast({ type: "success", title: "Invitation declined", message: "The invitation has been declined." });
     },
     onError: () => {

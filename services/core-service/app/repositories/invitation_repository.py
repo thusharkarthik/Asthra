@@ -168,7 +168,7 @@ class InvitationRepository:
                     .first()
                 )
                 if org_member_role:
-                    existing_org_assignment = (
+                    active_org_assignment = (
                         self.db.query(RoleAssignment)
                         .filter(
                             RoleAssignment.user_id == user_id,
@@ -178,43 +178,62 @@ class InvitationRepository:
                         )
                         .first()
                     )
-                    if existing_org_assignment is None:
-                        self.db.add(
-                            RoleAssignment(
-                                user_id=user_id,
-                                role_id=org_member_role.id,
-                                scope_type="organization",
-                                scope_id=workspace.organization_id,
-                                status="active",
-                                assigned_by=invitation.invited_by_id,
-                                assigned_at=datetime.now(timezone.utc),
-                            )
+                    if active_org_assignment is None:
+                        self._ensure_role_assignment(
+                            user_id=user_id,
+                            role_id=org_member_role.id,
+                            scope_type="organization",
+                            scope_id=workspace.organization_id,
+                            assigned_by=invitation.invited_by_id,
                         )
         if invitation.role_id is not None:
             scope_type = "workspace" if invitation.workspace_id is not None else "organization"
             scope_id = invitation.workspace_id if invitation.workspace_id is not None else invitation.organization_id
             if scope_id is not None:
-                existing = (
-                    self.db.query(RoleAssignment)
-                    .filter(
-                        RoleAssignment.user_id == user_id,
-                        RoleAssignment.role_id == invitation.role_id,
-                        RoleAssignment.scope_type == scope_type,
-                        RoleAssignment.scope_id == scope_id,
-                        RoleAssignment.status == "active",
-                    )
-                    .first()
+                self._ensure_role_assignment(
+                    user_id=user_id,
+                    role_id=invitation.role_id,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    assigned_by=invitation.invited_by_id,
                 )
-                if existing is None:
-                    self.db.add(RoleAssignment(
-                        user_id=user_id,
-                        role_id=invitation.role_id,
-                        scope_type=scope_type,
-                        scope_id=scope_id,
-                        status="active",
-                        assigned_by=invitation.invited_by_id,
-                        assigned_at=datetime.now(timezone.utc),
-                    ))
         invitation.status = "accepted"
         self.db.commit()
         self.db.refresh(invitation)
+
+    def _ensure_role_assignment(
+        self,
+        *,
+        user_id: int,
+        role_id: int,
+        scope_type: str,
+        scope_id: int,
+        assigned_by: int,
+    ) -> None:
+        existing = (
+            self.db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.role_id == role_id,
+                RoleAssignment.scope_type == scope_type,
+                RoleAssignment.scope_id == scope_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            existing.status = "active"
+            existing.revoked_at = None
+            existing.assigned_by = assigned_by
+            existing.assigned_at = datetime.now(timezone.utc)
+            return
+        self.db.add(
+            RoleAssignment(
+                user_id=user_id,
+                role_id=role_id,
+                scope_type=scope_type,
+                scope_id=scope_id,
+                status="active",
+                assigned_by=assigned_by,
+                assigned_at=datetime.now(timezone.utc),
+            )
+        )

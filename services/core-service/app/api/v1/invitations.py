@@ -58,6 +58,16 @@ def accept_invitation_in_app(
     return InvitationService(db).accept_in_app(invitation_id, current_user)
 
 
+@router.post("/{invitation_id}/decline-in-app", response_model=InvitationRead)
+def decline_invitation_in_app(
+    invitation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Invitation:
+    """Decline an invitation from the in-app notification center — invited user only."""
+    return InvitationService(db).decline_in_app(invitation_id, current_user)
+
+
 @router.post("/{invitation_id}/revoke", response_model=InvitationRead)
 def revoke_invitation(
     invitation_id: int,
