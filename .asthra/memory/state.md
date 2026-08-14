@@ -1037,3 +1037,9 @@ Frontend `/settings/navigation` now includes a simulated sidebar preview for the
 Live sidebar behavior remains unchanged. `AsthraShell`, SidebarNav live rendering, God Mode, bottom bar, `/context/platform` navigation, and `core.navigation_config.enabled` remain untouched. Navigation configuration still cannot grant access; backend permissions and route/page guards remain authoritative.
 
 Next navigation step: Step 6 preview QA/certification, followed only later by an explicitly approved feature-flagged live sidebar consumer.
+
+## Core Personal Settings Certification (added 2026-08-15)
+
+Core personal settings/account/profile behavior has been certified at the backend test/report level. `/api/v1/me` read/update is self-owned, org/workspace/project independent, and accepts only profile metadata. Password change requires the current password and does not expose password values. Self-deactivation affects only the current user and blocks the only active superuser from self-deactivating. Personal operations do not mutate role assignments.
+
+Frontend status: `/settings/profile` and `/settings/account` are wired to backend personal APIs; `/settings/preferences` is local/browser-only; `/settings/notifications` and `/settings/security` remain placeholders. Next personal-settings work should add server-backed preferences/notification delivery/session management only when those product capabilities are scheduled.
