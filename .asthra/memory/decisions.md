@@ -782,3 +782,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: Navigation customization is a UX layer, not an access-control layer. Adding persistence/API first lets Core model configuration safely while preserving the current source chain: Core Navigation Registry -> Module Registry fallback -> static fallback.
 
 **How to apply**: Step 2 APIs may read, update, and preview role navigation config. They must not alter `NavigationRegistryService.resolve_navigation_for_context(...)`, `/context/platform` navigation output, `AsthraShell`, God Mode, or bottom bar scope display. Future live consumption must remain feature-flagged and must never grant permissions or bypass backend guards.
+
+## 2026-08-14 — Core Audit Log Reads Require guard.audit.view
+
+**Decision**: Core `activity_logs` list/detail reads for platform, organization, workspace, and project audit scopes require `guard.audit.view` resolved by backend RBAC. Superuser bypass remains in the permission resolver. Own unscoped personal activity remains readable through the user activity path.
+
+**Why**: Audit logs are security/traceability records. Membership alone is not sufficient authority to inspect organization or platform audit trails, and frontend route gating cannot be the only boundary.
+
+**How to apply**: Use `ActivityService.log_activity(...)` only for writing traceability records. For reads, keep API/service checks permission-code based and scoped to the requested audit scope. Do not grant access or mutate roles from audit log reads/writes.
