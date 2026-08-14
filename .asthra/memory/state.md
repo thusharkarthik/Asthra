@@ -1043,3 +1043,9 @@ Next navigation step: Step 6 preview QA/certification, followed only later by an
 Core personal settings/account/profile behavior has been certified at the backend test/report level. `/api/v1/me` read/update is self-owned, org/workspace/project independent, and accepts only profile metadata. Password change requires the current password and does not expose password values. Self-deactivation affects only the current user and blocks the only active superuser from self-deactivating. Personal operations do not mutate role assignments.
 
 Frontend status: `/settings/profile` and `/settings/account` are wired to backend personal APIs; `/settings/preferences` is local/browser-only; `/settings/notifications` and `/settings/security` remain placeholders. Next personal-settings work should add server-backed preferences/notification delivery/session management only when those product capabilities are scheduled.
+
+## Core Scope Lifecycle Certification (added 2026-08-15)
+
+Core Organization -> Workspace -> Project lifecycle behavior has been certified at the backend test/report level. Organization self-serve onboarding assigns organization owner role; workspace/project lifecycle uses explicit permission codes for create/edit/archive/restore; active lists omit archived resources while canonical detail endpoints remain usable by authorized users. Context version bumps are covered for hierarchy lifecycle mutations, and ordinary lifecycle changes do not mutate role assignments.
+
+Known gaps documented: direct `POST /organizations` creates membership but not an owner role assignment, workspace create does not explicitly reject inactive organization parents, workspace archive/restore UI is less explicit than organization/project, create producers may duplicate audit events, and cascade archive/restore semantics remain limited.
