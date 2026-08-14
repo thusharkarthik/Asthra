@@ -1049,3 +1049,11 @@ Frontend status: `/settings/profile` and `/settings/account` are wired to backen
 Core Organization -> Workspace -> Project lifecycle behavior has been certified at the backend test/report level. Organization self-serve onboarding assigns organization owner role; workspace/project lifecycle uses explicit permission codes for create/edit/archive/restore; active lists omit archived resources while canonical detail endpoints remain usable by authorized users. Context version bumps are covered for hierarchy lifecycle mutations, and ordinary lifecycle changes do not mutate role assignments.
 
 Known gaps documented: direct `POST /organizations` creates membership but not an owner role assignment, workspace create does not explicitly reject inactive organization parents, workspace archive/restore UI is less explicit than organization/project, create producers may duplicate audit events, and cascade archive/restore semantics remain limited.
+
+## Core Member / Role Assignment Lifecycle Certification (added 2026-08-15)
+
+Core member and scoped role-assignment lifecycle behavior has been certified at the backend test/report level. Active `role_assignments` remain the access source of truth; organization/workspace/project/team membership rows are supporting records and do not grant access without active matching role assignments. Invite/add flows create expected membership and role-assignment records for existing users, multiple active roles union permissions, removing one role leaves remaining role permissions, and removing the last ordinary scoped role removes scoped membership/access without assigning fallback access.
+
+This pass also hardened role assignment list reads: non-superusers now see only their own assignments or assignments in scopes where they have `settings.role.view`; generic `/role-assignments` no longer exposes every scoped assignment to any active user.
+
+Known gaps documented: project member removal does not currently revoke separate project-scoped role assignments, descendant bulk revocation is not logged per assignment, member archive/restore is not a distinct lifecycle for org/workspace members, comprehensive last-owner policy still needs product certification, and role conflict/access review UX is future work.
