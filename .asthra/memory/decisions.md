@@ -790,3 +790,12 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: Audit logs are security/traceability records. Membership alone is not sufficient authority to inspect organization or platform audit trails, and frontend route gating cannot be the only boundary.
 
 **How to apply**: Use `ActivityService.log_activity(...)` only for writing traceability records. For reads, keep API/service checks permission-code based and scoped to the requested audit scope. Do not grant access or mutate roles from audit log reads/writes.
+
+
+## 2026-08-14 — Revoked API Keys Cannot Be Reactivated
+
+**Decision**: A revoked API key cannot be reactivated through `PATCH /api-keys/{id}`. Users must create a new key if they need a replacement credential.
+
+**Why**: API keys are security-sensitive credentials. Revoke should be a one-way safety action so incident response and manual key rotation remain trustworthy.
+
+**How to apply**: Keep `POST /api-keys/{id}/revoke` as the supported inactive transition. Do not add update paths that set `is_active=true` for existing API keys. Future key rotation should create a new secret and revoke/delete the old one.
