@@ -799,3 +799,11 @@ The helper lives at `services/core-service/app/db/migration_utils.py`. The `app`
 **Why**: API keys are security-sensitive credentials. Revoke should be a one-way safety action so incident response and manual key rotation remain trustworthy.
 
 **How to apply**: Keep `POST /api-keys/{id}/revoke` as the supported inactive transition. Do not add update paths that set `is_active=true` for existing API keys. Future key rotation should create a new secret and revoke/delete the old one.
+
+## 2026-08-15 — Role Assignment List Reads Are Scoped By Role View Permission
+
+**Decision**: `GET /role-assignments` must not be an active-user-wide directory. Non-superusers may see their own assignments and assignments in scopes where backend RBAC grants `settings.role.view`. Superuser remains the global bypass.
+
+**Why**: `role_assignments` is the access source of truth and can reveal sensitive cross-scope access structure. Listing assignments is itself an access-control surface, not just UI metadata.
+
+**How to apply**: Keep role assignment create/update/delete on `settings.role.manage`. Keep list/read behavior permission-code based with scoped `settings.role.view`; do not use role names/ranks or `user_roles` for this decision.

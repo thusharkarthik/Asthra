@@ -515,3 +515,10 @@
 2. The provider keeps `lastWorkspaceSyncKeyRef` and `lastWorkspaceSyncTokenRef`, so the same workspace key is not synced twice for the same access token.
 3. `workspace-store` compares stable sorted snapshots and no longer treats timestamp-only changes as workspace state changes.
 **Validation**: Safe frontend type validation passed from a clean `/tmp/asthra-frontend-tsc` copy; repository-local validation remains blocked by stale `.next/types` artifacts.
+
+### BUG-060 — Role Assignment List Exposed Cross-Scope Assignments To Any Active User [FIXED 2026-08-15]
+
+**Files**: `services/core-service/app/services/scoped_membership_service.py`, `services/core-service/tests/test_member_role_lifecycle_certification.py`
+**Symptom**: `GET /role-assignments` could return all role assignments to any active authenticated user because `ScopedMembershipService.list_role_assignments()` only checked that the caller was active.
+**Root cause**: Role assignment list reads were treated as generic metadata instead of an access-control surface. Create/update/delete already required scoped `settings.role.manage`, but list/read lacked a scoped `settings.role.view` filter.
+**Fix**: Non-superusers now receive only their own assignments or assignments in scopes where backend RBAC grants `settings.role.view`. Superuser remains the global bypass. Certification tests cover scoped visibility and mutation denial for lower-permission users.

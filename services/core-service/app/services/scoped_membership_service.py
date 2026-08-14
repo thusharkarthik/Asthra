@@ -49,7 +49,21 @@ class ScopedMembershipService:
             query = query.filter(RoleAssignment.scope_id == scope_id)
         if status_filter is not None:
             query = query.filter(RoleAssignment.status == status_filter)
-        return query.order_by(RoleAssignment.created_at.desc()).all()
+        assignments = query.order_by(RoleAssignment.created_at.desc()).all()
+        if current_user.is_superuser:
+            return assignments
+
+        access = AccessControlService(self.db)
+
+        def can_view_assignment(assignment: RoleAssignment) -> bool:
+            if assignment.user_id == current_user.id:
+                return True
+            try:
+                return access.can(current_user.id, "settings.role.view", assignment.scope_type, assignment.scope_id)
+            except HTTPException:
+                return False
+
+        return [assignment for assignment in assignments if can_view_assignment(assignment)]
 
     def create_role_assignment(self, assignment_create: RoleAssignmentCreate, current_user: User) -> RoleAssignment:
         self._ensure_active_user(current_user)
