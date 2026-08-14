@@ -2,6 +2,27 @@
 
 ## Fixed
 
+### BUG-063 — Organization Admin Could See Assigned Org But Not Descendant Workspaces/Projects [FIXED 2026-08-15]
+
+**Files**: `services/core-service/app/repositories/workspace_repository.py`, `services/core-service/app/repositories/project_repository.py`, `services/core-service/tests/test_organization_templates_certification.py`, `.asthra/reports/CORE_ORGANIZATION_TEMPLATES_CERTIFICATION.md`
+**Symptom**: Organization Templates QA with an Organization Admin account could not see the assigned organization hierarchy needed to select/apply templates. The user lacked visible workspaces/projects even though the organization-scoped role assignment should inherit to descendants.
+**Root cause**: `OrganizationRepository.list_for_user()` already considered organization-scoped `role_assignments`, but `WorkspaceRepository.list_for_user()` and `ProjectRepository.list_for_user()` still depended on workspace membership rows. Users with only an organization-scoped role assignment could resolve permissions for descendants through `AccessControlService`, but list/platform-context resource discovery omitted those descendants.
+**Fix**: Workspace and project list queries now include resources reachable through active organization, workspace, and project role assignments, while still filtering to active resources by default. Added regression coverage proving Organization Admin sees only assigned-org descendants, can use org-scoped template catalog, does not get platform template view, and does not use `user_roles`.
+
+### BUG-062 — Organization Templates Were Certified But Not Discoverable In Settings UI [FIXED 2026-08-15]
+
+**Files**: `frontend/src/app/settings/organization-templates/page.tsx`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/services/api/settings-api.ts`, `.asthra/reports/CORE_ORGANIZATION_TEMPLATES_CERTIFICATION.md`
+**Symptom**: Manual QA could not continue because Organization Templates were not visible/discoverable from Settings. A template card existed inside organization detail, but there was no Settings-level entry point or route for users to find the catalog intentionally.
+**Root cause**: Organization Templates v1 had backend APIs and an embedded organization detail section, but no standalone Settings route/card. The existing Settings home did not link to templates, and org-scoped users needed a UI path that passes `organization_id` for catalog reads.
+**Fix**: Added `/settings/organization-templates` with organization selection, org-scoped catalog loading, preview, apply, permission-aware read/apply states, and a Settings home/navigation link. The page keeps API permission gates intact and does not change sidebar, God Mode, bottom bar, feature flag defaults, or module record creation.
+
+### BUG-061 — Organization Template Catalog/Detail Reads Were Authenticated But Not Permission-Gated [FIXED 2026-08-15]
+
+**Files**: `services/core-service/app/services/organization_templates.py`, `services/core-service/app/api/v1/organization_templates.py`, `frontend/src/services/api/settings-api.ts`, `frontend/src/components/settings/settings-admin-views.tsx`
+**Symptom**: `GET /organization-templates` and `GET /organization-templates/{template_key}` required authentication but did not enforce `settings.organization_templates.view`. Organization owners also needed an organization-scoped way to read the catalog from organization detail without requiring platform-scope template permissions.
+**Root cause**: Catalog/detail routes called metadata-style service methods directly. Preview/apply were target-organization gated, but catalog/detail did not route through AccessControlService.
+**Fix**: Added user-aware catalog/detail service wrappers that require `settings.organization_templates.view` at platform scope by default or organization scope when `organization_id` is supplied. Updated API routes to use the wrappers and frontend organization detail to request the organization-scoped catalog.
+
 ### BUG-060 — Invitation Manual QA Showed Persisted Success With UI Error And Broken Invitee Actions [FIXED 2026-08-15]
 
 **Files**: `services/core-service/app/repositories/invitation_repository.py`, `services/core-service/app/services/invitation_service.py`, `services/core-service/app/api/v1/invitations.py`, `frontend/src/components/platform/notification-center.tsx`, `frontend/src/services/api/settings-api.ts`

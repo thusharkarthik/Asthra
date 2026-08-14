@@ -502,6 +502,7 @@ export function SettingsHomeView() {
   const canCreateProject = permissions.can(SETTINGS_ACTIONS.projectCreate.permissionCode);
   const canViewNavigation = permissions.can("settings.navigation.view") || permissions.can("settings.navigation.manage");
   const canViewFeatureFlags = permissions.can("settings.feature_flags.view") || permissions.can("settings.feature_flags.manage");
+  const canViewOrganizationTemplates = permissions.can("settings.organization_templates.view") || permissions.can("settings.organization_templates.apply") || organizations.length > 0;
   const cards = [
     { title: "Administration", value: "Open", href: "/settings/administration" },
     { title: "Organizations", value: organizations.length, href: "/settings/organizations" },
@@ -512,6 +513,7 @@ export function SettingsHomeView() {
     { title: "Access Control", value: "Manage", href: "/settings/access-control" },
     ...(canViewNavigation ? [{ title: "Navigation", value: "Inspect", href: "/settings/navigation" }] : []),
     ...(canViewFeatureFlags ? [{ title: "Feature Flags", value: "Inspect", href: "/settings/feature-flags" }] : []),
+    ...(canViewOrganizationTemplates ? [{ title: "Organization Templates", value: "Setup", href: "/settings/organization-templates" }] : []),
     { title: "API Keys", value: "Manage", href: "/settings/api-keys" },
     { title: "About Asthra", value: "Read", href: "/about" }
   ];
@@ -580,6 +582,7 @@ export function SettingsHomeView() {
               <Link className="text-muted-foreground hover:text-foreground" href="/settings/access-control">Access Control</Link>
               {canViewNavigation ? <Link className="text-muted-foreground hover:text-foreground" href="/settings/navigation">Navigation</Link> : null}
               {canViewFeatureFlags ? <Link className="text-muted-foreground hover:text-foreground" href="/settings/feature-flags">Feature Flags</Link> : null}
+              {canViewOrganizationTemplates ? <Link className="text-muted-foreground hover:text-foreground" href="/settings/organization-templates">Organization Templates</Link> : null}
             </div>
           </div>
           <div>
@@ -1103,8 +1106,8 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
   const canApplyOrganizationTemplates = permissions.can("settings.organization_templates.apply");
   const isOrganizationInactive = organization?.is_active === false;
   const templatesQuery = useQuery({
-    queryKey: ["settings", "organization-templates"],
-    queryFn: () => settingsApi.listOrganizationTemplates(accessToken ?? ""),
+    queryKey: ["settings", "organization-templates", organizationId],
+    queryFn: () => settingsApi.listOrganizationTemplates(accessToken ?? "", organizationId),
     enabled: Boolean(accessToken && canViewOrganizationTemplates)
   });
   const updateMutation = useMutation({
@@ -1145,7 +1148,7 @@ export function OrganizationDetailView({ organizationId }: { organizationId: num
     mutationFn: (templateKey: string) => settingsApi.applyOrganizationTemplate(accessToken ?? "", templateKey, organizationId),
     onSuccess: async (report) => {
       await invalidateSettingsAndContext(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "organization-templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "organization-templates", organizationId] });
       addToast({
         type: "success",
         title: "Organization template applied",
@@ -1744,12 +1747,14 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const canInvite = hasHierarchicalPermission(permissions.can, "settings.organization.view", "settings.member.view", SETTINGS_ACTIONS.memberInvite.permissionCode);
   const inviteScope = workspaceId ? "workspace" : "organization";
   const groupedInviteRoles = groupedRolesForInvite(visibleRoles, inviteScope, false);
-  // Invite modal role list: global directory shows platform-only; org/ws context shows non-platform only.
+  // Invite modal role list mirrors the invitation API: platform, organization, and workspace scopes only.
   const groupedInviteModalRoles = (() => {
     const activeRoles = visibleRoles.filter((role) => role.is_active !== false);
-    const filtered = isGlobalDirectory
-      ? activeRoles.filter((role) => role.scope === "platform")
-      : activeRoles.filter((role) => role.scope !== "platform");
+    const filtered = activeRoles.filter((role) => {
+      if (isGlobalDirectory) return role.scope === "platform";
+      if (scopeWorkspaceId) return role.scope === "workspace";
+      return role.scope === "organization" || role.scope === "workspace";
+    });
     return filtered.reduce<Record<string, RoleRecord[]>>((groups, role) => {
       groups[role.scope] = [...(groups[role.scope] ?? []), role];
       return groups;
@@ -1785,8 +1790,7 @@ export function MembersView({ organizationId, workspaceId }: { organizationId?: 
   const inviteMutation = useMutation({
     // organization_id is null for platform-scoped invites when no org context exists.
     mutationFn: (payload: { email: string; organization_id: number | null; workspace_id?: number | null; role_id?: number | null }) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      settingsApi.createInvitation(accessToken ?? "", payload as any),
+      settingsApi.createInvitation(accessToken ?? "", payload),
     onSuccess: async (invitation) => {
       setInviteOpen(false);
       setFormError(null);

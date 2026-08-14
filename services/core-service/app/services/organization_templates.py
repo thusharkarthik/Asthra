@@ -307,8 +307,27 @@ class OrganizationTemplateService:
     def get_template_catalog(self) -> dict[str, list[OrganizationTemplateRead]]:
         return {"templates": [self._template_to_read(template) for template in self._active_templates()]}
 
+    def get_template_catalog_for_user(
+        self,
+        user: User,
+        *,
+        organization_id: int | None = None,
+    ) -> dict[str, list[OrganizationTemplateRead]]:
+        self._require_template_view(user, organization_id)
+        return self.get_template_catalog()
+
     def get_template_detail(self, template_key: str) -> OrganizationTemplateRead:
         return self._template_to_read(self._get_template(template_key))
+
+    def get_template_detail_for_user(
+        self,
+        template_key: str,
+        user: User,
+        *,
+        organization_id: int | None = None,
+    ) -> OrganizationTemplateRead:
+        self._require_template_view(user, organization_id)
+        return self.get_template_detail(template_key)
 
     def get_template_metadata(self) -> dict[str, Any]:
         templates = self._active_templates()
@@ -537,6 +556,13 @@ class OrganizationTemplateService:
 
     def _require_template_permission(self, user: User, permission_code: str, organization_id: int) -> None:
         AccessControlService(self.db).require(user, permission_code, "organization", organization_id)
+
+    def _require_template_view(self, user: User, organization_id: int | None) -> None:
+        if organization_id is None:
+            AccessControlService(self.db).require(user, "settings.organization_templates.view", "platform", None)
+            return
+        organization = self._get_organization(organization_id)
+        AccessControlService(self.db).require(user, "settings.organization_templates.view", "organization", organization.id)
 
     def _get_organization(self, organization_id: int) -> Organization:
         organization = self.db.get(Organization, organization_id)

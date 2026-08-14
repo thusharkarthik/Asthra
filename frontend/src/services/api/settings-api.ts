@@ -156,8 +156,9 @@ export const settingsApi = {
   deleteOrganization(token: string, organizationId: number) {
     return apiRequest<void>(`${CORE_PREFIX}/organizations/${organizationId}`, { method: "DELETE", authToken: token });
   },
-  listOrganizationTemplates(token: string) {
-    return apiRequest<{ templates: OrganizationTemplateRecord[] }>(`${CORE_PREFIX}/organization-templates`, { method: "GET", authToken: token });
+  listOrganizationTemplates(token: string, organizationId?: number | null) {
+    const query = organizationId ? `?organization_id=${organizationId}` : "";
+    return apiRequest<{ templates: OrganizationTemplateRecord[] }>(`${CORE_PREFIX}/organization-templates${query}`, { method: "GET", authToken: token });
   },
   previewOrganizationTemplate(token: string, templateKey: string, organizationId: number) {
     return apiRequest<OrganizationTemplateReport>(`${CORE_PREFIX}/organization-templates/${templateKey}/preview`, { method: "POST", authToken: token, json: { organization_id: organizationId } });

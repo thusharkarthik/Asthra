@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.activity_log import ActivityLog
 from app.models.organization import Organization
+from app.models.user import RoleAssignment
 from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.workspace import WorkspaceUpdate
 
@@ -26,10 +27,32 @@ class WorkspaceRepository:
         return self.db.scalar(statement)
 
     def list_for_user(self, user_id: int, *, include_inactive: bool = False) -> list[Workspace]:
+        from_membership = (
+            select(WorkspaceMember.workspace_id.label("workspace_id"))
+            .where(WorkspaceMember.user_id == user_id)
+        )
+        from_workspace_assignment = (
+            select(RoleAssignment.scope_id.label("workspace_id"))
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "workspace",
+                RoleAssignment.status == "active",
+                RoleAssignment.scope_id.is_not(None),
+            )
+        )
+        from_organization_assignment = (
+            select(Workspace.id.label("workspace_id"))
+            .join(RoleAssignment, RoleAssignment.scope_id == Workspace.organization_id)
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.status == "active",
+            )
+        )
+        workspace_ids = from_membership.union(from_workspace_assignment, from_organization_assignment)
         statement = (
             select(Workspace)
-            .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
-            .where(WorkspaceMember.user_id == user_id)
+            .where(Workspace.id.in_(workspace_ids))
             .order_by(Workspace.created_at.desc())
         )
         if not include_inactive:

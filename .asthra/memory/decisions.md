@@ -1,4 +1,22 @@
 
+## 2026-08-15 — Resource Discovery Honors Inherited Role Assignments
+
+**Decision**: Organization/workspace/project list and platform-context resource discovery must include resources reachable through active scoped `role_assignments`, not only membership rows. Organization assignments expose child workspaces/projects for that organization, workspace assignments expose child projects, and direct project assignments expose that project.
+
+**Why**: `role_assignments` is the source of truth for access. Membership rows support membership lists, but permission resolution already inherits organization roles to descendants. If resource discovery remains membership-only, users can have valid permissions while the UI has no organization/workspace/project to select.
+
+**How to apply**: Keep list APIs isolated to assigned scopes and descendants only. Do not grant platform access or unrelated organization visibility. Do not reintroduce `user_roles` as a discovery source.
+
+
+## 2026-08-15 — Organization Template Catalog Reads Are Scope-Gated
+
+**Decision**: Organization Template catalog/detail APIs require `settings.organization_templates.view`. Calls without `organization_id` are platform-scoped; calls with `organization_id` are organization-scoped. Preview and apply remain target-organization scoped, with apply requiring `settings.organization_templates.apply`.
+
+**Why**: Template definitions describe setup operations and should be visible only to users allowed to inspect or apply organization setup. Organization owners/admins need to inspect templates for their own organization without needing platform-scope authority.
+
+**How to apply**: Frontend organization detail routes should pass the route organization id when reading template catalog/detail. Future global template administration can call the platform-scoped catalog with platform authority.
+
+
 ## 2026-08-15 — Invitee Decline Is Separate From Admin Cancel/Revoke
 
 **Decision**: Invited users decline invitations through `POST /invitations/{id}/decline-in-app`. Admin cancellation remains `POST /invitations/{id}/revoke` and continues to require `settings.member.cancel` at invitation scope.
