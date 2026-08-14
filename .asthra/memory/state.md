@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-14 (Navigation Config locked access UX)
+Last updated: 2026-08-14 (Access Request certification)
 
 ## Phase
 
@@ -8,6 +8,22 @@ Last updated: 2026-08-14 (Navigation Config locked access UX)
 
 
 
+
+## Core Access Request Certification (added 2026-08-14)
+
+**Purpose**: Request Access is now certified as a notification/workflow handoff for restricted Settings pages and locked navigation items. It does not grant access, assign roles, or mutate permission mappings.
+
+**Current flow**:
+- Frontend calls `settingsApi.sendAccessRequest(token, { page, message })`.
+- Restricted Settings pages use `RequestAccessButton`.
+- Locked navigation items reuse the same endpoint and include nav item, nav key, mode, role, and missing permissions inside the message body.
+- Backend creates an `access_request` notification for an org admin/owner, platform admin/owner, or superuser fallback.
+
+**Certification**:
+- Added `services/core-service/tests/test_access_request_certification.py` covering auth required, valid org notification, platform fallback, no-recipient safe failure, no role/permission mutation, context preservation in notification text, and duplicate request behavior.
+- Created `.asthra/reports/CORE_ACCESS_REQUEST_CERTIFICATION.md` with current-flow audit, test matrix, manual QA checklist, and known gaps.
+
+**Known gaps**: No full approval workflow, no dedicated admin inbox, no dedupe/rate limit, no structured backend fields for scope/permission/nav metadata beyond `page` and `message`, and no workspace/project-specific recipient routing yet.
 
 ## Navigation Config Locked Access UX (added 2026-08-14)
 
