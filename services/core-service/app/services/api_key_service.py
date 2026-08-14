@@ -63,6 +63,11 @@ class APIKeyService:
 
     def update(self, api_key_id: int, api_key_update: APIKeyUpdate, current_user: User) -> APIKey:
         api_key = self.get(api_key_id, current_user)
+        if api_key_update.is_active is True:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="API keys cannot be reactivated. Create a new key instead.",
+            )
         if api_key_update.name is not None:
             api_key_update.name = api_key_update.name.strip()
         api_key = self.api_key_repository.update(api_key, api_key_update)

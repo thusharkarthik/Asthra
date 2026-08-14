@@ -1,12 +1,31 @@
 # Platform State
 
-Last updated: 2026-08-14 (Audit Logs certification)
+Last updated: 2026-08-14 (API Keys certification)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
 
 
+
+
+## Core API Keys Certification (added 2026-08-14)
+
+**Purpose**: Core API Keys were certified as personal machine credential records before external integrations depend on them.
+
+**Confirmed flow**:
+- Raw keys are generated as `ak_` + `token_urlsafe(32)` and returned only once on create.
+- Core stores only `key_prefix` and SHA-256 `hashed_key`; list/detail responses do not expose raw keys or hashes.
+- API key records are owner-scoped; users can list/detail/revoke/delete only their own keys.
+- Optional organization/workspace metadata requires access to that scope.
+- Create/update/revoke/delete emit activity events without logging raw secrets.
+
+**Certification**:
+- Hardened `services/core-service/app/services/api_key_service.py` so `PATCH /api-keys/{id}` cannot reactivate a revoked key.
+- Added `services/core-service/tests/test_api_keys_certification.py`.
+- Created `.asthra/reports/CORE_API_KEYS_CERTIFICATION.md` with flow audit, security notes, test matrix, manual QA checklist, and known gaps.
+
+**Known gaps**: API-key authentication/validation middleware is not implemented yet, so `last_used_at`, expiry enforcement, machine-scope enforcement, successful key-use audit, and failed-validation audit remain future work. API key management is currently personal/authenticated, not gated by a dedicated `settings.api_keys.*` permission.
 
 
 ## Core Audit Logs Certification (added 2026-08-14)
