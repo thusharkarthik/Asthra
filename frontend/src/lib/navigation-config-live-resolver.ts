@@ -16,6 +16,7 @@ export type LiveNavigationConfigDiagnostics = {
 export type LiveNavigationConfigItem = ModeNavItem & {
   navigationConfigState?: Exclude<LiveNavigationItemState, "hidden">;
   navigationConfigReason?: string;
+  navigationConfigMissingPermissions?: string[];
 };
 
 export type LiveNavigationConfigSection = Omit<ModeNavSection, "items"> & {
@@ -146,6 +147,7 @@ export function resolveLiveNavigationConfig({
             label: config?.label_override ?? item.label,
             navigationConfigState: state,
             navigationConfigReason: state === "visible_locked" ? "Access restricted" : undefined,
+            navigationConfigMissingPermissions: state === "visible_locked" ? getRequiredPermissions(item) : undefined,
           });
         }
         return { ...section, items: resolvedItems };
@@ -192,6 +194,10 @@ export function resolveItemState(visibility: RoleNavigationVisibility, allowed: 
   if (allowed) return "visible_clickable";
   if (visibility === "show_locked_if_denied") return "visible_locked";
   return "hidden";
+}
+
+function getRequiredPermissions(item: ModeNavItem) {
+  return item.permissions?.length ? item.permissions : item.permission ? [item.permission] : [];
 }
 
 export function selectRoleForNavigationConfig(roles: CurrentUserResolvedRole[], mode: NavigationMode): CurrentUserResolvedRole | null {

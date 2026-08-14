@@ -3,8 +3,8 @@
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, Layers, Lock, Settings } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Building2, Layers, Lock, Send, Settings, X } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { usePlatformContext } from "@/context/platformContext";
 import { useAuthStore } from "@/stores/auth-store";
@@ -16,7 +16,9 @@ import type { LiveNavigationConfigItem } from "@/lib/navigation-config-live-reso
 import { useSimulationStore } from "@/lib/permission-simulator";
 import { PermissionGate } from "@/components/platform/permission-gate";
 import { GodModeActivation } from "@/components/platform/god-mode-activation";
+import { Button } from "@/components/ui/button";
 import { settingsApi } from "@/services/api/settings-api";
+import { useToastStore } from "@/stores/toast-store";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -47,6 +49,7 @@ export function SidebarNav({
   const pathname = usePathname();
   const { selectedOrganization, selectedWorkspace, can, permissions, availableModules, navigation, isFeatureEnabled, currentScope } = usePlatformContext();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const addToast = useToastStore((state) => state.addToast);
 
   const isSimulating = useSimulationStore((state) => state.isSimulating);
   const isEditMode = useSimulationStore((state) => state.isEditMode);
@@ -55,6 +58,7 @@ export function SidebarNav({
   const isDeactivating = useSimulationStore((state) => state.isDeactivating);
 
   const [godModeModalOpen, setGodModeModalOpen] = useState(false);
+  const [lockedAccessItem, setLockedAccessItem] = useState<LiveNavigationConfigItem | null>(null);
 
   const canSimulate =
     isSuperuser ||
@@ -86,6 +90,33 @@ export function SidebarNav({
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+  });
+
+  const requestAccessMutation = useMutation({
+    mutationFn: (item: LiveNavigationConfigItem) => settingsApi.sendAccessRequest(accessToken ?? "", {
+      page: item.href,
+      message: [
+        `Navigation item: ${item.label}`,
+        item.navKey ? `Navigation key: ${item.navKey}` : null,
+        `Mode: ${effectiveMode}`,
+        liveConfigRole ? `Role: ${liveConfigRole.name} (${liveConfigRole.key})` : null,
+        item.navigationConfigMissingPermissions?.length
+          ? `Missing permissions: ${item.navigationConfigMissingPermissions.join(", ")}`
+          : null,
+        "This item is visible because navigation config is set to show locked items, but backend permissions still block access.",
+      ].filter(Boolean).join("\n"),
+    }),
+    onSuccess: () => {
+      addToast({ type: "success", title: "Access requested", message: "Your request was sent to an admin." });
+      setLockedAccessItem(null);
+    },
+    onError: (error) => {
+      addToast({
+        type: "error",
+        title: "Request failed",
+        message: error instanceof Error ? error.message : "Could not send access request.",
+      });
+    },
   });
 
   // Core Navigation Registry is the primary source when present.
@@ -189,16 +220,20 @@ export function SidebarNav({
                 <button
                   type="button"
                   className={cn(
-                    "flex h-9 w-full cursor-not-allowed items-center gap-3 rounded-md border border-amber-200/70 bg-amber-50/70 px-3 text-sm text-amber-800 transition-colors dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200",
+                    "flex h-9 w-full cursor-help items-center gap-3 rounded-md border border-amber-200/70 bg-amber-50/70 px-3 text-sm text-amber-800 transition-colors hover:bg-amber-100/80 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/35",
                     collapsed && "justify-center px-0"
                   )}
                   aria-disabled="true"
                   title={liveItem.navigationConfigReason ?? "Access restricted"}
-                  onClick={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setLockedAccessItem(liveItem);
+                  }}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-                  {!collapsed && <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+                  <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="sr-only">Access restricted</span>
                 </button>
               ) : (
                 <Link
@@ -268,6 +303,94 @@ export function SidebarNav({
               {!collapsed && <span>God Mode</span>}
             </button>
           )}
+        </div>
+      )}
+
+      {lockedAccessItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Access restricted"
+          onClick={() => setLockedAccessItem(null)}
+        >
+          <div
+            className="flex w-full max-w-md flex-col overflow-hidden rounded-lg border bg-card shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b p-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Lock className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                  Access restricted
+                </div>
+                <p className="text-sm text-muted-foreground">{lockedAccessItem.label}</p>
+              </div>
+              <button
+                type="button"
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setLockedAccessItem(null)}
+                aria-label="Close access details"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="space-y-4 p-4 text-sm">
+              <p className="text-muted-foreground">
+                This item is visible because navigation config is set to show locked items, but backend permissions still block access.
+              </p>
+              <dl className="space-y-2 rounded-md border bg-muted/30 p-3">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Route</dt>
+                  <dd className="text-right font-mono text-xs text-foreground">{lockedAccessItem.href}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Mode</dt>
+                  <dd className="text-right capitalize text-foreground">{effectiveMode}</dd>
+                </div>
+                {liveConfigRole ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Role</dt>
+                    <dd className="text-right text-foreground">{liveConfigRole.name}</dd>
+                  </div>
+                ) : null}
+                {lockedAccessItem.navKey ? (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Nav key</dt>
+                    <dd className="text-right font-mono text-xs text-foreground">{lockedAccessItem.navKey}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Missing permissions</div>
+                {lockedAccessItem.navigationConfigMissingPermissions?.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {lockedAccessItem.navigationConfigMissingPermissions.map((permission) => (
+                      <code key={permission} className="rounded border bg-background px-1.5 py-0.5 text-xs text-foreground">
+                        {permission}
+                      </code>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No specific permission metadata was provided for this item.</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button type="button" variant="outline" size="sm" onClick={() => setLockedAccessItem(null)}>
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => requestAccessMutation.mutate(lockedAccessItem)}
+                  disabled={requestAccessMutation.isPending || !accessToken}
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  {requestAccessMutation.isPending ? "Sending..." : "Request access"}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

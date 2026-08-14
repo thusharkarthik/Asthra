@@ -104,6 +104,9 @@ describe("live navigation config resolver", () => {
       ["Home", "visible_clickable"],
       ["Members", "visible_locked"],
     ]);
+    expect(result.sections[0].items.find((item) => item.label === "Members")?.navigationConfigMissingPermissions).toEqual([
+      "settings.member.view",
+    ]);
     expect(result.diagnostics.lockedCount).toBe(1);
   });
 

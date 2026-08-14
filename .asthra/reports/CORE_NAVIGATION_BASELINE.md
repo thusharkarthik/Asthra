@@ -458,3 +458,19 @@ Step 7 is tests/docs certification only. It does not change sidebar rendering ru
 - Role Navigation Config cannot grant clickable access for a denied item.
 - Superuser and God Mode bypass live role config at the sidebar integration boundary.
 - Bottom bar scope selectors and identity display are outside Role Navigation Config.
+
+## 16. Step 8 Locked Access UX
+
+Step 8 improves only the flag-enabled locked-item path. When `core.navigation_config.enabled=false`, the baseline sidebar source order and visibility behavior remain unchanged.
+
+When the flag is true and the live resolver returns `visible_locked`, the sidebar renders the item as a restricted button with a lock indicator. Clicking it does not navigate; it opens an access explanation modal with route, mode, role/config source, nav key, and missing permission codes when available. The modal can send a request through the existing notification access-request endpoint, but it does not grant permissions or make the route accessible.
+
+Unchanged areas:
+
+- `AsthraShell`
+- God Mode
+- bottom bar scope and identity display
+- Core Navigation Registry source order
+- Module Registry fallback
+- static fallback
+- feature flag default value
