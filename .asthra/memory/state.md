@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-14 (Feature Flags certification)
+Last updated: 2026-08-14 (Notifications certification)
 
 ## Phase
 
@@ -8,6 +8,24 @@ Last updated: 2026-08-14 (Feature Flags certification)
 
 
 
+
+## Core Notifications Certification (added 2026-08-14)
+
+**Purpose**: Core Notifications were certified because Access Request and locked navigation request handoff now depend on them. Notifications remain communication-only and do not grant access.
+
+**Confirmed flow**:
+- Core notifications are stored in `notifications` with recipient, optional scope, type/title/message, entity target fields, read state, and timestamps.
+- Notification list/get/read/delete operations are scoped by `current_user.id`.
+- `PATCH /notifications/read-all` only updates the current user's unread notifications.
+- Access Request creates `access_request` notifications for org admin/owner, platform admin/owner, or superuser fallback and preserves route/context in the message.
+- Frontend bell/popover uses Core notifications through `["core", "notifications"]`, hides Mark all when no unread notifications exist, maps known entity targets to routes, and marks Core notifications read before navigation.
+
+**Certification**:
+- Added `services/core-service/tests/test_notifications_certification.py`.
+- Created `.asthra/reports/CORE_NOTIFICATIONS_CERTIFICATION.md`.
+- Confirmed notifications do not mutate role assignments, permissions, feature flags, or navigation config.
+
+**Known gaps**: No realtime/email/push delivery, no dedicated notification center page, no admin access-request inbox, no structured access-request context fields beyond message text, and local persisted demo notifications can affect the shell badge separately from Core server notifications.
 
 ## Core Feature Flags Certification (added 2026-08-14)
 
