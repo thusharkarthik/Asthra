@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.activity_log import ActivityLog
 from app.models.project import Project, ProjectTeam
 from app.models.team import Team
-from app.models.user import User
+from app.models.user import RoleAssignment, User
 from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.project import ProjectUpdate
 
@@ -30,10 +30,47 @@ class ProjectRepository:
         return self.db.scalar(statement)
 
     def list_for_user(self, user_id: int, *, include_inactive: bool = False) -> list[Project]:
-        statement = (
-            select(Project)
+        from_workspace_membership = (
+            select(Project.id.label("project_id"))
             .join(WorkspaceMember, WorkspaceMember.workspace_id == Project.workspace_id)
             .where(WorkspaceMember.user_id == user_id)
+        )
+        from_project_assignment = (
+            select(RoleAssignment.scope_id.label("project_id"))
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "project",
+                RoleAssignment.status == "active",
+                RoleAssignment.scope_id.is_not(None),
+            )
+        )
+        from_workspace_assignment = (
+            select(Project.id.label("project_id"))
+            .join(RoleAssignment, RoleAssignment.scope_id == Project.workspace_id)
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "workspace",
+                RoleAssignment.status == "active",
+            )
+        )
+        from_organization_assignment = (
+            select(Project.id.label("project_id"))
+            .join(Workspace, Workspace.id == Project.workspace_id)
+            .join(RoleAssignment, RoleAssignment.scope_id == Workspace.organization_id)
+            .where(
+                RoleAssignment.user_id == user_id,
+                RoleAssignment.scope_type == "organization",
+                RoleAssignment.status == "active",
+            )
+        )
+        project_ids = from_workspace_membership.union(
+            from_project_assignment,
+            from_workspace_assignment,
+            from_organization_assignment,
+        )
+        statement = (
+            select(Project)
+            .where(Project.id.in_(project_ids))
             .order_by(Project.created_at.desc())
         )
         if not include_inactive:

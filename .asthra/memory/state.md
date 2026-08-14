@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-15 (Core Invitations QA bug fix)
+Last updated: 2026-08-15 (Core Organization Templates Certification)
 
 ## Phase
 
@@ -8,6 +8,29 @@ Last updated: 2026-08-15 (Core Invitations QA bug fix)
 
 
 
+
+
+## Core Organization Templates Certification (added 2026-08-15)
+
+**Purpose**: Core Organization Templates were certified as a conservative organization setup mechanism that creates Core-owned structures and applies scoped defaults without touching module-owned records.
+
+**Confirmed flow**:
+- Template catalog is code-defined for startup, software team, healthcare, support desk, agency, and enterprise IT setups.
+- Preview is non-mutating and reports pending/skipped workspaces, projects, teams, feature flags, and configuration values.
+- Apply is idempotent by name within scope, creates only missing Core workspaces/projects/teams, applies organization-scoped feature flag overrides and configuration values, and skips existing structures.
+- Catalog/detail reads now require `settings.organization_templates.view` at platform scope or organization scope when `organization_id` is supplied.
+- Apply requires `settings.organization_templates.apply` for the target organization.
+- Unified Platform Context exposes compact `organization_templates` metadata.
+
+**Certification**:
+- Hardened `services/core-service/app/services/organization_templates.py` and `app/api/v1/organization_templates.py` so catalog/detail reads are permission-gated.
+- Updated the organization detail frontend template catalog query to request organization-scoped catalog access.
+- Added `services/core-service/tests/test_organization_templates_certification.py`.
+- Created `.asthra/reports/CORE_ORGANIZATION_TEMPLATES_CERTIFICATION.md`.
+
+**QA bug fix**: Added `/settings/organization-templates` and a Settings home link so authorized platform users and organization owners/admins can discover the catalog, preview templates, and apply them to selected organizations without requiring platform-scope authority. Workspace/project list visibility now honors inherited organization/workspace/project role assignments, so Organization Admin can see the assigned organization descendants needed for template QA without platform access.
+
+**Known gaps**: No full template builder UI, no rollback/versioning/history UI, preview is not yet a multi-step wizard, conflict detection is name-based, and v1 intentionally does not create Flow/Docs/Desk records.
 
 ## Core Invitations Certification (added 2026-08-15)
 
