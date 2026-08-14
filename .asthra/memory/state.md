@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-14 (Access Request certification)
+Last updated: 2026-08-14 (Feature Flags certification)
 
 ## Phase
 
@@ -8,6 +8,25 @@ Last updated: 2026-08-14 (Access Request certification)
 
 
 
+
+## Core Feature Flags Certification (added 2026-08-14)
+
+**Purpose**: Core Feature Flags were certified as scope-level availability controls. They remain distinct from RBAC permissions, which continue to decide whether a user can use an enabled feature.
+
+**Confirmed flow**:
+- Default flags are seeded idempotently by `FeatureFlagService.ensure_default_flags()`.
+- Effective flags resolve defaults plus platform and scoped overrides.
+- Inactive and unknown flags fail closed.
+- Override updates require `settings.feature_flags.manage` and bump context version.
+- Unified Platform Context exposes `feature_flags` and `enabled_modules`.
+- `/settings/feature-flags` consumes backend catalog/effective APIs and invalidates feature flag queries, platform context, and context version after toggles.
+
+**Certification**:
+- Added `services/core-service/tests/test_feature_flags_certification.py`.
+- Created `.asthra/reports/CORE_FEATURE_FLAGS_CERTIFICATION.md`.
+- `core.navigation_config.enabled` remains a system Core flag with default `false`; toggling it does not mutate role assignments or permission codes.
+
+**Known gaps**: Workspace/project override precedence is implemented but not the main QA target for this certification; manual browser QA is still needed for the Settings Feature Flags page and Navigation page refresh path.
 
 ## Core Access Request Certification (added 2026-08-14)
 
