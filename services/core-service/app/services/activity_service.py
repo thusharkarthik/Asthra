@@ -11,6 +11,7 @@ from app.schemas.activity_log import ActivityLogFilter
 
 class ActivityService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.activity_repository = ActivityRepository(db)
 
     def log_activity(
@@ -60,8 +61,11 @@ class ActivityService:
         current_user: User,
     ) -> list[ActivityLog]:
         self._ensure_active_user(current_user)
-        if not current_user.is_superuser and current_user.id != user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid activity access.")
+        if current_user.is_superuser:
+            return self.activity_repository.list_for_user(user_id, limit, offset)
+        if current_user.id == user_id:
+            return self.activity_repository.list_for_user(user_id, limit, offset, unscoped_only=True)
+        self._require_audit_permission(current_user, "platform", None)
         return self.activity_repository.list_for_user(user_id, limit, offset)
 
     def list_for_organization(
@@ -104,41 +108,39 @@ class ActivityService:
     def _ensure_filter_access(self, filters: ActivityLogFilter, user: User) -> None:
         if user.is_superuser:
             return
-        if filters.project_id is not None:
-            project = self.activity_repository.get_project(filters.project_id)
-            if project is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
-            self._ensure_workspace_access(project.workspace_id, user)
-        if filters.workspace_id is not None:
-            self._ensure_workspace_access(filters.workspace_id, user)
-        if filters.organization_id is not None:
-            self._ensure_organization_access(filters.organization_id, user)
-        if (
-            filters.project_id is None
-            and filters.workspace_id is None
-            and filters.organization_id is None
-            and filters.actor_user_id is not None
-            and filters.actor_user_id != user.id
-        ):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid activity access.")
+        scope_type, scope_id = self._scope_for_filters(filters)
+        self._require_audit_permission(user, scope_type, scope_id)
 
     def _ensure_activity_access(self, activity: ActivityLog, user: User) -> None:
         if user.is_superuser:
             return
+        if activity.actor_user_id == user.id and activity.project_id is None and activity.workspace_id is None and activity.organization_id is None:
+            return
+        scope_type, scope_id = self._scope_for_activity(activity)
+        self._require_audit_permission(user, scope_type, scope_id)
+
+    def _require_audit_permission(self, user: User, scope_type: str, scope_id: int | None) -> None:
+        from app.services.access_control_service import AccessControlService
+
+        AccessControlService(self.db).require(user, "guard.audit.view", scope_type, scope_id)
+
+    def _scope_for_filters(self, filters: ActivityLogFilter) -> tuple[str, int | None]:
+        if filters.project_id is not None:
+            return "project", filters.project_id
+        if filters.workspace_id is not None:
+            return "workspace", filters.workspace_id
+        if filters.organization_id is not None:
+            return "organization", filters.organization_id
+        return "platform", None
+
+    def _scope_for_activity(self, activity: ActivityLog) -> tuple[str, int | None]:
         if activity.project_id is not None:
-            project = self.activity_repository.get_project(activity.project_id)
-            if project is not None:
-                self._ensure_workspace_access(project.workspace_id, user)
-                return
+            return "project", activity.project_id
         if activity.workspace_id is not None:
-            self._ensure_workspace_access(activity.workspace_id, user)
-            return
+            return "workspace", activity.workspace_id
         if activity.organization_id is not None:
-            self._ensure_organization_access(activity.organization_id, user)
-            return
-        if activity.actor_user_id == user.id:
-            return
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid activity access.")
+            return "organization", activity.organization_id
+        return "platform", None
 
     def _ensure_workspace_access(self, workspace_id: int, user: User) -> None:
         workspace = self.activity_repository.get_workspace(workspace_id)

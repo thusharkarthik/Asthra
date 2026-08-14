@@ -34,9 +34,16 @@ class ActivityRepository:
         statement = statement.limit(filters.limit).offset(filters.offset)
         return list(self.db.scalars(statement).all())
 
-    def list_for_user(self, user_id: int, limit: int, offset: int) -> list[ActivityLog]:
-        filters = ActivityLogFilter(actor_user_id=user_id, limit=limit, offset=offset)
-        return self.list(filters)
+    def list_for_user(self, user_id: int, limit: int, offset: int, *, unscoped_only: bool = False) -> list[ActivityLog]:
+        statement = select(ActivityLog).where(ActivityLog.actor_user_id == user_id).order_by(ActivityLog.created_at.desc())
+        if unscoped_only:
+            statement = statement.where(
+                ActivityLog.organization_id.is_(None),
+                ActivityLog.workspace_id.is_(None),
+                ActivityLog.project_id.is_(None),
+            )
+        statement = statement.limit(limit).offset(offset)
+        return list(self.db.scalars(statement).all())
 
     def create(
         self,

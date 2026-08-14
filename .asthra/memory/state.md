@@ -1,6 +1,6 @@
 # Platform State
 
-Last updated: 2026-08-14 (Notifications certification)
+Last updated: 2026-08-14 (Audit Logs certification)
 
 ## Phase
 
@@ -8,6 +8,24 @@ Last updated: 2026-08-14 (Notifications certification)
 
 
 
+
+## Core Audit Logs Certification (added 2026-08-14)
+
+**Purpose**: Core Audit Logs were certified as traceability records for admin/security-relevant actions. Core stores these as `activity_logs`; Settings exposes them through `/settings/audit-logs`.
+
+**Confirmed flow**:
+- `ActivityService.log_activity(...)` writes actor, action, entity, scope, description, metadata, and timestamps.
+- Activity list/detail APIs expose newest-first logs with filters for action, entity type, actor, organization, workspace, project, limit, and offset.
+- Audit list/detail reads now require `guard.audit.view` for platform/org/workspace/project audit scopes.
+- Personal self-activity remains readable through the user activity path.
+- Existing producers cover organization/workspace/project lifecycle, several member/team/invitation flows, role/permission edits, API keys, notification read/delete, settings updates, and organization template apply.
+
+**Certification**:
+- Hardened `services/core-service/app/services/activity_service.py` so generic/scoped audit reads require `guard.audit.view`.
+- Added `services/core-service/tests/test_audit_logs_certification.py`.
+- Created `.asthra/reports/CORE_AUDIT_LOGS_CERTIFICATION.md` with producer coverage matrix and manual QA checklist.
+
+**Known gaps**: Auth login/logout, feature flag overrides, access request submit, navigation config edit, and configuration registry updates are not audited today. No central metadata redaction, retention policy, export UI/API, immutable append-only enforcement, or advanced search exists yet.
 
 ## Core Notifications Certification (added 2026-08-14)
 
