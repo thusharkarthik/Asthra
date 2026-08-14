@@ -1,10 +1,35 @@
 # Platform State
 
-Last updated: 2026-08-14 (API Keys certification)
+Last updated: 2026-08-15 (Core Invitations QA bug fix)
 
 ## Phase
 
 **Phase C Core — Enterprise Grade** — Policy Engine, Labels system, Global Search Registry (runtime), Organization Templates (UI), AI Context Registry (UI).
+
+
+
+
+## Core Invitations Certification (added 2026-08-15)
+
+**Purpose**: Core Invitations were certified as a membership and role-assignment entry point across platform, organization, and workspace scopes.
+
+**Confirmed flow**:
+- Invitation create requires `settings.member.invite` at platform, organization, or workspace scope based on payload.
+- New/unregistered emails create pending invitations with `token_urlsafe(32)` tokens and 7-day expiry.
+- Existing registered users are auto-accepted into organization/workspace scopes and receive membership plus `role_assignments` records.
+- Pending invitations support resend and cancel; cancelled/expired/accepted invites cannot be reused.
+- Token accept requires matching token, pending status, non-expired invite, and authenticated user email matching the invite email.
+- In-app accept skips token entry but still requires the authenticated same-email user.
+
+**Certification**:
+- Hardened `services/core-service/app/services/invitation_service.py` so invite role scope must match the actual invite scope at create and accept time.
+- Updated Settings invite UI to show only platform, organization, and workspace roles supported by the Core invitation API.
+- Added `services/core-service/tests/test_invitations_certification.py`.
+- Created `.asthra/reports/CORE_INVITATIONS_CERTIFICATION.md`.
+
+**Manual QA bug fix**: Invite create/accept now reactivate stale same-scope role assignments instead of inserting duplicate `role_assignments`, invite responses refresh before serialization, existing-user auto-accepted invites use non-actionable `invitation.accepted` notifications, in-app accept updates pending notifications, and invited-user decline is supported through `decline-in-app` without requiring member-cancel permissions. Browser recertification remains required.
+
+**Known gaps**: No email delivery, no public invite landing/signup flow, no dedicated invite inbox, no invite reject endpoint/admin approval workflow, no rate limiting/domain policy, no project/team invitation schema, and invite expiry status changes do not emit a dedicated activity event.
 
 
 

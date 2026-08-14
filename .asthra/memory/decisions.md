@@ -1,3 +1,21 @@
+
+## 2026-08-15 — Invitee Decline Is Separate From Admin Cancel/Revoke
+
+**Decision**: Invited users decline invitations through `POST /invitations/{id}/decline-in-app`. Admin cancellation remains `POST /invitations/{id}/revoke` and continues to require `settings.member.cancel` at invitation scope.
+
+**Why**: Decline is a self-service response by the invited email owner and must not require member-management permissions. Admin cancel is an administrative workflow and should remain permission-gated. Keeping separate endpoints avoids weakening `settings.member.cancel` while making notification Decline work for ordinary invited users.
+
+**How to apply**: Frontend invite notifications should call `accept-in-app` or `decline-in-app`. Settings invite management should continue using resend/revoke. Declined invites must not create membership or role assignments and cannot later be accepted.
+
+
+## 2026-08-15 — Invitation Roles Must Match Invitation Scope
+
+**Decision**: Core invitations may assign only roles whose declared role scope matches the invitation target scope. Platform invitations may assign platform roles, organization invitations may assign organization roles, and workspace invitations may assign workspace roles. Project/team roles are not assignable through the v1 invitation schema because invitations do not carry `project_id` or `team_id`.
+
+**Why**: Invitations create `role_assignments` during existing-user auto-accept and token/in-app acceptance. Allowing a role id from a different role scope creates inconsistent access records and can accidentally grant authority outside the intended scope model.
+
+**How to apply**: Add project/team invitation support only with explicit schema fields and backend scope resolution. Frontend role pickers for invitations must be generated from backend role records but filtered to role scopes supported by the invitation target. Backend remains authoritative and must reject invalid role/scope combinations even if the UI is bypassed.
+
 ## 2026-08-13 — Role Navigation Config Live Consumer Is Feature-Flagged And Self-Scoped
 
 **Decision**: The live sidebar may consume Role Navigation Config only behind `core.navigation_config.enabled`. The default false path must preserve the existing Core Navigation Registry -> Module Registry -> static fallback chain and must not fetch live role config. Users read live config through a self-scoped endpoint that only returns config for roles already present in their effective role list for the requested scope.

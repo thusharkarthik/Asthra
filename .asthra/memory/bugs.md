@@ -2,6 +2,20 @@
 
 ## Fixed
 
+### BUG-060 — Invitation Manual QA Showed Persisted Success With UI Error And Broken Invitee Actions [FIXED 2026-08-15]
+
+**Files**: `services/core-service/app/repositories/invitation_repository.py`, `services/core-service/app/services/invitation_service.py`, `services/core-service/app/api/v1/invitations.py`, `frontend/src/components/platform/notification-center.tsx`, `frontend/src/services/api/settings-api.ts`
+**Symptom**: Inviting from the UI persisted the invite and sent a notification, but the frontend showed Internal Server Error. Retrying showed the pending duplicate conflict. Member lists did not refresh because the frontend mutation went through `onError`. Invite notification Accept/Decline actions also failed.
+**Root cause**: Core logs showed `sqlite3.IntegrityError: UNIQUE constraint failed: role_assignments.user_id, role_assignments.role_id, role_assignments.scope_type, role_assignments.scope_id` from `InvitationRepository.add_memberships()` during `POST /api/v1/invitations`. The repository only checked for active role assignments before inserting, but the database uniqueness constraint also conflicts with inactive/stale rows for the same user/role/scope. Existing-user auto-accepted invites also emitted actionable `invitation.pending` notifications, and invitee Decline called the admin revoke endpoint that requires `settings.member.cancel`.
+**Fix**: Invitation membership assignment now reactivates an existing same user/role/scope assignment instead of inserting over inactive/stale rows, preventing persisted-success 500s. Invitation create/accept/cancel paths refresh the ORM record before response serialization. Existing-user auto-accepted invites emit `invitation.accepted`. In-app accept/decline update the invitee notification state. Added invitee-safe `POST /invitations/{id}/decline-in-app` and wired the frontend Notification Center to it.
+
+### BUG-059 — Invitation Role Scope Could Mismatch Invite Scope [FIXED 2026-08-15]
+
+**Files**: `services/core-service/app/services/invitation_service.py`, `frontend/src/components/settings/settings-admin-views.tsx`, `frontend/src/services/api/settings-api.ts`
+**Symptom**: The invitation API accepted a `role_id` without ensuring the role's declared scope matched the invitation target scope. A workspace invite could carry an organization/project/team role id, and an organization invite could carry a workspace/platform role id.
+**Root cause**: `InvitationService._ensure_role_allowed()` only checked platform-role authority. It did not validate `role.scope` against the computed invitation scope before `InvitationRepository.add_memberships()` wrote scoped `role_assignments`. The Settings invite modal also displayed non-platform roles broadly in scoped invite flows, including project/team roles unsupported by the invitation schema.
+**Fix**: Invitation create and accept now require role scope to match platform, organization, or workspace invitation scope. Token accept and in-app accept re-check stored invitations before assignment. The Settings invite modal now only shows role scopes supported by the invitation API, and the API client type accepts platform `organization_id: null` without an `any` cast.
+
 ### BUG-058 — PlatformContextProvider Re-Synced Workspace Store on Context Object Identity [FIXED 2026-07-13]
 
 **Files**: `frontend/src/context/platformContext.tsx`, `frontend/src/stores/workspace-store.ts`, `.asthra/reports/CORE_RBAC_CERTIFICATION.md`

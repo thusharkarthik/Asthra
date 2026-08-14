@@ -434,7 +434,7 @@ export const settingsApi = {
     return apiRequest<ApiKeyRecord>(`${CORE_PREFIX}/api-keys/${apiKeyId}/revoke`, { method: "POST", authToken: token });
   },
 
-  createInvitation(token: string, payload: { email: string; organization_id: number; workspace_id?: number | null; role_id?: number | null }) {
+  createInvitation(token: string, payload: { email: string; organization_id: number | null; workspace_id?: number | null; role_id?: number | null }) {
     return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations`, { method: "POST", authToken: token, json: payload });
   },
   listInvitations(token: string) {
@@ -448,6 +448,9 @@ export const settingsApi = {
   },
   acceptInvitationInApp(token: string, invitationId: number) {
     return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/accept-in-app`, { method: "POST", authToken: token });
+  },
+  declineInvitationInApp(token: string, invitationId: number) {
+    return apiRequest<InvitationRecord>(`${CORE_PREFIX}/invitations/${invitationId}/decline-in-app`, { method: "POST", authToken: token });
   },
   listNotifications(token: string) {
     return apiRequest<CoreNotificationRecord[]>(`${CORE_PREFIX}/notifications`, { method: "GET", authToken: token });

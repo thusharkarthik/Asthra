@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
+from app.models.notification import Notification
 from app.models.role import Role
 from app.models.user import RoleAssignment, User
 from app.repositories.invitation_repository import InvitationRepository
@@ -69,7 +70,7 @@ class InvitationService:
             )
 
         invited_user = self.repository.get_user_by_email(email)
-        self._ensure_role_allowed(invitation_create.role_id, current_user)
+        self._ensure_role_allowed(invitation_create.role_id, current_user, permission_scope_type)
         if invited_user is not None:
             if organization_id is None:
                 already_member = False
@@ -122,9 +123,9 @@ class InvitationService:
             role_name = role.name if role else "Member"
             NotificationService(self.db).create_notification(
                 user_id=invited_user.id,
-                type="invitation.pending",
-                title="Asthra invitation",
-                message=f"You have been invited to Asthra as {role_name}.",
+                type="invitation.accepted",
+                title="Asthra invitation accepted",
+                message=f"You have been added to Asthra as {role_name}.",
                 organization_id=invitation.organization_id,
                 workspace_id=invitation.workspace_id,
                 entity_type="invitation",
@@ -132,6 +133,7 @@ class InvitationService:
             )
         ContextVersionService(self.db).bump_access(permission_scope_type, permission_scope_id)
         self.db.commit()
+        self.db.refresh(invitation)
         return invitation
 
     def list(self, current_user: User) -> list[Invitation]:
@@ -167,6 +169,7 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation has expired.")
         if current_user.email.lower() != invitation.email.lower():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation email does not match user.")
+        self._ensure_invitation_role_matches_scope(invitation)
 
         if invitation.organization_id is None:
             self._assign_platform_role(invitation.role_id, current_user.id, invitation.invited_by_id)
@@ -194,8 +197,10 @@ class InvitationService:
             entity_type="invitation",
             entity_id=str(invitation.id),
         )
+        self._update_invitee_invitation_notification(invitation, current_user.id, "accepted")
         self._bump_invitation_scope(invitation)
         self.db.commit()
+        self.db.refresh(invitation)
         return invitation
 
     def accept_in_app(self, invitation_id: int, current_user: User) -> Invitation:
@@ -211,6 +216,7 @@ class InvitationService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation has expired.")
         if current_user.email.lower() != invitation.email.lower():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation email does not match user.")
+        self._ensure_invitation_role_matches_scope(invitation)
 
         if invitation.organization_id is None:
             self._assign_platform_role(invitation.role_id, current_user.id, invitation.invited_by_id)
@@ -238,8 +244,51 @@ class InvitationService:
             entity_type="invitation",
             entity_id=str(invitation.id),
         )
+        self._update_invitee_invitation_notification(invitation, current_user.id, "accepted")
         self._bump_invitation_scope(invitation)
         self.db.commit()
+        self.db.refresh(invitation)
+        return invitation
+
+    def decline_in_app(self, invitation_id: int, current_user: User) -> Invitation:
+        """Decline a pending invitation as the invited user without member-management permissions."""
+        self._ensure_active_user(current_user)
+        invitation = self.repository.get_by_id(invitation_id)
+        if invitation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found.")
+        if invitation.status != "pending":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation is not pending.")
+        if self._as_aware_utc(invitation.expires_at) < datetime.now(timezone.utc):
+            self.repository.update_status(invitation, "expired")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitation has expired.")
+        if current_user.email.lower() != invitation.email.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation email does not match user.")
+
+        invitation = self.repository.update_status(invitation, "declined")
+        actor_name = current_user.full_name or current_user.email
+        ActivityService(self.db).log_activity(
+            actor_user_id=current_user.id,
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+            action="member.invitation_declined",
+            description=f"{actor_name} declined an invitation.",
+        )
+        NotificationService(self.db).create_notification(
+            user_id=invitation.invited_by_id,
+            type="invitation.declined",
+            title="Invitation declined",
+            message=f"{current_user.email} declined an invitation.",
+            organization_id=invitation.organization_id,
+            workspace_id=invitation.workspace_id,
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+        )
+        self._update_invitee_invitation_notification(invitation, current_user.id, "declined")
+        self._bump_invitation_scope(invitation)
+        self.db.commit()
+        self.db.refresh(invitation)
         return invitation
 
     def revoke(self, invitation_id: int, current_user: User) -> Invitation:
@@ -269,6 +318,7 @@ class InvitationService:
         )
         self._bump_invitation_scope(invitation)
         self.db.commit()
+        self.db.refresh(invitation)
         return invitation
 
     def resend(self, invitation_id: int, current_user: User) -> Invitation:
@@ -338,12 +388,17 @@ class InvitationService:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
 
-    def _ensure_role_allowed(self, role_id: int | None, current_user: User) -> None:
+    def _ensure_role_allowed(self, role_id: int | None, current_user: User, scope_type: str) -> None:
         if role_id is None:
             return
         role = self.db.get(Role, role_id)
         if role is None or not role.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
+        if role.scope != scope_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{role.scope.title()} roles cannot be assigned at {scope_type} scope.",
+            )
         if role.scope != "platform" or current_user.is_superuser:
             return
         platform_assignment = (
@@ -360,6 +415,43 @@ class InvitationService:
         )
         if platform_assignment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only platform owners or admins can assign platform roles.")
+
+    def _ensure_invitation_role_matches_scope(self, invitation: Invitation) -> None:
+        if invitation.role_id is None:
+            return
+        role = self.db.get(Role, invitation.role_id)
+        if role is None or not role.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
+        if invitation.organization_id is None:
+            scope_type = "platform"
+        elif invitation.workspace_id is not None:
+            scope_type = "workspace"
+        else:
+            scope_type = "organization"
+        if role.scope != scope_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{role.scope.title()} roles cannot be assigned at {scope_type} scope.",
+            )
+
+    def _update_invitee_invitation_notification(self, invitation: Invitation, user_id: int, result: str) -> None:
+        notification = (
+            self.db.query(Notification)
+            .filter(
+                Notification.user_id == user_id,
+                Notification.type == "invitation.pending",
+                Notification.entity_type == "invitation",
+                Notification.entity_id == str(invitation.id),
+            )
+            .first()
+        )
+        if notification is None:
+            return
+        notification.type = f"invitation.{result}"
+        notification.title = f"Invitation {result}"
+        notification.message = f"You {result} the Asthra invitation."
+        notification.is_read = True
+        notification.read_at = datetime.now(timezone.utc)
 
     def _require_invitation_manage(self, invitation: Invitation, current_user: User, permission_code: str) -> None:
         if invitation.organization_id is None:
